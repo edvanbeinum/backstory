@@ -1,0 +1,361 @@
+@import "tailwindcss";
+
+/*
+ * GitHub Primer tokens. The brief is "look like the GitHub UI", so these are
+ * Primer's actual values rather than an approximation — close-but-not-quite
+ * reads as uncanny sitting next to the real thing in another tab.
+ */
+:root {
+  --canvas: #ffffff;
+  --canvas-subtle: #f6f8fa;
+  --canvas-inset: #f6f8fa;
+  --border: #d1d9e0;
+  --border-muted: #d1d9e0b3;
+  --fg: #1f2328;
+  --fg-muted: #59636e;
+  --fg-subtle: #818b98;
+  --accent: #0969da;
+  --accent-subtle: #ddf4ff;
+  --success: #1a7f37;
+  --danger: #d1242f;
+  --attention: #9a6700;
+  --done: #8250df;
+
+  --diff-add-bg: #e6ffec;
+  --diff-add-num-bg: #ccffd8;
+  --diff-del-bg: #ffebe9;
+  --diff-del-num-bg: #ffd7d5;
+  --diff-hunk-bg: #f6f8fa;
+  --diff-hunk-fg: #59636e;
+
+  --overlay-shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
+
+  color-scheme: light;
+}
+
+/* Dark values live in a mixin-ish block applied by both the media query and
+   the explicit data-theme override, so the toggle wins in either direction. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #0d1117;
+    --canvas-subtle: #151b23;
+    --canvas-inset: #010409;
+    --border: #3d444d;
+    --border-muted: #3d444db3;
+    --fg: #f0f6fc;
+    --fg-muted: #9198a1;
+    --fg-subtle: #6e7681;
+    --accent: #4493f8;
+    --accent-subtle: #121d2f;
+    --success: #3fb950;
+    --danger: #f85149;
+    --attention: #d29922;
+    --done: #ab7df8;
+
+    --diff-add-bg: rgba(46, 160, 67, 0.15);
+    --diff-add-num-bg: rgba(46, 160, 67, 0.3);
+    --diff-del-bg: rgba(248, 81, 73, 0.15);
+    --diff-del-num-bg: rgba(248, 81, 73, 0.3);
+    --diff-hunk-bg: #151b23;
+    --diff-hunk-fg: #9198a1;
+
+    --overlay-shadow: 0 8px 24px rgba(1, 4, 9, 0.8);
+
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --canvas: #0d1117;
+  --canvas-subtle: #151b23;
+  --canvas-inset: #010409;
+  --border: #3d444d;
+  --border-muted: #3d444db3;
+  --fg: #f0f6fc;
+  --fg-muted: #9198a1;
+  --fg-subtle: #6e7681;
+  --accent: #4493f8;
+  --accent-subtle: #121d2f;
+  --success: #3fb950;
+  --danger: #f85149;
+  --attention: #d29922;
+  --done: #ab7df8;
+
+  --diff-add-bg: rgba(46, 160, 67, 0.15);
+  --diff-add-num-bg: rgba(46, 160, 67, 0.3);
+  --diff-del-bg: rgba(248, 81, 73, 0.15);
+  --diff-del-num-bg: rgba(248, 81, 73, 0.3);
+  --diff-hunk-bg: #151b23;
+  --diff-hunk-fg: #9198a1;
+
+  --overlay-shadow: 0 8px 24px rgba(1, 4, 9, 0.8);
+
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-canvas-subtle: var(--canvas-subtle);
+  --color-canvas-inset: var(--canvas-inset);
+  --color-bd: var(--border);
+  --color-bd-muted: var(--border-muted);
+  --color-fg: var(--fg);
+  --color-fg-muted: var(--fg-muted);
+  --color-fg-subtle: var(--fg-subtle);
+  --color-accent: var(--accent);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-success: var(--success);
+  --color-danger: var(--danger);
+  --color-attention: var(--attention);
+  --color-done: var(--done);
+}
+
+html {
+  background: var(--canvas);
+}
+
+body {
+  background: var(--canvas);
+  color: var(--fg);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica,
+    Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji";
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.mono {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+/* Shiki emits both themes as custom properties on every token; pick one. */
+.diff-code span {
+  color: var(--shiki-light);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .diff-code span {
+    color: var(--shiki-dark);
+  }
+}
+:root[data-theme="dark"] .diff-code span {
+  color: var(--shiki-dark);
+}
+:root[data-theme="light"] .diff-code span {
+  color: var(--shiki-light);
+}
+
+/* --- Diff table ------------------------------------------------------- */
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 20px;
+  tab-size: 4;
+}
+
+.diff-num {
+  width: 1%;
+  min-width: 50px;
+  padding: 0 10px;
+  text-align: right;
+  color: var(--fg-subtle);
+  vertical-align: top;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.diff-marker {
+  width: 1%;
+  min-width: 22px;
+  padding-left: 10px;
+  color: var(--fg-subtle);
+  vertical-align: top;
+  user-select: none;
+}
+
+.diff-code {
+  padding: 0 10px 0 4px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+
+tr.line-add .diff-code,
+tr.line-add .diff-marker {
+  background: var(--diff-add-bg);
+}
+tr.line-add .diff-num {
+  background: var(--diff-add-num-bg);
+  color: var(--fg-muted);
+}
+tr.line-del .diff-code,
+tr.line-del .diff-marker {
+  background: var(--diff-del-bg);
+}
+tr.line-del .diff-num {
+  background: var(--diff-del-num-bg);
+  color: var(--fg-muted);
+}
+
+tr.line-hunk td {
+  background: var(--diff-hunk-bg);
+  color: var(--diff-hunk-fg);
+  padding: 4px 10px;
+  border-top: 1px solid var(--border-muted);
+  border-bottom: 1px solid var(--border-muted);
+}
+
+tr.line-anchored .diff-code {
+  box-shadow: inset 3px 0 0 var(--attention);
+}
+
+/* --- Markdown in review comments -------------------------------------- */
+
+.md {
+  font-size: 14px;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+.md > *:first-child {
+  margin-top: 0;
+}
+.md > *:last-child {
+  margin-bottom: 0;
+}
+.md p,
+.md ul,
+.md ol,
+.md blockquote,
+.md pre,
+.md table {
+  margin: 0 0 12px;
+}
+.md ul,
+.md ol {
+  padding-left: 2em;
+}
+.md ul {
+  list-style: disc;
+}
+.md ol {
+  list-style: decimal;
+}
+.md li + li {
+  margin-top: 4px;
+}
+.md h1,
+.md h2,
+.md h3,
+.md h4 {
+  margin: 20px 0 12px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+.md h1 {
+  font-size: 1.4em;
+}
+.md h2 {
+  font-size: 1.2em;
+}
+.md h3 {
+  font-size: 1.05em;
+}
+.md strong {
+  font-weight: 600;
+}
+.md em {
+  font-style: italic;
+}
+.md a {
+  color: var(--accent);
+  text-decoration: none;
+}
+.md a:hover {
+  text-decoration: underline;
+}
+.md code {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 85%;
+  padding: 0.2em 0.4em;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--fg-muted) 14%, transparent);
+}
+.md pre {
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: 6px;
+  background: var(--canvas-subtle);
+  border: 1px solid var(--border-muted);
+}
+.md pre code {
+  padding: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.md blockquote {
+  padding-left: 12px;
+  border-left: 3px solid var(--border);
+  color: var(--fg-muted);
+}
+.md table {
+  border-collapse: collapse;
+  display: block;
+  overflow-x: auto;
+}
+.md th,
+.md td {
+  border: 1px solid var(--border);
+  padding: 6px 12px;
+}
+.md th {
+  background: var(--canvas-subtle);
+  font-weight: 600;
+}
+.md hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+.md img {
+  max-width: 100%;
+}
+
+/* --- Misc ------------------------------------------------------------- */
+
+.thin-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.thin-scroll::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 6px;
+  border: 3px solid var(--canvas);
+}
+.thin-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@keyframes flashfade {
+  from {
+    background: var(--accent-subtle);
+  }
+  to {
+    background: transparent;
+  }
+}
+.flash {
+  animation: flashfade 1.4s ease-out;
+}
