@@ -25,6 +25,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const repoPath = searchParams.get("repo");
   const rev = searchParams.get("rev");
+  // Optional: scope the diff to particular paths. The comment view renders
+  // one file, so shipping the whole 13-file diff to show it would be waste.
+  // Renames send both names, as in /api/file.
+  const paths = searchParams.getAll("path").filter(Boolean);
+  const pathspec = paths.length > 0 ? paths : undefined;
 
   if (!repoPath || !rev) {
     return NextResponse.json<ApiError>(
@@ -39,7 +44,9 @@ export async function GET(request: Request) {
     let patch: string;
     if (rev === WORKING_REV) {
       const working = await getWorkingTree(repo);
-      patch = await getWorkingPatch(repo.root, working.untrackedPaths);
+      patch = await getWorkingPatch(repo.root, working.untrackedPaths, {
+        pathspec,
+      });
     } else if (rev === BRANCH_REV) {
       // The combined branch diff: fork point (or push boundary) → HEAD.
       // The PR's base branch decides the fork — on a stacked PR that's the
@@ -56,7 +63,9 @@ export async function GET(request: Request) {
           { status: 404 },
         );
       }
-      patch = await getRangePatch(repo.root, info.baseSha, "HEAD");
+      patch = await getRangePatch(repo.root, info.baseSha, "HEAD", {
+        pathspec,
+      });
     } else {
       const sha = await resolveRev(repo.root, rev);
       if (!sha) {
@@ -69,6 +78,7 @@ export async function GET(request: Request) {
         repo.root,
         sha,
         await isMergeCommit(repo.root, sha),
+        { pathspec },
       );
     }
 

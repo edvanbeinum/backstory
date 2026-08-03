@@ -3,21 +3,32 @@
 import { useMemo, useState } from "react";
 
 import type { ReviewThread } from "@/lib/types";
-import { CheckIcon, CommentIcon, DotFillIcon, PinIcon } from "./icons";
+import { CheckIcon, CommentIcon, PencilIcon, PinIcon } from "./icons";
 
 type Filter = "open" | "all";
 
-export function ThreadRail({
+/**
+ * The comments rail — the app's primary list.
+ *
+ * differ began commit-first, with review comments as a second parallel list
+ * underneath. In practice the comment is the thing you work on and commits
+ * are how you answer it, so this leads and the commit list sits behind a
+ * toggle.
+ *
+ * Each row answers the two questions you actually have: what does it say, and
+ * has anything answered it yet.
+ */
+export function CommentList({
   threads,
-  anchoredIds,
-  focusedThreadId,
-  onFocus,
+  selectedId,
+  onSelect,
+  workingPaths,
 }: {
   threads: ReviewThread[];
-  /** Thread ids that land on a line of the diff currently on screen */
-  anchoredIds: Set<string>;
-  focusedThreadId: string | null;
-  onFocus: (thread: ReviewThread) => void;
+  selectedId: string | null;
+  onSelect: (thread: ReviewThread) => void;
+  /** Paths the working tree touches, for the "uncommitted" answer state */
+  workingPaths: Set<string>;
 }) {
   const [filter, setFilter] = useState<Filter>("open");
 
@@ -27,6 +38,8 @@ export function ThreadRail({
     [threads, filter],
   );
 
+  // Threads cluster on a handful of files, so the file heading is worth
+  // keeping — it's grouping, not a second hierarchy to navigate.
   const byFile = useMemo(() => {
     const groups = new Map<string, ReviewThread[]>();
     for (const thread of visible) {
@@ -36,26 +49,33 @@ export function ThreadRail({
     return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
   }, [visible]);
 
-  if (threads.length === 0) return null;
+  if (threads.length === 0) {
+    return (
+      <p className="px-3 py-4 text-[12px] text-[var(--fg-muted)]">
+        No review comments on this pull request yet.
+      </p>
+    );
+  }
 
   return (
-    <nav aria-label="Review threads" className="border-t border-[var(--border)]">
+    <nav aria-label="Review comments">
       <div className="flex items-center gap-2 px-3 pb-1.5 pt-3">
         <h2 className="flex-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-muted)]">
-          Review threads
+          {threads.length} {threads.length === 1 ? "comment" : "comments"}
+          {openCount > 0 && ` · ${openCount} open`}
         </h2>
         <button
           type="button"
           onClick={() => setFilter(filter === "open" ? "all" : "open")}
           className="text-[11px] text-[var(--accent)] hover:underline"
         >
-          {filter === "open" ? `${openCount} open` : `all ${threads.length}`}
+          {filter === "open" ? "show all" : "open only"}
         </button>
       </div>
 
       {visible.length === 0 ? (
         <p className="px-3 py-2 text-[12px] text-[var(--fg-muted)]">
-          Every thread is resolved.
+          Every comment is resolved.
         </p>
       ) : (
         byFile.map(([file, group]) => (
@@ -69,33 +89,27 @@ export function ThreadRail({
             <ul>
               {group.map((thread) => {
                 const first = thread.comments[0];
-                const anchored = anchoredIds.has(thread.id);
                 return (
                   <li key={thread.id}>
                     <button
                       type="button"
-                      onClick={() => onFocus(thread)}
-                      className={`flex w-full items-start gap-2 border-l-2 px-3 py-1.5 text-left transition-colors ${
-                        focusedThreadId === thread.id
-                          ? "border-[var(--attention)] bg-[var(--accent-subtle)]"
+                      onClick={() => onSelect(thread)}
+                      aria-current={
+                        selectedId === thread.id ? "true" : undefined
+                      }
+                      className={`flex w-full items-start gap-2 border-l-2 px-3 py-2 text-left transition-colors ${
+                        selectedId === thread.id
+                          ? "border-[var(--accent)] bg-[var(--accent-subtle)]"
                           : "border-transparent hover:bg-[var(--canvas-subtle)]"
                       }`}
                     >
                       <span className="mt-[3px] shrink-0">
                         {thread.isResolved ? (
-                          <CheckIcon
-                            size={12}
-                            className="text-[var(--done)]"
-                          />
-                        ) : anchored ? (
-                          <DotFillIcon
-                            size={12}
-                            className="text-[var(--attention)]"
-                          />
+                          <CheckIcon size={12} className="text-[var(--done)]" />
                         ) : (
                           <CommentIcon
                             size={12}
-                            className="text-[var(--fg-subtle)]"
+                            className="text-[var(--attention)]"
                           />
                         )}
                       </span>
@@ -105,12 +119,14 @@ export function ThreadRail({
                         </span>
                         <span className="flex flex-wrap items-center gap-x-1 text-[11px] text-[var(--fg-muted)]">
                           <span>{first?.author}</span>
-                          {thread.line != null && <span>· line {thread.line}</span>}
-                          {anchored && <span>· in this diff</span>}
+                          {thread.line != null && (
+                            <span>· line {thread.line}</span>
+                          )}
                         </span>
-                        {/* Which commit this thread's reply will link to —
-                            solid when pinned, dimmed when inferred. */}
-                        <ReplyTarget thread={thread} />
+                        <AnswerState
+                          thread={thread}
+                          workingPaths={workingPaths}
+                        />
                       </span>
                     </button>
                   </li>
@@ -125,12 +141,17 @@ export function ThreadRail({
 }
 
 /**
- * The commit a thread's reply will link to, shown on its rail row: a pin
- * reads as decided, an inferred commit as a guess, and neither as an open
- * question — which is the whole point of showing it here rather than only
- * inside the composer.
+ * What currently answers this comment — a pin reads as decided, an inferred
+ * commit as a guess, uncommitted work as in progress, and nothing as an open
+ * item. Showing it on the row turns the list into a checklist.
  */
-function ReplyTarget({ thread }: { thread: ReviewThread }) {
+export function AnswerState({
+  thread,
+  workingPaths,
+}: {
+  thread: ReviewThread;
+  workingPaths: Set<string>;
+}) {
   if (thread.pinnedSha && thread.pinnedShaMissing) {
     return (
       <span className="flex items-center gap-1 text-[11px] text-[var(--attention)]">
@@ -151,6 +172,16 @@ function ReplyTarget({ thread }: { thread: ReviewThread }) {
       </span>
     );
   }
+  // Uncommitted work on the comment's file is the most current answer there
+  // is, even though it has no sha to link to yet.
+  if (thread.path && workingPaths.has(thread.path)) {
+    return (
+      <span className="flex items-center gap-1 text-[11px] text-[var(--attention)]">
+        <PencilIcon size={10} />
+        <span>uncommitted work</span>
+      </span>
+    );
+  }
   if (thread.addressedBySha) {
     return (
       <span className="flex items-center gap-1 text-[11px] text-[var(--fg-subtle)]">
@@ -160,12 +191,12 @@ function ReplyTarget({ thread }: { thread: ReviewThread }) {
     );
   }
   return (
-    <span className="text-[11px] text-[var(--fg-subtle)]">→ unlinked</span>
+    <span className="text-[11px] text-[var(--fg-subtle)]">unanswered</span>
   );
 }
 
 /** Enough markdown stripping for a one-line preview. */
-function stripMarkdown(body: string): string {
+export function stripMarkdown(body: string): string {
   return body
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`([^`]*)`/g, "$1")

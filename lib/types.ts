@@ -109,6 +109,12 @@ export interface WorkingTreeInfo {
   untracked: number;
   /** Paths of untracked files, needed to synthesise their diffs */
   untrackedPaths: string[];
+  /**
+   * Every path the working tree touches, tracked and untracked. Lets the
+   * comment view decide whether uncommitted work answers a given comment
+   * without asking the server a second time.
+   */
+  changedPaths: string[];
 }
 
 export interface ReviewComment {

@@ -10,9 +10,18 @@ import type { CommitSummary } from "./types";
  * statically prerendered client component, and `useSearchParams` would drag it
  * into a Suspense boundary for no benefit here.
  */
+/** Which list the rail is showing. Comments is the default. */
+export type RailMode = "comments" | "commits";
+
 export interface UrlState {
   repo: string | null;
   rev: string | null;
+  /** Rail mode; null means the default (comments) */
+  mode: RailMode | null;
+  /** Selected review thread id, in comments mode */
+  comment: string | null;
+  /** Source chip override for the comment's diff: a rev, working, or branch */
+  src: string | null;
 }
 
 /** Pure half of readUrlState, so it can be tested without a DOM. */
@@ -20,19 +29,37 @@ export function parseUrlState(search: string): UrlState {
   const params = new URLSearchParams(search);
   const repo = params.get("repo")?.trim();
   const rev = params.get("rev")?.trim();
+  const mode = params.get("mode")?.trim();
+  const comment = params.get("comment")?.trim();
+  const src = params.get("src")?.trim();
 
   return {
     repo: repo ? repo : null,
     rev: rev ? rev : null,
+    // Anything other than the two known modes is treated as absent rather
+    // than trusted into state.
+    mode: mode === "comments" || mode === "commits" ? mode : null,
+    comment: comment ? comment : null,
+    src: src ? src : null,
   };
 }
 
-export function buildUrl(state: UrlState, pathname = "/"): string {
+export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
   const params = new URLSearchParams();
   if (state.repo) params.set("repo", state.repo);
+  // Only the non-default mode is worth spelling out.
+  if (state.mode === "commits") params.set("mode", "commits");
+
+  // Each param is emitted independently of mode, so a link carries where you
+  // were in *both* lists — toggling back to Commits returns you to the commit
+  // you were reading rather than resetting it.
+  //
   // `working` is the default landing spot; leaving it out keeps the common
   // URL short, and a missing rev falls back to it anyway.
   if (state.rev && state.rev !== WORKING_REV) params.set("rev", state.rev);
+  if (state.comment) params.set("comment", state.comment);
+  // The source chip is auto-picked, so it only appears once overridden.
+  if (state.src) params.set("src", state.src);
 
   // URLSearchParams percent-encodes slashes, which turns every repo path into
   // an unreadable %2F soup. A slash is legal unencoded in a query string, and
@@ -43,8 +70,16 @@ export function buildUrl(state: UrlState, pathname = "/"): string {
   return `${pathname}${query ? `?${query}` : ""}`;
 }
 
+const EMPTY_STATE: UrlState = {
+  repo: null,
+  rev: null,
+  mode: null,
+  comment: null,
+  src: null,
+};
+
 export function readUrlState(): UrlState {
-  if (typeof window === "undefined") return { repo: null, rev: null };
+  if (typeof window === "undefined") return EMPTY_STATE;
   return parseUrlState(window.location.search);
 }
 
@@ -61,6 +96,35 @@ export function writeUrlState(state: UrlState) {
   if (next !== current) {
     window.history.replaceState(null, "", next);
   }
+}
+
+export interface CommentResolution {
+  commentId: string | null;
+  /** The requested id, when it's no longer in the PR */
+  notice: string | null;
+}
+
+/**
+ * Decide which comment to show, given what a URL (or the previous session)
+ * asked for and what threads the PR actually has.
+ *
+ * A thread can vanish — deleted, or the branch now matches a different PR —
+ * so a stale `?comment=` falls back to the first open thread and says so,
+ * the same way resolveRev handles a rev that has gone. Falling back to *open*
+ * rather than merely first matches the workflow: the list is a to-do.
+ */
+export function resolveComment(
+  requested: string | null,
+  threads: Array<{ id: string; isResolved: boolean }>,
+): CommentResolution {
+  const fallback =
+    threads.find((t) => !t.isResolved)?.id ?? threads[0]?.id ?? null;
+
+  if (!requested) return { commentId: fallback, notice: null };
+  if (threads.some((t) => t.id === requested)) {
+    return { commentId: requested, notice: null };
+  }
+  return { commentId: fallback, notice: requested };
 }
 
 export interface RevResolution {

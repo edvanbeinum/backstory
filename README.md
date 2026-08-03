@@ -113,6 +113,24 @@ one diff against the default branch, with commit/file/line totals — GitHub's
 often better than per-commit, since the combined diff shows the final state
 of every line.
 
+**The rail has two modes.** *Comments* is the default: a checklist of the
+PR's review comments, each showing what currently answers it — a pinned
+commit, an inferred one, uncommitted work, or nothing yet. Selecting one puts
+the comment and its reply box at the top of the page, with the change that
+answers it below, scoped to that comment's file.
+
+Which change gets shown is auto-picked, with chips to override:
+
+```
+Answered by  ( ◍ Uncommitted )  ( 26ef8f7 )  ( ⧉ All changes )
+```
+
+Uncommitted leads when your working tree touches the comment's file — that's
+where you are when you glance at a comment mid-fix, before committing.
+Otherwise the pinned or inferred commit, otherwise the whole branch diff.
+
+*Commits* is the other mode, and is the pre-push self-review view:
+
 **Left rail** — every commit between your branch tip and what's on the remote,
 with uncommitted work pinned at the top as a pseudo-commit. The push boundary
 line marks what GitHub has; below it, the last 30 already-pushed commits

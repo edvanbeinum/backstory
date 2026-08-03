@@ -3,7 +3,12 @@ import { test } from "node:test";
 
 import { WORKING_REV } from "../lib/constants";
 import type { CommitSummary } from "../lib/types";
-import { buildUrl, parseUrlState, resolveRev } from "../lib/url";
+import {
+  buildUrl,
+  parseUrlState,
+  resolveComment,
+  resolveRev,
+} from "../lib/url";
 
 function commit(sha: string): CommitSummary {
   return {
@@ -54,9 +59,89 @@ test("omits the default rev to keep the common URL short", () => {
   );
 });
 
+const EMPTY = {
+  repo: null,
+  rev: null,
+  mode: null,
+  comment: null,
+  src: null,
+};
+
 test("an empty query yields nulls, not empty strings", () => {
-  assert.deepEqual(parseUrlState(""), { repo: null, rev: null });
-  assert.deepEqual(parseUrlState("?repo=&rev=  "), { repo: null, rev: null });
+  assert.deepEqual(parseUrlState(""), EMPTY);
+  assert.deepEqual(parseUrlState("?repo=&rev=  &comment=&src="), EMPTY);
+});
+
+test("mode round-trips, and only the non-default one is written", () => {
+  assert.equal(parseUrlState("?mode=commits").mode, "commits");
+  assert.equal(parseUrlState("?mode=comments").mode, "comments");
+  // An unknown mode is treated as absent rather than trusted into state
+  assert.equal(parseUrlState("?mode=nonsense").mode, null);
+
+  assert.match(buildUrl({ repo: "/r", mode: "commits" }), /mode=commits/);
+  assert.doesNotMatch(buildUrl({ repo: "/r", mode: "comments" }), /mode=/);
+});
+
+test("a link carries your place in both lists", () => {
+  const url = buildUrl({
+    repo: "/r",
+    mode: "commits",
+    rev: "abc1234",
+    comment: "PRRT_abc",
+  });
+  const parsed = parseUrlState(new URL(url, "http://x").search);
+
+  // Toggling back to comments should not have lost the selected comment
+  assert.equal(parsed.rev, "abc1234");
+  assert.equal(parsed.comment, "PRRT_abc");
+});
+
+test("the source chip only appears once overridden", () => {
+  assert.doesNotMatch(buildUrl({ repo: "/r", comment: "PRRT_abc" }), /src=/);
+  assert.match(
+    buildUrl({ repo: "/r", comment: "PRRT_abc", src: "working" }),
+    /src=working/,
+  );
+});
+
+test("a comment id resolves, falling back to the first OPEN thread", () => {
+  const threads = [
+    { id: "resolved-one", isResolved: true },
+    { id: "open-one", isResolved: false },
+    { id: "open-two", isResolved: false },
+  ];
+
+  // A known id is honoured, resolved or not
+  assert.deepEqual(resolveComment("resolved-one", threads), {
+    commentId: "resolved-one",
+    notice: null,
+  });
+
+  // Nothing requested → first open, not merely first
+  assert.deepEqual(resolveComment(null, threads), {
+    commentId: "open-one",
+    notice: null,
+  });
+
+  // A stale id falls back and reports what was asked for
+  assert.deepEqual(resolveComment("gone-thread", threads), {
+    commentId: "open-one",
+    notice: "gone-thread",
+  });
+});
+
+test("comment resolution copes with all-resolved and empty PRs", () => {
+  const allResolved = [{ id: "only", isResolved: true }];
+  assert.equal(resolveComment(null, allResolved).commentId, "only");
+
+  assert.deepEqual(resolveComment(null, []), {
+    commentId: null,
+    notice: null,
+  });
+  assert.deepEqual(resolveComment("gone", []), {
+    commentId: null,
+    notice: "gone",
+  });
 });
 
 test("a short sha from a hand-typed URL resolves to the full one", () => {

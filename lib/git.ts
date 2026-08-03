@@ -546,6 +546,7 @@ export async function getWorkingTree(repo: RepoInfo): Promise<WorkingTreeInfo> {
     unstaged: 0,
     untracked: 0,
     untrackedPaths: [],
+    changedPaths: [],
   };
   if (!out) return info;
 
@@ -561,11 +562,19 @@ export async function getWorkingTree(repo: RepoInfo): Promise<WorkingTreeInfo> {
     if (x === "?" && y === "?") {
       info.untracked++;
       info.untrackedPaths.push(filePath);
+      info.changedPaths.push(filePath);
       continue;
     }
 
-    // Renames and copies carry a second NUL-separated path; skip over it.
-    if (x === "R" || x === "C") i++;
+    info.changedPaths.push(filePath);
+
+    // Renames and copies carry a second NUL-separated path: the entry's own
+    // path is the destination and the next field is the source. Both count
+    // as touched, so a comment on either name matches.
+    if (x === "R" || x === "C") {
+      const source = entries[++i];
+      if (source) info.changedPaths.push(source);
+    }
 
     if (x !== " " && x !== "?") info.staged++;
     if (y !== " " && y !== "?") info.unstaged++;
