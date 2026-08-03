@@ -143,6 +143,14 @@ export interface ReviewThread {
    * so blame answers "who wrote this line", not "who responded to this".
    */
   addressedBySha?: string | null;
+  /** A commit the user pinned to this thread. Beats addressedBySha. */
+  pinnedSha?: string | null;
+  /**
+   * True when `pinnedSha` no longer exists on the branch — usually a rebase
+   * rewrote it. The pin is kept (not silently dropped) and the UI asks for
+   * a re-pin rather than quietly reverting to the guess.
+   */
+  pinnedShaMissing?: boolean;
 }
 
 export interface ReviewSummary {

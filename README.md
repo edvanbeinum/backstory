@@ -125,6 +125,24 @@ anchor **inline, on the line they were written against**, so "did this change
 actually answer the review?" is a glance rather than a memory test. `j`/`k`
 move through commits.
 
+## Linking threads to commits
+
+Each thread's reply links to a commit. differ guesses — the newest branch
+commit that touched the thread's file — and shows that guess on the thread's
+rail row (`→ 26ef8f7`). When the guess is wrong, **pin** the right commit from
+the reply box and it sticks: pinned threads always propose that commit, no
+matter which one you're viewing.
+
+That link is what makes the two lists navigable together. Commit rows show how
+many threads point at them, thread rows show where they point (solid when
+pinned, dimmed when inferred, `unlinked` when neither), and clicking a thread
+jumps to its commit *and* scrolls to the comment.
+
+Pins live in `~/.differ/links.json`, keyed by `owner/repo#pr` — outside your
+repo, so the read-only promise holds, and shared by every differ server on the
+machine. A rebase can strip a pinned commit; differ says so (`26ef8f7 gone`)
+and asks for a re-pin rather than silently falling back to the guess.
+
 **View file** — every file header has a *View file* toggle that swaps the
 hunks for the entire file at that commit, change still highlighted in place,
 for when three lines of context isn't enough to judge the change. It scrolls

@@ -387,29 +387,86 @@ export default function Page() {
   }, [diff, threads]);
 
   /**
-   * How many open threads land in a given commit's diff. Answering that for
-   * every commit would mean fetching every diff up front, so it's scoped to
-   * the commit on screen — the badge is a "look here" hint, not a full index.
+   * How many threads a commit answers. A commit's linked threads (pinned, or
+   * inferred from the file) are known for every commit without fetching any
+   * diffs — that's what makes the rail navigable. For the commit on screen we
+   * can also count open threads that land in its diff.
    */
+  const linkedCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const thread of threads) {
+      const linked =
+        (thread.pinnedShaMissing ? null : thread.pinnedSha) ??
+        thread.addressedBySha ??
+        null;
+      if (linked) counts.set(linked, (counts.get(linked) ?? 0) + 1);
+    }
+    return counts;
+  }, [threads]);
+
   const threadCountFor = useCallback(
     (candidate: string) => {
+      const linked = linkedCounts.get(candidate) ?? 0;
+      if (linked > 0) return linked;
       if (candidate !== rev) return 0;
       return threads.filter((t) => !t.isResolved && anchoredIds.has(t.id))
         .length;
     },
-    [rev, threads, anchoredIds],
+    [rev, threads, anchoredIds, linkedCounts],
   );
 
-  const focusThread = useCallback((thread: ReviewThread) => {
-    setFocusedThreadId(thread.id);
-    requestAnimationFrame(() => {
-      const element = document.getElementById(`thread-${thread.id}`);
-      if (!element) return;
-      element.scrollIntoView({ behavior: "smooth", block: "center" });
-      element.classList.add("flash");
-      setTimeout(() => element.classList.remove("flash"), 1500);
-    });
-  }, []);
+  /**
+   * Clicking a thread takes you to the commit it's linked to, then scrolls
+   * to the thread. With eight threads spread across several commits, hunting
+   * for the right commit by hand was the confusing part.
+   */
+  const focusThread = useCallback(
+    (thread: ReviewThread) => {
+      setFocusedThreadId(thread.id);
+
+      const linked =
+        (thread.pinnedShaMissing ? null : thread.pinnedSha) ??
+        thread.addressedBySha ??
+        null;
+      const known =
+        linked !== null &&
+        (session?.commits.some((c) => c.sha === linked) ||
+          session?.history.some((c) => c.sha === linked));
+      if (known && linked !== rev) setRev(linked);
+
+      // Two frames: one for the rev switch to render, one for the thread to
+      // exist in the new diff. When the rev didn't change this is still fine.
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => {
+          const element = document.getElementById(`thread-${thread.id}`);
+          if (!element) return;
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+          element.classList.add("flash");
+          setTimeout(() => element.classList.remove("flash"), 1500);
+        }),
+      );
+    },
+    [session, rev],
+  );
+
+  /** Pin (or unpin) a thread to a commit, then refresh so the rail agrees. */
+  const pinThread = useCallback(
+    async (threadId: string, sha: string | null) => {
+      try {
+        await fetch(`/api/links?repo=${encodeURIComponent(repoPath)}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ threadId, sha }),
+        });
+      } catch {
+        // Pins are a convenience; a failed write shouldn't break the view.
+      }
+      // Pins are re-read from disk on every session load, so the cached
+      // GitHub data is still fine — no need to spend an API call here.
+      void loadSession(repoPath, { background: true });
+    },
+    [repoPath, loadSession],
+  );
 
   const selectRepo = useCallback((path: string) => {
     const trimmed = path.trim();
@@ -549,6 +606,7 @@ export default function Page() {
               pr={session.github.pr}
               commit={commitForRev}
               focusedThreadId={focusedThreadId}
+              onPin={pinThread}
             />
           </main>
         </div>

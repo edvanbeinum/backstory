@@ -12,6 +12,7 @@ import {
   resolveRepo,
 } from "@/lib/git";
 import { loadGitHubDataCached } from "@/lib/github";
+import { getLinks, prKey } from "@/lib/links";
 import type { ApiError, SessionResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -68,29 +69,57 @@ export async function GET(request: Request) {
       rawGithub.pr?.baseRefName ?? null,
     );
 
-    // Tag each thread with the newest branch commit touching its file — the
-    // reply composer's default for "Addressed in <commit>". Cached per path,
-    // since threads cluster on few files. New objects, not mutation: the
-    // GitHub data behind this is shared via a 30s cache.
+    // Tag each thread with (a) the user's pin, if any, and (b) the newest
+    // branch commit touching its file — the reply composer's default for
+    // "Addressed in <commit>". New objects, not mutation: the GitHub data
+    // behind this is shared via a 30s cache.
     const github = { ...rawGithub, threads: rawGithub.threads };
-    if (branchDiff && rawGithub.threads.length > 0) {
+    if (rawGithub.threads.length > 0) {
+      const key = rawGithub.pr
+        ? prKey(repo.owner, repo.name, rawGithub.pr.number)
+        : null;
+      const pins = key ? await getLinks(key) : {};
+
+      // A rebase rewrites shas, so a pin can outlive its commit. Resolve
+      // each distinct pinned sha once against the branch.
+      const pinAlive = new Map<string, boolean>();
+      for (const sha of new Set(Object.values(pins))) {
+        const found = await gitLine(repo.root, [
+          "rev-parse",
+          "--verify",
+          "--quiet",
+          `${sha}^{commit}`,
+        ]);
+        pinAlive.set(sha, Boolean(found));
+      }
+
+      // Cached per path, since threads cluster on few files.
       const byPath = new Map<string, string | null>();
       github.threads = await Promise.all(
         rawGithub.threads.map(async (thread) => {
-          if (!thread.path) return thread;
-          let sha = byPath.get(thread.path);
-          if (sha === undefined) {
-            sha = await gitLine(repo.root, [
-              "log",
-              "-1",
-              "--format=%H",
-              `${branchDiff.baseSha}..HEAD`,
-              "--",
-              thread.path,
-            ]);
-            byPath.set(thread.path, sha);
+          const pinnedSha = pins[thread.id] ?? null;
+          const pinnedShaMissing = pinnedSha
+            ? !pinAlive.get(pinnedSha)
+            : false;
+
+          let addressedBySha: string | null = null;
+          if (branchDiff && thread.path) {
+            let sha = byPath.get(thread.path);
+            if (sha === undefined) {
+              sha = await gitLine(repo.root, [
+                "log",
+                "-1",
+                "--format=%H",
+                `${branchDiff.baseSha}..HEAD`,
+                "--",
+                thread.path,
+              ]);
+              byPath.set(thread.path, sha);
+            }
+            addressedBySha = sha;
           }
-          return { ...thread, addressedBySha: sha };
+
+          return { ...thread, addressedBySha, pinnedSha, pinnedShaMissing };
         }),
       );
     }

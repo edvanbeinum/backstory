@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { ReviewThread } from "@/lib/types";
-import { CheckIcon, CommentIcon, DotFillIcon } from "./icons";
+import { CheckIcon, CommentIcon, DotFillIcon, PinIcon } from "./icons";
 
 type Filter = "open" | "all";
 
@@ -103,11 +103,14 @@ export function ThreadRail({
                         <span className="block truncate text-[12px] leading-5">
                           {stripMarkdown(first?.body ?? "")}
                         </span>
-                        <span className="text-[11px] text-[var(--fg-muted)]">
-                          {first?.author}
-                          {thread.line != null && ` · line ${thread.line}`}
-                          {anchored && " · in this diff"}
+                        <span className="flex flex-wrap items-center gap-x-1 text-[11px] text-[var(--fg-muted)]">
+                          <span>{first?.author}</span>
+                          {thread.line != null && <span>· line {thread.line}</span>}
+                          {anchored && <span>· in this diff</span>}
                         </span>
+                        {/* Which commit this thread's reply will link to —
+                            solid when pinned, dimmed when inferred. */}
+                        <ReplyTarget thread={thread} />
                       </span>
                     </button>
                   </li>
@@ -118,6 +121,43 @@ export function ThreadRail({
         ))
       )}
     </nav>
+  );
+}
+
+/**
+ * The commit a thread's reply will link to, shown on its rail row: a pin
+ * reads as decided, an inferred commit as a guess, and neither as an open
+ * question — which is the whole point of showing it here rather than only
+ * inside the composer.
+ */
+function ReplyTarget({ thread }: { thread: ReviewThread }) {
+  if (thread.pinnedSha && thread.pinnedShaMissing) {
+    return (
+      <span className="flex items-center gap-1 text-[11px] text-[var(--attention)]">
+        <PinIcon size={10} />
+        <span className="mono">{thread.pinnedSha.slice(0, 7)}</span>
+        <span>gone</span>
+      </span>
+    );
+  }
+  if (thread.pinnedSha) {
+    return (
+      <span className="flex items-center gap-1 text-[11px] text-[var(--done)]">
+        <PinIcon size={10} />
+        <span className="mono">{thread.pinnedSha.slice(0, 7)}</span>
+      </span>
+    );
+  }
+  if (thread.addressedBySha) {
+    return (
+      <span className="flex items-center gap-1 text-[11px] text-[var(--fg-subtle)]">
+        <span>→</span>
+        <span className="mono">{thread.addressedBySha.slice(0, 7)}</span>
+      </span>
+    );
+  }
+  return (
+    <span className="text-[11px] text-[var(--fg-subtle)]">→ unlinked</span>
   );
 }
 

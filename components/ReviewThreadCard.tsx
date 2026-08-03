@@ -109,6 +109,7 @@ export function ReviewThreadCard({
   showContext = false,
   defaultCollapsed,
   highlighted = false,
+  onPin,
 }: {
   thread: ReviewThread;
   repo: RepoInfo;
@@ -118,6 +119,7 @@ export function ReviewThreadCard({
   showContext?: boolean;
   defaultCollapsed?: boolean;
   highlighted?: boolean;
+  onPin?: (threadId: string, sha: string | null) => void;
 }) {
   const [collapsed, setCollapsed] = useState(
     defaultCollapsed ?? thread.isResolved,
@@ -188,6 +190,11 @@ export function ReviewThreadCard({
               commit={commit}
               threadUrl={threadUrl}
               suggestedSha={thread.addressedBySha}
+              pinnedSha={thread.pinnedSha}
+              pinnedShaMissing={thread.pinnedShaMissing}
+              onPin={
+                onPin ? (sha) => onPin(thread.id, sha) : undefined
+              }
             />
           </div>
         </>

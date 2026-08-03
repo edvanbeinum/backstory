@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
 import type { CommitSummary, PullRequestInfo, RepoInfo } from "@/lib/types";
-import { LinkExternalIcon } from "./icons";
+import { LinkExternalIcon, PinIcon } from "./icons";
 import { CopyButton } from "./ui";
 
 type Template = "url" | "sha" | "ack" | "custom";
@@ -68,6 +68,9 @@ export function ReplyComposer({
   commit,
   threadUrl,
   suggestedSha,
+  pinnedSha,
+  pinnedShaMissing = false,
+  onPin,
 }: {
   repo: RepoInfo;
   pr: PullRequestInfo | null;
@@ -75,6 +78,12 @@ export function ReplyComposer({
   threadUrl: string;
   /** Newest branch commit touching the thread's file, if known */
   suggestedSha?: string | null;
+  /** A commit the user pinned to this thread — beats the suggestion */
+  pinnedSha?: string | null;
+  /** The pinned sha is gone (rebased away) */
+  pinnedShaMissing?: boolean;
+  /** Pin the thread to a sha, or unpin with null. Absent = pinning off. */
+  onPin?: (sha: string | null) => void;
 }) {
   const [template, setTemplate] = useState<Template>("url");
   const [custom, setCustom] = useState("");
@@ -89,10 +98,18 @@ export function ReplyComposer({
     ? { sha: suggestedSha, shortSha: suggestedSha.slice(0, 7) }
     : null;
 
+  // A live pin is the answer, full stop — that's what pinning is for. A pin
+  // whose commit was rebased away is surfaced rather than obeyed.
+  const pinned: LinkTarget | null =
+    pinnedSha && !pinnedShaMissing
+      ? { sha: pinnedSha, shortSha: pinnedSha.slice(0, 7) }
+      : null;
+
   const target: LinkTarget | null =
-    preferSelected && selectedIsReal
+    pinned ??
+    (preferSelected && selectedIsReal
       ? commit
-      : (suggested ?? (selectedIsReal ? commit : null));
+      : (suggested ?? (selectedIsReal ? commit : null)));
 
   const url = useMemo(
     () => (target ? buildPrCommitUrl(repo, pr, target.sha) : null),
@@ -122,9 +139,17 @@ export function ReplyComposer({
   const isBranch = target === null && commit?.sha === BRANCH_REV;
 
   const linkingSuggested =
-    target !== null && suggested !== null && target.sha === suggested.sha;
+    pinned === null &&
+    target !== null &&
+    suggested !== null &&
+    target.sha === suggested.sha;
   const showSwap =
-    suggested !== null && selectedIsReal && commit.sha !== suggested.sha;
+    pinned === null &&
+    suggested !== null &&
+    selectedIsReal &&
+    commit.sha !== suggested.sha;
+  // Offer to pin whatever is currently being linked, once it's a real commit
+  const canPin = onPin !== undefined && target !== null && pinned === null;
 
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--canvas)]">
@@ -161,32 +186,66 @@ export function ReplyComposer({
         </p>
       ) : (
         <>
-          {(linkingSuggested || showSwap) && (
-            <p className="flex flex-wrap items-center gap-x-2 border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1 text-[11px] text-[var(--fg-muted)]">
-              {linkingSuggested ? (
-                <>
-                  Links <span className="mono">{target.shortSha}</span> — the
-                  last commit that touched this file.
-                </>
-              ) : (
-                <>
-                  Links the selected commit{" "}
-                  <span className="mono">{target.shortSha}</span>.
-                </>
-              )}
-              {showSwap && (
-                <button
-                  type="button"
-                  onClick={() => setPreferSelected((value) => !value)}
-                  className="text-[var(--accent)] hover:underline"
-                >
-                  {linkingSuggested
-                    ? `Link selected ${commit.shortSha} instead`
-                    : `Link ${suggested.shortSha} (last touched this file)`}
-                </button>
-              )}
-            </p>
-          )}
+          <p className="flex flex-wrap items-center gap-x-2 border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1 text-[11px] text-[var(--fg-muted)]">
+            {pinnedShaMissing && (
+              <span className="text-[var(--attention)]">
+                <PinIcon size={11} /> Pinned to{" "}
+                <span className="mono">{pinnedSha?.slice(0, 7)}</span>, which
+                is no longer on this branch — probably rebased away.
+              </span>
+            )}
+
+            {pinned ? (
+              <span className="text-[var(--fg)]">
+                <PinIcon size={11} className="text-[var(--done)]" /> Pinned to{" "}
+                <span className="mono">{pinned.shortSha}</span>
+              </span>
+            ) : linkingSuggested ? (
+              <>
+                Links <span className="mono">{target.shortSha}</span> — the
+                last commit that touched this file.
+              </>
+            ) : (
+              <>
+                Links the selected commit{" "}
+                <span className="mono">{target.shortSha}</span>.
+              </>
+            )}
+
+            {showSwap && (
+              <button
+                type="button"
+                onClick={() => setPreferSelected((value) => !value)}
+                className="text-[var(--accent)] hover:underline"
+              >
+                {linkingSuggested
+                  ? `Link selected ${commit.shortSha} instead`
+                  : `Link ${suggested.shortSha} (last touched this file)`}
+              </button>
+            )}
+
+            <span className="flex-1" />
+
+            {canPin && (
+              <button
+                type="button"
+                onClick={() => onPin(target.sha)}
+                title="Always link this commit for this thread"
+                className="inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
+              >
+                <PinIcon size={11} /> Pin {target.shortSha}
+              </button>
+            )}
+            {onPin && pinnedSha && (
+              <button
+                type="button"
+                onClick={() => onPin(null)}
+                className="text-[var(--accent)] hover:underline"
+              >
+                {pinnedShaMissing ? "Clear pin" : "Unpin"}
+              </button>
+            )}
+          </p>
           <textarea
             value={text}
             readOnly={template !== "custom"}

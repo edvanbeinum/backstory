@@ -53,6 +53,7 @@ export function DiffView({
   pr,
   commit,
   focusedThreadId,
+  onPin,
 }: {
   diff: DiffResponse | null;
   loading: boolean;
@@ -63,6 +64,7 @@ export function DiffView({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
+  onPin?: (threadId: string, sha: string | null) => void;
 }) {
   const { perFile, elsewhere } = useMemo(
     () => partitionThreads(diff, threads),
@@ -117,6 +119,7 @@ export function DiffView({
             pr={pr}
             commit={commit}
             focusedThreadId={focusedThreadId}
+            onPin={onPin}
           />
         ))
       )}
@@ -168,6 +171,7 @@ export function DiffView({
               showContext
               defaultCollapsed
               highlighted={focusedThreadId === thread.id}
+              onPin={onPin}
             />
           ))}
         </section>
