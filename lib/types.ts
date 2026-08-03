@@ -135,6 +135,14 @@ export interface ReviewThread {
   /** "RIGHT" | "LEFT" */
   side: string | null;
   comments: ReviewComment[];
+  /**
+   * The newest branch commit that touched this thread's file — the best
+   * guess at "the commit that addressed this comment", and the reply
+   * composer's default link. Line-level blame is deliberately not used: a
+   * fix usually adds code near the commented line rather than editing it,
+   * so blame answers "who wrote this line", not "who responded to this".
+   */
+  addressedBySha?: string | null;
 }
 
 export interface ReviewSummary {

@@ -187,6 +187,7 @@ export function ReviewThreadCard({
               pr={pr}
               commit={commit}
               threadUrl={threadUrl}
+              suggestedSha={thread.addressedBySha}
             />
           </div>
         </>

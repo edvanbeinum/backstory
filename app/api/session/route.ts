@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse } from "@/lib/api";
+import { gitLine } from "@/lib/exec";
 import {
   getBoundarySha,
   getBranchDiffSummary,
@@ -52,12 +53,39 @@ export async function GET(request: Request) {
 
     // GitHub is the slow part and the only one that can fail softly, so let
     // it run alongside the remaining local git work.
-    const [history, working, github, branchDiff] = await Promise.all([
+    const [history, working, rawGithub, branchDiff] = await Promise.all([
       getHistory(repo, base),
       getWorkingTree(repo),
       loadGitHubDataCached(repo, { fresh }),
       getBranchDiffSummary(repo, base),
     ]);
+
+    // Tag each thread with the newest branch commit touching its file — the
+    // reply composer's default for "Addressed in <commit>". Cached per path,
+    // since threads cluster on few files. New objects, not mutation: the
+    // GitHub data behind this is shared via a 30s cache.
+    const github = { ...rawGithub, threads: rawGithub.threads };
+    if (branchDiff && rawGithub.threads.length > 0) {
+      const byPath = new Map<string, string | null>();
+      github.threads = await Promise.all(
+        rawGithub.threads.map(async (thread) => {
+          if (!thread.path) return thread;
+          let sha = byPath.get(thread.path);
+          if (sha === undefined) {
+            sha = await gitLine(repo.root, [
+              "log",
+              "-1",
+              "--format=%H",
+              `${branchDiff.baseSha}..HEAD`,
+              "--",
+              thread.path,
+            ]);
+            byPath.set(thread.path, sha);
+          }
+          return { ...thread, addressedBySha: sha };
+        }),
+      );
+    }
 
     const body: SessionResponse = {
       repo,

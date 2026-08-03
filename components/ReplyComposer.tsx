@@ -29,9 +29,12 @@ export function buildPrCommitUrl(
   return `https://github.com/${repo.owner}/${repo.name}/commit/${sha}`;
 }
 
+/** The composer only needs a sha to link — not a full CommitSummary. */
+type LinkTarget = Pick<CommitSummary, "sha" | "shortSha">;
+
 function templateText(
   template: Template,
-  commit: CommitSummary | null,
+  commit: LinkTarget | null,
   url: string | null,
 ): string {
   if (!commit) return "";
@@ -48,42 +51,66 @@ function templateText(
 }
 
 /**
- * Drafts a reply against the *currently selected* commit and hands it over via
- * the clipboard. differ never posts to GitHub — you paste this into the thread
+ * Drafts an "Addressed in <commit>" reply and hands it over via the
+ * clipboard. differ never posts to GitHub — you paste this into the thread
  * yourself, which keeps the last word on wording (and on whether to reply at
  * all) with you.
+ *
+ * Which commit gets linked: by default the newest branch commit that touched
+ * the thread's file (`suggestedSha`, computed server-side) — the commit that
+ * most plausibly addressed the comment — regardless of which commit is
+ * selected in the rail. The selected commit is one click away. Without a
+ * suggestion, the selected commit is used as before.
  */
 export function ReplyComposer({
   repo,
   pr,
   commit,
   threadUrl,
+  suggestedSha,
 }: {
   repo: RepoInfo;
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   threadUrl: string;
+  /** Newest branch commit touching the thread's file, if known */
+  suggestedSha?: string | null;
 }) {
   const [template, setTemplate] = useState<Template>("url");
   const [custom, setCustom] = useState("");
+  const [preferSelected, setPreferSelected] = useState(false);
+
+  const selectedIsReal =
+    commit !== null &&
+    commit.sha !== WORKING_REV &&
+    commit.sha !== BRANCH_REV;
+
+  const suggested: LinkTarget | null = suggestedSha
+    ? { sha: suggestedSha, shortSha: suggestedSha.slice(0, 7) }
+    : null;
+
+  const target: LinkTarget | null =
+    preferSelected && selectedIsReal
+      ? commit
+      : (suggested ?? (selectedIsReal ? commit : null));
 
   const url = useMemo(
-    () => (commit ? buildPrCommitUrl(repo, pr, commit.sha) : null),
-    [repo, pr, commit],
+    () => (target ? buildPrCommitUrl(repo, pr, target.sha) : null),
+    [repo, pr, target],
   );
 
-  const generated = templateText(template, commit, url);
+  const generated = templateText(template, target, url);
   const text = template === "custom" ? custom : generated;
 
   // Seed the custom box from whatever was last generated, so switching to
   // "write my own" is an edit rather than a blank page.
   useEffect(() => {
     if (template === "custom" && !custom) {
-      setCustom(templateText("url", commit, url));
+      setCustom(templateText("url", target, url));
     }
-  }, [template, custom, commit, url]);
+  }, [template, custom, target, url]);
 
-  if (!commit) {
+  if (!commit && !suggested) {
     return (
       <p className="text-[12px] text-[var(--fg-muted)]">
         Select a commit to draft a reply that links to it.
@@ -91,8 +118,13 @@ export function ReplyComposer({
     );
   }
 
-  const isWorking = commit.sha === WORKING_REV;
-  const isBranch = commit.sha === BRANCH_REV;
+  const isWorking = target === null && commit?.sha === WORKING_REV;
+  const isBranch = target === null && commit?.sha === BRANCH_REV;
+
+  const linkingSuggested =
+    target !== null && suggested !== null && target.sha === suggested.sha;
+  const showSwap =
+    suggested !== null && selectedIsReal && commit.sha !== suggested.sha;
 
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--canvas)]">
@@ -123,8 +155,38 @@ export function ReplyComposer({
           This is the combined branch diff — select a single commit in the
           rail to draft a reply that links to it.
         </p>
+      ) : target === null ? (
+        <p className="px-3 py-2.5 text-[12px] text-[var(--fg-muted)]">
+          Select a commit to draft a reply that links to it.
+        </p>
       ) : (
         <>
+          {(linkingSuggested || showSwap) && (
+            <p className="flex flex-wrap items-center gap-x-2 border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1 text-[11px] text-[var(--fg-muted)]">
+              {linkingSuggested ? (
+                <>
+                  Links <span className="mono">{target.shortSha}</span> — the
+                  last commit that touched this file.
+                </>
+              ) : (
+                <>
+                  Links the selected commit{" "}
+                  <span className="mono">{target.shortSha}</span>.
+                </>
+              )}
+              {showSwap && (
+                <button
+                  type="button"
+                  onClick={() => setPreferSelected((value) => !value)}
+                  className="text-[var(--accent)] hover:underline"
+                >
+                  {linkingSuggested
+                    ? `Link selected ${commit.shortSha} instead`
+                    : `Link ${suggested.shortSha} (last touched this file)`}
+                </button>
+              )}
+            </p>
+          )}
           <textarea
             value={text}
             readOnly={template !== "custom"}
