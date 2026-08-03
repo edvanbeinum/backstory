@@ -449,6 +449,17 @@ export default function Page() {
     [session, rev],
   );
 
+  /**
+   * Commits a thread can be pinned to: the unpushed ones first, then a slice
+   * of pushed history. The right commit is often neither the guess nor the
+   * selection — a fix can land in a different file from the one commented on
+   * — so the picker has to offer the whole branch.
+   */
+  const pinCandidates = useMemo(
+    () => [...(session?.commits ?? []), ...(session?.history ?? []).slice(0, 15)],
+    [session],
+  );
+
   /** Pin (or unpin) a thread to a commit, then refresh so the rail agrees. */
   const pinThread = useCallback(
     async (threadId: string, sha: string | null) => {
@@ -607,6 +618,7 @@ export default function Page() {
               commit={commitForRev}
               focusedThreadId={focusedThreadId}
               onPin={pinThread}
+              pinCandidates={pinCandidates}
             />
           </main>
         </div>

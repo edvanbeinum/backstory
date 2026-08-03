@@ -37,6 +37,7 @@ export function DiffFile({
   commit,
   focusedThreadId,
   onPin,
+  pinCandidates,
 }: {
   file: DiffFileType;
   threads: ReviewThread[];
@@ -45,6 +46,7 @@ export function DiffFile({
   commit: CommitSummary | null;
   focusedThreadId: string | null;
   onPin?: (threadId: string, sha: string | null) => void;
+  pinCandidates?: CommitSummary[];
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
@@ -273,6 +275,7 @@ export function DiffFile({
                         copiedLine={copiedLine}
                         onCopyLine={copyLineRef}
                         onPin={onPin}
+                        pinCandidates={pinCandidates}
                       />
                     ))}
                   </tbody>
@@ -321,6 +324,7 @@ export function DiffFile({
                   defaultCollapsed
                   highlighted={focusedThreadId === thread.id}
                   onPin={onPin}
+                  pinCandidates={pinCandidates}
                 />
               ))}
             </div>
@@ -345,6 +349,7 @@ function HunkRows({
   copiedLine,
   onCopyLine,
   onPin,
+  pinCandidates,
 }: {
   hunk: DiffFileType["hunks"][number];
   hunkIndex: number;
@@ -359,6 +364,7 @@ function HunkRows({
   copiedLine: string | null;
   onCopyLine: (key: string, line: number) => void;
   onPin?: (threadId: string, sha: string | null) => void;
+  pinCandidates?: CommitSummary[];
 }) {
   // Clicking a line number copies the editor-style "path:line" reference —
   // the thing you paste into a terminal, an editor, or a review reply. The
@@ -427,6 +433,7 @@ function HunkRows({
                     commit={commit}
                     highlighted={focusedThreadId === thread.id}
                     onPin={onPin}
+                    pinCandidates={pinCandidates}
                   />
                 </td>
               </tr>
