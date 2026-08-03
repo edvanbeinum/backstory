@@ -53,12 +53,20 @@ export async function GET(request: Request) {
 
     // GitHub is the slow part and the only one that can fail softly, so let
     // it run alongside the remaining local git work.
-    const [history, working, rawGithub, branchDiff] = await Promise.all([
+    const [history, working, rawGithub] = await Promise.all([
       getHistory(repo, base),
       getWorkingTree(repo),
       loadGitHubDataCached(repo, { fresh }),
-      getBranchDiffSummary(repo, base),
     ]);
+
+    // The branch diff needs the PR's base branch, so it waits on GitHub —
+    // a couple of local git commands once that resolves. On a stacked PR
+    // the base is the parent branch, not the default branch.
+    const branchDiff = await getBranchDiffSummary(
+      repo,
+      base,
+      rawGithub.pr?.baseRefName ?? null,
+    );
 
     // Tag each thread with the newest branch commit touching its file — the
     // reply composer's default for "Addressed in <commit>". Cached per path,

@@ -15,6 +15,7 @@ import {
   resolveRepo,
   resolveRev,
 } from "@/lib/git";
+import { loadGitHubDataCached } from "@/lib/github";
 import {
   highlightFiles,
   MAX_HIGHLIGHT_LINES_SINGLE_FILE,
@@ -59,7 +60,12 @@ export async function GET(request: Request) {
         pathspec: paths,
       });
     } else if (rev === BRANCH_REV) {
-      const info = await getBranchDiffBase(repo, await resolveBase(repo));
+      const github = await loadGitHubDataCached(repo);
+      const info = await getBranchDiffBase(
+        repo,
+        await resolveBase(repo),
+        github.pr?.baseRefName ?? null,
+      );
       if (!info) {
         return NextResponse.json<ApiError>(
           { error: "Nothing to diff the branch against.", kind: "git" },

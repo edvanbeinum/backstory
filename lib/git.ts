@@ -412,29 +412,49 @@ async function logRange(
  * the default branch (there "vs main" means "vs origin/main"). Null when
  * there's nothing meaningful to diff against.
  */
+/** Fork point from `branchName`, if a local or remote ref for it exists. */
+async function forkPointFrom(
+  root: string,
+  branchName: string,
+): Promise<string | null> {
+  for (const ref of [
+    `refs/remotes/origin/${branchName}`,
+    `refs/heads/${branchName}`,
+  ]) {
+    const exists = await gitLine(root, [
+      "rev-parse",
+      "--verify",
+      "--quiet",
+      ref,
+    ]);
+    if (exists) return gitLine(root, ["merge-base", ref, "HEAD"]);
+  }
+  return null;
+}
+
 export async function getBranchDiffBase(
   repo: RepoInfo,
   base: BaseInfo,
+  /**
+   * The PR's own base branch (`baseRefName`), when there is a PR. This is
+   * authoritative and beats the default branch: a stacked PR targets its
+   * parent branch, so diffing against the default branch would show this
+   * branch PLUS the whole parent stack — the PR itself shows far less.
+   */
+  prBaseRef?: string | null,
 ): Promise<{ baseSha: string; label: string } | null> {
   const { root, branch, defaultBranch } = repo;
 
+  if (prBaseRef && prBaseRef !== branch) {
+    const fork = await forkPointFrom(root, prBaseRef);
+    if (fork) return { baseSha: fork, label: `vs ${prBaseRef}` };
+    // The base branch isn't checked out locally — fall through rather than
+    // silently diffing against something else.
+  }
+
   if (defaultBranch && branch && branch !== defaultBranch) {
-    for (const ref of [
-      `refs/remotes/origin/${defaultBranch}`,
-      `refs/heads/${defaultBranch}`,
-    ]) {
-      const exists = await gitLine(root, [
-        "rev-parse",
-        "--verify",
-        "--quiet",
-        ref,
-      ]);
-      if (exists) {
-        const fork = await gitLine(root, ["merge-base", ref, "HEAD"]);
-        if (fork) return { baseSha: fork, label: `vs ${defaultBranch}` };
-        break;
-      }
-    }
+    const fork = await forkPointFrom(root, defaultBranch);
+    if (fork) return { baseSha: fork, label: `vs ${defaultBranch}` };
   }
 
   if (base.sha) return { baseSha: base.sha, label: `vs ${base.ref}` };
@@ -445,8 +465,9 @@ export async function getBranchDiffBase(
 export async function getBranchDiffSummary(
   repo: RepoInfo,
   base: BaseInfo,
+  prBaseRef?: string | null,
 ): Promise<BranchDiffSummary | null> {
-  const info = await getBranchDiffBase(repo, base);
+  const info = await getBranchDiffBase(repo, base, prBaseRef);
   if (!info) return null;
 
   const count = await gitLine(repo.root, [

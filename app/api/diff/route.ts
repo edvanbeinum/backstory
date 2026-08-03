@@ -14,6 +14,7 @@ import {
   resolveRepo,
   resolveRev,
 } from "@/lib/git";
+import { loadGitHubDataCached } from "@/lib/github";
 import { highlightFiles } from "@/lib/highlight";
 import type { ApiError, DiffResponse } from "@/lib/types";
 
@@ -41,7 +42,14 @@ export async function GET(request: Request) {
       patch = await getWorkingPatch(repo.root, working.untrackedPaths);
     } else if (rev === BRANCH_REV) {
       // The combined branch diff: fork point (or push boundary) → HEAD.
-      const info = await getBranchDiffBase(repo, await resolveBase(repo));
+      // The PR's base branch decides the fork — on a stacked PR that's the
+      // parent branch, not the default one. Cached, so usually free.
+      const github = await loadGitHubDataCached(repo);
+      const info = await getBranchDiffBase(
+        repo,
+        await resolveBase(repo),
+        github.pr?.baseRefName ?? null,
+      );
       if (!info) {
         return NextResponse.json<ApiError>(
           { error: "Nothing to diff the branch against.", kind: "git" },
