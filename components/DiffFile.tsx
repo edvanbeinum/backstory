@@ -38,6 +38,7 @@ export function DiffFile({
   focusedThreadId,
   onPin,
   pinCandidates,
+  onDraftChange,
 }: {
   file: DiffFileType;
   threads: ReviewThread[];
@@ -47,6 +48,7 @@ export function DiffFile({
   focusedThreadId: string | null;
   onPin?: (threadId: string, sha: string | null) => void;
   pinCandidates?: CommitSummary[];
+  onDraftChange?: (threadId: string, text: string | null) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
@@ -276,6 +278,7 @@ export function DiffFile({
                         onCopyLine={copyLineRef}
                         onPin={onPin}
                         pinCandidates={pinCandidates}
+                        onDraftChange={onDraftChange}
                       />
                     ))}
                   </tbody>
@@ -325,6 +328,7 @@ export function DiffFile({
                   highlighted={focusedThreadId === thread.id}
                   onPin={onPin}
                   pinCandidates={pinCandidates}
+                  onDraftChange={onDraftChange}
                 />
               ))}
             </div>
@@ -350,6 +354,7 @@ function HunkRows({
   onCopyLine,
   onPin,
   pinCandidates,
+  onDraftChange,
 }: {
   hunk: DiffFileType["hunks"][number];
   hunkIndex: number;
@@ -365,6 +370,7 @@ function HunkRows({
   onCopyLine: (key: string, line: number) => void;
   onPin?: (threadId: string, sha: string | null) => void;
   pinCandidates?: CommitSummary[];
+  onDraftChange?: (threadId: string, text: string | null) => void;
 }) {
   // Clicking a line number copies the editor-style "path:line" reference —
   // the thing you paste into a terminal, an editor, or a review reply. The
@@ -434,6 +440,7 @@ function HunkRows({
                     highlighted={focusedThreadId === thread.id}
                     onPin={onPin}
                     pinCandidates={pinCandidates}
+                    onDraftChange={onDraftChange}
                   />
                 </td>
               </tr>

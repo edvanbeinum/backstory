@@ -138,10 +138,31 @@ many threads point at them, thread rows show where they point (solid when
 pinned, dimmed when inferred, `unlinked` when neither), and clicking a thread
 jumps to its commit *and* scrolls to the comment.
 
-Pins live in `~/.differ/links.json`, keyed by `owner/repo#pr` — outside your
-repo, so the read-only promise holds, and shared by every differ server on the
-machine. A rebase can strip a pinned commit; differ says so (`26ef8f7 gone`)
-and asks for a re-pin rather than silently falling back to the guess.
+When the fix landed in a *different* file from the one commented on — a test
+move, a refactor — no file-level guess can reach it, so the reply box has a
+**Pin to…** picker listing the branch commits directly.
+
+## Drafts
+
+A reply you're part-way through writing is saved automatically. It survives
+reloading, collapsing the thread, switching commits and restarting the server
+— which matters because a draft is the only thing differ produces that you
+can't regenerate from git. The box says *Draft saved*, and *Discard draft*
+clears it.
+
+## Where local state lives
+
+`~/.differ/links.json` (pins) and `~/.differ/drafts.json` (drafts), both keyed
+by `owner/repo#pr` — outside your repo, so the read-only promise holds, and
+shared by every differ server on the machine.
+
+Plain JSON on purpose: it's a few KB of click-driven writes with no queries,
+so a database would buy nothing, and a file you can `cat`, hand-edit or `rm`
+is a feature in a local tool. Both go through `lib/store.ts`, so swapping in
+SQLite later would be a change there and nowhere else.
+
+A rebase can strip a pinned commit; differ says so (`26ef8f7 gone`) and asks
+for a re-pin rather than silently falling back to the guess.
 
 **View file** — every file header has a *View file* toggle that swaps the
 hunks for the entire file at that commit, change still highlighted in place,

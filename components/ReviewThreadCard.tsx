@@ -111,6 +111,7 @@ export function ReviewThreadCard({
   highlighted = false,
   onPin,
   pinCandidates,
+  onDraftChange,
 }: {
   thread: ReviewThread;
   repo: RepoInfo;
@@ -122,6 +123,7 @@ export function ReviewThreadCard({
   highlighted?: boolean;
   onPin?: (threadId: string, sha: string | null) => void;
   pinCandidates?: CommitSummary[];
+  onDraftChange?: (threadId: string, text: string | null) => void;
 }) {
   const [collapsed, setCollapsed] = useState(
     defaultCollapsed ?? thread.isResolved,
@@ -198,6 +200,12 @@ export function ReviewThreadCard({
                 onPin ? (sha) => onPin(thread.id, sha) : undefined
               }
               pinCandidates={pinCandidates}
+              draft={thread.draft}
+              onDraftChange={
+                onDraftChange
+                  ? (text) => onDraftChange(thread.id, text)
+                  : undefined
+              }
             />
           </div>
         </>

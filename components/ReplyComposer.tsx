@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
 import type { CommitSummary, PullRequestInfo, RepoInfo } from "@/lib/types";
@@ -72,6 +72,8 @@ export function ReplyComposer({
   pinnedShaMissing = false,
   onPin,
   pinCandidates = [],
+  draft,
+  onDraftChange,
 }: {
   repo: RepoInfo;
   pr: PullRequestInfo | null;
@@ -91,9 +93,15 @@ export function ReplyComposer({
    * from the one commented on, which no file-level heuristic can reach.
    */
   pinCandidates?: CommitSummary[];
+  /** A previously saved draft for this thread, if any */
+  draft?: string | null;
+  /** Persist the draft; null clears it. Absent = drafts not saved. */
+  onDraftChange?: (text: string | null) => void;
 }) {
-  const [template, setTemplate] = useState<Template>("url");
-  const [custom, setCustom] = useState("");
+  // A saved draft is text you wrote and haven't sent — resume straight into
+  // it rather than showing a template and burying it.
+  const [template, setTemplate] = useState<Template>(draft ? "custom" : "url");
+  const [custom, setCustom] = useState(draft ?? "");
   const [preferSelected, setPreferSelected] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -134,6 +142,26 @@ export function ReplyComposer({
       setCustom(templateText("url", target, url));
     }
   }, [template, custom, target, url]);
+
+  // Persist the draft, debounced — the point is that it survives a reload,
+  // a collapse, or switching commits, not that every keystroke hits disk.
+  // The saved value is compared against so a session refresh echoing the
+  // draft back can't trigger a pointless write.
+  const savedRef = useRef(draft ?? "");
+  useEffect(() => {
+    savedRef.current = draft ?? "";
+  }, [draft]);
+
+  useEffect(() => {
+    if (!onDraftChange || template !== "custom") return;
+    if (custom === savedRef.current) return;
+
+    const timer = setTimeout(() => {
+      savedRef.current = custom;
+      onDraftChange(custom.trim() === "" ? null : custom);
+    }, 600);
+    return () => clearTimeout(timer);
+  }, [custom, template, onDraftChange]);
 
   if (!commit && !suggested) {
     return (
@@ -320,6 +348,29 @@ export function ReplyComposer({
             >
               Open thread <LinkExternalIcon size={12} />
             </a>
+
+            {/* Say plainly that the text is safe — an unsaved-looking box is
+                the reason drafts felt risky in the first place. */}
+            {draft && template === "custom" && (
+              <span className="text-[11px] text-[var(--fg-muted)]">
+                Draft saved
+              </span>
+            )}
+            {draft && onDraftChange && (
+              <button
+                type="button"
+                onClick={() => {
+                  setCustom("");
+                  savedRef.current = "";
+                  onDraftChange(null);
+                  setTemplate("url");
+                }}
+                className="text-[11px] text-[var(--accent)] hover:underline"
+              >
+                Discard draft
+              </button>
+            )}
+
             <span className="flex-1" />
             {url && (
               <CopyButton

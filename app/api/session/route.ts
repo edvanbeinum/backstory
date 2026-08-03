@@ -12,6 +12,7 @@ import {
   resolveRepo,
 } from "@/lib/git";
 import { loadGitHubDataCached } from "@/lib/github";
+import { getDrafts } from "@/lib/drafts";
 import { getLinks, prKey } from "@/lib/links";
 import type { ApiError, SessionResponse } from "@/lib/types";
 
@@ -78,7 +79,9 @@ export async function GET(request: Request) {
       const key = rawGithub.pr
         ? prKey(repo.owner, repo.name, rawGithub.pr.number)
         : null;
-      const pins = key ? await getLinks(key) : {};
+      const [pins, drafts] = key
+        ? await Promise.all([getLinks(key), getDrafts(key)])
+        : [{}, {}];
 
       // A rebase rewrites shas, so a pin can outlive its commit. Resolve
       // each distinct pinned sha once against the branch.
@@ -119,7 +122,13 @@ export async function GET(request: Request) {
             addressedBySha = sha;
           }
 
-          return { ...thread, addressedBySha, pinnedSha, pinnedShaMissing };
+          return {
+            ...thread,
+            addressedBySha,
+            pinnedSha,
+            pinnedShaMissing,
+            draft: drafts[thread.id] ?? null,
+          };
         }),
       );
     }

@@ -145,6 +145,8 @@ export interface ReviewThread {
   addressedBySha?: string | null;
   /** A commit the user pinned to this thread. Beats addressedBySha. */
   pinnedSha?: string | null;
+  /** A saved reply the user was part-way through writing. */
+  draft?: string | null;
   /**
    * True when `pinnedSha` no longer exists on the branch — usually a rebase
    * rewrote it. The pin is kept (not silently dropped) and the UI asks for

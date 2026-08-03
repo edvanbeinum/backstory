@@ -460,6 +460,27 @@ export default function Page() {
     [session],
   );
 
+  /**
+   * Save a thread's draft reply. Fire-and-forget: no session refresh, since
+   * one would echo the text back into a box you're still typing in. The
+   * saved copy is picked up on the next load, which is exactly when it's
+   * needed — after a reload, a collapse, or switching commits.
+   */
+  const saveDraft = useCallback(
+    (threadId: string, text: string | null) => {
+      void fetch(`/api/drafts?repo=${encodeURIComponent(repoPath)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId, text }),
+        // Survive the tab closing mid-save
+        keepalive: true,
+      }).catch(() => {
+        // Drafts are best-effort; the text is still on screen.
+      });
+    },
+    [repoPath],
+  );
+
   /** Pin (or unpin) a thread to a commit, then refresh so the rail agrees. */
   const pinThread = useCallback(
     async (threadId: string, sha: string | null) => {
@@ -619,6 +640,7 @@ export default function Page() {
               focusedThreadId={focusedThreadId}
               onPin={pinThread}
               pinCandidates={pinCandidates}
+              onDraftChange={saveDraft}
             />
           </main>
         </div>
