@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse } from "@/lib/api";
-import { resolveRepo } from "@/lib/git";
+import { getPatchId, resolveRepo } from "@/lib/git";
 import { loadGitHubDataCached } from "@/lib/github";
 import { getLinks, prKey, setLink } from "@/lib/links";
 import type { ApiError } from "@/lib/types";
@@ -75,10 +75,16 @@ export async function POST(request: Request) {
       );
     }
 
+    // Record the commit's patch-id alongside the sha: a later rebase will
+    // rewrite the sha but not the patch-id, which is how the pin survives.
+    const repo = await resolveRepo(repoPath);
+    const patchId = body.sha ? await getPatchId(repo.root, body.sha) : null;
+
     const links = await setLink(
       resolved.key,
       body.threadId,
       body.sha ?? null,
+      patchId,
     );
     return NextResponse.json(
       { links },

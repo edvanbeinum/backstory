@@ -148,11 +148,18 @@ export interface ReviewThread {
   /** A saved reply the user was part-way through writing. */
   draft?: string | null;
   /**
-   * True when `pinnedSha` no longer exists on the branch — usually a rebase
-   * rewrote it. The pin is kept (not silently dropped) and the UI asks for
-   * a re-pin rather than quietly reverting to the guess.
+   * True when `pinnedSha` no longer exists on the branch and couldn't be
+   * re-matched — a squash, an amend, or a conflict-resolved rebase changed
+   * the diff, so the patch-id no longer matches anything. The pin is kept
+   * (not silently dropped) and the UI asks for a re-pin rather than quietly
+   * reverting to the guess.
    */
   pinnedShaMissing?: boolean;
+  /**
+   * The pin was re-matched to a rewritten commit by patch-id this load.
+   * Shown once so a silent re-point is never invisible.
+   */
+  pinnedShaHealed?: boolean;
 }
 
 export interface ReviewSummary {

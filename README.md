@@ -161,8 +161,27 @@ so a database would buy nothing, and a file you can `cat`, hand-edit or `rm`
 is a feature in a local tool. Both go through `lib/store.ts`, so swapping in
 SQLite later would be a change there and nowhere else.
 
-A rebase can strip a pinned commit; differ says so (`26ef8f7 gone`) and asks
-for a re-pin rather than silently falling back to the guess.
+## Pins survive rebases
+
+Rebasing a stack rewrites every sha, which would break every pin. So a pin
+stores the commit's **patch-id** — a hash of its diff alone — alongside the
+sha. A rebased commit keeps its patch-id, so a stale pin is re-matched to the
+rewritten commit automatically and marked *re-matched after a rebase*.
+
+| you did | result |
+|---|---|
+| rebase / restack (clean) | heals silently |
+| reword a commit message | heals — same diff, same patch-id |
+| squash, amend the content, rebase through a conflict | `26ef8f7 gone`, asks for a re-pin |
+
+The last row is deliberate: those genuinely change the diff, so attaching your
+reply to a guessed commit would be worse than admitting the link broke. Same
+when two commits share a patch-id (revert-then-reapply) — ambiguous never
+auto-resolves.
+
+Note that "still on the branch" means *reachable from HEAD*, not "the object
+exists": rebased-away commits linger in the object database and would
+otherwise look healthy.
 
 **View file** — every file header has a *View file* toggle that swaps the
 hunks for the entire file at that commit, change still highlighted in place,

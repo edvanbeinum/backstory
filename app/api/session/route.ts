@@ -7,13 +7,16 @@ import {
   getBranchDiffSummary,
   getCommits,
   getHistory,
+  getPatchId,
+  getPatchIdMap,
   getWorkingTree,
+  isOnBranch,
   resolveBase,
   resolveRepo,
 } from "@/lib/git";
-import { loadGitHubDataCached } from "@/lib/github";
 import { getDrafts } from "@/lib/drafts";
-import { getLinks, prKey } from "@/lib/links";
+import { loadGitHubDataCached } from "@/lib/github";
+import { getLinks, prKey, updateLinks, type Pin } from "@/lib/links";
 import type { ApiError, SessionResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -83,24 +86,68 @@ export async function GET(request: Request) {
         ? await Promise.all([getLinks(key), getDrafts(key)])
         : [{}, {}];
 
-      // A rebase rewrites shas, so a pin can outlive its commit. Resolve
-      // each distinct pinned sha once against the branch.
+      // A rebase rewrites shas, so a pin can outlive its commit. Ask whether
+      // each pinned sha is still *reachable from HEAD* — not merely whether
+      // the object exists, since rebased-away commits linger in the object
+      // database and would otherwise pass as healthy.
       const pinAlive = new Map<string, boolean>();
-      for (const sha of new Set(Object.values(pins))) {
-        const found = await gitLine(repo.root, [
-          "rev-parse",
-          "--verify",
-          "--quiet",
-          `${sha}^{commit}`,
-        ]);
-        pinAlive.set(sha, Boolean(found));
+      for (const pin of Object.values(pins)) {
+        if (pinAlive.has(pin.sha)) continue;
+        pinAlive.set(pin.sha, await isOnBranch(repo.root, pin.sha));
+      }
+
+      // Pins made before patch-ids existed have none stored, which would
+      // leave them unable to survive the next rebase. Backfill quietly while
+      // their commit is still reachable — one cheap call per such pin, once.
+      // Collected then written in a single batch: separate writes would race
+      // each other through the same file.
+      if (key) {
+        const backfill: Record<string, Pin> = {};
+        for (const [threadId, pin] of Object.entries(pins)) {
+          if (pin.patchId || !pinAlive.get(pin.sha)) continue;
+          const patchId = await getPatchId(repo.root, pin.sha);
+          if (patchId) {
+            pins[threadId] = { sha: pin.sha, patchId };
+            backfill[threadId] = pins[threadId];
+          }
+        }
+        await updateLinks(key, backfill);
+      }
+
+      // Anything still missing may just have been rebased. A commit's
+      // patch-id hashes its diff alone, so a rewritten commit keeps it —
+      // find the new sha by patch-id rather than making the user re-pin.
+      // Only computed when something is actually broken.
+      const healed = new Set<string>();
+      const stale = Object.entries(pins).filter(
+        ([, pin]) => !pinAlive.get(pin.sha) && pin.patchId,
+      );
+      if (stale.length > 0 && branchDiff && key) {
+        const patchIds = await getPatchIdMap(
+          repo.root,
+          `${branchDiff.baseSha}..HEAD`,
+        );
+        const moves: Record<string, Pin> = {};
+        for (const [threadId, pin] of stale) {
+          // null = the patch-id appears more than once on the branch, so
+          // the match is ambiguous; leave it broken and let the user decide.
+          const match = pin.patchId ? patchIds.get(pin.patchId) : undefined;
+          if (match) {
+            pins[threadId] = { sha: match, patchId: pin.patchId };
+            moves[threadId] = pins[threadId];
+            pinAlive.set(match, true);
+            healed.add(threadId);
+          }
+        }
+        await updateLinks(key, moves);
       }
 
       // Cached per path, since threads cluster on few files.
       const byPath = new Map<string, string | null>();
       github.threads = await Promise.all(
         rawGithub.threads.map(async (thread) => {
-          const pinnedSha = pins[thread.id] ?? null;
+          const pin = pins[thread.id];
+          const pinnedSha = pin?.sha ?? null;
           const pinnedShaMissing = pinnedSha
             ? !pinAlive.get(pinnedSha)
             : false;
@@ -127,6 +174,7 @@ export async function GET(request: Request) {
             addressedBySha,
             pinnedSha,
             pinnedShaMissing,
+            pinnedShaHealed: healed.has(thread.id),
             draft: drafts[thread.id] ?? null,
           };
         }),

@@ -2,7 +2,7 @@ import { promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
-import { ExecError, git, gitLine, gitTry } from "./exec";
+import { ExecError, git, gitLine, gitTry, run } from "./exec";
 import type {
   BaseInfo,
   BranchDiffSummary,
@@ -621,6 +621,86 @@ function pathspecArgs(opts: PatchOptions): string[] {
     Array.isArray(opts.pathspec) ? opts.pathspec : [opts.pathspec]
   ).filter(Boolean);
   return paths.length > 0 ? ["--", ...paths] : [];
+}
+
+/**
+ * Is `sha` reachable from HEAD?
+ *
+ * Not the same as "does this object exist": after a rebase the pre-rebase
+ * commits are still in the object database, reachable via the reflog, so an
+ * existence check happily validates a commit that is no longer on the
+ * branch. Containment is what "this pin still points at real work" means.
+ */
+export async function isOnBranch(
+  root: string,
+  sha: string,
+): Promise<boolean> {
+  const { code } = await run(
+    "git",
+    ["merge-base", "--is-ancestor", sha, "HEAD"],
+    { cwd: root, allowExitCodes: [1, 128], timeout: 10_000 },
+  ).catch(() => ({ code: 1 }));
+  return code === 0;
+}
+
+/**
+ * A commit's patch-id: a hash of its diff, ignoring parent and metadata.
+ * Rebasing rewrites shas but preserves patch-ids, which is what lets a pin
+ * survive a restack. Null for empty commits, merges, or if git declines.
+ */
+export async function getPatchId(
+  root: string,
+  sha: string,
+): Promise<string | null> {
+  const { stdout } = await run(
+    "sh",
+    [
+      "-c",
+      // patch-id reads a patch on stdin; --stable keeps the hash independent
+      // of hunk ordering, which is what makes it comparable across rebases.
+      'git diff-tree -p --no-color --no-ext-diff "$1" | git patch-id --stable',
+      "sh",
+      sha,
+    ],
+    { cwd: root, timeout: 15_000 },
+  ).catch(() => ({ stdout: "" }));
+
+  const id = stdout.trim().split(/\s+/)[0];
+  return id && /^[0-9a-f]{40}$/.test(id) ? id : null;
+}
+
+/**
+ * Patch-id → sha for every commit in `range`, in one pipeline rather than
+ * one process per commit. Used to re-match pins after a rebase.
+ *
+ * A patch-id occurring more than once (revert-then-reapply, cherry-picked
+ * duplicates) maps to null: an ambiguous match must not be guessed at.
+ */
+export async function getPatchIdMap(
+  root: string,
+  range: string,
+): Promise<Map<string, string | null>> {
+  const { stdout } = await run(
+    "sh",
+    [
+      "-c",
+      'git log --format="%H" "$1" | while read sha; do ' +
+        'git diff-tree -p --no-color --no-ext-diff "$sha" | ' +
+        "git patch-id --stable; done",
+      "sh",
+      range,
+    ],
+    { cwd: root, timeout: 60_000 },
+  ).catch(() => ({ stdout: "" }));
+
+  const map = new Map<string, string | null>();
+  for (const line of stdout.split("\n")) {
+    const [patchId, sha] = line.trim().split(/\s+/);
+    if (!patchId || !sha) continue;
+    // Second sighting of a patch-id makes it ambiguous, permanently.
+    map.set(patchId, map.has(patchId) ? null : sha);
+  }
+  return map;
 }
 
 /** The patch for a single commit. Merges are diffed against their first parent. */

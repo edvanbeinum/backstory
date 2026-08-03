@@ -196,6 +196,7 @@ export function ReviewThreadCard({
               suggestedSha={thread.addressedBySha}
               pinnedSha={thread.pinnedSha}
               pinnedShaMissing={thread.pinnedShaMissing}
+              pinnedShaHealed={thread.pinnedShaHealed}
               onPin={
                 onPin ? (sha) => onPin(thread.id, sha) : undefined
               }

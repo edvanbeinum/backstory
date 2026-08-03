@@ -70,6 +70,7 @@ export function ReplyComposer({
   suggestedSha,
   pinnedSha,
   pinnedShaMissing = false,
+  pinnedShaHealed = false,
   onPin,
   pinCandidates = [],
   draft,
@@ -83,8 +84,10 @@ export function ReplyComposer({
   suggestedSha?: string | null;
   /** A commit the user pinned to this thread — beats the suggestion */
   pinnedSha?: string | null;
-  /** The pinned sha is gone (rebased away) */
+  /** The pinned sha is gone and couldn't be re-matched */
   pinnedShaMissing?: boolean;
+  /** The pin was re-matched to a rewritten commit by patch-id */
+  pinnedShaHealed?: boolean;
   /** Pin the thread to a sha, or unpin with null. Absent = pinning off. */
   onPin?: (sha: string | null) => void;
   /**
@@ -227,7 +230,8 @@ export function ReplyComposer({
               <span className="text-[var(--attention)]">
                 <PinIcon size={11} /> Pinned to{" "}
                 <span className="mono">{pinnedSha?.slice(0, 7)}</span>, which
-                is no longer on this branch — probably rebased away.
+                is no longer on this branch and doesn&apos;t match any commit
+                here — squashed, amended, or rebased through a conflict.
               </span>
             )}
 
@@ -235,6 +239,12 @@ export function ReplyComposer({
               <span className="text-[var(--fg)]">
                 <PinIcon size={11} className="text-[var(--done)]" /> Pinned to{" "}
                 <span className="mono">{pinned.shortSha}</span>
+                {pinnedShaHealed && (
+                  <span className="text-[var(--fg-muted)]">
+                    {" "}
+                    · re-matched after a rebase
+                  </span>
+                )}
               </span>
             ) : linkingSuggested ? (
               <>

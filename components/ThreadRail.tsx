@@ -145,6 +145,9 @@ function ReplyTarget({ thread }: { thread: ReviewThread }) {
       <span className="flex items-center gap-1 text-[11px] text-[var(--done)]">
         <PinIcon size={10} />
         <span className="mono">{thread.pinnedSha.slice(0, 7)}</span>
+        {thread.pinnedShaHealed && (
+          <span className="text-[var(--fg-subtle)]">re-matched</span>
+        )}
       </span>
     );
   }
