@@ -170,6 +170,15 @@ body {
   white-space: nowrap;
 }
 
+/* Line numbers copy their path:line reference on click. */
+.diff-num-copy {
+  cursor: pointer;
+}
+.diff-num-copy:hover {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .diff-marker {
   width: 1%;
   min-width: 22px;

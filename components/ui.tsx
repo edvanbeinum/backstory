@@ -77,6 +77,30 @@ export function Button({
 }
 
 /**
+ * Copy text to the clipboard, with a selection-based fallback — the
+ * Clipboard API needs a secure context; localhost qualifies, but belt and
+ * braces. Returns whether the copy landed.
+ */
+export async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const area = document.createElement("textarea");
+    area.value = text;
+    area.style.position = "fixed";
+    area.style.opacity = "0";
+    document.body.appendChild(area);
+    area.select();
+    try {
+      return document.execCommand("copy");
+    } finally {
+      document.body.removeChild(area);
+    }
+  }
+}
+
+/**
  * Copy-to-clipboard with a confirmation state. This is the app's whole output
  * path — nothing is ever posted to GitHub — so it needs to be unmistakable
  * when a copy actually landed.
@@ -113,25 +137,7 @@ export function CopyButton({
 
   const copy = async () => {
     const text = typeof value === "function" ? value() : value;
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-    } catch {
-      // Clipboard API needs a secure context; localhost qualifies, but fall
-      // back to a selection-based copy just in case.
-      const area = document.createElement("textarea");
-      area.value = text;
-      area.style.position = "fixed";
-      area.style.opacity = "0";
-      document.body.appendChild(area);
-      area.select();
-      try {
-        document.execCommand("copy");
-        setCopied(true);
-      } finally {
-        document.body.removeChild(area);
-      }
-    }
+    if (await copyToClipboard(text)) setCopied(true);
   };
 
   return (

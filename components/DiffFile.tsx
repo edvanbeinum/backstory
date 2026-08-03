@@ -19,7 +19,7 @@ import {
   UnfoldIcon,
 } from "./icons";
 import { ReviewThreadCard } from "./ReviewThreadCard";
-import { Badge, Spinner } from "./ui";
+import { Badge, copyToClipboard, CopyButton, Spinner } from "./ui";
 
 const STATUS_TONE: Record<string, string> = {
   added: "text-[var(--success)]",
@@ -102,6 +102,27 @@ export function DiffFile({
     if (!whole) void loadWhole();
   };
 
+  // Which line-number cell just copied its `path:line` reference — keyed by
+  // hunk/line/side so exactly one cell shows the confirmation tick.
+  const [copiedLine, setCopiedLine] = useState<string | null>(null);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const copyLineRef = useCallback(
+    async (key: string, line: number) => {
+      if (await copyToClipboard(`${file.path}:${line}`)) {
+        setCopiedLine(key);
+        if (copiedTimer.current) clearTimeout(copiedTimer.current);
+        copiedTimer.current = setTimeout(() => setCopiedLine(null), 1200);
+      }
+    },
+    [file.path],
+  );
+  useEffect(
+    () => () => {
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    },
+    [],
+  );
+
   // Expanding a 2,000-line file would otherwise dump you at the top of it with
   // the actual change somewhere far below. Put the first change back on screen.
   useEffect(() => {
@@ -158,6 +179,14 @@ export function DiffFile({
             file.path
           )}
         </span>
+
+        <CopyButton
+          value={file.path}
+          label=""
+          title="Copy file path"
+          variant="invisible"
+          className="!px-1"
+        />
 
         {anchoredCount > 0 && (
           <Badge tone="attention">
@@ -228,6 +257,7 @@ export function DiffFile({
                       <HunkRows
                         key={hunkIndex}
                         hunk={hunk}
+                        hunkIndex={hunkIndex}
                         // In whole-file mode the single hunk spans the file,
                         // so its @@ header is noise rather than a landmark.
                         showHunkHeader={!showWhole}
@@ -237,6 +267,9 @@ export function DiffFile({
                         pr={pr}
                         commit={commit}
                         focusedThreadId={focusedThreadId}
+                        filePath={file.path}
+                        copiedLine={copiedLine}
+                        onCopyLine={copyLineRef}
                       />
                     ))}
                   </tbody>
@@ -296,6 +329,7 @@ export function DiffFile({
 
 function HunkRows({
   hunk,
+  hunkIndex,
   showHunkHeader = true,
   byNewLine,
   byOldLine,
@@ -303,8 +337,12 @@ function HunkRows({
   pr,
   commit,
   focusedThreadId,
+  filePath,
+  copiedLine,
+  onCopyLine,
 }: {
   hunk: DiffFileType["hunks"][number];
+  hunkIndex: number;
   showHunkHeader?: boolean;
   byNewLine: Map<number, ReviewThread[]>;
   byOldLine: Map<number, ReviewThread[]>;
@@ -312,7 +350,26 @@ function HunkRows({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
+  filePath: string;
+  copiedLine: string | null;
+  onCopyLine: (key: string, line: number) => void;
 }) {
+  // Clicking a line number copies the editor-style "path:line" reference —
+  // the thing you paste into a terminal, an editor, or a review reply. The
+  // cell briefly shows a tick instead of its number as confirmation.
+  const numCell = (line: number | null, side: "old" | "new") => {
+    if (line === null) return <td className="diff-num" />;
+    const key = `${hunkIndex}:${side}:${line}`;
+    return (
+      <td
+        className="diff-num diff-num-copy"
+        title={`Copy ${filePath}:${line}`}
+        onClick={() => onCopyLine(key, line)}
+      >
+        {copiedLine === key ? "✓" : line}
+      </td>
+    );
+  };
   return (
     <>
       {showHunkHeader && (
@@ -343,8 +400,8 @@ function HunkRows({
                     : ""
               } ${threads.length > 0 ? "line-anchored" : ""}`}
             >
-              <td className="diff-num">{line.oldNo ?? ""}</td>
-              <td className="diff-num">{line.newNo ?? ""}</td>
+              {numCell(line.oldNo, "old")}
+              {numCell(line.newNo, "new")}
               <td className="diff-marker">
                 {line.type === "add" ? "+" : line.type === "del" ? "-" : ""}
               </td>
