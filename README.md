@@ -29,8 +29,15 @@ npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:3000 and paste in the path to a checkout. The path is
-remembered, so you only do that once per repo.
+Open http://127.0.0.1:3000 and pick a checkout — **Browse** finds them for
+you, or paste a path. The path is remembered, and recent repos are one click
+away in the input's dropdown.
+
+Browse leads with the **sibling worktrees** of whatever repo is open, listed
+with the branch each one holds, straight from `git worktree list`. Below that
+is a directory navigator that marks which folders are git checkouts. (It has
+to be server-side: a browser's native folder picker only ever yields relative
+paths, never the absolute one differ needs.)
 
 ## Running it as an app
 

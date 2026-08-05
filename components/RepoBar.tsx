@@ -6,12 +6,14 @@ import {
   AlertIcon,
   ChevronDownIcon,
   FileDiffIcon,
+  FolderIcon,
   GitCommitIcon,
   LinkExternalIcon,
   PullRequestIcon,
   SyncIcon,
   XIcon,
 } from "./icons";
+import { RepoBrowser } from "./RepoBrowser";
 import { Badge, Button, CopyButton, Spinner } from "./ui";
 import type { RecentRepo } from "@/lib/recents";
 import type { SessionResponse } from "@/lib/types";
@@ -39,6 +41,7 @@ export function RepoBar({
 }) {
   const [draft, setDraft] = useState(repoPath);
   const [listOpen, setListOpen] = useState(false);
+  const [browserOpen, setBrowserOpen] = useState(false);
   const headerRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -177,6 +180,14 @@ export function RepoBar({
               </ul>
             )}
           </div>
+          <Button
+            onClick={() => setBrowserOpen(true)}
+            size="md"
+            title="Find a repository or worktree"
+          >
+            <FolderIcon size={14} />
+            Browse
+          </Button>
           <Button type="submit" size="md">
             Open
           </Button>
@@ -265,6 +276,17 @@ export function RepoBar({
             )
           )}
         </div>
+      )}
+
+      {browserOpen && (
+        <RepoBrowser
+          currentRepo={session?.repo.root ?? null}
+          onPick={(picked) => {
+            setBrowserOpen(false);
+            onRepoPathChange(picked);
+          }}
+          onClose={() => setBrowserOpen(false)}
+        />
       )}
     </header>
   );
