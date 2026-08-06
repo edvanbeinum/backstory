@@ -2,11 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
+import { ChangePane, bestChangeFor } from "@/components/ChangePane";
 import { CommentList } from "@/components/CommentList";
-import { CommentView } from "@/components/CommentView";
-import { CommitHeader } from "@/components/CommitHeader";
+import { CommentPane } from "@/components/CommentPane";
 import { CommitList } from "@/components/CommitList";
-import { DiffView } from "@/components/DiffView";
 import { AlertIcon, FileDiffIcon } from "@/components/icons";
 import { PrTitle } from "@/components/PrTitle";
 import { RailTabs } from "@/components/RailTabs";
@@ -92,8 +91,6 @@ export default function Page() {
   /** Which rail is showing. Comments is the default; commits is self-review. */
   const [mode, setMode] = useState<RailMode>("comments");
   const [commentId, setCommentId] = useState<string | null>(null);
-  /** Source chip override for the selected comment; null = auto-pick. */
-  const [src, setSrc] = useState<string | null>(null);
   /** Set when a URL asked for a comment that isn't in this PR. */
   const [commentNotice, setCommentNotice] = useState<string | null>(null);
   /** Bumped by watcher events; retriggers the working-tree diff fetch. */
@@ -119,7 +116,6 @@ export default function Page() {
     if (fromUrl.rev) setRev(fromUrl.rev);
     if (fromUrl.mode) setMode(fromUrl.mode);
     if (fromUrl.comment) setCommentId(fromUrl.comment);
-    if (fromUrl.src) setSrc(fromUrl.src);
     if (fromUrl.repo) window.localStorage.setItem(STORAGE_KEY, fromUrl.repo);
     setRecents(loadRecents());
     setReady(true);
@@ -159,9 +155,8 @@ export default function Page() {
       rev,
       mode,
       comment: commentId,
-      src,
     });
-  }, [ready, repoPath, rev, mode, commentId, src]);
+  }, [ready, repoPath, rev, mode, commentId]);
 
   // Someone navigating with the back/forward buttons, or editing the URL by
   // hand, should land on the view they asked for.
@@ -172,7 +167,6 @@ export default function Page() {
       setRev(fromUrl.rev ?? WORKING_REV);
       setMode(fromUrl.mode ?? "comments");
       setCommentId(fromUrl.comment);
-      setSrc(fromUrl.src);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -224,8 +218,6 @@ export default function Page() {
             data.github.threads,
           );
           setCommentNotice(notice);
-          // A different comment means the old source override is meaningless.
-          if (next !== current) setSrc(null);
           return next;
         });
 
@@ -508,6 +500,37 @@ export default function Page() {
     [threads, commentId],
   );
 
+  const commentIndex = useMemo(
+    () => threads.findIndex((t) => t.id === commentId),
+    [threads, commentId],
+  );
+
+  /**
+   * Selecting a comment moves the change column to whatever answers it —
+   * that's the app's whole point. The reverse doesn't hold: picking a commit
+   * leaves the comment alone, so the two lists really are separate axes.
+   */
+  const selectComment = useCallback(
+    (id: string) => {
+      setCommentId(id);
+      setFocusedThreadId(id);
+      const thread = threads.find((t) => t.id === id) ?? null;
+      const best = session ? bestChangeFor(thread, session) : null;
+      if (best) setRev(best);
+      window.scrollTo({ top: 0 });
+    },
+    [threads, session],
+  );
+
+  const stepComment = useCallback(
+    (delta: number) => {
+      if (commentIndex === -1) return;
+      const next = threads[commentIndex + delta];
+      if (next) selectComment(next.id);
+    },
+    [threads, commentIndex, selectComment],
+  );
+
   /** Paths the working tree touches — drives the "uncommitted" answer state. */
   const workingPaths = useMemo(
     () => new Set(session?.working.changedPaths ?? []),
@@ -586,10 +609,7 @@ export default function Page() {
         if (step < 0 || step >= ids.length) return;
 
         event.preventDefault();
-        setCommentId(ids[step]);
-        setFocusedThreadId(ids[step]);
-        setSrc(null);
-        window.scrollTo({ top: 0 });
+        selectComment(ids[step]);
         return;
       }
 
@@ -657,12 +677,7 @@ export default function Page() {
               <CommentList
                 threads={threads}
                 selectedId={commentId}
-                onSelect={(thread) => {
-                  setCommentId(thread.id);
-                  setFocusedThreadId(thread.id);
-                  setSrc(null);
-                  window.scrollTo({ top: 0 });
-                }}
+                onSelect={(thread) => selectComment(thread.id)}
                 workingPaths={workingPaths}
               />
             ) : (
@@ -725,50 +740,51 @@ export default function Page() {
               </p>
             )}
 
-            {mode === "comments" ? (
-              selectedThread ? (
-                <CommentView
+            {/* Two columns, two independent selections: the comment you're
+                working on stays put on the left while you browse changes on
+                the right. Stacks below xl, where side-by-side would squeeze
+                the diff too hard. */}
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+              <div
+                className="thin-scroll min-w-0 xl:sticky xl:w-[380px] xl:shrink-0 xl:overflow-y-auto"
+                style={{
+                  top: "calc(var(--header-height, 0px) + 1rem)",
+                  maxHeight: "calc(100vh - var(--header-height, 0px) - 2rem)",
+                }}
+              >
+                <CommentPane
+                  threads={threads}
                   thread={selectedThread}
-                  session={session}
-                  repoPath={repoPath}
-                  srcOverride={src}
-                  onSrcChange={setSrc}
-                  focusedThreadId={focusedThreadId}
+                  index={commentIndex}
+                  onStep={stepComment}
+                  repo={session.repo}
+                  pr={session.github.pr}
+                  commit={commitForRev}
                   onPin={pinThread}
                   pinCandidates={pinCandidates}
                   onDraftChange={saveDraft}
                 />
-              ) : (
-                <p className="rounded-md border border-[var(--border)] bg-[var(--canvas)] px-3 py-10 text-center text-[13px] text-[var(--fg-muted)]">
-                  No review comments on this pull request yet.
-                </p>
-              )
-            ) : (
-              <>
-                <CommitHeader
-                  commit={commitForRev}
-                  diff={diff}
-                  repo={session.repo}
-                  pr={session.github.pr}
-                  pushed={revIsPushed}
-                />
+              </div>
 
-                <DiffView
+              <div className="min-w-0 flex-1">
+                <ChangePane
+                  session={session}
+                  rev={rev}
+                  onRevChange={setRev}
+                  commit={commitForRev}
                   diff={diff}
                   loading={diffLoading}
                   error={diffError}
                   threads={threads}
-                  reviews={session.github.reviews}
-                  repo={session.repo}
-                  pr={session.github.pr}
-                  commit={commitForRev}
+                  thread={selectedThread}
                   focusedThreadId={focusedThreadId}
                   onPin={pinThread}
                   pinCandidates={pinCandidates}
                   onDraftChange={saveDraft}
+                  pushed={revIsPushed}
                 />
-              </>
-            )}
+              </div>
+            </div>
           </main>
         </div>
       ) : null}

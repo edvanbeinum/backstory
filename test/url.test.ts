@@ -64,12 +64,11 @@ const EMPTY = {
   rev: null,
   mode: null,
   comment: null,
-  src: null,
 };
 
 test("an empty query yields nulls, not empty strings", () => {
   assert.deepEqual(parseUrlState(""), EMPTY);
-  assert.deepEqual(parseUrlState("?repo=&rev=  &comment=&src="), EMPTY);
+  assert.deepEqual(parseUrlState("?repo=&rev=  &comment=  "), EMPTY);
 });
 
 test("mode round-trips, and only the non-default one is written", () => {
@@ -94,14 +93,6 @@ test("a link carries your place in both lists", () => {
   // Toggling back to comments should not have lost the selected comment
   assert.equal(parsed.rev, "abc1234");
   assert.equal(parsed.comment, "PRRT_abc");
-});
-
-test("the source chip only appears once overridden", () => {
-  assert.doesNotMatch(buildUrl({ repo: "/r", comment: "PRRT_abc" }), /src=/);
-  assert.match(
-    buildUrl({ repo: "/r", comment: "PRRT_abc", src: "working" }),
-    /src=working/,
-  );
 });
 
 test("a comment id resolves, falling back to the first OPEN thread", () => {

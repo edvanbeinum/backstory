@@ -18,10 +18,8 @@ export interface UrlState {
   rev: string | null;
   /** Rail mode; null means the default (comments) */
   mode: RailMode | null;
-  /** Selected review thread id, in comments mode */
+  /** Selected review thread id */
   comment: string | null;
-  /** Source chip override for the comment's diff: a rev, working, or branch */
-  src: string | null;
 }
 
 /** Pure half of readUrlState, so it can be tested without a DOM. */
@@ -31,7 +29,6 @@ export function parseUrlState(search: string): UrlState {
   const rev = params.get("rev")?.trim();
   const mode = params.get("mode")?.trim();
   const comment = params.get("comment")?.trim();
-  const src = params.get("src")?.trim();
 
   return {
     repo: repo ? repo : null,
@@ -40,7 +37,6 @@ export function parseUrlState(search: string): UrlState {
     // than trusted into state.
     mode: mode === "comments" || mode === "commits" ? mode : null,
     comment: comment ? comment : null,
-    src: src ? src : null,
   };
 }
 
@@ -58,8 +54,6 @@ export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
   // URL short, and a missing rev falls back to it anyway.
   if (state.rev && state.rev !== WORKING_REV) params.set("rev", state.rev);
   if (state.comment) params.set("comment", state.comment);
-  // The source chip is auto-picked, so it only appears once overridden.
-  if (state.src) params.set("src", state.src);
 
   // URLSearchParams percent-encodes slashes, which turns every repo path into
   // an unreadable %2F soup. A slash is legal unencoded in a query string, and
@@ -75,7 +69,6 @@ const EMPTY_STATE: UrlState = {
   rev: null,
   mode: null,
   comment: null,
-  src: null,
 };
 
 export function readUrlState(): UrlState {

@@ -101,54 +101,61 @@ work — you just get a banner where the PR comments would be.
 ## What you see
 
 ```
-┌────────────────────┬─────────────────────────────────────────────┐
-│ NOT YET PUSHED     │  Debounce the search input                  │
-│ ◍ Uncommitted (3)  │  ┌ SearchBox.tsx              +3 −0  ─────┐  │
-│ ● a23c7cf Debou…   │  │  33   function onQueryChange() {       │  │
-│ ● aeaf49f Cache…   │  │  34 + // Debounced by 300ms.           │  │
-│ ● 5e99a82 Fix…     │  │     💬 reviewer: Nit: this still       │  │
-│ ── origin/main ──  │  │        fires on every keystroke…       │  │
-│                    │  │        [Addressed in <link>] ⧉ Copy    │  │
-│ REVIEW THREADS     │  └────────────────────────────────────────┘  │
-│ ⬤ SearchBox:34     │                                              │
-└────────────────────┴─────────────────────────────────────────────┘
+┌──────────────────┬────────────────────┬───────────────────────────┐
+│ [Comments][Commits]                   │                           │
+│ 6 comments       │ COMMENT 2 of 6 ‹ › │ Showing (◍) (fc6ff8f) (⧉) │
+│ AudioEngine.swift│ ┌────────────────┐ │ 💬 1 comment lands here   │
+│ ● The pending…   │ │ julianrubisch  │ │ ┌ FakePlaybackEngine.swift│
+│   → 888c79c      │ │ Keying off     │ │ │  49   func complete() { │
+│ ● Nit: the guard…│ │ pendingSeek…   │ │ │  51 + assert(target)    │
+│   → 888c79c      │ │                │ │ │     💬 the comment,     │
+│ FakePlayback…    │ │ [Addressed in  │ │ │        anchored inline  │
+│ ● Keying off…    │ │  fc6ff8f] ⧉    │ │ └─────────────────────────│
+│   → fc6ff8f      │ └────────────────┘ │                           │
+└──────────────────┴────────────────────┴───────────────────────────┘
+     the rail          the comment              the change
 ```
 
-**All changes vs main** — pinned at the top of the rail: the whole branch as
-one diff against the default branch, with commit/file/line totals — GitHub's
-"Files changed" tab, before the push. Review threads anchor here too, and
-often better than per-commit, since the combined diff shows the final state
-of every line.
+**Comments and commits are separate axes.** The main pane is two columns: the
+comment you're working on stays pinned on the left while you browse changes on
+the right. Selecting a comment moves the right column to whatever answers it;
+selecting a commit leaves the comment alone. The comment column has its own
+‹ › stepper, so you can step through comments whichever list the rail happens
+to be showing. Below `xl` the columns stack, where side by side would squeeze
+the diff too hard.
 
-**The rail has two modes.** *Comments* is the default: a checklist of the
-PR's review comments, each showing what currently answers it — a pinned
-commit, an inferred one, uncommitted work, or nothing yet. Selecting one puts
-the comment and its reply box at the top of the page, with the change that
-answers it below, scoped to that comment's file.
+**The rail has two modes** and drives only itself.
 
-Which change gets shown is auto-picked, with chips to override:
+*Comments* is the default: a checklist of the PR's review comments, each
+showing what currently answers it — a pinned commit, an inferred one,
+uncommitted work, or nothing yet.
+
+*Commits* is the pre-push self-review list: every commit between your branch
+tip and what's on the remote, with uncommitted work pinned at the top as a
+pseudo-commit and **All changes vs main** above that — the whole branch as one
+diff, GitHub's "Files changed" tab before the push. The push boundary line
+marks what GitHub has; below it, the last 30 already-pushed commits continue
+the timeline, dimmed but selectable. `j`/`k` move through whichever list is
+showing.
+
+**The change column** picks what to show automatically, with chips to
+override:
 
 ```
-Answered by  ( ◍ Uncommitted )  ( 26ef8f7 )  ( ⧉ All changes )
+Showing  ( ◍ Uncommitted )  ( fc6ff8f )  ( ⧉ All changes )
 ```
 
 Uncommitted leads when your working tree touches the comment's file — that's
-where you are when you glance at a comment mid-fix, before committing.
-Otherwise the pinned or inferred commit, otherwise the whole branch diff.
+where you are when you check a comment mid-fix, before committing. Otherwise
+the pinned or inferred commit, otherwise the whole branch diff. Whatever is
+selected says how many comments land in it, which is the reverse lookup: given
+a commit, which review comments does it answer?
 
-*Commits* is the other mode, and is the pre-push self-review view:
-
-**Left rail** — every commit between your branch tip and what's on the remote,
-with uncommitted work pinned at the top as a pseudo-commit. The push boundary
-line marks what GitHub has; below it, the last 30 already-pushed commits
-continue the timeline, dimmed but selectable — viewing one shows its diff
-with an "already pushed" badge. Below that, the review threads, filtered to
-unresolved by default.
-
-**Main pane** — the selected commit's message, then its diff. Review threads
-anchor **inline, on the line they were written against**, so "did this change
-actually answer the review?" is a glance rather than a memory test. `j`/`k`
-move through commits.
+Review threads anchor **inline, on the line they were written against**, so
+"did this change actually answer the review?" is a glance rather than a memory
+test. Nothing is ever hidden: a thread that doesn't land on a line in the
+current change still appears, either under its file or in *Other comments on
+this PR*.
 
 ## Linking threads to commits
 
