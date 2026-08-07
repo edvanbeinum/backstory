@@ -7,7 +7,6 @@ import type {
   DiffResponse,
   PullRequestInfo,
   RepoInfo,
-  ReviewSummary,
   ReviewThread,
 } from "@/lib/types";
 import { DiffFile } from "./DiffFile";
@@ -35,9 +34,11 @@ function partitionThreads(diff: DiffResponse | null, threads: ReviewThread[]) {
   for (const thread of threads) {
     if (thread.path && paths.has(thread.path)) {
       perFile.set(thread.path, [...(perFile.get(thread.path) ?? []), thread]);
-    } else {
+    } else if (thread.path) {
       elsewhere.push(thread);
     }
+    // Review summaries have no file, and the comment column already shows
+    // them — repeating them under the diff would just be noise.
   }
 
   return { perFile, elsewhere };
@@ -48,7 +49,6 @@ export function DiffView({
   loading,
   error,
   threads,
-  reviews,
   repo,
   pr,
   commit,
@@ -61,7 +61,6 @@ export function DiffView({
   loading: boolean;
   error: string | null;
   threads: ReviewThread[];
-  reviews: ReviewSummary[];
   repo: RepoInfo;
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
@@ -128,34 +127,6 @@ export function DiffView({
             onDraftChange={onDraftChange}
           />
         ))
-      )}
-
-      {reviews.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="flex items-center gap-2 pt-2 text-[13px] font-semibold">
-            <CommentIcon size={14} className="text-[var(--fg-muted)]" />
-            Review summaries
-          </h2>
-          {reviews.map((review) => (
-            <div
-              key={review.id}
-              className="rounded-md border border-[var(--border)] bg-[var(--canvas)] p-3"
-            >
-              <p className="mb-1 text-[12px] text-[var(--fg-muted)]">
-                <a
-                  href={review.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="font-semibold text-[var(--fg)] hover:text-[var(--accent)] hover:underline"
-                >
-                  {review.author}
-                </a>{" "}
-                {review.state.toLowerCase().replace(/_/g, " ")}
-              </p>
-              <p className="whitespace-pre-wrap text-[13px]">{review.body}</p>
-            </div>
-          ))}
-        </section>
       )}
 
       {elsewhere.length > 0 && (

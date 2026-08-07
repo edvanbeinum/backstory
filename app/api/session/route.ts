@@ -21,7 +21,11 @@ import {
   updateLinks,
   type LinkRecord,
 } from "@/lib/links";
-import type { ApiError, SessionResponse } from "@/lib/types";
+import type {
+  ApiError,
+  ReviewThread,
+  SessionResponse,
+} from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -77,12 +81,41 @@ export async function GET(request: Request) {
       rawGithub.pr?.baseRefName ?? null,
     );
 
+    // A review left as a top-level body — no inline thread — is still
+    // something to address, so it joins the checklist as a thread with no
+    // file. Without this a PR whose only feedback is a review summary looks
+    // like it has no comments at all.
+    const summaryThreads: ReviewThread[] = rawGithub.reviews.map((review) => ({
+      id: review.id,
+      isResolved: false,
+      isOutdated: false,
+      path: null,
+      line: null,
+      originalLine: null,
+      startLine: null,
+      side: null,
+      isReviewSummary: true,
+      comments: [
+        {
+          id: review.id,
+          databaseId: null,
+          author: review.author,
+          avatarUrl: review.avatarUrl,
+          body: review.body,
+          createdAt: review.createdAt,
+          url: review.url,
+          diffHunk: null,
+        },
+      ],
+    }));
+
     // Attach how each comment was handled. Nothing is inferred: differ used
     // to guess which commit answered a comment, but a guess always found
     // something, so no comment ever read as outstanding and the list
     // couldn't work as a checklist.
-    const github = { ...rawGithub, threads: rawGithub.threads };
-    if (rawGithub.threads.length > 0) {
+    const allThreads = [...summaryThreads, ...rawGithub.threads];
+    const github = { ...rawGithub, threads: allThreads };
+    if (allThreads.length > 0) {
       const key = rawGithub.pr
         ? prKey(repo.owner, repo.name, rawGithub.pr.number)
         : null;
@@ -159,7 +192,7 @@ export async function GET(request: Request) {
         await updateLinks(key, moves);
       }
 
-      github.threads = rawGithub.threads.map((thread) => {
+      github.threads = allThreads.map((thread) => {
         const link = links[thread.id];
         const linkedSha = link?.kind === "commit" ? link.sha : null;
 

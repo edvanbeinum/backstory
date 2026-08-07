@@ -220,7 +220,6 @@ export function ChangePane({
         loading={loading}
         error={error}
         threads={threads}
-        reviews={session.github.reviews}
         repo={session.repo}
         pr={session.github.pr}
         commit={commit}

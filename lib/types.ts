@@ -154,6 +154,11 @@ export interface ReviewThread {
    * as addressed alongside a commit link.
    */
   acknowledged?: boolean;
+  /**
+   * A top-level review body rather than an inline thread. It has no file or
+   * line, but it still needs addressing, so it belongs in the checklist.
+   */
+  isReviewSummary?: boolean;
   /** A saved reply the user was part-way through writing. */
   draft?: string | null;
   /**
@@ -173,6 +178,7 @@ export interface ReviewThread {
 export interface ReviewSummary {
   id: string;
   author: string;
+  avatarUrl: string | null;
   body: string;
   state: string;
   url: string;

@@ -44,7 +44,7 @@ export function CommentList({
   const byFile = useMemo(() => {
     const groups = new Map<string, ReviewThread[]>();
     for (const thread of visible) {
-      const key = thread.path ?? "General";
+      const key = thread.path ?? "Review summary";
       groups.set(key, [...(groups.get(key) ?? []), thread]);
     }
     return [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0]));
@@ -84,7 +84,7 @@ export function CommentList({
               className="mono truncate px-3 py-1 text-[11px] text-[var(--fg-subtle)]"
               title={file}
             >
-              {file.split("/").pop()}
+              {file === "Review summary" ? file : file.split("/").pop()}
             </p>
             <ul>
               {group.map((thread) => {

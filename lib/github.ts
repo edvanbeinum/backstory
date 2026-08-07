@@ -27,7 +27,7 @@ query($owner: String!, $name: String!, $number: Int!) {
           state
           url
           createdAt
-          author { login }
+          author { login avatarUrl }
         }
       }
       reviewThreads(first: 100) {
@@ -85,7 +85,7 @@ interface GqlReviewNode {
   state: string;
   url: string;
   createdAt: string;
-  author: { login: string } | null;
+  author: { login: string; avatarUrl: string | null } | null;
 }
 
 /**
@@ -273,6 +273,7 @@ async function loadThreads(repo: RepoInfo, number: number) {
     .map((r) => ({
       id: r.id,
       author: r.author?.login ?? "ghost",
+      avatarUrl: r.author?.avatarUrl ?? null,
       body: r.body,
       state: r.state,
       url: r.url,
