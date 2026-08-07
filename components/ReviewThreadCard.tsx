@@ -193,10 +193,10 @@ export function ReviewThreadCard({
               pr={pr}
               commit={commit}
               threadUrl={threadUrl}
-              suggestedSha={thread.addressedBySha}
-              pinnedSha={thread.pinnedSha}
-              pinnedShaMissing={thread.pinnedShaMissing}
-              pinnedShaHealed={thread.pinnedShaHealed}
+              linkedSha={thread.linkedSha}
+              linkedShaMissing={thread.linkedShaMissing}
+              linkedShaHealed={thread.linkedShaHealed}
+              acknowledged={thread.acknowledged}
               onPin={
                 onPin ? (sha) => onPin(thread.id, sha) : undefined
               }

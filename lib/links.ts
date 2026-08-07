@@ -1,50 +1,59 @@
 import { KEY, readNamespaced, storePath, writeNamespaced } from "./store";
 
 /**
- * Thread → commit pins.
+ * How a review comment was handled.
  *
- * A pin says "this review comment was addressed by this commit", replacing
- * the file-level guess for good. Stored server-side rather than in
- * localStorage so the dev server, the standalone server and the installed
- * app window all agree — and outside the repo, so the read-only promise
- * holds: differ never writes to a checkout.
+ * Linking is deliberate: differ no longer guesses which commit answers a
+ * comment. A guess always found *something*, so nothing ever read as
+ * outstanding and the comment list couldn't work as a checklist. Asserting
+ * the link is also the moment you actually check the change against the
+ * comment, which is the point of the exercise.
  *
- * Each pin carries a patch-id as well as a sha. A rebase gives every commit
- * a new sha but leaves its patch-id — a hash of the diff alone — untouched,
- * so a stale pin can be re-matched instead of thrown away. See healLinks().
+ * Two ways to handle one:
+ *   - `commit` — this commit addresses it. Carries a patch-id so the link
+ *     survives a rebase (see healing in the session route).
+ *   - `ack` — no code change needed; it just wants a reply.
  *
- * Shape: { "owner/repo#26": { "<threadId>": { sha, patchId } } }
+ * Shape: { "owner/repo#26": { "<threadId>": {kind:"commit",sha,patchId} } }
  */
 
 const NAME = "links";
 const SHA = /^[0-9a-f]{7,40}$/;
 const PATCH_ID = /^[0-9a-f]{40}$/;
 
-export interface Pin {
-  sha: string;
-  /** Diff hash that survives rebases; null when git couldn't produce one */
-  patchId: string | null;
-}
+export type LinkRecord =
+  | { kind: "commit"; sha: string; patchId: string | null }
+  | { kind: "ack" };
+
+/** The stored forms, current and historical. */
+type StoredLink = LinkRecord | { sha: string; patchId?: string | null } | string;
 
 /**
- * Accepts the original bare-string form as well as the current object form,
- * so pins made before patch-ids existed keep working. They heal into the new
- * shape the next time they're written.
+ * Accepts every shape this file has ever held: a bare sha string, the
+ * `{sha, patchId}` object, and the current tagged union. Older entries are
+ * normalised on read and rewritten in the new shape whenever they're touched.
  */
-function isPin(value: unknown): value is Pin {
+function isStoredLink(value: unknown): value is StoredLink {
   if (typeof value === "string") return SHA.test(value);
   if (!value || typeof value !== "object") return false;
-  const pin = value as Pin;
+
+  const record = value as Record<string, unknown>;
+  if (record.kind === "ack") return true;
+  if (typeof record.sha !== "string" || !SHA.test(record.sha)) return false;
   return (
-    typeof pin.sha === "string" &&
-    SHA.test(pin.sha) &&
-    (pin.patchId === null ||
-      (typeof pin.patchId === "string" && PATCH_ID.test(pin.patchId)))
+    record.patchId === null ||
+    record.patchId === undefined ||
+    (typeof record.patchId === "string" && PATCH_ID.test(record.patchId))
   );
 }
 
-function normalize(value: Pin | string): Pin {
-  return typeof value === "string" ? { sha: value, patchId: null } : value;
+function normalize(value: StoredLink): LinkRecord {
+  if (typeof value === "string") {
+    return { kind: "commit", sha: value, patchId: null };
+  }
+  if ("kind" in value && value.kind === "ack") return { kind: "ack" };
+  const record = value as { sha: string; patchId?: string | null };
+  return { kind: "commit", sha: record.sha, patchId: record.patchId ?? null };
 }
 
 export function prKey(
@@ -56,8 +65,10 @@ export function prKey(
   return `${owner}/${name}#${prNumber}`;
 }
 
-export async function getLinks(key: string): Promise<Record<string, Pin>> {
-  const store = await readNamespaced<Pin | string>(NAME, isPin);
+export async function getLinks(
+  key: string,
+): Promise<Record<string, LinkRecord>> {
+  const store = await readNamespaced<StoredLink>(NAME, isStoredLink);
   const entries = store[key] ?? {};
   return Object.fromEntries(
     Object.entries(entries).map(([threadId, value]) => [
@@ -67,24 +78,25 @@ export async function getLinks(key: string): Promise<Record<string, Pin>> {
   );
 }
 
-/** Pin a thread to a commit, or unpin it when `sha` is null. */
+/** Record how a comment was handled, or clear it with `null`. */
 export async function setLink(
   key: string,
   threadId: string,
-  sha: string | null,
-  patchId: string | null = null,
-): Promise<Record<string, Pin>> {
+  link: LinkRecord | null,
+): Promise<Record<string, LinkRecord>> {
   if (!KEY.test(threadId)) throw new Error("Invalid thread id");
-  if (sha !== null && !SHA.test(sha)) throw new Error("Invalid commit sha");
-  if (patchId !== null && !PATCH_ID.test(patchId)) {
-    throw new Error("Invalid patch id");
+  if (link?.kind === "commit") {
+    if (!SHA.test(link.sha)) throw new Error("Invalid commit sha");
+    if (link.patchId !== null && !PATCH_ID.test(link.patchId)) {
+      throw new Error("Invalid patch id");
+    }
   }
 
-  const store = await readNamespaced<Pin | string>(NAME, isPin);
+  const store = await readNamespaced<StoredLink>(NAME, isStoredLink);
   const forPr = { ...(store[key] ?? {}) };
 
-  if (sha === null) delete forPr[threadId];
-  else forPr[threadId] = { sha, patchId };
+  if (link === null) delete forPr[threadId];
+  else forPr[threadId] = link;
 
   store[key] = forPr;
   await writeNamespaced(NAME, store);
@@ -95,26 +107,26 @@ export async function setLink(
 }
 
 /**
- * Apply several pin updates in ONE read-modify-write.
+ * Apply several updates in ONE read-modify-write.
  *
- * Not a loop over setLink: each of those rereads and rewrites the whole
- * file, so running them concurrently makes the last writer win and silently
- * drop the others. Used for both rebase healing and patch-id backfill, which
- * are inherently batch operations.
+ * Not a loop over setLink: each of those rereads and rewrites the whole file,
+ * so running them concurrently makes the last writer win and silently drop
+ * the others. Used for rebase healing and patch-id backfill, which are
+ * inherently batch operations.
  */
 export async function updateLinks(
   key: string,
-  updates: Record<string, Pin>,
+  updates: Record<string, LinkRecord>,
 ): Promise<void> {
   if (Object.keys(updates).length === 0) return;
 
-  const store = await readNamespaced<Pin | string>(NAME, isPin);
+  const store = await readNamespaced<StoredLink>(NAME, isStoredLink);
   const forPr = { ...(store[key] ?? {}) };
 
-  for (const [threadId, pin] of Object.entries(updates)) {
-    // Only update pins that still exist — never resurrect an unpinned thread.
+  for (const [threadId, link] of Object.entries(updates)) {
+    // Only update entries that still exist — never resurrect a cleared one.
     if (!forPr[threadId]) continue;
-    forPr[threadId] = pin;
+    forPr[threadId] = link;
   }
 
   store[key] = forPr;

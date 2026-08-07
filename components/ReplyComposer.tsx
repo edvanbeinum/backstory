@@ -4,15 +4,29 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
 import type { CommitSummary, PullRequestInfo, RepoInfo } from "@/lib/types";
-import { ChevronDownIcon, LinkExternalIcon, PinIcon } from "./icons";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  LinkExternalIcon,
+  LinkIcon,
+  PinIcon,
+} from "./icons";
 import { CopyButton } from "./ui";
 
-type Template = "url" | "sha" | "ack" | "custom";
+type Template = "url" | "sha" | "thumbsUp" | "noChange" | "custom";
 
-const TEMPLATES: Array<{ id: Template; label: string }> = [
+/** Reply wording for a comment answered by a commit. */
+const COMMIT_TEMPLATES: Array<{ id: Template; label: string }> = [
   { id: "url", label: "Addressed in <link>" },
   { id: "sha", label: "Addressed in <sha>" },
-  { id: "ack", label: "👍 Addressed in <sha>" },
+  { id: "thumbsUp", label: "👍 Addressed in <sha>" },
+  { id: "custom", label: "Write my own" },
+];
+
+/** Reply wording for one that only wanted an acknowledgement. */
+const ACK_TEMPLATES: Array<{ id: Template; label: string }> = [
+  { id: "thumbsUp", label: "👍" },
+  { id: "noChange", label: "Noted, no change" },
   { id: "custom", label: "Write my own" },
 ];
 
@@ -37,14 +51,15 @@ function templateText(
   commit: LinkTarget | null,
   url: string | null,
 ): string {
-  if (!commit) return "";
   switch (template) {
+    case "noChange":
+      return "Noted — no change needed here, thanks.";
+    case "thumbsUp":
+      return commit ? `👍 Addressed in ${commit.shortSha}` : "👍";
     case "url":
-      return `Addressed in ${url ?? commit.sha}`;
+      return commit ? `Addressed in ${url ?? commit.sha}` : "";
     case "sha":
-      return `Addressed in ${commit.shortSha}`;
-    case "ack":
-      return `👍 Addressed in ${commit.shortSha}`;
+      return commit ? `Addressed in ${commit.shortSha}` : "";
     default:
       return "";
   }
@@ -56,21 +71,19 @@ function templateText(
  * yourself, which keeps the last word on wording (and on whether to reply at
  * all) with you.
  *
- * Which commit gets linked: by default the newest branch commit that touched
- * the thread's file (`suggestedSha`, computed server-side) — the commit that
- * most plausibly addressed the comment — regardless of which commit is
- * selected in the rail. The selected commit is one click away. Without a
- * suggestion, the selected commit is used as before.
+ * Which commit gets linked is never guessed: it's the one you linked to this
+ * comment, or the one selected in the change column if you haven't linked yet.
+ * A comment marked as needing no change gets acknowledgement wording instead.
  */
 export function ReplyComposer({
   repo,
   pr,
   commit,
   threadUrl,
-  suggestedSha,
-  pinnedSha,
-  pinnedShaMissing = false,
-  pinnedShaHealed = false,
+  linkedSha,
+  linkedShaMissing = false,
+  linkedShaHealed = false,
+  acknowledged = false,
   onPin,
   pinCandidates = [],
   draft,
@@ -80,20 +93,19 @@ export function ReplyComposer({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   threadUrl: string;
-  /** Newest branch commit touching the thread's file, if known */
-  suggestedSha?: string | null;
-  /** A commit the user pinned to this thread — beats the suggestion */
-  pinnedSha?: string | null;
-  /** The pinned sha is gone and couldn't be re-matched */
-  pinnedShaMissing?: boolean;
-  /** The pin was re-matched to a rewritten commit by patch-id */
-  pinnedShaHealed?: boolean;
-  /** Pin the thread to a sha, or unpin with null. Absent = pinning off. */
+  /** The commit you linked to this comment */
+  linkedSha?: string | null;
+  /** The linked sha is gone and couldn't be re-matched */
+  linkedShaMissing?: boolean;
+  /** The link was re-matched to a rewritten commit by patch-id */
+  linkedShaHealed?: boolean;
+  /** Handled without a code change — reply wording changes accordingly */
+  acknowledged?: boolean;
+  /** Link the thread to a sha, or clear it with null */
   onPin?: (sha: string | null) => void;
   /**
-   * Branch commits available to pin. Needed because the right commit often
-   * isn't the guess *or* the selection: a fix can land in a different file
-   * from the one commented on, which no file-level heuristic can reach.
+   * Branch commits available to link. The right commit is often not the one
+   * on screen: a fix can land in a different file from the one commented on.
    */
   pinCandidates?: CommitSummary[];
   /** A previously saved draft for this thread, if any */
@@ -103,9 +115,11 @@ export function ReplyComposer({
 }) {
   // A saved draft is text you wrote and haven't sent — resume straight into
   // it rather than showing a template and burying it.
-  const [template, setTemplate] = useState<Template>(draft ? "custom" : "url");
+  const templates = acknowledged ? ACK_TEMPLATES : COMMIT_TEMPLATES;
+  const [template, setTemplate] = useState<Template>(
+    draft ? "custom" : acknowledged ? "thumbsUp" : "url",
+  );
   const [custom, setCustom] = useState(draft ?? "");
-  const [preferSelected, setPreferSelected] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
   const selectedIsReal =
@@ -113,22 +127,15 @@ export function ReplyComposer({
     commit.sha !== WORKING_REV &&
     commit.sha !== BRANCH_REV;
 
-  const suggested: LinkTarget | null = suggestedSha
-    ? { sha: suggestedSha, shortSha: suggestedSha.slice(0, 7) }
-    : null;
-
-  // A live pin is the answer, full stop — that's what pinning is for. A pin
-  // whose commit was rebased away is surfaced rather than obeyed.
+  // A live link is the answer. One whose commit was rebased away is
+  // surfaced rather than obeyed.
   const pinned: LinkTarget | null =
-    pinnedSha && !pinnedShaMissing
-      ? { sha: pinnedSha, shortSha: pinnedSha.slice(0, 7) }
+    linkedSha && !linkedShaMissing
+      ? { sha: linkedSha, shortSha: linkedSha.slice(0, 7) }
       : null;
 
   const target: LinkTarget | null =
-    pinned ??
-    (preferSelected && selectedIsReal
-      ? commit
-      : (suggested ?? (selectedIsReal ? commit : null)));
+    pinned ?? (selectedIsReal ? commit : null);
 
   const url = useMemo(
     () => (target ? buildPrCommitUrl(repo, pr, target.sha) : null),
@@ -166,34 +173,19 @@ export function ReplyComposer({
     return () => clearTimeout(timer);
   }, [custom, template, onDraftChange]);
 
-  if (!commit && !suggested) {
-    return (
-      <p className="text-[12px] text-[var(--fg-muted)]">
-        Select a commit to draft a reply that links to it.
-      </p>
-    );
-  }
+  // An acknowledged comment needs no commit at all, so it skips every
+  // "pick a commit first" branch below.
+  const isWorking = !acknowledged && target === null && commit?.sha === WORKING_REV;
+  const isBranch = !acknowledged && target === null && commit?.sha === BRANCH_REV;
+  const needsCommit = !acknowledged && target === null;
 
-  const isWorking = target === null && commit?.sha === WORKING_REV;
-  const isBranch = target === null && commit?.sha === BRANCH_REV;
-
-  const linkingSuggested =
-    pinned === null &&
-    target !== null &&
-    suggested !== null &&
-    target.sha === suggested.sha;
-  const showSwap =
-    pinned === null &&
-    suggested !== null &&
-    selectedIsReal &&
-    commit.sha !== suggested.sha;
-  // Offer to pin whatever is currently being linked, once it's a real commit
+  // Offer to link whatever is on screen, once it's a real commit
   const canPin = onPin !== undefined && target !== null && pinned === null;
 
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--canvas)]">
       <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-muted)] px-2 py-1.5">
-        {TEMPLATES.map((option) => (
+        {templates.map((option) => (
           <button
             key={option.id}
             type="button"
@@ -219,55 +211,44 @@ export function ReplyComposer({
           This is the combined branch diff — select a single commit in the
           rail to draft a reply that links to it.
         </p>
-      ) : target === null ? (
+      ) : needsCommit ? (
         <p className="px-3 py-2.5 text-[12px] text-[var(--fg-muted)]">
-          Select a commit to draft a reply that links to it.
+          Link this comment to a commit — or mark it as needing no change —
+          and the reply drafts itself.
         </p>
       ) : (
         <>
           <p className="flex flex-wrap items-center gap-x-2 border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1 text-[11px] text-[var(--fg-muted)]">
-            {pinnedShaMissing && (
+            {linkedShaMissing && (
               <span className="text-[var(--attention)]">
-                <PinIcon size={11} /> Pinned to{" "}
-                <span className="mono">{pinnedSha?.slice(0, 7)}</span>, which
+                <LinkIcon size={11} /> Linked to{" "}
+                <span className="mono">{linkedSha?.slice(0, 7)}</span>, which
                 is no longer on this branch and doesn&apos;t match any commit
                 here — squashed, amended, or rebased through a conflict.
               </span>
             )}
 
-            {pinned ? (
+            {acknowledged ? (
               <span className="text-[var(--fg)]">
-                <PinIcon size={11} className="text-[var(--done)]" /> Pinned to{" "}
+                <CheckIcon size={11} className="text-[var(--done)]" />{" "}
+                Acknowledged — no code change needed.
+              </span>
+            ) : pinned ? (
+              <span className="text-[var(--fg)]">
+                <LinkIcon size={11} className="text-[var(--done)]" /> Linked to{" "}
                 <span className="mono">{pinned.shortSha}</span>
-                {pinnedShaHealed && (
+                {linkedShaHealed && (
                   <span className="text-[var(--fg-muted)]">
                     {" "}
                     · re-matched after a rebase
                   </span>
                 )}
               </span>
-            ) : linkingSuggested ? (
-              <>
-                Links <span className="mono">{target.shortSha}</span> — the
-                last commit that touched this file.
-              </>
             ) : (
               <>
-                Links the selected commit{" "}
-                <span className="mono">{target.shortSha}</span>.
+                Would link the selected commit{" "}
+                <span className="mono">{target?.shortSha}</span>.
               </>
-            )}
-
-            {showSwap && (
-              <button
-                type="button"
-                onClick={() => setPreferSelected((value) => !value)}
-                className="text-[var(--accent)] hover:underline"
-              >
-                {linkingSuggested
-                  ? `Link selected ${commit.shortSha} instead`
-                  : `Link ${suggested.shortSha} (last touched this file)`}
-              </button>
             )}
 
             <span className="flex-1" />
@@ -309,7 +290,7 @@ export function ReplyComposer({
                             onPin(candidate.sha);
                           }}
                           className={`flex w-full items-baseline gap-2 px-2 py-1 text-left hover:bg-[var(--canvas-subtle)] ${
-                            candidate.sha === pinnedSha
+                            candidate.sha === linkedSha
                               ? "bg-[var(--accent-subtle)]"
                               : ""
                           }`}
@@ -328,13 +309,13 @@ export function ReplyComposer({
               </span>
             )}
 
-            {onPin && pinnedSha && (
+            {onPin && linkedSha && (
               <button
                 type="button"
                 onClick={() => onPin(null)}
                 className="text-[var(--accent)] hover:underline"
               >
-                {pinnedShaMissing ? "Clear pin" : "Unpin"}
+                {linkedShaMissing ? "Clear pin" : "Unpin"}
               </button>
             )}
           </p>

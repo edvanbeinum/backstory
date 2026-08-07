@@ -142,30 +142,32 @@ export interface ReviewThread {
   side: string | null;
   comments: ReviewComment[];
   /**
-   * The newest branch commit that touched this thread's file — the best
-   * guess at "the commit that addressed this comment", and the reply
-   * composer's default link. Line-level blame is deliberately not used: a
-   * fix usually adds code near the commented line rather than editing it,
-   * so blame answers "who wrote this line", not "who responded to this".
+   * The commit you linked to this comment. Never inferred: differ used to
+   * guess (the newest commit touching the file), but a guess always found
+   * *something*, so no comment ever read as outstanding and the list
+   * couldn't work as a checklist. Asserting the link is also the moment you
+   * actually check the change against the comment.
    */
-  addressedBySha?: string | null;
-  /** A commit the user pinned to this thread. Beats addressedBySha. */
-  pinnedSha?: string | null;
+  linkedSha?: string | null;
+  /**
+   * Handled without a code change — the comment only wanted a reply. Counts
+   * as addressed alongside a commit link.
+   */
+  acknowledged?: boolean;
   /** A saved reply the user was part-way through writing. */
   draft?: string | null;
   /**
-   * True when `pinnedSha` no longer exists on the branch and couldn't be
+   * True when `linkedSha` no longer exists on the branch and couldn't be
    * re-matched — a squash, an amend, or a conflict-resolved rebase changed
-   * the diff, so the patch-id no longer matches anything. The pin is kept
-   * (not silently dropped) and the UI asks for a re-pin rather than quietly
-   * reverting to the guess.
+   * the diff, so the patch-id matches nothing. The link is kept (not
+   * silently dropped) and the UI asks you to re-link.
    */
-  pinnedShaMissing?: boolean;
+  linkedShaMissing?: boolean;
   /**
-   * The pin was re-matched to a rewritten commit by patch-id this load.
+   * The link was re-matched to a rewritten commit by patch-id this load.
    * Shown once so a silent re-point is never invisible.
    */
-  pinnedShaHealed?: boolean;
+  linkedShaHealed?: boolean;
 }
 
 export interface ReviewSummary {

@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 
 import type { ReviewThread } from "@/lib/types";
-import { CheckIcon, CommentIcon, PencilIcon, PinIcon } from "./icons";
+import { CheckIcon, CommentIcon, LinkIcon, PencilIcon } from "./icons";
 
 type Filter = "open" | "all";
 
@@ -33,6 +33,7 @@ export function CommentList({
   const [filter, setFilter] = useState<Filter>("open");
 
   const openCount = threads.filter((t) => !t.isResolved).length;
+  const handledCount = threads.filter(isHandled).length;
   const visible = useMemo(
     () => (filter === "open" ? threads.filter((t) => !t.isResolved) : threads),
     [threads, filter],
@@ -61,8 +62,7 @@ export function CommentList({
     <nav aria-label="Review comments">
       <div className="flex items-center gap-2 px-3 pb-1.5 pt-3">
         <h2 className="flex-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-muted)]">
-          {threads.length} {threads.length === 1 ? "comment" : "comments"}
-          {openCount > 0 && ` · ${openCount} open`}
+          {handledCount} of {threads.length} addressed
         </h2>
         <button
           type="button"
@@ -104,7 +104,7 @@ export function CommentList({
                       }`}
                     >
                       <span className="mt-[3px] shrink-0">
-                        {thread.isResolved ? (
+                        {isHandled(thread) ? (
                           <CheckIcon size={12} className="text-[var(--done)]" />
                         ) : (
                           <CommentIcon
@@ -140,10 +140,16 @@ export function CommentList({
   );
 }
 
+/** A comment is handled by a commit, by an acknowledgement, or not yet. */
+export function isHandled(thread: ReviewThread): boolean {
+  if (thread.acknowledged) return true;
+  return Boolean(thread.linkedSha && !thread.linkedShaMissing);
+}
+
 /**
- * What currently answers this comment — a pin reads as decided, an inferred
- * commit as a guess, uncommitted work as in progress, and nothing as an open
- * item. Showing it on the row turns the list into a checklist.
+ * How this comment was handled. Nothing here is inferred — an unanswered
+ * comment says so, which is what makes the list a checklist rather than a
+ * wall of plausible-looking links.
  */
 export function AnswerState({
   thread,
@@ -152,46 +158,46 @@ export function AnswerState({
   thread: ReviewThread;
   workingPaths: Set<string>;
 }) {
-  if (thread.pinnedSha && thread.pinnedShaMissing) {
+  if (thread.linkedSha && thread.linkedShaMissing) {
     return (
       <span className="flex items-center gap-1 text-[11px] text-[var(--attention)]">
-        <PinIcon size={10} />
-        <span className="mono">{thread.pinnedSha.slice(0, 7)}</span>
-        <span>gone</span>
+        <LinkIcon size={10} />
+        <span className="mono">{thread.linkedSha.slice(0, 7)}</span>
+        <span>gone — re-link</span>
       </span>
     );
   }
-  if (thread.pinnedSha) {
+  if (thread.linkedSha) {
     return (
       <span className="flex items-center gap-1 text-[11px] text-[var(--done)]">
-        <PinIcon size={10} />
-        <span className="mono">{thread.pinnedSha.slice(0, 7)}</span>
-        {thread.pinnedShaHealed && (
+        <CheckIcon size={10} />
+        <span className="mono">{thread.linkedSha.slice(0, 7)}</span>
+        {thread.linkedShaHealed && (
           <span className="text-[var(--fg-subtle)]">re-matched</span>
         )}
       </span>
     );
   }
-  // Uncommitted work on the comment's file is the most current answer there
-  // is, even though it has no sha to link to yet.
+  if (thread.acknowledged) {
+    return (
+      <span className="flex items-center gap-1 text-[11px] text-[var(--done)]">
+        <CheckIcon size={10} />
+        <span>acknowledged</span>
+      </span>
+    );
+  }
+  // Not an answer — just a nudge that the file you'd need to look at has
+  // uncommitted changes in it.
   if (thread.path && workingPaths.has(thread.path)) {
     return (
       <span className="flex items-center gap-1 text-[11px] text-[var(--attention)]">
         <PencilIcon size={10} />
-        <span>uncommitted work</span>
-      </span>
-    );
-  }
-  if (thread.addressedBySha) {
-    return (
-      <span className="flex items-center gap-1 text-[11px] text-[var(--fg-subtle)]">
-        <span>→</span>
-        <span className="mono">{thread.addressedBySha.slice(0, 7)}</span>
+        <span>unanswered · file has uncommitted work</span>
       </span>
     );
   }
   return (
-    <span className="text-[11px] text-[var(--fg-subtle)]">unanswered</span>
+    <span className="text-[11px] text-[var(--attention)]">unanswered</span>
   );
 }
 

@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse } from "@/lib/api";
-import { gitLine } from "@/lib/exec";
 import {
   getBoundarySha,
   getBranchDiffSummary,
@@ -16,7 +15,12 @@ import {
 } from "@/lib/git";
 import { getDrafts } from "@/lib/drafts";
 import { loadGitHubDataCached } from "@/lib/github";
-import { getLinks, prKey, updateLinks, type Pin } from "@/lib/links";
+import {
+  getLinks,
+  prKey,
+  updateLinks,
+  type LinkRecord,
+} from "@/lib/links";
 import type { ApiError, SessionResponse } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -73,42 +77,47 @@ export async function GET(request: Request) {
       rawGithub.pr?.baseRefName ?? null,
     );
 
-    // Tag each thread with (a) the user's pin, if any, and (b) the newest
-    // branch commit touching its file — the reply composer's default for
-    // "Addressed in <commit>". New objects, not mutation: the GitHub data
-    // behind this is shared via a 30s cache.
+    // Attach how each comment was handled. Nothing is inferred: differ used
+    // to guess which commit answered a comment, but a guess always found
+    // something, so no comment ever read as outstanding and the list
+    // couldn't work as a checklist.
     const github = { ...rawGithub, threads: rawGithub.threads };
     if (rawGithub.threads.length > 0) {
       const key = rawGithub.pr
         ? prKey(repo.owner, repo.name, rawGithub.pr.number)
         : null;
-      const [pins, drafts] = key
+      const [links, drafts] = key
         ? await Promise.all([getLinks(key), getDrafts(key)])
         : [{}, {}];
 
-      // A rebase rewrites shas, so a pin can outlive its commit. Ask whether
-      // each pinned sha is still *reachable from HEAD* — not merely whether
-      // the object exists, since rebased-away commits linger in the object
+      /** Commit links only — acknowledgements have no sha to check. */
+      const commitLinks = Object.entries(links).filter(
+        (entry): entry is [string, Extract<LinkRecord, { kind: "commit" }>] =>
+          entry[1].kind === "commit",
+      );
+
+      // A rebase rewrites shas, so a link can outlive its commit. Ask whether
+      // each sha is still *reachable from HEAD* — not merely whether the
+      // object exists, since rebased-away commits linger in the object
       // database and would otherwise pass as healthy.
-      const pinAlive = new Map<string, boolean>();
-      for (const pin of Object.values(pins)) {
-        if (pinAlive.has(pin.sha)) continue;
-        pinAlive.set(pin.sha, await isOnBranch(repo.root, pin.sha));
+      const alive = new Map<string, boolean>();
+      for (const [, link] of commitLinks) {
+        if (alive.has(link.sha)) continue;
+        alive.set(link.sha, await isOnBranch(repo.root, link.sha));
       }
 
-      // Pins made before patch-ids existed have none stored, which would
+      // Links made before patch-ids existed have none stored, which would
       // leave them unable to survive the next rebase. Backfill quietly while
-      // their commit is still reachable — one cheap call per such pin, once.
-      // Collected then written in a single batch: separate writes would race
-      // each other through the same file.
+      // the commit is still reachable. Collected then written in a single
+      // batch: separate writes would race each other through the same file.
       if (key) {
-        const backfill: Record<string, Pin> = {};
-        for (const [threadId, pin] of Object.entries(pins)) {
-          if (pin.patchId || !pinAlive.get(pin.sha)) continue;
-          const patchId = await getPatchId(repo.root, pin.sha);
+        const backfill: Record<string, LinkRecord> = {};
+        for (const [threadId, link] of commitLinks) {
+          if (link.patchId || !alive.get(link.sha)) continue;
+          const patchId = await getPatchId(repo.root, link.sha);
           if (patchId) {
-            pins[threadId] = { sha: pin.sha, patchId };
-            backfill[threadId] = pins[threadId];
+            links[threadId] = { kind: "commit", sha: link.sha, patchId };
+            backfill[threadId] = links[threadId];
           }
         }
         await updateLinks(key, backfill);
@@ -116,69 +125,53 @@ export async function GET(request: Request) {
 
       // Anything still missing may just have been rebased. A commit's
       // patch-id hashes its diff alone, so a rewritten commit keeps it —
-      // find the new sha by patch-id rather than making the user re-pin.
-      // Only computed when something is actually broken.
+      // find the new sha rather than making the user re-link. Only computed
+      // when something is actually broken.
       const healed = new Set<string>();
-      const stale = Object.entries(pins).filter(
-        ([, pin]) => !pinAlive.get(pin.sha) && pin.patchId,
+      const stale = commitLinks.filter(
+        ([threadId, link]) =>
+          !alive.get(link.sha) &&
+          (links[threadId] as Extract<LinkRecord, { kind: "commit" }>).patchId,
       );
       if (stale.length > 0 && branchDiff && key) {
         const patchIds = await getPatchIdMap(
           repo.root,
           `${branchDiff.baseSha}..HEAD`,
         );
-        const moves: Record<string, Pin> = {};
-        for (const [threadId, pin] of stale) {
-          // null = the patch-id appears more than once on the branch, so
-          // the match is ambiguous; leave it broken and let the user decide.
-          const match = pin.patchId ? patchIds.get(pin.patchId) : undefined;
+        const moves: Record<string, LinkRecord> = {};
+        for (const [threadId] of stale) {
+          const link = links[threadId];
+          if (link.kind !== "commit" || !link.patchId) continue;
+          // null = the patch-id appears more than once on the branch, so the
+          // match is ambiguous; leave it broken and let the user decide.
+          const match = patchIds.get(link.patchId);
           if (match) {
-            pins[threadId] = { sha: match, patchId: pin.patchId };
-            moves[threadId] = pins[threadId];
-            pinAlive.set(match, true);
+            links[threadId] = {
+              kind: "commit",
+              sha: match,
+              patchId: link.patchId,
+            };
+            moves[threadId] = links[threadId];
+            alive.set(match, true);
             healed.add(threadId);
           }
         }
         await updateLinks(key, moves);
       }
 
-      // Cached per path, since threads cluster on few files.
-      const byPath = new Map<string, string | null>();
-      github.threads = await Promise.all(
-        rawGithub.threads.map(async (thread) => {
-          const pin = pins[thread.id];
-          const pinnedSha = pin?.sha ?? null;
-          const pinnedShaMissing = pinnedSha
-            ? !pinAlive.get(pinnedSha)
-            : false;
+      github.threads = rawGithub.threads.map((thread) => {
+        const link = links[thread.id];
+        const linkedSha = link?.kind === "commit" ? link.sha : null;
 
-          let addressedBySha: string | null = null;
-          if (branchDiff && thread.path) {
-            let sha = byPath.get(thread.path);
-            if (sha === undefined) {
-              sha = await gitLine(repo.root, [
-                "log",
-                "-1",
-                "--format=%H",
-                `${branchDiff.baseSha}..HEAD`,
-                "--",
-                thread.path,
-              ]);
-              byPath.set(thread.path, sha);
-            }
-            addressedBySha = sha;
-          }
-
-          return {
-            ...thread,
-            addressedBySha,
-            pinnedSha,
-            pinnedShaMissing,
-            pinnedShaHealed: healed.has(thread.id),
-            draft: drafts[thread.id] ?? null,
-          };
-        }),
-      );
+        return {
+          ...thread,
+          linkedSha,
+          linkedShaMissing: linkedSha ? !alive.get(linkedSha) : false,
+          linkedShaHealed: healed.has(thread.id),
+          acknowledged: link?.kind === "ack",
+          draft: drafts[thread.id] ?? null,
+        };
+      });
     }
 
     const body: SessionResponse = {

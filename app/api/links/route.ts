@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api";
 import { getPatchId, resolveRepo } from "@/lib/git";
 import { loadGitHubDataCached } from "@/lib/github";
-import { getLinks, prKey, setLink } from "@/lib/links";
+import { getLinks, prKey, setLink, type LinkRecord } from "@/lib/links";
 import type { ApiError } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -44,7 +44,12 @@ export async function GET(request: Request) {
   }
 }
 
-/** Pin `{threadId, sha}`; a null sha unpins. Returns the PR's full pin map. */
+/**
+ * Record how a comment was handled:
+ *   `{threadId, sha}`   — this commit addresses it
+ *   `{threadId, ack:1}` — no code change needed, it just wants a reply
+ *   `{threadId}`        — clear it, back to unanswered
+ */
 export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const repoPath = searchParams.get("repo");
@@ -59,6 +64,7 @@ export async function POST(request: Request) {
     const body = (await request.json()) as {
       threadId?: string;
       sha?: string | null;
+      ack?: boolean;
     };
     if (typeof body.threadId !== "string") {
       return NextResponse.json<ApiError>(
@@ -75,17 +81,21 @@ export async function POST(request: Request) {
       );
     }
 
-    // Record the commit's patch-id alongside the sha: a later rebase will
-    // rewrite the sha but not the patch-id, which is how the pin survives.
-    const repo = await resolveRepo(repoPath);
-    const patchId = body.sha ? await getPatchId(repo.root, body.sha) : null;
+    let record: LinkRecord | null = null;
+    if (body.sha) {
+      // Record the commit's patch-id alongside the sha: a later rebase will
+      // rewrite the sha but not the patch-id, which is how the link survives.
+      const repo = await resolveRepo(repoPath);
+      record = {
+        kind: "commit",
+        sha: body.sha,
+        patchId: await getPatchId(repo.root, body.sha),
+      };
+    } else if (body.ack) {
+      record = { kind: "ack" };
+    }
 
-    const links = await setLink(
-      resolved.key,
-      body.threadId,
-      body.sha ?? null,
-      patchId,
-    );
+    const links = await setLink(resolved.key, body.threadId, record);
     return NextResponse.json(
       { links },
       { headers: { "Cache-Control": "no-store" } },

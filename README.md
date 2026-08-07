@@ -157,41 +157,24 @@ test. Nothing is ever hidden: a thread that doesn't land on a line in the
 current change still appears, either under its file or in *Other comments on
 this PR*.
 
-## Linking threads to commits
+## Handling a comment is deliberate
 
-Each thread's reply links to a commit. differ guesses — the newest branch
-commit that touched the thread's file — and shows that guess on the thread's
-rail row (`→ 26ef8f7`). When the guess is wrong, **pin** the right commit from
-the reply box and it sticks: pinned threads always propose that commit, no
-matter which one you're viewing.
+differ does **not** guess which commit answers a comment. It used to — the
+newest commit touching the file — and the guess always found *something*, so
+no comment ever read as outstanding and the list couldn't work as a checklist.
+On a six-comment PR, all six showed a plausible link and none showed as open.
 
-That link is what makes the two lists navigable together. Commit rows show how
-many threads point at them, thread rows show where they point (solid when
-pinned, dimmed when inferred, `unlinked` when neither), and clicking a thread
-jumps to its commit *and* scrolls to the comment.
+Now every comment starts **unanswered**, and you handle it one of two ways:
 
-When the fix landed in a *different* file from the one commented on — a test
-move, a refactor — no file-level guess can reach it, so the reply box has a
-**Pin to…** picker listing the branch commits directly.
+- **This addresses it** — links the comment to the commit on screen. You had
+  to read the diff to get there, which is the point: the act of linking is
+  the moment you actually check.
+- **No change needed** — some review comments only want a reply. Acknowledging
+  one counts as handled and switches the reply templates from
+  `Addressed in <commit>` to a plain 👍 or "Noted — no change needed".
 
-## Drafts
-
-A reply you're part-way through writing is saved automatically. It survives
-reloading, collapsing the thread, switching commits and restarting the server
-— which matters because a draft is the only thing differ produces that you
-can't regenerate from git. The box says *Draft saved*, and *Discard draft*
-clears it.
-
-## Where local state lives
-
-`~/.differ/links.json` (pins) and `~/.differ/drafts.json` (drafts), both keyed
-by `owner/repo#pr` — outside your repo, so the read-only promise holds, and
-shared by every differ server on the machine.
-
-Plain JSON on purpose: it's a few KB of click-driven writes with no queries,
-so a database would buy nothing, and a file you can `cat`, hand-edit or `rm`
-is a feature in a local tool. Both go through `lib/store.ts`, so swapping in
-SQLite later would be a change there and nowhere else.
+The rail header reads `3 of 6 addressed`, and the change column tells you how
+many comments land in whatever you're looking at — the reverse lookup.
 
 ## Pins survive rebases
 

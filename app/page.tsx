@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ChangePane, bestChangeFor } from "@/components/ChangePane";
+import { ChangePane, openingChangeFor } from "@/components/ChangePane";
 import { CommentList } from "@/components/CommentList";
 import { CommentPane } from "@/components/CommentPane";
 import { CommitList } from "@/components/CommitList";
@@ -430,11 +430,11 @@ export default function Page() {
   const linkedCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const thread of threads) {
-      const linked =
-        (thread.pinnedShaMissing ? null : thread.pinnedSha) ??
-        thread.addressedBySha ??
-        null;
-      if (linked) counts.set(linked, (counts.get(linked) ?? 0) + 1);
+      if (thread.linkedShaMissing || !thread.linkedSha) continue;
+      counts.set(
+        thread.linkedSha,
+        (counts.get(thread.linkedSha) ?? 0) + 1,
+      );
     }
     return counts;
   }, [threads]);
@@ -459,10 +459,7 @@ export default function Page() {
     (thread: ReviewThread) => {
       setFocusedThreadId(thread.id);
 
-      const linked =
-        (thread.pinnedShaMissing ? null : thread.pinnedSha) ??
-        thread.addressedBySha ??
-        null;
+      const linked = thread.linkedShaMissing ? null : (thread.linkedSha ?? null);
       const known =
         linked !== null &&
         (session?.commits.some((c) => c.sha === linked) ||
@@ -506,16 +503,17 @@ export default function Page() {
   );
 
   /**
-   * Selecting a comment moves the change column to whatever answers it —
-   * that's the app's whole point. The reverse doesn't hold: picking a commit
-   * leaves the comment alone, so the two lists really are separate axes.
+   * Selecting a comment opens the change column on its linked commit if it
+   * has one, or the whole branch diff if it doesn't — never a guess about
+   * which commit answers it. Picking a commit leaves the comment alone, so
+   * the two lists stay separate axes.
    */
   const selectComment = useCallback(
     (id: string) => {
       setCommentId(id);
       setFocusedThreadId(id);
       const thread = threads.find((t) => t.id === id) ?? null;
-      const best = session ? bestChangeFor(thread, session) : null;
+      const best = session ? openingChangeFor(thread, session) : null;
       if (best) setRev(best);
       window.scrollTo({ top: 0 });
     },
@@ -558,23 +556,36 @@ export default function Page() {
     [repoPath],
   );
 
-  /** Pin (or unpin) a thread to a commit, then refresh so the rail agrees. */
-  const pinThread = useCallback(
-    async (threadId: string, sha: string | null) => {
+  /**
+   * Record how a comment was handled — a commit, an acknowledgement, or
+   * cleared — then refresh so the rail's progress agrees.
+   */
+  const linkThread = useCallback(
+    async (
+      threadId: string,
+      link: { sha?: string; ack?: boolean } | null,
+    ) => {
       try {
         await fetch(`/api/links?repo=${encodeURIComponent(repoPath)}`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ threadId, sha }),
+          body: JSON.stringify({ threadId, ...(link ?? {}) }),
         });
       } catch {
-        // Pins are a convenience; a failed write shouldn't break the view.
+        // A failed write shouldn't break the view; the next action retries.
       }
-      // Pins are re-read from disk on every session load, so the cached
+      // Links are re-read from disk on every session load, so the cached
       // GitHub data is still fine — no need to spend an API call here.
       void loadSession(repoPath, { background: true });
     },
     [repoPath, loadSession],
+  );
+
+  /** The composer's commit picker speaks in shas. */
+  const pinThread = useCallback(
+    (threadId: string, sha: string | null) =>
+      linkThread(threadId, sha ? { sha } : null),
+    [linkThread],
   );
 
   const selectRepo = useCallback((path: string) => {
@@ -782,6 +793,7 @@ export default function Page() {
                   pinCandidates={pinCandidates}
                   onDraftChange={saveDraft}
                   pushed={revIsPushed}
+                  onLink={linkThread}
                 />
               </div>
             </div>
