@@ -12,7 +12,6 @@ import type {
 import { DiffFile } from "./DiffFile";
 import { FileNav } from "./FileNav";
 import { AlertIcon, CommentIcon } from "./icons";
-import { ReviewThreadCard } from "./ReviewThreadCard";
 import { Spinner } from "./ui";
 
 /**
@@ -53,9 +52,7 @@ export function DiffView({
   pr,
   commit,
   focusedThreadId,
-  onPin,
-  pinCandidates,
-  onDraftChange,
+  onSelectThread,
 }: {
   diff: DiffResponse | null;
   loading: boolean;
@@ -65,9 +62,8 @@ export function DiffView({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
-  onPin?: (threadId: string, sha: string | null) => void;
-  pinCandidates?: CommitSummary[];
-  onDraftChange?: (threadId: string, text: string | null) => void;
+  /** Hand a comment to the response panel, which owns answering it. */
+  onSelectThread?: (threadId: string) => void;
 }) {
   const { perFile, elsewhere } = useMemo(
     () => partitionThreads(diff, threads),
@@ -122,38 +118,22 @@ export function DiffView({
             pr={pr}
             commit={commit}
             focusedThreadId={focusedThreadId}
-            onPin={onPin}
-            pinCandidates={pinCandidates}
-            onDraftChange={onDraftChange}
+            onSelectThread={onSelectThread}
           />
         ))
       )}
 
+      {/* This used to re-render every off-file thread as a card, composer and
+          all. The spine already lists every comment, always visible — so the
+          section was the same list a third time, and a second live composer
+          per thread on top of it. One line is enough. */}
       {elsewhere.length > 0 && (
-        <section className="space-y-2">
-          <h2 className="flex items-center gap-2 pt-2 text-[13px] font-semibold">
-            <CommentIcon size={14} className="text-[var(--fg-muted)]" />
-            Other comments on this PR
-            <span className="font-normal text-[var(--fg-muted)]">
-              — on files this commit doesn&apos;t touch
-            </span>
-          </h2>
-          {elsewhere.map((thread) => (
-            <ReviewThreadCard
-              key={thread.id}
-              thread={thread}
-              repo={repo}
-              pr={pr}
-              commit={commit}
-              showContext
-              defaultCollapsed
-              highlighted={focusedThreadId === thread.id}
-              onPin={onPin}
-              pinCandidates={pinCandidates}
-              onDraftChange={onDraftChange}
-            />
-          ))}
-        </section>
+        <p className="flex items-center gap-1.5 px-1 pt-1 text-[12px] text-[var(--fg-muted)]">
+          <CommentIcon size={12} />
+          {elsewhere.length}{" "}
+          {elsewhere.length === 1 ? "comment is" : "comments are"}{" "}
+          on files this change doesn&apos;t touch — see the spine.
+        </p>
       )}
     </div>
   );

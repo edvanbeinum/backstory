@@ -15,18 +15,25 @@ import { CopyButton } from "./ui";
 
 type Template = "url" | "sha" | "thumbsUp" | "noChange" | "custom";
 
-/** Reply wording for a comment answered by a commit. */
-const COMMIT_TEMPLATES: Array<{ id: Template; label: string }> = [
-  { id: "url", label: "Addressed in <link>" },
-  { id: "sha", label: "Addressed in <sha>" },
-  { id: "thumbsUp", label: "👍 Addressed in <sha>" },
-  { id: "custom", label: "Write my own" },
-];
-
-/** Reply wording for one that only wanted an acknowledgement. */
-const ACK_TEMPLATES: Array<{ id: Template; label: string }> = [
-  { id: "thumbsUp", label: "👍" },
-  { id: "noChange", label: "Noted, no change" },
+/**
+ * One list, not two.
+ *
+ * There used to be a separate set for "acknowledged" comments, back when
+ * acknowledging was its own kind of handled. It isn't any more — a comment
+ * needing no code change is just one you tick without linking a commit — so
+ * the only thing that varies is whether there's a commit to name. Those
+ * entries disable rather than disappear: a chip row that changes length as
+ * you link and unlink is a chip row you can't aim at.
+ */
+const TEMPLATES: Array<{
+  id: Template;
+  label: string;
+  needsCommit?: boolean;
+}> = [
+  { id: "url", label: "Addressed in <link>", needsCommit: true },
+  { id: "sha", label: "Addressed in <sha>", needsCommit: true },
+  { id: "thumbsUp", label: "👍 Addressed in <sha>", needsCommit: true },
+  { id: "noChange", label: "No change needed" },
   { id: "custom", label: "Write my own" },
 ];
 
@@ -83,7 +90,6 @@ export function ReplyComposer({
   linkedSha,
   linkedShaMissing = false,
   linkedShaHealed = false,
-  acknowledged = false,
   onPin,
   pinCandidates = [],
   draft,
@@ -92,15 +98,13 @@ export function ReplyComposer({
   repo: RepoInfo;
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
-  threadUrl: string;
+  threadUrl: string | null;
   /** The commit you linked to this comment */
   linkedSha?: string | null;
   /** The linked sha is gone and couldn't be re-matched */
   linkedShaMissing?: boolean;
   /** The link was re-matched to a rewritten commit by patch-id */
   linkedShaHealed?: boolean;
-  /** Handled without a code change — reply wording changes accordingly */
-  acknowledged?: boolean;
   /** Link the thread to a sha, or clear it with null */
   onPin?: (sha: string | null) => void;
   /**
@@ -115,10 +119,7 @@ export function ReplyComposer({
 }) {
   // A saved draft is text you wrote and haven't sent — resume straight into
   // it rather than showing a template and burying it.
-  const templates = acknowledged ? ACK_TEMPLATES : COMMIT_TEMPLATES;
-  const [template, setTemplate] = useState<Template>(
-    draft ? "custom" : acknowledged ? "thumbsUp" : "url",
-  );
+  const [template, setTemplate] = useState<Template>(draft ? "custom" : "url");
   const [custom, setCustom] = useState(draft ?? "");
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -153,6 +154,7 @@ export function ReplyComposer({
     }
   }, [template, custom, target, url]);
 
+
   // Persist the draft, debounced — the point is that it survives a reload,
   // a collapse, or switching commits, not that every keystroke hits disk.
   // The saved value is compared against so a session refresh echoing the
@@ -173,11 +175,18 @@ export function ReplyComposer({
     return () => clearTimeout(timer);
   }, [custom, template, onDraftChange]);
 
-  // An acknowledged comment needs no commit at all, so it skips every
-  // "pick a commit first" branch below.
-  const isWorking = !acknowledged && target === null && commit?.sha === WORKING_REV;
-  const isBranch = !acknowledged && target === null && commit?.sha === BRANCH_REV;
-  const needsCommit = !acknowledged && target === null;
+  // No commit linked, so the templates that name one have nothing to say.
+  // The box stays open regardless: you can always write a reply, and most
+  // comments are answered without a commit at all.
+  const commitTemplatesDisabled = target === null;
+
+
+  // Unlinking a commit while an "Addressed in <sha>" template is selected
+  // would otherwise leave an empty box that looks broken.
+  useEffect(() => {
+    if (!commitTemplatesDisabled) return;
+    if (template === "url" || template === "sha") setTemplate("noChange");
+  }, [commitTemplatesDisabled, template]);
 
   // Offer to link whatever is on screen, once it's a real commit
   const canPin = onPin !== undefined && target !== null && pinned === null;
@@ -185,39 +194,28 @@ export function ReplyComposer({
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--canvas)]">
       <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-muted)] px-2 py-1.5">
-        {templates.map((option) => (
-          <button
-            key={option.id}
-            type="button"
-            onClick={() => setTemplate(option.id)}
-            className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
-              template === option.id
-                ? "bg-[var(--accent-subtle)] text-[var(--accent)]"
-                : "text-[var(--fg-muted)] hover:bg-[var(--canvas-subtle)]"
-            }`}
-          >
-            {option.label}
-          </button>
-        ))}
+        {TEMPLATES.map((option) => {
+          const disabled = Boolean(option.needsCommit && commitTemplatesDisabled);
+          return (
+            <button
+              key={option.id}
+              type="button"
+              disabled={disabled}
+              title={disabled ? "Link a commit to use this wording" : undefined}
+              onClick={() => setTemplate(option.id)}
+              className={`rounded px-2 py-1 text-[11px] font-medium transition-colors ${
+                template === option.id
+                  ? "bg-[var(--accent-subtle)] text-[var(--accent)]"
+                  : "text-[var(--fg-muted)] hover:bg-[var(--canvas-subtle)]"
+              } disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent`}
+            >
+              {option.label}
+            </button>
+          );
+        })}
       </div>
 
-      {isWorking ? (
-        <p className="px-3 py-2.5 text-[12px] text-[var(--fg-muted)]">
-          Uncommitted work has no SHA yet. Commit it, then come back and this
-          will link to the new commit.
-        </p>
-      ) : isBranch ? (
-        <p className="px-3 py-2.5 text-[12px] text-[var(--fg-muted)]">
-          This is the combined branch diff — select a single commit in the
-          rail to draft a reply that links to it.
-        </p>
-      ) : needsCommit ? (
-        <p className="px-3 py-2.5 text-[12px] text-[var(--fg-muted)]">
-          Link this comment to a commit — or mark it as needing no change —
-          and the reply drafts itself.
-        </p>
-      ) : (
-        <>
+      <>
           <p className="flex flex-wrap items-center gap-x-2 border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1 text-[11px] text-[var(--fg-muted)]">
             {linkedShaMissing && (
               <span className="text-[var(--attention)]">
@@ -228,12 +226,7 @@ export function ReplyComposer({
               </span>
             )}
 
-            {acknowledged ? (
-              <span className="text-[var(--fg)]">
-                <CheckIcon size={11} className="text-[var(--done)]" />{" "}
-                Acknowledged — no code change needed.
-              </span>
-            ) : pinned ? (
+            {pinned ? (
               <span className="text-[var(--fg)]">
                 <LinkIcon size={11} className="text-[var(--done)]" /> Linked to{" "}
                 <span className="mono">{pinned.shortSha}</span>
@@ -244,11 +237,15 @@ export function ReplyComposer({
                   </span>
                 )}
               </span>
-            ) : (
+            ) : target ? (
               <>
                 Would link the selected commit{" "}
-                <span className="mono">{target?.shortSha}</span>.
+                <span className="mono">{target.shortSha}</span>.
               </>
+            ) : (
+              <span className="text-[var(--fg-muted)]">
+                No commit linked — reply anyway, or link one.
+              </span>
             )}
 
             <span className="flex-1" />
@@ -331,14 +328,16 @@ export function ReplyComposer({
 
           <div className="flex items-center gap-2 border-t border-[var(--border-muted)] px-2 py-1.5">
             <CopyButton value={text} label="Copy reply" />
-            <a
-              href={threadUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] hover:underline"
-            >
-              Open thread <LinkExternalIcon size={12} />
-            </a>
+            {threadUrl && (
+              <a
+                href={threadUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] hover:underline"
+              >
+                Open thread <LinkExternalIcon size={12} />
+              </a>
+            )}
 
             {/* Say plainly that the text is safe — an unsaved-looking box is
                 the reason drafts felt risky in the first place. */}
@@ -372,8 +371,7 @@ export function ReplyComposer({
               />
             )}
           </div>
-        </>
-      )}
+      </>
     </div>
   );
 }

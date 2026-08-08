@@ -6,16 +6,19 @@ import type {
   RepoInfo,
   ReviewThread,
 } from "@/lib/types";
-import { ChevronDownIcon, ChevronRightIcon, CommentIcon } from "./icons";
+import { CompletionCard } from "./CompletionCard";
+import { ChevronRightIcon } from "./icons";
+import { ResponsePanel } from "./ResponsePanel";
 import { ReviewThreadCard } from "./ReviewThreadCard";
 
 /**
- * The left column: the comment you're working on, held still while you browse
- * commits on the right.
+ * The middle column: the comment you're working on, and what you're doing
+ * about it. Held still while you browse changes on the right — comments and
+ * commits are separate axes, so the ‹ › stepper here belongs to comments
+ * alone.
  *
- * Its own ‹ › stepper is the point — comments and commits are separate axes,
- * so moving through comments must not depend on which list the rail happens
- * to be showing.
+ * The tick leads, above the comment rather than below it, because it's the
+ * thing you came here to do.
  */
 export function CommentPane({
   threads,
@@ -25,22 +28,28 @@ export function CommentPane({
   repo,
   pr,
   commit,
-  onPin,
-  pinCandidates,
+  branch,
+  commitCandidates,
+  onToggleDone,
+  onLinkCommit,
   onDraftChange,
+  onBackToInbox,
 }: {
   threads: ReviewThread[];
   thread: ReviewThread | null;
-  /** Position of `thread` within `threads`, for the "2 of 6" readout */
+  /** Position of `thread` within `threads`, for the "3 of 7" readout */
   index: number;
   onStep: (delta: number) => void;
   repo: RepoInfo;
   pr: PullRequestInfo | null;
-  /** The commit a reply would link to — the change column's selection */
+  /** The change on screen in the diff column — what a link would point at */
   commit: CommitSummary | null;
-  onPin?: (threadId: string, sha: string | null) => void;
-  pinCandidates?: CommitSummary[];
+  branch: string | null;
+  commitCandidates?: CommitSummary[];
+  onToggleDone: (threadId: string, done: boolean) => void;
+  onLinkCommit: (threadId: string, sha: string | null) => void;
   onDraftChange?: (threadId: string, text: string | null) => void;
+  onBackToInbox?: () => void;
 }) {
   if (threads.length === 0) {
     return (
@@ -50,12 +59,31 @@ export function CommentPane({
     );
   }
 
+  const allDone = threads.every((t) => t.response.done);
+  const where = thread?.path
+    ? `${thread.path.split("/").pop()}${thread.line != null ? `:${thread.line}` : ""}`
+    : thread
+      ? "Review summary"
+      : null;
+
   return (
     <div className="space-y-2">
+      {/* The payoff sits above everything, so finishing the last comment is
+          impossible to miss — it's the moment the whole app is for. */}
+      {allDone && (
+        <CompletionCard
+          threads={threads}
+          branch={branch}
+          repo={repo}
+          pr={pr}
+          onBack={onBackToInbox}
+        />
+      )}
+
       <div className="flex items-center gap-2 px-0.5">
-        <CommentIcon size={13} className="text-[var(--fg-muted)]" />
-        <h2 className="flex-1 text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-muted)]">
+        <h2 className="flex-1 truncate text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-muted)]">
           Comment {index + 1} of {threads.length}
+          {where && <span className="normal-case"> · {where}</span>}
         </h2>
         <button
           type="button"
@@ -78,22 +106,32 @@ export function CommentPane({
       </div>
 
       {thread ? (
-        <ReviewThreadCard
-          key={thread.id}
-          thread={thread}
-          repo={repo}
-          pr={pr}
-          commit={commit}
-          showContext
-          defaultCollapsed={false}
-          onPin={onPin}
-          pinCandidates={pinCandidates}
-          onDraftChange={onDraftChange}
-        />
+        <>
+          <ResponsePanel
+            key={`${thread.id}-response`}
+            thread={thread}
+            repo={repo}
+            pr={pr}
+            commit={commit}
+            commitCandidates={commitCandidates}
+            onToggleDone={onToggleDone}
+            onLinkCommit={onLinkCommit}
+            onDraftChange={onDraftChange}
+          />
+          <ReviewThreadCard
+            key={thread.id}
+            thread={thread}
+            repo={repo}
+            pr={pr}
+            commit={commit}
+            showContext
+            defaultCollapsed={false}
+            hideComposer
+          />
+        </>
       ) : (
         <p className="rounded-md border border-[var(--border)] bg-[var(--canvas)] px-3 py-6 text-center text-[12px] text-[var(--fg-muted)]">
-          <ChevronDownIcon size={13} className="text-[var(--fg-subtle)] mr-1" />
-          Pick a comment from the rail.
+          Pick a comment from the spine.
         </p>
       )}
     </div>

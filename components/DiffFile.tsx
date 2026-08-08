@@ -36,9 +36,7 @@ export function DiffFile({
   pr,
   commit,
   focusedThreadId,
-  onPin,
-  pinCandidates,
-  onDraftChange,
+  onSelectThread,
 }: {
   file: DiffFileType;
   threads: ReviewThread[];
@@ -46,9 +44,8 @@ export function DiffFile({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
-  onPin?: (threadId: string, sha: string | null) => void;
-  pinCandidates?: CommitSummary[];
-  onDraftChange?: (threadId: string, text: string | null) => void;
+  /** Hand a comment to the response panel, which owns answering it. */
+  onSelectThread?: (threadId: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
@@ -276,9 +273,7 @@ export function DiffFile({
                         filePath={file.path}
                         copiedLine={copiedLine}
                         onCopyLine={copyLineRef}
-                        onPin={onPin}
-                        pinCandidates={pinCandidates}
-                        onDraftChange={onDraftChange}
+                        onSelectThread={onSelectThread}
                       />
                     ))}
                   </tbody>
@@ -326,9 +321,10 @@ export function DiffFile({
                   showContext
                   defaultCollapsed
                   highlighted={focusedThreadId === thread.id}
-                  onPin={onPin}
-                  pinCandidates={pinCandidates}
-                  onDraftChange={onDraftChange}
+                  hideComposer
+                  onRespond={
+                    onSelectThread ? () => onSelectThread(thread.id) : undefined
+                  }
                 />
               ))}
             </div>
@@ -352,9 +348,7 @@ function HunkRows({
   filePath,
   copiedLine,
   onCopyLine,
-  onPin,
-  pinCandidates,
-  onDraftChange,
+  onSelectThread,
 }: {
   hunk: DiffFileType["hunks"][number];
   hunkIndex: number;
@@ -368,9 +362,8 @@ function HunkRows({
   filePath: string;
   copiedLine: string | null;
   onCopyLine: (key: string, line: number) => void;
-  onPin?: (threadId: string, sha: string | null) => void;
-  pinCandidates?: CommitSummary[];
-  onDraftChange?: (threadId: string, text: string | null) => void;
+  /** Hand a comment to the response panel, which owns answering it. */
+  onSelectThread?: (threadId: string) => void;
 }) {
   // Clicking a line number copies the editor-style "path:line" reference —
   // the thing you paste into a terminal, an editor, or a review reply. The
@@ -438,9 +431,10 @@ function HunkRows({
                     pr={pr}
                     commit={commit}
                     highlighted={focusedThreadId === thread.id}
-                    onPin={onPin}
-                    pinCandidates={pinCandidates}
-                    onDraftChange={onDraftChange}
+                    hideComposer
+                    onRespond={
+                      onSelectThread ? () => onSelectThread(thread.id) : undefined
+                    }
                   />
                 </td>
               </tr>

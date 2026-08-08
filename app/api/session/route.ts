@@ -114,7 +114,18 @@ export async function GET(request: Request) {
     // differ used to guess which commit answered a comment, but a guess
     // always found something, so no comment ever read as outstanding and the
     // list couldn't work as a checklist.
-    const allThreads = [...summaryThreads, ...rawGithub.threads];
+    // Ordered by file here rather than in the client, so the checklist, the
+    // ‹ › stepper, `j`/`k` and the "first open comment" fallback can't
+    // disagree about what "next" means. Review summaries have no file and
+    // sort last.
+    const allThreads = [...rawGithub.threads, ...summaryThreads].sort(
+      (a, b) => {
+        if (!a.path && !b.path) return 0;
+        if (!a.path) return 1;
+        if (!b.path) return -1;
+        return a.path.localeCompare(b.path) || (a.line ?? 0) - (b.line ?? 0);
+      },
+    );
     const github = { ...rawGithub, threads: allThreads };
     if (allThreads.length > 0) {
       const key = rawGithub.pr

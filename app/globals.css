@@ -20,6 +20,11 @@
   --danger: #d1242f;
   --attention: #9a6700;
   --done: #8250df;
+  /* Primer's sponsors pink, for the tick and everything that follows from it.
+     Deliberately not --done: that's already the merged-PR badge, and "this PR
+     is merged" and "I've handled this comment" must not be one colour. Green
+     would read as CI, blue as selection. */
+  --handled: #bf3989;
 
   --diff-add-bg: #e6ffec;
   --diff-add-num-bg: #ccffd8;
@@ -51,6 +56,7 @@
     --danger: #f85149;
     --attention: #d29922;
     --done: #ab7df8;
+    --handled: #db61a2;
 
     --diff-add-bg: rgba(46, 160, 67, 0.15);
     --diff-add-num-bg: rgba(46, 160, 67, 0.3);
@@ -80,6 +86,7 @@
   --danger: #f85149;
   --attention: #d29922;
   --done: #ab7df8;
+  --handled: #db61a2;
 
   --diff-add-bg: rgba(46, 160, 67, 0.15);
   --diff-add-num-bg: rgba(46, 160, 67, 0.3);
@@ -108,6 +115,7 @@
   --color-danger: var(--danger);
   --color-attention: var(--attention);
   --color-done: var(--done);
+  --color-handled: var(--handled);
 }
 
 html {
@@ -367,4 +375,140 @@ tr.line-anchored .diff-code {
 }
 .flash {
   animation: flashfade 1.4s ease-out;
+}
+
+/* --- The tick ---------------------------------------------------------- */
+
+/*
+ * differ is a checklist, so checking a comment off is the moment it earns
+ * itself. All of this is one spring easing and a couple of keyframes — no
+ * animation library, and every rule below is skipped under reduced motion,
+ * where the state change still lands, just instantly.
+ */
+
+.tick-spring {
+  transition:
+    background-color 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+@keyframes tick-pop {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.18);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+/* Draws the check on rather than snapping it in. Needs a stroked path. */
+@keyframes tick-draw {
+  from {
+    stroke-dashoffset: 22;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* One ring. Confetti on every comment stops being a reward by the third. */
+@keyframes tick-ring {
+  from {
+    transform: scale(0.6);
+    opacity: 0.35;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+@keyframes tick-strike {
+  from {
+    background-size: 0% 1px;
+  }
+  to {
+    background-size: 100% 1px;
+  }
+}
+
+@keyframes digit-roll {
+  from {
+    transform: translateY(60%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+/* The last comment on a PR — the only place the big effect is spent. */
+@keyframes burst-fly {
+  from {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  to {
+    transform: translate(var(--dx), var(--dy)) scale(0.3);
+    opacity: 0;
+  }
+}
+
+@keyframes sweep {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tick-pop {
+    animation: tick-pop 260ms cubic-bezier(0.2, 0.8, 0.3, 1.2);
+  }
+  .tick-draw {
+    stroke-dasharray: 22;
+    animation: tick-draw 180ms cubic-bezier(0.2, 0.8, 0.3, 1.2) 40ms backwards;
+  }
+  .tick-ring {
+    animation: tick-ring 340ms cubic-bezier(0.2, 0.8, 0.3, 1.2) forwards;
+  }
+  .tick-strike {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-repeat: no-repeat;
+    background-position: 0 60%;
+    background-size: 100% 1px;
+    animation: tick-strike 200ms ease-out;
+  }
+  .digit-roll {
+    animation: digit-roll 180ms cubic-bezier(0.2, 0.8, 0.3, 1.2);
+  }
+  .burst-particle {
+    animation: burst-fly 900ms cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  }
+  .sweep::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--canvas) 70%, transparent),
+      transparent
+    );
+    animation: sweep 900ms ease-out;
+  }
+}
+
+/* Struck-through without motion still has to read as struck through. */
+@media (prefers-reduced-motion: reduce) {
+  .tick-strike {
+    text-decoration: line-through;
+  }
 }

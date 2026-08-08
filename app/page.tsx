@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChangePane, openingChangeFor } from "@/components/ChangePane";
-import { CommentList } from "@/components/CommentList";
 import { CommentPane } from "@/components/CommentPane";
-import { CommitList } from "@/components/CommitList";
 import { AlertIcon, FileDiffIcon } from "@/components/icons";
 import { PrTitle } from "@/components/PrTitle";
-import { RailTabs } from "@/components/RailTabs";
+import { TickSpine, TickStrip } from "@/components/TickSpine";
 import { RepoBar } from "@/components/RepoBar";
 import { BRANCH_REV, STORAGE_KEY, WORKING_REV } from "@/lib/constants";
 import {
@@ -23,7 +21,6 @@ import {
   resolveComment,
   resolveRev,
   writeUrlState,
-  type RailMode,
 } from "@/lib/url";
 import type {
   ApiError,
@@ -89,7 +86,6 @@ export default function Page() {
   const [recents, setRecents] = useState<RecentRepo[]>([]);
 
   /** Which rail is showing. Comments is the default; commits is self-review. */
-  const [mode, setMode] = useState<RailMode>("comments");
   const [commentId, setCommentId] = useState<string | null>(null);
   /** Set when a URL asked for a comment that isn't in this PR. */
   const [commentNotice, setCommentNotice] = useState<string | null>(null);
@@ -114,7 +110,6 @@ export default function Page() {
 
     setRepoPath(path);
     if (fromUrl.rev) setRev(fromUrl.rev);
-    if (fromUrl.mode) setMode(fromUrl.mode);
     if (fromUrl.comment) setCommentId(fromUrl.comment);
     if (fromUrl.repo) window.localStorage.setItem(STORAGE_KEY, fromUrl.repo);
     setRecents(loadRecents());
@@ -153,10 +148,10 @@ export default function Page() {
     writeUrlState({
       repo: repoPath || null,
       rev,
-      mode,
+      mode: null,
       comment: commentId,
     });
-  }, [ready, repoPath, rev, mode, commentId]);
+  }, [ready, repoPath, rev, commentId]);
 
   // Someone navigating with the back/forward buttons, or editing the URL by
   // hand, should land on the view they asked for.
@@ -165,7 +160,6 @@ export default function Page() {
       const fromUrl = readUrlState();
       setRepoPath(fromUrl.repo ?? "");
       setRev(fromUrl.rev ?? WORKING_REV);
-      setMode(fromUrl.mode ?? "comments");
       setCommentId(fromUrl.comment);
     };
     window.addEventListener("popstate", onPopState);
@@ -199,6 +193,17 @@ export default function Page() {
         setSession(data);
         setSessionError(null);
 
+        let landedOn: string | null = null;
+        setCommentId((current) => {
+          const { commentId: next, notice } = resolveComment(
+            current,
+            data.github.threads,
+          );
+          setCommentNotice(notice);
+          landedOn = next;
+          return next;
+        });
+
         setRev((current) => {
           // History counts: a URL can point at an already-pushed commit and
           // that's a perfectly good thing to view.
@@ -209,21 +214,20 @@ export default function Page() {
             data.branchDiff !== null,
           );
           setRevNotice(notice);
+
+          // Arriving with no rev asked for, on a comment that already names
+          // the change answering it: show that change rather than an empty
+          // "Uncommitted" pane. Only ever a fallback — an explicit rev, and
+          // anything you pick later, wins.
+          if (next === WORKING_REV && !data.working.hasChanges) {
+            const thread = data.github.threads.find((t) => t.id === landedOn);
+            const linked = thread?.response.commit;
+            if (linked && !linked.missing) return linked.sha;
+            if (data.branchDiff) return BRANCH_REV;
+          }
           return next;
         });
 
-        setCommentId((current) => {
-          const { commentId: next, notice } = resolveComment(
-            current,
-            data.github.threads,
-          );
-          setCommentNotice(notice);
-          return next;
-        });
-
-        // Comments mode has nothing to show without threads — land on the
-        // commit list rather than an empty rail.
-        if (data.github.threads.length === 0) setMode("commits");
       } catch (err) {
         if (seq !== sessionSeq.current) return;
         // A background failure keeps the last good view — the repo may just
@@ -404,10 +408,11 @@ export default function Page() {
     [session, rev],
   );
 
-  const threads = useMemo(
-    () => session?.github.threads ?? [],
-    [session],
-  );
+  /**
+   * Already ordered by file server-side, so the spine's grouping gaps, the
+   * stepper and `j`/`k` all agree with the "first open comment" fallback.
+   */
+  const threads = useMemo(() => session?.github.threads ?? [], [session]);
 
   /** Thread ids whose file is touched by the diff currently on screen. */
   const anchoredIds = useMemo(() => {
@@ -590,20 +595,51 @@ export default function Page() {
   );
 
   /**
-   * Record part of a response — a linked commit, the tick, or a clear — then
-   * refresh so the checklist's progress agrees.
+   * The tick.
+   *
+   * Optimistic, and that isn't polish: a checkbox that waits for a round trip
+   * doesn't feel like checking something off, and this is the interaction the
+   * whole app is built around. The write is fire-and-forget; the next session
+   * load reconciles it.
    */
-  const linkThread = useCallback(
-    async (
-      threadId: string,
-      link: { sha?: string; ack?: boolean } | null,
-    ) => {
-      if (link?.sha) await writeResponse(threadId, { sha: link.sha, done: true });
-      else if (link?.ack) await writeResponse(threadId, { done: true });
-      else await writeResponse(threadId, { done: false, sha: null });
+  const toggleDone = useCallback(
+    (threadId: string, done: boolean) => {
+      setSession((current) => {
+        if (!current) return current;
+        return {
+          ...current,
+          github: {
+            ...current.github,
+            threads: current.github.threads.map((thread) =>
+              thread.id === threadId
+                ? {
+                    ...thread,
+                    response: {
+                      ...thread.response,
+                      done,
+                      doneAt: done
+                        ? (thread.response.doneAt ?? Date.now())
+                        : null,
+                    },
+                  }
+                : thread,
+            ),
+          },
+        };
+      });
+      void writeResponse(threadId, { done });
+    },
+    [writeResponse],
+  );
 
-      // Responses are re-read from disk on every session load, so the cached
-      // GitHub data is still fine — no need to spend an API call here.
+  /**
+   * Link the change on screen to a comment, or clear the link. Refreshes,
+   * because the server computes the patch-id that lets the link survive a
+   * rebase and the client has no way to know it.
+   */
+  const linkCommit = useCallback(
+    async (threadId: string, sha: string | null) => {
+      await writeResponse(threadId, { sha });
       void loadSession(repoPath, { background: true });
     },
     [writeResponse, repoPath, loadSession],
@@ -611,9 +647,8 @@ export default function Page() {
 
   /** The composer's commit picker speaks in shas. */
   const pinThread = useCallback(
-    (threadId: string, sha: string | null) =>
-      linkThread(threadId, sha ? { sha } : null),
-    [linkThread],
+    (threadId: string, sha: string | null) => void linkCommit(threadId, sha),
+    [linkCommit],
   );
 
   const selectRepo = useCallback((path: string) => {
@@ -627,7 +662,7 @@ export default function Page() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key !== "j" && event.key !== "k") return;
+      if (event.key !== "j" && event.key !== "k" && event.key !== "x") return;
 
       const target = event.target as HTMLElement | null;
       if (
@@ -640,7 +675,18 @@ export default function Page() {
       }
       if (!session) return;
 
-      if (mode === "comments") {
+      // `x` ticks in place and deliberately does not advance: auto-advancing
+      // steals the moment you just earned and makes a mis-tick awkward to
+      // undo. `j` is right there.
+      if (event.key === "x") {
+        const thread = threads.find((t) => t.id === commentId);
+        if (!thread) return;
+        event.preventDefault();
+        toggleDone(thread.id, !thread.response.done);
+        return;
+      }
+
+      if (threads.length > 0) {
         const ids = threads.map((t) => t.id);
         const at = commentId ? ids.indexOf(commentId) : -1;
         if (at === -1) return;
@@ -672,7 +718,7 @@ export default function Page() {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session, rev, mode, threads, commentId]);
+  }, [session, rev, threads, commentId, toggleDone, selectComment]);
 
   return (
     <div className="min-h-screen">
@@ -698,41 +744,24 @@ export default function Page() {
         </div>
       ) : session ? (
         <div className="flex items-start">
-          <aside
-            className="thin-scroll hidden w-[300px] shrink-0 overflow-y-auto border-r border-[var(--border)] pb-8 lg:sticky lg:block"
-            style={{
-              top: "var(--header-height, 0px)",
-              maxHeight: "calc(100vh - var(--header-height, 0px))",
-            }}
-          >
-            <RailTabs
-              mode={mode}
-              onChange={setMode}
-              commentCount={threads.filter((t) => !t.isResolved).length}
-              commitCount={session.commits.length}
-            />
+          <TickSpine
+            threads={threads}
+            selectedId={commentId}
+            onSelect={(thread) => selectComment(thread.id)}
+          />
 
-            {mode === "comments" ? (
-              <CommentList
+          <main className="min-w-0 flex-1 space-y-3 pb-16">
+            {/* Below lg the spine can't sit beside the content, and the old
+                rail simply vanished at this width — leaving the checklist
+                unreachable. Same squares, laid out sideways. */}
+            {threads.length > 0 && (
+              <TickStrip
                 threads={threads}
                 selectedId={commentId}
                 onSelect={(thread) => selectComment(thread.id)}
-                workingPaths={workingPaths}
-              />
-            ) : (
-              <CommitList
-                session={session}
-                selected={rev}
-                onSelect={(next) => {
-                  setRev(next);
-                  window.scrollTo({ top: 0 });
-                }}
-                threadCountFor={threadCountFor}
               />
             )}
-          </aside>
-
-          <main className="min-w-0 flex-1 space-y-3 p-4 pb-16">
+            <div className="space-y-3 p-4 pt-3">
             {session.github.pr && <PrTitle pr={session.github.pr} />}
 
             {revNotice && (
@@ -759,7 +788,7 @@ export default function Page() {
               </p>
             )}
 
-            {commentNotice && mode === "comments" && (
+            {commentNotice && (
               <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
                 <AlertIcon
                   size={13}
@@ -785,7 +814,7 @@ export default function Page() {
                 the diff too hard. */}
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
               <div
-                className="thin-scroll min-w-0 xl:sticky xl:w-[380px] xl:shrink-0 xl:overflow-y-auto"
+                className="thin-scroll min-w-0 xl:sticky xl:w-[440px] xl:shrink-0 xl:overflow-y-auto"
                 style={{
                   top: "calc(var(--header-height, 0px) + 1rem)",
                   maxHeight: "calc(100vh - var(--header-height, 0px) - 2rem)",
@@ -799,8 +828,10 @@ export default function Page() {
                   repo={session.repo}
                   pr={session.github.pr}
                   commit={commitForRev}
-                  onPin={pinThread}
-                  pinCandidates={pinCandidates}
+                  branch={session.repo.branch}
+                  commitCandidates={pinCandidates}
+                  onToggleDone={toggleDone}
+                  onLinkCommit={linkCommit}
                   onDraftChange={saveDraft}
                 />
               </div>
@@ -817,13 +848,11 @@ export default function Page() {
                   threads={threads}
                   thread={selectedThread}
                   focusedThreadId={focusedThreadId}
-                  onPin={pinThread}
-                  pinCandidates={pinCandidates}
-                  onDraftChange={saveDraft}
+                  onSelectThread={selectComment}
                   pushed={revIsPushed}
-                  onLink={linkThread}
                 />
               </div>
+            </div>
             </div>
           </main>
         </div>

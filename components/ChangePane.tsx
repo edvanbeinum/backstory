@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
 import type {
@@ -12,7 +12,7 @@ import type {
 import { CommitHeader } from "./CommitHeader";
 import { DiffView } from "./DiffView";
 import {
-  CheckIcon,
+  ChevronDownIcon,
   CommentIcon,
   FileDiffIcon,
   GitCommitIcon,
@@ -115,11 +115,8 @@ export function ChangePane({
   threads,
   thread,
   focusedThreadId,
-  onPin,
-  pinCandidates,
-  onDraftChange,
+  onSelectThread,
   pushed,
-  onLink,
 }: {
   session: SessionResponse;
   rev: string;
@@ -132,12 +129,9 @@ export function ChangePane({
   /** The comment on the left, so its thread can be highlighted here */
   thread: ReviewThread | null;
   focusedThreadId: string | null;
-  onPin?: (threadId: string, sha: string | null) => void;
-  pinCandidates?: CommitSummary[];
-  onDraftChange?: (threadId: string, text: string | null) => void;
+  /** Hand a comment to the response panel, which owns answering it. */
+  onSelectThread?: (threadId: string) => void;
   pushed: boolean;
-  /** Record how the comment was handled: a commit, an ack, or cleared. */
-  onLink?: (threadId: string, link: { sha?: string; ack?: boolean } | null) => void;
 }) {
   const options = useMemo(
     () => changesFor(thread, session),
@@ -157,9 +151,8 @@ export function ChangePane({
 
   return (
     <div className="space-y-3">
-      {options.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-[11px] text-[var(--fg-muted)]">Showing</span>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[11px] text-[var(--fg-muted)]">Showing</span>
           {options.map((option) => (
             <button
               key={option.rev}
@@ -176,25 +169,17 @@ export function ChangePane({
               {option.label}
             </button>
           ))}
-          {/* A commit picked from the rail that isn't one of the offered
-              options still needs to read as the current selection. */}
+          {/* A commit picked from the dropdown isn't one of the offered
+              options, but still needs to read as the current selection. */}
           {!options.some((o) => o.rev === rev) && commit && (
             <span className="inline-flex items-center gap-1 rounded-full border border-[var(--accent)] bg-[var(--accent-subtle)] px-2.5 py-[3px] text-[11px] font-medium text-[var(--accent)]">
               <GitCommitIcon size={12} />
               {commit.shortSha}
             </span>
           )}
-        </div>
-      )}
 
-      {thread && (
-        <LinkActions
-          thread={thread}
-          rev={rev}
-          commit={commit}
-          onLink={onLink}
-        />
-      )}
+        <CommitPicker session={session} rev={rev} onRevChange={onRevChange} />
+      </div>
 
       {landing.length > 0 && (
         <p className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-1.5 text-[11px] text-[var(--fg-muted)]">
@@ -226,112 +211,94 @@ export function ChangePane({
         pr={session.github.pr}
         commit={commit}
         focusedThreadId={focusedThreadId}
-        onPin={onPin}
-        pinCandidates={pinCandidates}
-        onDraftChange={onDraftChange}
+        onSelectThread={onSelectThread}
       />
     </div>
   );
 }
 
 /**
- * The deliberate part: saying that this change answers the comment, or that
- * no change is needed. differ won't decide either for you — the act of
- * saying so is what makes you check, and it's the only thing that moves a
- * comment off the outstanding list.
+ * Browse to any commit on the branch.
+ *
+ * differ used to carry a whole second rail for this, competing with the
+ * comment list for the same column. Reading your own commits before you push
+ * is still a real workflow — it's what differ was built for — but it's a
+ * thing you reach for, not a thing you need on screen at all times. So it
+ * lives here, next to the other things the diff column can show.
  */
-function LinkActions({
-  thread,
+function CommitPicker({
+  session,
   rev,
-  commit,
-  onLink,
+  onRevChange,
 }: {
-  thread: ReviewThread;
+  session: SessionResponse;
   rev: string;
-  commit: CommitSummary | null;
-  onLink?: (
-    threadId: string,
-    link: { sha?: string; ack?: boolean } | null,
-  ) => void;
+  onRevChange: (rev: string) => void;
 }) {
-  if (!onLink) return null;
+  const [open, setOpen] = useState(false);
+  const candidates = useMemo(
+    () => [...session.commits, ...session.history.slice(0, 30)],
+    [session],
+  );
 
-  const link = thread.response.commit;
-  const linkedHere = Boolean(link && !link.missing && link.sha === rev);
-  // Only a real commit can be linked: uncommitted work and the combined
-  // branch diff have no sha to point a reply at.
-  const linkable =
-    commit !== null && rev !== WORKING_REV && rev !== BRANCH_REV;
-
-  if (thread.response.done && !link) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--done)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-        <CheckIcon size={13} className="text-[var(--done)]" />
-        <span className="flex-1">
-          Acknowledged — no code change needed.
-        </span>
-        <button
-          type="button"
-          onClick={() => onLink(thread.id, null)}
-          className="text-[11px] text-[var(--accent)] hover:underline"
-        >
-          Undo
-        </button>
-      </div>
-    );
-  }
-
-  if (linkedHere) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--done)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-        <CheckIcon size={13} className="text-[var(--done)]" />
-        <span className="flex-1">
-          This comment is answered by{" "}
-          <span className="mono">{commit?.shortSha ?? rev.slice(0, 7)}</span>.
-        </span>
-        <button
-          type="button"
-          onClick={() => onLink(thread.id, null)}
-          className="text-[11px] text-[var(--accent)] hover:underline"
-        >
-          Unlink
-        </button>
-      </div>
-    );
-  }
+  if (candidates.length === 0) return null;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2">
-      <span className="flex-1 text-[12px] text-[var(--fg-muted)]">
-        {link?.missing
-          ? "Its linked commit was rebased away — link it again."
-          : "Does this change answer the comment?"}
-      </span>
+    <span className="relative">
       <button
         type="button"
-        disabled={!linkable}
-        title={
-          linkable
-            ? `Link this comment to ${commit?.shortSha}`
-            : "Select a commit — uncommitted work and the combined diff have no sha to link"
-        }
-        onClick={() => commit && onLink(thread.id, { sha: commit.sha })}
-        className="inline-flex items-center gap-1.5 rounded-md border border-[#1f883d] bg-[#1f883d] px-2.5 py-1 text-[12px] font-medium text-white hover:bg-[#1a7f37] disabled:cursor-not-allowed disabled:opacity-40"
+        onClick={() => setOpen((value) => !value)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-[3px] text-[11px] font-medium text-[var(--fg-muted)] hover:text-[var(--fg)]"
       >
-        <CheckIcon size={12} />
-        This addresses it
-        {linkable && (
-          <span className="mono opacity-80">{commit?.shortSha}</span>
-        )}
+        <GitCommitIcon size={12} />
+        A commit…
+        <ChevronDownIcon size={10} />
       </button>
-      <button
-        type="button"
-        title="No code change needed — this one just wants a reply"
-        onClick={() => onLink(thread.id, { ack: true })}
-        className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--canvas)] px-2.5 py-1 text-[12px] font-medium text-[var(--fg)] hover:bg-[var(--canvas-subtle)]"
-      >
-        No change needed
-      </button>
-    </div>
+
+      {open && (
+        <ul className="absolute left-0 top-full z-40 mt-1 max-h-80 w-[26rem] overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--canvas)] py-1 shadow-[var(--overlay-shadow)]">
+          {candidates.map((candidate) => {
+            // The push boundary is the one distinction worth keeping from the
+            // old rail: what you can still rewrite, and what's already out.
+            const pushed = !session.commits.some(
+              (c) => c.sha === candidate.sha,
+            );
+            return (
+              <li key={candidate.sha}>
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    // mousedown: onBlur would close the list before a click
+                    event.preventDefault();
+                    setOpen(false);
+                    onRevChange(candidate.sha);
+                  }}
+                  className={`flex w-full items-baseline gap-2 px-2 py-1 text-left hover:bg-[var(--canvas-subtle)] ${
+                    candidate.sha === rev ? "bg-[var(--accent-subtle)]" : ""
+                  }`}
+                >
+                  <span className="mono shrink-0 text-[11px] text-[var(--fg-muted)]">
+                    {candidate.shortSha}
+                  </span>
+                  <span
+                    className={`min-w-0 flex-1 truncate text-[11px] ${
+                      pushed ? "text-[var(--fg-muted)]" : "text-[var(--fg)]"
+                    }`}
+                  >
+                    {candidate.subject}
+                  </span>
+                  {pushed && (
+                    <span className="shrink-0 text-[10px] text-[var(--fg-subtle)]">
+                      pushed
+                    </span>
+                  )}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </span>
   );
 }

@@ -112,6 +112,8 @@ export function ReviewThreadCard({
   onPin,
   pinCandidates,
   onDraftChange,
+  hideComposer = false,
+  onRespond,
 }: {
   thread: ReviewThread;
   repo: RepoInfo;
@@ -124,6 +126,14 @@ export function ReviewThreadCard({
   onPin?: (threadId: string, sha: string | null) => void;
   pinCandidates?: CommitSummary[];
   onDraftChange?: (threadId: string, text: string | null) => void;
+  /**
+   * The response panel already owns the composer for the selected comment.
+   * Two live composers on one thread is a second writer for one record, and
+   * a second place to wonder which draft is the real one.
+   */
+  hideComposer?: boolean;
+  /** Offered instead of a composer: select this comment and answer it there. */
+  onRespond?: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(
     defaultCollapsed ?? thread.isResolved,
@@ -187,28 +197,61 @@ export function ReviewThreadCard({
             <Comment key={comment.id} comment={comment} />
           ))}
 
-          <div className="border-t border-[var(--border-muted)] bg-[var(--canvas-subtle)] p-2">
-            <ReplyComposer
-              repo={repo}
-              pr={pr}
-              commit={commit}
-              threadUrl={threadUrl}
-              linkedSha={thread.response.commit?.sha ?? null}
-              linkedShaMissing={thread.response.commit?.missing}
-              linkedShaHealed={thread.response.commit?.healed}
-              acknowledged={thread.response.done && !thread.response.commit}
-              onPin={
-                onPin ? (sha) => onPin(thread.id, sha) : undefined
-              }
-              pinCandidates={pinCandidates}
-              draft={thread.response.reply}
-              onDraftChange={
-                onDraftChange
-                  ? (text) => onDraftChange(thread.id, text)
-                  : undefined
-              }
-            />
-          </div>
+          {hideComposer ? (
+            // Anchored in the diff, where the response panel beside it is
+            // already answering this comment. A summary of where it stands,
+            // and a way back to the one place that can change it.
+            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1.5 text-[11px] text-[var(--fg-muted)]">
+              {thread.response.done && (
+                <span className="inline-flex items-center gap-1 text-[var(--handled)]">
+                  <CheckIcon size={11} /> handled
+                </span>
+              )}
+              {thread.response.commit && (
+                <span
+                  className={`mono ${
+                    thread.response.commit.missing
+                      ? "text-[var(--attention)]"
+                      : ""
+                  }`}
+                >
+                  {thread.response.commit.shortSha}
+                  {thread.response.commit.missing && " gone"}
+                </span>
+              )}
+              {thread.response.reply && <span>reply drafted</span>}
+              <span className="flex-1" />
+              {onRespond && (
+                <button
+                  type="button"
+                  onClick={onRespond}
+                  className="text-[var(--accent)] hover:underline"
+                >
+                  Respond →
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="border-t border-[var(--border-muted)] bg-[var(--canvas-subtle)] p-2">
+              <ReplyComposer
+                repo={repo}
+                pr={pr}
+                commit={commit}
+                threadUrl={threadUrl}
+                linkedSha={thread.response.commit?.sha ?? null}
+                linkedShaMissing={thread.response.commit?.missing}
+                linkedShaHealed={thread.response.commit?.healed}
+                onPin={onPin ? (sha) => onPin(thread.id, sha) : undefined}
+                pinCandidates={pinCandidates}
+                draft={thread.response.reply}
+                onDraftChange={
+                  onDraftChange
+                    ? (text) => onDraftChange(thread.id, text)
+                    : undefined
+                }
+              />
+            </div>
+          )}
         </>
       )}
     </div>
