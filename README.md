@@ -7,11 +7,14 @@ GitHub — and by then, fixing anything costs another commit and another push.
 The review comments live in GitHub's UI; the code that answers them lives on
 your machine. Nothing shows you both at once.
 
-differ is a local web app that puts them side by side. It lists the commits
-GitHub hasn't seen yet, renders each one's diff in a GitHub-style UI, and drops
-the pull request's review threads onto the exact lines they refer to. When a
-commit answers a comment, it drafts the `Addressed in <commit-link>` reply for
-you to paste back.
+differ is a local web app that puts them side by side: a TODO tracker built
+from your PR's review comments, and a drafting tool for the responses. It
+lists every worktree you have checked out with how far through each review
+you are, renders the diffs in a GitHub-style UI, drops the review threads onto
+the exact lines they refer to, and drafts the `Addressed in <commit-link>`
+reply for you to paste back.
+
+Whether a comment is handled is your call and nobody else's — you tick it.
 
 ## Read-only, on purpose
 
@@ -29,9 +32,9 @@ npm install
 npm run dev
 ```
 
-Open http://127.0.0.1:3000 and pick a checkout — **Browse** finds them for
-you, or paste a path. The path is remembered, and recent repos are one click
-away in the input's dropdown.
+Open http://127.0.0.1:3000 and point differ at a checkout — **Browse** finds
+them for you, or paste a path. From then on `/` is the inbox: every worktree
+of every repo you've opened, so you never type a path again.
 
 Browse leads with the **sibling worktrees** of whatever repo is open, listed
 with the branch each one holds, straight from `git worktree list`. Below that
@@ -109,102 +112,121 @@ Slashes are left unencoded so the path stays readable; `&`, `=` and spaces are
 still escaped. `rev` is optional and accepts a short sha, which is normalised
 to the full one. If a link points at a commit that's since been pushed, differ
 falls back to the latest and tells you rather than silently showing something
-else. A URL beats the remembered path; a bare `/` uses the remembered one.
+else. A bare `/` is the inbox — it used to reopen your last checkout, which
+hides the home screen behind a branch you may well be done with.
 
 Requirements: **git**, and **[gh](https://cli.github.com)** authenticated
 (`gh auth login`) for the GitHub half. Without `gh` the commits and diffs still
 work — you just get a banner where the PR comments would be.
 
-## What you see
+## Three levels
+
+**The inbox** is the home screen: every worktree you've got checked out,
+across every repo you've opened, with how far through each one's review you
+are.
 
 ```
-┌──────────────────┬────────────────────┬───────────────────────────┐
-│ [Comments][Commits]                   │                           │
-│ 6 comments       │ COMMENT 2 of 6 ‹ › │ Showing (◍) (fc6ff8f) (⧉) │
-│ AudioEngine.swift│ ┌────────────────┐ │ 💬 1 comment lands here   │
-│ ● The pending…   │ │ julianrubisch  │ │ ┌ FakePlaybackEngine.swift│
-│   → 888c79c      │ │ Keying off     │ │ │  49   func complete() { │
-│ ● Nit: the guard…│ │ pendingSeek…   │ │ │  51 + assert(target)    │
-│   → 888c79c      │ │                │ │ │     💬 the comment,     │
-│ FakePlayback…    │ │ [Addressed in  │ │ │        anchored inline  │
-│ ● Keying off…    │ │  fc6ff8f] ⧉    │ │ └─────────────────────────│
-│   → fc6ff8f      │ └────────────────┘ │                           │
-└──────────────────┴────────────────────┴───────────────────────────┘
-     the rail          the comment              the change
+10 comments need a response
+across 5 branches · 21 worktrees checked out
+
+INDEE-IOS ─────────────────────────────────────────────────────────
+ ●  feature/seek-target-1649        #40 merged   ▓▓░░░░░  2 of 7 handled
+    Publish the engine's pending seek target
+ ✓  fix/audio-test-notification-36  #38 merged   ▓▓▓▓     all handled
+ ○  feature/release-script          no PR yet
 ```
 
-**Comments and commits are separate axes.** The main pane is two columns: the
-comment you're working on stays pinned on the left while you browse changes on
-the right. Selecting a comment moves the right column to whatever answers it;
-selecting a commit leaves the comment alone. The comment column has its own
-‹ › stepper, so you can step through comments whichever list the rail happens
-to be showing. Below `xl` the columns stack, where side by side would squeeze
-the diff too hard.
+The branch leads, because the branch is the identity — folder names drift, and
+one of these directories is named after a branch it stopped holding two
+renames ago, so the folder is a footnote shown only when it disagrees.
+Progress sits in a fixed right-hand column so the counts line up down the page.
 
-**The rail has two modes** and drives only itself.
+This costs **one `gh` call per repository**, not per worktree: a single
+aliased GraphQL query asks for every branch at once. Three repos and
+twenty-one worktrees resolve in about half a second. GitHub only decorates the
+list — without `gh`, or without a remote, every worktree still appears with a
+note saying the counts are missing.
 
-*Comments* is the default: a checklist of the PR's review comments, each
-showing what currently answers it — a pinned commit, an inferred one,
-uncommitted work, or nothing yet.
-
-*Commits* is the pre-push self-review list: every commit between your branch
-tip and what's on the remote, with uncommitted work pinned at the top as a
-pseudo-commit and **All changes vs main** above that — the whole branch as one
-diff, GitHub's "Files changed" tab before the push. The push boundary line
-marks what GitHub has; below it, the last 30 already-pushed commits continue
-the timeline, dimmed but selectable. `j`/`k` move through whichever list is
-showing.
-
-**The change column** picks what to show automatically, with chips to
-override:
+**The workspace** is one branch, three columns:
 
 ```
-Showing  ( ◍ Uncommitted )  ( fc6ff8f )  ( ⧉ All changes )
+┌────┬──────────────────────┬───────────────────────────┐
+│2/7 │ COMMENT 3 OF 7  ‹ ›  │ Showing (⧉)(◍)(a commit…) │
+│    │                      │                           │
+│ ☑  │ [ ✓ Mark handled  x] │ ┌ AudioEngine.swift ─────  │
+│ ☑  │                      │ │  29 + guard let target  │
+│ ▣  │ 🧑 julianrubisch     │ │  30 + engine.seek(…)    │
+│ ☐  │ Keying off pending…  │ │     💬 the comment,     │
+│ ☐  │                      │ │        anchored inline  │
+│ ☐  │ YOUR RESPONSE        │ └───────────────────────── │
+│ ☐  │ [chips] [reply box]  │                           │
+│    │ [Copy reply] [Link…] │                           │
+└────┴──────────────────────┴───────────────────────────┘
+ spine     the response              the change
 ```
 
-Uncommitted leads when your working tree touches the comment's file — that's
-where you are when you check a comment mid-fix, before committing. Otherwise
-the pinned or inferred commit, otherwise the whole branch diff. Whatever is
-selected says how many comments land in it, which is the reverse lookup: given
-a commit, which review comments does it answer?
+The **spine** is the checklist: one square per comment, filled when handled.
+It used to be a 300px rail restating in text what the column beside it already
+showed. What a standing list is actually for is knowing how far through you
+are and jumping to any comment in one click, and both fit in 48px — the diff
+gets the rest. A square selects; `j`/`k` move; `x` ticks. Below `lg` it
+becomes a horizontal strip under the header.
 
-Review threads anchor **inline, on the line they were written against**, so
-"did this change actually answer the review?" is a glance rather than a memory
-test. Nothing is ever hidden: a thread that doesn't land on a line in the
-current change still appears, either under its file or in *Other comments on
-this PR*.
+**The response** is what you're doing about the comment on screen: the tick,
+a drafted reply, and optionally the commit that answers it. All three are
+independent.
+
+**The change** keeps its full column. `Showing` offers the whole branch diff,
+your uncommitted work, the linked commit, and a picker for any commit on the
+branch — the pre-push self-review differ was originally built for. Whatever is
+selected says how many comments land in it, which is the reverse lookup:
+given a commit, which review comments does it answer? Threads anchor inline on
+the line they were written against, so "did this change actually answer the
+review?" is a glance rather than a memory test.
 
 ## Handling a comment is deliberate
 
-differ does **not** guess which commit answers a comment. It used to — the
-newest commit touching the file — and the guess always found *something*, so
-no comment ever read as outstanding and the list couldn't work as a checklist.
-On a six-comment PR, all six showed a plausible link and none showed as open.
+differ does **not** decide when a comment is handled. It used to guess which
+commit answered one — the newest commit touching the file — and the guess
+always found *something*, so no comment ever read as outstanding and the list
+couldn't work as a checklist. On a six-comment PR, all six showed a plausible
+link and none showed as open.
 
-Now every comment starts **unanswered**, and you handle it one of two ways:
+So there is exactly one thing that means handled: **you tick it.** Not linking
+a commit, not drafting a reply, not a reply spotted on GitHub. The point of a
+checklist is working down it and checking things off, and a flag something
+else can set isn't one.
 
-- **This addresses it** — links the comment to the commit on screen. You had
-  to read the diff to get there, which is the point: the act of linking is
-  the moment you actually check.
-- **No change needed** — some review comments only want a reply. Acknowledging
-  one counts as handled and switches the reply templates from
-  `Addressed in <commit>` to a plain 👍 or "Noted — no change needed".
+Which makes the tick the moment differ earns itself, so it is built rather
+than assumed: a spring on the box, the check drawn on rather than snapped in,
+one expanding ring. One ring, not confetti — confetti on every comment stops
+being a reward by the third. The big effect is spent only on the last comment
+of a PR, where the panel becomes the payoff: nothing left, and every drafted
+reply on the clipboard in one go. Unticking is quiet; undoing a mis-tick
+shouldn't feel like a second event. All of it is skipped under
+`prefers-reduced-motion`, where the state still lands, just instantly.
 
-The rail header reads `3 of 6 addressed`, and the change column tells you how
-many comments land in whatever you're looking at — the reverse lookup.
+A comment answered without any code change is simply one you tick without
+linking a commit — the reply templates drop `Addressed in <commit>` and offer
+a plain 👍 or "No change needed".
 
-## Pins survive rebases
+## Links survive rebases
 
-Rebasing a stack rewrites every sha, which would break every pin. So a pin
-stores the commit's **patch-id** — a hash of its diff alone — alongside the
-sha. A rebased commit keeps its patch-id, so a stale pin is re-matched to the
-rewritten commit automatically and marked *re-matched after a rebase*.
+Rebasing a stack rewrites every sha, which would break every linked commit. So
+a link stores the commit's **patch-id** — a hash of its diff alone — alongside
+the sha. A rebased commit keeps its patch-id, so a stale link is re-matched to
+the rewritten commit automatically and marked *re-matched after a rebase*.
 
 | you did | result |
 |---|---|
 | rebase / restack (clean) | heals silently |
 | reword a commit message | heals — same diff, same patch-id |
-| squash, amend the content, rebase through a conflict | `26ef8f7 gone`, asks for a re-pin |
+| squash, amend the content, rebase through a conflict | `26ef8f7 gone`, asks for a new link |
+
+**A rebase never unticks anything.** Healing writes the link and only the
+link. The work was done; it's the pointer that rotted, so the comment stays
+handled, the count doesn't move, and re-linking is offered rather than
+demanded.
 
 The last row is deliberate: those genuinely change the diff, so attaching your
 reply to a guessed commit would be worse than admitting the link broke. Same
@@ -226,8 +248,9 @@ Files over 5,000 lines render in full but without syntax highlighting — the
 footer says so. Dual-theme highlighting emits two CSS variables per token, and
 past that size the payload and DOM cost stop being worth it.
 
-Nothing is ever hidden: a thread that doesn't land on a line in the current
-commit still appears, either under its file or in *Other comments on this PR*.
+A thread that doesn't land on a line in the current change isn't repeated as a
+card — the spine already lists every comment, always visible — just counted,
+so you know it's there.
 
 ## How "not yet pushed" is decided
 
@@ -246,11 +269,16 @@ origin/main`), so the commit list is never a mystery.
 
 | Path | What's in it |
 |---|---|
-| `app/api/session` | repo state, commit list, PR, review threads |
+| `app/api/inbox` | every worktree of every known repo, with its PR and counts |
+| `app/api/session` | one branch: repo state, commits, PR, review threads |
+| `app/api/responses` | the tick, the draft reply, the linked commit |
 | `app/api/diff` | one commit's parsed and highlighted diff |
 | `app/api/file` | one file at full context, for *View file* |
 | `lib/git.ts` | base resolution, commits, patches, working tree |
 | `lib/github.ts` | `gh` PR lookup and GraphQL threads, with soft failure |
+| `lib/inbox.ts` | the batched per-repo query behind the inbox |
+| `lib/responses.ts` | `~/.differ/responses.json`, and the one-way migration |
+| `lib/progress.ts` | the single definition of "3 of 7 handled" |
 | `lib/diff.ts` | unified diff parser |
 | `lib/anchor.ts` | which thread belongs on which line |
 | `lib/highlight.ts` | Shiki, both themes, per line |
