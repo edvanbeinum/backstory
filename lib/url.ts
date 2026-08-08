@@ -148,6 +148,15 @@ export function resolveRev(
   commits: CommitSummary[],
   hasWorkingChanges: boolean,
   hasBranchDiff = false,
+  /**
+   * Shas chosen by hand this session — pasted into the commit picker rather
+   * than picked from the offered list. differ can render any commit in the
+   * repo, but it only *lists* the branch's recent ones, so without this a
+   * pasted sha would be bounced back by the next background refresh a second
+   * after you chose it. A rev from a URL still falls back, which is what
+   * keeps a stale bookmark graceful.
+   */
+  pinned: string[] = [],
 ): RevResolution {
   const fallback = hasWorkingChanges
     ? WORKING_REV
@@ -171,6 +180,8 @@ export function resolveRev(
     (c) => c.sha === requested || c.sha.startsWith(requested),
   );
   if (match) return { rev: match.sha, notice: null };
+
+  if (pinned.includes(requested)) return { rev: requested, notice: null };
 
   return { rev: fallback, notice: requested };
 }

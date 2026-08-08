@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 
 import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
 import type {
@@ -11,8 +11,8 @@ import type {
 } from "@/lib/types";
 import { CommitHeader } from "./CommitHeader";
 import { DiffView } from "./DiffView";
+import { CommitPicker } from "./CommitPicker";
 import {
-  ChevronDownIcon,
   CommentIcon,
   FileDiffIcon,
   GitCommitIcon,
@@ -138,6 +138,16 @@ export function ChangePane({
     [thread, session],
   );
 
+  /**
+   * Any commit on the branch, so the diff column isn't limited to the three
+   * chips. Reading your own commits before pushing is what differ was built
+   * for; it just no longer needs a rail of its own to do it.
+   */
+  const commitCandidates = useMemo(
+    () => [...session.commits, ...session.history],
+    [session],
+  );
+
   // How many comments this change answers — the reverse lookup that was
   // missing: given a commit, which review comments land in it?
   const landing = useMemo(
@@ -178,7 +188,15 @@ export function ChangePane({
             </span>
           )}
 
-        <CommitPicker session={session} rev={rev} onRevChange={onRevChange} />
+          {commitCandidates.length > 0 && (
+            <CommitPicker
+              label="A commit…"
+              candidates={commitCandidates}
+              selected={rev}
+              onPick={onRevChange}
+              align="left"
+            />
+          )}
       </div>
 
       {landing.length > 0 && (
@@ -214,91 +232,5 @@ export function ChangePane({
         onSelectThread={onSelectThread}
       />
     </div>
-  );
-}
-
-/**
- * Browse to any commit on the branch.
- *
- * differ used to carry a whole second rail for this, competing with the
- * comment list for the same column. Reading your own commits before you push
- * is still a real workflow — it's what differ was built for — but it's a
- * thing you reach for, not a thing you need on screen at all times. So it
- * lives here, next to the other things the diff column can show.
- */
-function CommitPicker({
-  session,
-  rev,
-  onRevChange,
-}: {
-  session: SessionResponse;
-  rev: string;
-  onRevChange: (rev: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const candidates = useMemo(
-    () => [...session.commits, ...session.history.slice(0, 30)],
-    [session],
-  );
-
-  if (candidates.length === 0) return null;
-
-  return (
-    <span className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        onBlur={() => setTimeout(() => setOpen(false), 120)}
-        className="inline-flex items-center gap-1 rounded-full border border-[var(--border)] px-2.5 py-[3px] text-[11px] font-medium text-[var(--fg-muted)] hover:text-[var(--fg)]"
-      >
-        <GitCommitIcon size={12} />
-        A commit…
-        <ChevronDownIcon size={10} />
-      </button>
-
-      {open && (
-        <ul className="absolute left-0 top-full z-40 mt-1 max-h-80 w-[26rem] overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--canvas)] py-1 shadow-[var(--overlay-shadow)]">
-          {candidates.map((candidate) => {
-            // The push boundary is the one distinction worth keeping from the
-            // old rail: what you can still rewrite, and what's already out.
-            const pushed = !session.commits.some(
-              (c) => c.sha === candidate.sha,
-            );
-            return (
-              <li key={candidate.sha}>
-                <button
-                  type="button"
-                  onMouseDown={(event) => {
-                    // mousedown: onBlur would close the list before a click
-                    event.preventDefault();
-                    setOpen(false);
-                    onRevChange(candidate.sha);
-                  }}
-                  className={`flex w-full items-baseline gap-2 px-2 py-1 text-left hover:bg-[var(--canvas-subtle)] ${
-                    candidate.sha === rev ? "bg-[var(--accent-subtle)]" : ""
-                  }`}
-                >
-                  <span className="mono shrink-0 text-[11px] text-[var(--fg-muted)]">
-                    {candidate.shortSha}
-                  </span>
-                  <span
-                    className={`min-w-0 flex-1 truncate text-[11px] ${
-                      pushed ? "text-[var(--fg-muted)]" : "text-[var(--fg)]"
-                    }`}
-                  >
-                    {candidate.subject}
-                  </span>
-                  {pushed && (
-                    <span className="shrink-0 text-[10px] text-[var(--fg-subtle)]">
-                      pushed
-                    </span>
-                  )}
-                </button>
-              </li>
-            );
-          })}
-        </ul>
-      )}
-    </span>
   );
 }

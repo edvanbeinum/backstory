@@ -190,3 +190,17 @@ test("an empty repo with a clean tree still resolves to something", () => {
     notice: "abc123",
   });
 });
+
+test("a hand-picked sha survives, an unknown one from a URL still falls back", () => {
+  // differ can render any commit in the repo but only lists the branch's
+  // recent ones, so a pasted sha must not be bounced by the next refresh.
+  assert.deepEqual(resolveRev("fc6ff8f", COMMITS, false, false, ["fc6ff8f"]), {
+    rev: "fc6ff8f",
+    notice: null,
+  });
+  // Without that, the graceful fallback for a stale bookmark is unchanged.
+  assert.deepEqual(resolveRev("fc6ff8f", COMMITS, false, false, []), {
+    rev: COMMITS[0].sha,
+    notice: "fc6ff8f",
+  });
+});

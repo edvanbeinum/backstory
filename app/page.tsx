@@ -104,6 +104,13 @@ export default function Page() {
   const repoRef = useRef(repoPath);
   /** Discards out-of-order session responses from overlapping refreshes. */
   const sessionSeq = useRef(0);
+  /**
+   * Shas typed or pasted into the commit picker rather than chosen from the
+   * list. The session only carries the branch's recent commits, so without
+   * remembering these the next background refresh would decide the rev didn't
+   * exist and bounce you off it.
+   */
+  const pickedRevs = useRef<string[]>([]);
 
   useEffect(() => {
     repoRef.current = repoPath;
@@ -279,6 +286,7 @@ export default function Page() {
             [...data.commits, ...data.history],
             data.working.hasChanges,
             data.branchDiff !== null,
+            pickedRevs.current,
           );
           setRevNotice(notice);
 
@@ -961,7 +969,19 @@ export default function Page() {
                 <ChangePane
                   session={session}
                   rev={rev}
-                  onRevChange={setRev}
+                  onRevChange={(next) => {
+                    // Remember anything that isn't in the offered list, so a
+                    // pasted sha survives the next refresh.
+                    if (
+                      !session.commits.some((c) => c.sha === next) &&
+                      !session.history.some((c) => c.sha === next)
+                    ) {
+                      pickedRevs.current = [
+                        ...new Set([...pickedRevs.current, next]),
+                      ];
+                    }
+                    setRev(next);
+                  }}
                   commit={commitForRev}
                   diff={diff}
                   loading={diffLoading}
