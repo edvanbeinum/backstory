@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse } from "@/lib/api";
-import { getPatchId, resolveRepo } from "@/lib/git";
+import { getPatchId, resolveRepo, resolveRev } from "@/lib/git";
 import {
   getResponses,
   updateResponses,
@@ -112,10 +112,19 @@ export async function POST(request: Request) {
           );
         }
         const repo = await resolveRepo(repoPath);
-        patch.commit = {
-          sha: body.sha,
-          patchId: await getPatchId(repo.root, body.sha),
-        };
+        // Expand whatever was given — a pasted short sha, or a ref — to the
+        // full one. Storing an abbreviation would compare unequal against
+        // every full sha in the UI, and would stop being unique as the repo
+        // grows. Not resolving is also how a typo gets caught, here, rather
+        // than as a link that silently points at nothing.
+        const sha = await resolveRev(repo.root, body.sha);
+        if (!sha) {
+          return NextResponse.json<ApiError>(
+            { error: `No commit ${body.sha} in this repository.` },
+            { status: 400 },
+          );
+        }
+        patch.commit = { sha, patchId: await getPatchId(repo.root, sha) };
       }
     }
 

@@ -97,6 +97,7 @@ export default function Page() {
   const [commentId, setCommentId] = useState<string | null>(null);
   /** Set when a URL asked for a comment that isn't in this PR. */
   const [commentNotice, setCommentNotice] = useState<string | null>(null);
+  const [linkNotice, setLinkNotice] = useState<string | null>(null);
   /** Bumped by watcher events; retriggers the working-tree diff fetch. */
   const [workingTick, setWorkingTick] = useState(0);
   const revRef = useRef(rev);
@@ -639,9 +640,7 @@ export default function Page() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ threadId, ...patch }),
         keepalive: opts.keepalive,
-      }).catch(() => {
-        // A failed write shouldn't break the view; the next action retries.
-      });
+      }).catch(() => null);
     },
     [responseKey, repoPath],
   );
@@ -705,7 +704,17 @@ export default function Page() {
    */
   const linkCommit = useCallback(
     async (threadId: string, sha: string | null) => {
-      await writeResponse(threadId, { sha });
+      const response = await writeResponse(threadId, { sha });
+      // A pasted sha can simply not exist. Saying so beats a click that looks
+      // like it worked and leaves the row unchanged.
+      if (response && !response.ok) {
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setLinkNotice(body?.error ?? "Couldn't link that commit.");
+        return;
+      }
+      setLinkNotice(null);
       void loadSession(repoPath, { background: true });
     },
     [writeResponse, repoPath, loadSession],
@@ -880,6 +889,23 @@ export default function Page() {
             {session.github.unavailable && !session.github.pr && (
               <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
                 {session.github.unavailable}
+              </p>
+            )}
+
+            {linkNotice && (
+              <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                <AlertIcon
+                  size={13}
+                  className="mt-0.5 shrink-0 text-[var(--attention)]"
+                />
+                <span className="flex-1">{linkNotice}</span>
+                <button
+                  type="button"
+                  onClick={() => setLinkNotice(null)}
+                  className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                >
+                  Dismiss
+                </button>
               </p>
             )}
 

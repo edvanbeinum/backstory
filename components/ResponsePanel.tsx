@@ -251,14 +251,39 @@ function Picker({
   setOpen: (value: boolean) => void;
   onPick: (sha: string) => void;
 }) {
-  if (candidates.length === 0) {
+  const [query, setQuery] = useState("");
+
+  const trimmed = query.trim();
+  const matches = trimmed
+    ? candidates.filter(
+        (c) =>
+          c.sha.startsWith(trimmed.toLowerCase()) ||
+          c.subject.toLowerCase().includes(trimmed.toLowerCase()),
+      )
+    : candidates;
+
+  // A pasted sha often isn't in the list: differ offers the branch's recent
+  // commits, and the one that answered a comment can sit outside that window,
+  // or on another branch entirely. Rather than making you hunt for it, take
+  // it as typed — the server expands it and rejects it if it isn't real.
+  const looksLikeSha = /^[0-9a-f]{7,40}$/i.test(trimmed);
+  const offerRaw = looksLikeSha && !matches.some((c) => c.sha.startsWith(trimmed.toLowerCase()));
+
+  const choose = (sha: string) => {
+    setOpen(false);
+    setQuery("");
+    onPick(sha);
+  };
+
+  if (candidates.length === 0 && !open) {
     return (
-      <span
-        className="text-[var(--fg-subtle)]"
-        title="differ found no commits on this branch to offer"
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="font-medium text-[var(--accent)] hover:underline"
       >
-        no commits to link
-      </span>
+        {label}
+      </button>
     );
   }
 
@@ -267,7 +292,6 @@ function Picker({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        onBlur={() => setTimeout(() => setOpen(false), 120)}
         className="inline-flex items-center gap-0.5 font-medium text-[var(--accent)] hover:underline"
       >
         {label}
@@ -275,31 +299,86 @@ function Picker({
       </button>
 
       {open && (
-        <ul className="absolute right-0 top-full z-40 mt-1 max-h-72 w-[24rem] overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--canvas)] py-1 shadow-[var(--overlay-shadow)]">
-          {candidates.map((candidate) => (
-            <li key={candidate.sha}>
-              <button
-                type="button"
-                onMouseDown={(event) => {
-                  // mousedown: onBlur would close the list before a click
-                  event.preventDefault();
-                  setOpen(false);
-                  onPick(candidate.sha);
-                }}
-                className={`flex w-full items-baseline gap-2 px-2 py-1 text-left hover:bg-[var(--canvas-subtle)] ${
-                  candidate.sha === selected ? "bg-[var(--accent-subtle)]" : ""
-                }`}
-              >
-                <span className="mono shrink-0 text-[11px] text-[var(--fg-muted)]">
-                  {candidate.shortSha}
-                </span>
-                <span className="min-w-0 flex-1 truncate text-[11px]">
-                  {candidate.subject}
-                </span>
-              </button>
-            </li>
-          ))}
-        </ul>
+        <div
+          className="absolute right-0 top-full z-40 mt-1 w-[24rem] overflow-hidden rounded-md border border-[var(--border)] bg-[var(--canvas)] shadow-[var(--overlay-shadow)]"
+          // Blur is on the container, not the trigger, so clicking into the
+          // input doesn't close the thing it belongs to.
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node)) {
+              setTimeout(() => setOpen(false), 120);
+            }
+          }}
+        >
+          <input
+            autoFocus
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") setOpen(false);
+              if (event.key === "Enter") {
+                event.preventDefault();
+                if (offerRaw) choose(trimmed);
+                else if (matches[0]) choose(matches[0].sha);
+              }
+            }}
+            placeholder="Paste a sha, or filter by message"
+            spellCheck={false}
+            className="mono w-full border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-2.5 py-1.5 text-[11px] outline-none"
+          />
+
+          <ul className="max-h-72 overflow-y-auto py-1">
+            {offerRaw && (
+              <li>
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    event.preventDefault();
+                    choose(trimmed);
+                  }}
+                  className="flex w-full items-baseline gap-2 px-2 py-1.5 text-left hover:bg-[var(--canvas-subtle)]"
+                >
+                  <span className="mono shrink-0 text-[11px] font-semibold text-[var(--accent)]">
+                    {trimmed}
+                  </span>
+                  <span className="text-[11px] text-[var(--fg-muted)]">
+                    link this sha
+                  </span>
+                </button>
+              </li>
+            )}
+
+            {matches.map((candidate) => (
+              <li key={candidate.sha}>
+                <button
+                  type="button"
+                  onMouseDown={(event) => {
+                    // mousedown: blur would close the list before a click
+                    event.preventDefault();
+                    choose(candidate.sha);
+                  }}
+                  className={`flex w-full items-baseline gap-2 px-2 py-1 text-left hover:bg-[var(--canvas-subtle)] ${
+                    candidate.sha === selected ? "bg-[var(--accent-subtle)]" : ""
+                  }`}
+                >
+                  <span className="mono shrink-0 text-[11px] text-[var(--fg-muted)]">
+                    {candidate.shortSha}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-[11px]">
+                    {candidate.subject}
+                  </span>
+                </button>
+              </li>
+            ))}
+
+            {matches.length === 0 && !offerRaw && (
+              <li className="px-2.5 py-2 text-[11px] text-[var(--fg-muted)]">
+                {trimmed
+                  ? "Nothing matches. Paste a full or short sha to link it anyway."
+                  : "differ found no commits on this branch to offer."}
+              </li>
+            )}
+          </ul>
+        </div>
       )}
     </span>
   );
