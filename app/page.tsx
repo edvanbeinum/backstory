@@ -5,10 +5,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChangePane, openingChangeFor } from "@/components/ChangePane";
 import { CommentPane } from "@/components/CommentPane";
 import { AlertIcon, FileDiffIcon } from "@/components/icons";
+import { Inbox } from "@/components/Inbox";
+import { RepoBrowser } from "@/components/RepoBrowser";
 import { PrTitle } from "@/components/PrTitle";
 import { TickSpine, TickStrip } from "@/components/TickSpine";
 import { RepoBar } from "@/components/RepoBar";
-import { BRANCH_REV, STORAGE_KEY, WORKING_REV } from "@/lib/constants";
+import {
+  BRANCH_REV,
+  INBOX_ROOTS_KEY,
+  STORAGE_KEY,
+  WORKING_REV,
+} from "@/lib/constants";
 import {
   loadRecents,
   removeFromList,
@@ -82,6 +89,7 @@ export default function Page() {
   const [revNotice, setRevNotice] = useState<string | null>(null);
   /** True while the watch stream is connected — shown as the live dot. */
   const [live, setLive] = useState(false);
+  const [browsing, setBrowsing] = useState(false);
   /** Previously-opened repos for the RepoBar dropdown. */
   const [recents, setRecents] = useState<RecentRepo[]>([]);
 
@@ -100,13 +108,14 @@ export default function Page() {
     repoRef.current = repoPath;
   }, [repoPath]);
 
-  // The URL wins over localStorage, so a pasted or bookmarked link opens the
-  // view it describes. Falling back to localStorage keeps a bare visit to `/`
-  // on the checkout you were last looking at.
+  // A bare `/` is the inbox. It used to reopen whatever you last had open,
+  // which now hides the home screen behind a checkout you may be done with —
+  // the key is still written, so the inbox can mark where you were, but it is
+  // no longer an instruction to skip past it. A URL with `repo` still opens
+  // exactly the view it describes.
   useEffect(() => {
     const fromUrl = readUrlState();
-    const stored = window.localStorage.getItem(STORAGE_KEY) ?? "";
-    const path = fromUrl.repo ?? stored;
+    const path = fromUrl.repo ?? "";
 
     setRepoPath(path);
     if (fromUrl.rev) setRev(fromUrl.rev);
@@ -134,6 +143,59 @@ export default function Page() {
     });
   }, [sessionRoot, sessionBranch]);
 
+  /**
+   * Which repos the inbox scans.
+   *
+   * Not `recents` directly: that holds *worktree* paths capped at twelve, so
+   * with twenty worktrees it fills up with one repo and quietly evicts the
+   * other. The inbox reports the canonical root of everything it finds, and
+   * those get written back here — twelve volatile worktree paths converge to
+   * two stable repo roots after one load.
+   */
+  const [inboxRoots, setInboxRoots] = useState<string[]>([]);
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(INBOX_ROOTS_KEY);
+      const stored = raw ? (JSON.parse(raw) as unknown) : null;
+      const known = Array.isArray(stored)
+        ? stored.filter((v): v is string => typeof v === "string")
+        : [];
+      const seeds = loadRecents().map((r) => r.path);
+      setInboxRoots([...new Set([...known, ...seeds])]);
+    } catch {
+      setInboxRoots(loadRecents().map((r) => r.path));
+    }
+  }, []);
+
+  const rememberRoot = useCallback((root: string) => {
+    setInboxRoots((current) => {
+      if (current.includes(root)) return current;
+      const next = [...current, root];
+      try {
+        window.localStorage.setItem(INBOX_ROOTS_KEY, JSON.stringify(next));
+      } catch {
+        // Storage full or blocked — the inbox just rescans from recents.
+      }
+      return next;
+    });
+  }, []);
+
+  const forgetRoot = useCallback((root: string) => {
+    setInboxRoots((current) => {
+      const next = current.filter((r) => r !== root);
+      try {
+        window.localStorage.setItem(INBOX_ROOTS_KEY, JSON.stringify(next));
+      } catch {
+        // As above.
+      }
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (sessionRoot) rememberRoot(sessionRoot);
+  }, [sessionRoot, rememberRoot]);
+
   const removeRecent = useCallback((path: string) => {
     setRecents((current) => {
       const next = removeFromList(current, path);
@@ -142,15 +204,19 @@ export default function Page() {
     });
   }, []);
 
-  // Keep the address bar in step with what's on screen.
+  // Keep the address bar in step with what's on screen. Entering or leaving a
+  // workspace is a real navigation and gets a history entry; moving between
+  // comments and commits inside one replaces, so Back doesn't have to walk
+  // back through every keystroke.
+  const wasInWorkspace = useRef(false);
   useEffect(() => {
     if (!ready) return;
-    writeUrlState({
-      repo: repoPath || null,
-      rev,
-      mode: null,
-      comment: commentId,
-    });
+    const inWorkspace = Boolean(repoPath);
+    writeUrlState(
+      { repo: repoPath || null, rev, mode: null, comment: commentId },
+      { push: inWorkspace !== wasInWorkspace.current },
+    );
+    wasInWorkspace.current = inWorkspace;
   }, [ready, repoPath, rev, commentId]);
 
   // Someone navigating with the back/forward buttons, or editing the URL by
@@ -651,6 +717,15 @@ export default function Page() {
     [linkCommit],
   );
 
+  /** Back to the home screen. Clearing the repo is what the inbox *is*. */
+  const backToInbox = useCallback(() => {
+    setRepoPath("");
+    setSession(null);
+    setSessionError(null);
+    setCommentId(null);
+    setRev(WORKING_REV);
+  }, []);
+
   const selectRepo = useCallback((path: string) => {
     const trimmed = path.trim();
     window.localStorage.setItem(STORAGE_KEY, trimmed);
@@ -722,6 +797,7 @@ export default function Page() {
 
   return (
     <div className="min-h-screen">
+      {repoPath && (
       <RepoBar
         repoPath={repoPath}
         onRepoPathChange={selectRepo}
@@ -731,10 +807,29 @@ export default function Page() {
         live={live}
         recents={recents}
         onRemoveRecent={removeRecent}
+        onBackToInbox={backToInbox}
       />
+      )}
 
       {!repoPath ? (
-        <EmptyState onPick={selectRepo} />
+        <>
+          <Inbox
+            roots={inboxRoots}
+            onOpen={selectRepo}
+            onBrowse={() => setBrowsing(true)}
+            onForget={forgetRoot}
+          />
+          {browsing && (
+            <RepoBrowser
+              currentRepo={inboxRoots[0] ?? null}
+              onPick={(path) => {
+                setBrowsing(false);
+                selectRepo(path);
+              }}
+              onClose={() => setBrowsing(false)}
+            />
+          )}
+        </>
       ) : sessionError ? (
         <div className="mx-auto max-w-3xl p-6">
           <div className="flex items-start gap-2 rounded-md border border-[var(--danger)] bg-[var(--canvas)] p-4 text-[13px]">
@@ -857,45 +952,6 @@ export default function Page() {
           </main>
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function EmptyState({ onPick }: { onPick: (path: string) => void }) {
-  const [value, setValue] = useState("");
-
-  return (
-    <div className="mx-auto max-w-xl px-6 py-24 text-center">
-      <FileDiffIcon size={32} className="mb-4 text-[var(--fg-subtle)]" />
-      <h1 className="mb-2 text-[20px] font-semibold">
-        Review your diff before you push it
-      </h1>
-      <p className="mb-6 text-[14px] text-[var(--fg-muted)]">
-        Point differ at a checkout. It lists the commits GitHub hasn&apos;t seen
-        yet and drops the pull request&apos;s review comments onto the lines
-        they refer to.
-      </p>
-      <form
-        className="flex gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          onPick(value);
-        }}
-      >
-        <input
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder="/Users/you/code/your-repo"
-          spellCheck={false}
-          className="mono flex-1 rounded-md border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 text-[13px] outline-none focus:border-[var(--accent)] focus:ring-1 focus:ring-[var(--accent)]"
-        />
-        <button
-          type="submit"
-          className="rounded-md border border-[#1f883d] bg-[#1f883d] px-4 py-2 text-[14px] font-medium text-white hover:bg-[#1a7f37]"
-        >
-          Open
-        </button>
-      </form>
     </div>
   );
 }

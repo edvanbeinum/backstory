@@ -9,3 +9,10 @@ export const WORKING_REV = "working";
 export const BRANCH_REV = "branch";
 
 export const STORAGE_KEY = "differ.repoPath";
+
+/**
+ * Canonical repo roots the inbox scans. Separate from `differ.recentRepos`,
+ * which holds worktree paths and is capped — with twenty worktrees it would
+ * fill with one repo and evict the other.
+ */
+export const INBOX_ROOTS_KEY = "differ.inboxRepos";

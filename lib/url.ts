@@ -81,13 +81,20 @@ export function readUrlState(): UrlState {
  * bury the previous page under dozens of history entries, and the URL only
  * needs to be *current*, not a trail.
  */
-export function writeUrlState(state: UrlState) {
+export function writeUrlState(
+  state: UrlState,
+  opts: { push?: boolean } = {},
+) {
   if (typeof window === "undefined") return;
 
   const next = buildUrl(state, window.location.pathname);
   const current = `${window.location.pathname}${window.location.search}`;
   if (next !== current) {
-    window.history.replaceState(null, "", next);
+    // `push` only for inbox↔workspace, which are real navigations: without a
+    // history entry the Back button skips straight past the inbox. Everything
+    // else replaces, or j/k would bury the history stack.
+    if (opts.push) window.history.pushState(null, "", next);
+    else window.history.replaceState(null, "", next);
   }
 }
 

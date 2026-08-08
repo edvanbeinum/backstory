@@ -25,6 +25,8 @@ export interface WorktreeEntry {
   path: string;
   name: string;
   branch: string | null;
+  /** Tip commit, straight from the porcelain output — free, so keep it */
+  head?: string | null;
   /** True for the checkout the browse started from */
   isCurrent: boolean;
   /** A worktree whose directory is gone (pruned but still registered) */
@@ -84,17 +86,22 @@ export async function listWorktrees(
   if (!out) return [];
 
   const entries: WorktreeEntry[] = [];
-  let current: Partial<WorktreeEntry> & { path?: string } = {};
+  let current: Partial<WorktreeEntry> & { path?: string; bare?: boolean } = {};
 
   const flush = () => {
     if (!current.path) return;
-    entries.push({
-      path: current.path,
-      name: path.basename(current.path),
-      branch: current.branch ?? null,
-      isCurrent: current.path === root,
-      ...(current.missing ? { missing: true } : {}),
-    });
+    // A bare repository has no working tree to review, and listing it
+    // produces a branchless phantom row.
+    if (!current.bare) {
+      entries.push({
+        path: current.path,
+        name: path.basename(current.path),
+        branch: current.branch ?? null,
+        head: current.head ?? null,
+        isCurrent: current.path === root,
+        ...(current.missing ? { missing: true } : {}),
+      });
+    }
     current = {};
   };
 
@@ -108,8 +115,12 @@ export async function listWorktrees(
         .slice("branch ".length)
         .trim()
         .replace(/^refs\/heads\//, "");
+    } else if (line.startsWith("HEAD ")) {
+      current.head = line.slice("HEAD ".length).trim();
     } else if (line.startsWith("detached")) {
       current.branch = null;
+    } else if (line.startsWith("bare")) {
+      current.bare = true;
     } else if (line.startsWith("prunable")) {
       current.missing = true;
     }

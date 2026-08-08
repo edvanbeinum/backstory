@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   AlertIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   FileDiffIcon,
   FolderIcon,
   GitCommitIcon,
@@ -27,6 +28,7 @@ export function RepoBar({
   live = false,
   recents = [],
   onRemoveRecent,
+  onBackToInbox,
 }: {
   repoPath: string;
   onRepoPathChange: (value: string) => void;
@@ -38,6 +40,8 @@ export function RepoBar({
   /** Previously-opened repos, newest first, for the dropdown */
   recents?: RecentRepo[];
   onRemoveRecent?: (path: string) => void;
+  /** Leave the workspace for the home screen. */
+  onBackToInbox?: () => void;
 }) {
   const [draft, setDraft] = useState(repoPath);
   const [listOpen, setListOpen] = useState(false);
@@ -76,10 +80,21 @@ export function RepoBar({
       className="sticky top-0 z-30 border-b border-[var(--border)] bg-[var(--canvas-subtle)]"
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-4 py-2.5">
-        <div className="flex items-center gap-2 text-[15px] font-semibold">
-          <FileDiffIcon className="text-[var(--fg-muted)]" />
-          <span>differ</span>
-        </div>
+        {onBackToInbox ? (
+          <button
+            type="button"
+            onClick={onBackToInbox}
+            className="flex items-center gap-1.5 text-[13px] text-[var(--accent)] hover:underline"
+          >
+            <ChevronRightIcon size={13} className="rotate-180" />
+            Inbox
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 text-[15px] font-semibold">
+            <FileDiffIcon className="text-[var(--fg-muted)]" />
+            <span>differ</span>
+          </div>
+        )}
 
         <form
           className="flex min-w-[280px] flex-1 items-center gap-2"

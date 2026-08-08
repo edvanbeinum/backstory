@@ -21,7 +21,8 @@ export const NO_RESPONSE: ThreadResponse = Object.freeze({
   commit: null,
 });
 
-function gh(cwd: string, args: string[]) {
+/** Exported so the inbox can issue its own batched query. */
+export function gh(cwd: string, args: string[]) {
   return run("gh", args, {
     cwd,
     timeout: 20_000,
@@ -190,7 +191,7 @@ async function findPullRequest(
     "--limit",
     "10",
     "--json",
-    "number,title,url,state,isDraft,baseRefName,headRefName,author",
+    "number,title,url,state,isDraft,baseRefName,headRefName,author,isCrossRepository,headRepositoryOwner",
   ]);
 
   const rows = JSON.parse(stdout || "[]") as Array<{
@@ -202,13 +203,12 @@ async function findPullRequest(
     baseRefName: string;
     headRefName: string;
     author: { login: string } | null;
+    isCrossRepository?: boolean;
+    headRepositoryOwner?: { login: string } | null;
   }>;
 
-  if (rows.length === 0) return null;
-
-  // An open PR is what you're about to push to; fall back to the newest.
-  const open = rows.find((r) => r.state === "OPEN");
-  const chosen = open ?? rows.sort((a, b) => b.number - a.number)[0];
+  const chosen = pickPullRequest(rows, repo.owner);
+  if (!chosen) return null;
 
   return {
     number: chosen.number,
@@ -298,7 +298,7 @@ async function loadThreads(repo: RepoInfo, number: number) {
   return { threads, reviews };
 }
 
-function describeGhError(err: unknown): string {
+export function describeGhError(err: unknown): string {
   if (err instanceof ExecError) {
     if (err.code === 127) {
       return "The `gh` CLI isn't on PATH. Install it to see PR comments.";
@@ -314,4 +314,44 @@ function describeGhError(err: unknown): string {
   }
   if (err instanceof Error) return `GitHub lookup failed: ${err.message}`;
   return "GitHub lookup failed.";
+}
+
+/**
+ * Which of several PRs on the same branch name is *yours*.
+ *
+ * Matching on head branch alone reaches into forks. On a public repo,
+ * `headRefName: "trunk"` returns every contributor who pushed a branch called
+ * trunk to their own fork — measured against cli/cli, five of them, all
+ * `isCrossRepository`. Without this, opening a worktree sitting on `main` or
+ * `master` would attach a stranger's pull request and present their review
+ * comments as your checklist.
+ *
+ * Shared by the workspace and the inbox on purpose. If they picked
+ * differently the home screen's counts would describe a different PR from the
+ * one that opens when you click the row.
+ */
+export function pickPullRequest<
+  T extends {
+    number: number;
+    state: string;
+    isCrossRepository?: boolean;
+    headRepositoryOwner?: { login: string } | null;
+  },
+>(candidates: T[], repoOwner: string | null): T | null {
+  if (candidates.length === 0) return null;
+
+  const sameRepo = candidates.filter((row) => {
+    if (row.isCrossRepository === true) return false;
+    if (!repoOwner || !row.headRepositoryOwner) return true;
+    return row.headRepositoryOwner.login === repoOwner;
+  });
+  // Only fall back to a fork's PR when nothing local matches — better than
+  // showing nothing when the field is missing from an older `gh`.
+  const pool = sameRepo.length > 0 ? sameRepo : candidates;
+
+  // An open PR is what you're about to push to; fall back to the newest.
+  return (
+    pool.find((row) => row.state === "OPEN") ??
+    [...pool].sort((a, b) => b.number - a.number)[0]
+  );
 }
