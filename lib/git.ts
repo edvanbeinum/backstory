@@ -359,9 +359,13 @@ export async function getHistory(
   // No fork point to be found — fall back to the plain walk.
   if (!fork) return logRange(repo, [start], limit);
 
-  // The boundary sits exactly at the fork: nothing of this branch has been
-  // pushed, so everything below would be the default branch's history.
-  if (fork === start) return [];
+  // The boundary sits exactly at the fork, so this branch has nothing of its
+  // own — it's level with the default branch, which is what a worktree looks
+  // like once its PR has merged. Walk plain history rather than returning
+  // nothing: those commits are exactly the ones that answered the review, and
+  // with an empty list there is no commit anywhere in the UI to link a
+  // comment to.
+  if (fork === start) return logRange(repo, [start], limit);
 
   return logRange(repo, [`${fork}..${start}`], limit);
 }

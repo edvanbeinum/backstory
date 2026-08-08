@@ -1,12 +1,15 @@
 "use client";
 
+import { useState } from "react";
+
+import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
 import type {
   CommitSummary,
   PullRequestInfo,
   RepoInfo,
   ReviewThread,
 } from "@/lib/types";
-import { AlertIcon, LinkIcon } from "./icons";
+import { AlertIcon, ChevronDownIcon, LinkIcon, XIcon } from "./icons";
 import { ReplyComposer } from "./ReplyComposer";
 import { TickButton } from "./Tick";
 
@@ -65,6 +68,13 @@ export function ResponsePanel({
           Your response
         </p>
 
+        <CommitLink
+          thread={thread}
+          commit={commit}
+          candidates={commitCandidates ?? []}
+          onLink={onLinkCommit}
+        />
+
         <ReplyComposer
           repo={repo}
           pr={pr}
@@ -73,8 +83,6 @@ export function ResponsePanel({
           linkedSha={response.commit?.sha ?? null}
           linkedShaMissing={response.commit?.missing}
           linkedShaHealed={response.commit?.healed}
-          onPin={(sha) => onLinkCommit(thread.id, sha)}
-          pinCandidates={commitCandidates}
           draft={response.reply}
           onDraftChange={
             onDraftChange ? (text) => onDraftChange(thread.id, text) : undefined
@@ -132,5 +140,167 @@ function StaleLink({
         </button>
       </div>
     </div>
+  );
+}
+
+/**
+ * Linking the commit that answers a comment.
+ *
+ * This used to live as a "Pin to…" link inside the composer's status line,
+ * which was wrong twice over: it called the thing a pin when every other
+ * surface calls it a link, and the one-click version only appeared when the
+ * diff column happened to already be showing a real commit. On a branch you'd
+ * just pushed the panel would say "reply anyway, or link one" and then offer
+ * no way to link one.
+ *
+ * So it's a row of its own, always present, with the change on screen offered
+ * first because that's usually the one you just read.
+ */
+function CommitLink({
+  thread,
+  commit,
+  candidates,
+  onLink,
+}: {
+  thread: ReviewThread;
+  commit: CommitSummary | null;
+  candidates: CommitSummary[];
+  onLink: (threadId: string, sha: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const linked = thread.response.commit;
+
+  // Uncommitted work and the combined branch diff have no sha to point at.
+  const onScreen =
+    commit && commit.sha !== WORKING_REV && commit.sha !== BRANCH_REV
+      ? commit
+      : null;
+
+  if (linked && !linked.missing) {
+    return (
+      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-muted)] px-3 py-2 text-[11px]">
+        <LinkIcon size={11} className="text-[var(--handled)]" />
+        <span className="text-[var(--fg-muted)]">Answered by</span>
+        <span className="mono font-semibold">{linked.shortSha}</span>
+        {linked.healed && (
+          <span className="text-[var(--fg-subtle)]">· re-matched after a rebase</span>
+        )}
+        <span className="flex-1" />
+        <Picker
+          label="Change…"
+          candidates={candidates}
+          selected={linked.sha}
+          open={open}
+          setOpen={setOpen}
+          onPick={(sha) => onLink(thread.id, sha)}
+        />
+        <button
+          type="button"
+          onClick={() => onLink(thread.id, null)}
+          className="inline-flex items-center gap-0.5 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+          title="Unlink"
+        >
+          <XIcon size={11} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-muted)] px-3 py-2 text-[11px]">
+      <LinkIcon size={11} className="text-[var(--fg-subtle)]" />
+      <span className="text-[var(--fg-muted)]">
+        {linked?.missing ? "Link needs replacing" : "No commit linked"}
+      </span>
+      <span className="flex-1" />
+      {onScreen && (
+        <button
+          type="button"
+          onClick={() => onLink(thread.id, onScreen.sha)}
+          className="inline-flex items-center gap-1 rounded border border-[var(--accent)] px-1.5 py-[1px] font-medium text-[var(--accent)] hover:bg-[var(--accent-subtle)]"
+          title={onScreen.subject}
+        >
+          Link <span className="mono">{onScreen.shortSha}</span>
+          <span className="text-[var(--fg-muted)]">on screen</span>
+        </button>
+      )}
+      <Picker
+        label={onScreen ? "or pick…" : "Link a commit…"}
+        candidates={candidates}
+        selected={null}
+        open={open}
+        setOpen={setOpen}
+        onPick={(sha) => onLink(thread.id, sha)}
+      />
+    </div>
+  );
+}
+
+function Picker({
+  label,
+  candidates,
+  selected,
+  open,
+  setOpen,
+  onPick,
+}: {
+  label: string;
+  candidates: CommitSummary[];
+  selected: string | null;
+  open: boolean;
+  setOpen: (value: boolean) => void;
+  onPick: (sha: string) => void;
+}) {
+  if (candidates.length === 0) {
+    return (
+      <span
+        className="text-[var(--fg-subtle)]"
+        title="differ found no commits on this branch to offer"
+      >
+        no commits to link
+      </span>
+    );
+  }
+
+  return (
+    <span className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        onBlur={() => setTimeout(() => setOpen(false), 120)}
+        className="inline-flex items-center gap-0.5 font-medium text-[var(--accent)] hover:underline"
+      >
+        {label}
+        <ChevronDownIcon size={10} />
+      </button>
+
+      {open && (
+        <ul className="absolute right-0 top-full z-40 mt-1 max-h-72 w-[24rem] overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--canvas)] py-1 shadow-[var(--overlay-shadow)]">
+          {candidates.map((candidate) => (
+            <li key={candidate.sha}>
+              <button
+                type="button"
+                onMouseDown={(event) => {
+                  // mousedown: onBlur would close the list before a click
+                  event.preventDefault();
+                  setOpen(false);
+                  onPick(candidate.sha);
+                }}
+                className={`flex w-full items-baseline gap-2 px-2 py-1 text-left hover:bg-[var(--canvas-subtle)] ${
+                  candidate.sha === selected ? "bg-[var(--accent-subtle)]" : ""
+                }`}
+              >
+                <span className="mono shrink-0 text-[11px] text-[var(--fg-muted)]">
+                  {candidate.shortSha}
+                </span>
+                <span className="min-w-0 flex-1 truncate text-[11px]">
+                  {candidate.subject}
+                </span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </span>
   );
 }

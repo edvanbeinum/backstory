@@ -9,7 +9,6 @@ import {
   ChevronDownIcon,
   LinkExternalIcon,
   LinkIcon,
-  PinIcon,
 } from "./icons";
 import { CopyButton } from "./ui";
 
@@ -90,8 +89,6 @@ export function ReplyComposer({
   linkedSha,
   linkedShaMissing = false,
   linkedShaHealed = false,
-  onPin,
-  pinCandidates = [],
   draft,
   onDraftChange,
 }: {
@@ -105,13 +102,6 @@ export function ReplyComposer({
   linkedShaMissing?: boolean;
   /** The link was re-matched to a rewritten commit by patch-id */
   linkedShaHealed?: boolean;
-  /** Link the thread to a sha, or clear it with null */
-  onPin?: (sha: string | null) => void;
-  /**
-   * Branch commits available to link. The right commit is often not the one
-   * on screen: a fix can land in a different file from the one commented on.
-   */
-  pinCandidates?: CommitSummary[];
   /** A previously saved draft for this thread, if any */
   draft?: string | null;
   /** Persist the draft; null clears it. Absent = drafts not saved. */
@@ -121,7 +111,6 @@ export function ReplyComposer({
   // it rather than showing a template and burying it.
   const [template, setTemplate] = useState<Template>(draft ? "custom" : "url");
   const [custom, setCustom] = useState(draft ?? "");
-  const [pickerOpen, setPickerOpen] = useState(false);
 
   const selectedIsReal =
     commit !== null &&
@@ -188,9 +177,6 @@ export function ReplyComposer({
     if (template === "url" || template === "sha") setTemplate("noChange");
   }, [commitTemplatesDisabled, template]);
 
-  // Offer to link whatever is on screen, once it's a real commit
-  const canPin = onPin !== undefined && target !== null && pinned === null;
-
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--canvas)]">
       <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-muted)] px-2 py-1.5">
@@ -239,82 +225,18 @@ export function ReplyComposer({
               </span>
             ) : target ? (
               <>
-                Would link the selected commit{" "}
-                <span className="mono">{target.shortSha}</span>.
+                Drafting against{" "}
+                <span className="mono">{target.shortSha}</span>, the change on
+                screen.
               </>
             ) : (
               <span className="text-[var(--fg-muted)]">
-                No commit linked — reply anyway, or link one.
+                No commit linked — the wordings above that name one are off.
               </span>
             )}
 
             <span className="flex-1" />
 
-            {canPin && (
-              <button
-                type="button"
-                onClick={() => onPin(target.sha)}
-                title="Always link this commit for this thread"
-                className="inline-flex items-center gap-1 text-[var(--accent)] hover:underline"
-              >
-                <PinIcon size={11} /> Pin {target.shortSha}
-              </button>
-            )}
-
-            {onPin && pinCandidates.length > 0 && (
-              <span className="relative">
-                <button
-                  type="button"
-                  onClick={() => setPickerOpen((value) => !value)}
-                  onBlur={() => setTimeout(() => setPickerOpen(false), 120)}
-                  className="inline-flex items-center gap-0.5 text-[var(--accent)] hover:underline"
-                >
-                  {pinned ? "Repin to…" : "Pin to…"}
-                  <ChevronDownIcon size={10} />
-                </button>
-
-                {pickerOpen && (
-                  <ul className="absolute bottom-full right-0 z-40 mb-1 max-h-72 w-[22rem] overflow-y-auto rounded-md border border-[var(--border)] bg-[var(--canvas)] py-1 shadow-[var(--overlay-shadow)]">
-                    {pinCandidates.map((candidate) => (
-                      <li key={candidate.sha}>
-                        <button
-                          type="button"
-                          onMouseDown={(event) => {
-                            // mousedown: the button's onBlur would otherwise
-                            // close the list before this click registers
-                            event.preventDefault();
-                            setPickerOpen(false);
-                            onPin(candidate.sha);
-                          }}
-                          className={`flex w-full items-baseline gap-2 px-2 py-1 text-left hover:bg-[var(--canvas-subtle)] ${
-                            candidate.sha === linkedSha
-                              ? "bg-[var(--accent-subtle)]"
-                              : ""
-                          }`}
-                        >
-                          <span className="mono shrink-0 text-[11px] text-[var(--fg-muted)]">
-                            {candidate.shortSha}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-[11px] text-[var(--fg)]">
-                            {candidate.subject}
-                          </span>
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </span>
-            )}
-
-            {onPin && linkedSha && (
-              <button
-                type="button"
-                onClick={() => onPin(null)}
-                className="text-[var(--accent)] hover:underline"
-              >
-                {linkedShaMissing ? "Clear pin" : "Unpin"}
-              </button>
-            )}
           </p>
           <textarea
             value={text}

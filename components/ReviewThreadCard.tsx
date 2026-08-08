@@ -241,8 +241,6 @@ export function ReviewThreadCard({
                 linkedSha={thread.response.commit?.sha ?? null}
                 linkedShaMissing={thread.response.commit?.missing}
                 linkedShaHealed={thread.response.commit?.healed}
-                onPin={onPin ? (sha) => onPin(thread.id, sha) : undefined}
-                pinCandidates={pinCandidates}
                 draft={thread.response.reply}
                 onDraftChange={
                   onDraftChange
