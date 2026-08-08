@@ -63,6 +63,23 @@ focus. One server handles all your checkouts (default port 4460).
 `brew services start differ` (an always-on background server, so the window
 works even with no terminal open).
 
+### When the server isn't running
+
+The installed window outlives the server — restart your laptop, open differ
+from the dock, and the browser's own "refused to connect" is all you'd get.
+So differ registers a small service worker (`public/sw.js`), which lives in
+the browser rather than on the server and catches that failed navigation to
+serve `public/offline.html` instead: what's wrong, the command that fixes it
+(matched to the port the window was opened on), and how to make it start on
+its own. The page polls `/api/health` and reloads itself the moment the
+server answers — onto the same URL, so you land back on the repo and comment
+you were reading.
+
+It only handles navigations, and only network failures; nothing else is
+cached, because everything else differ serves is git state that changes under
+it. The one gap is a browser that has never loaded differ successfully —
+there's no worker to install until the server has been up once.
+
 ## Live updates
 
 The window follows the repo without reloading: the server watches the

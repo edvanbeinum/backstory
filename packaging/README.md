@@ -20,6 +20,13 @@ you're standing in.
    tied to the terminal instead — everything still works, the window just
    dies with the terminal.
 
+   Because the window can outlive the server either way, a service worker
+   (`public/sw.js`) catches the failed navigation and serves
+   `public/offline.html`: it names the port, gives the command to start the
+   server, points at `brew services` for the permanent fix, and reloads
+   itself once `/api/health` answers. Editing that page means bumping the
+   `CACHE` constant in `sw.js`, or installed browsers keep the old copy.
+
 3. **The `differ` CLI.** From any checkout, `differ` hands the repo to the
    running server (`/api/open`) and raises a window. The app window collects
    the handoff on load and on every focus — so the flow is: `differ` in a

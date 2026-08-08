@@ -1,0 +1,286 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>differ isn't running</title>
+    <link rel="icon" href="/icon-192.png" type="image/png" />
+    <!--
+      Served by the service worker when the differ server isn't answering —
+      so it has to stand on its own: no stylesheet, no font, no script from
+      the origin it's apologising for. Everything is inline.
+    -->
+    <style>
+      :root {
+        --canvas: #ffffff;
+        --canvas-subtle: #f6f8fa;
+        --border: #d1d9e0;
+        --fg: #1f2328;
+        --fg-muted: #59636e;
+        --accent: #0969da;
+        --attention: #9a6700;
+        --success: #1a7f37;
+        color-scheme: light;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --canvas: #0d1117;
+          --canvas-subtle: #151b23;
+          --border: #3d444d;
+          --fg: #f0f6fc;
+          --fg-muted: #9198a1;
+          --accent: #4493f8;
+          --attention: #d29922;
+          --success: #3fb950;
+          color-scheme: dark;
+        }
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        background: var(--canvas);
+        color: var(--fg);
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica,
+          Arial, sans-serif;
+        font-size: 14px;
+        line-height: 1.5;
+      }
+      main {
+        width: 100%;
+        max-width: 540px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 20px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .dot {
+        width: 9px;
+        height: 9px;
+        border-radius: 50%;
+        background: var(--attention);
+        flex: none;
+      }
+      .lede {
+        margin: 0 0 20px;
+        color: var(--fg-muted);
+      }
+      .card {
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        background: var(--canvas-subtle);
+        padding: 16px;
+        margin-bottom: 12px;
+      }
+      .card h2 {
+        margin: 0 0 4px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .card p {
+        margin: 0 0 12px;
+        color: var(--fg-muted);
+        font-size: 13px;
+      }
+      .card p:last-child {
+        margin-bottom: 0;
+      }
+      .cmd {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        background: var(--canvas);
+        padding: 8px 10px;
+      }
+      .cmd code {
+        flex: 1;
+        font-family:
+          ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 13px;
+        overflow-x: auto;
+        white-space: nowrap;
+      }
+      .cmd code::before {
+        content: "$ ";
+        color: var(--fg-muted);
+      }
+      button {
+        font: inherit;
+        cursor: pointer;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--canvas-subtle);
+        color: var(--fg);
+        padding: 4px 10px;
+        font-size: 12px;
+        white-space: nowrap;
+      }
+      button:hover {
+        border-color: var(--fg-muted);
+      }
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: var(--fg-muted);
+        margin-top: 16px;
+      }
+      .spinner {
+        width: 12px;
+        height: 12px;
+        flex: none;
+        border: 2px solid var(--border);
+        border-top-color: var(--fg-muted);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .status.found .spinner {
+        animation: none;
+        border-color: var(--success);
+        border-top-color: var(--success);
+      }
+      .status.found {
+        color: var(--success);
+      }
+      .status button {
+        margin-left: auto;
+      }
+      details {
+        margin-top: 18px;
+        font-size: 12px;
+        color: var(--fg-muted);
+      }
+      summary {
+        cursor: pointer;
+        color: var(--accent);
+      }
+      details p {
+        margin: 10px 0 0;
+      }
+      details code {
+        font-family:
+          ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+        font-size: 11px;
+        padding: 0.15em 0.4em;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        background: var(--canvas-subtle);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1><span class="dot"></span> differ isn't running</h1>
+      <p class="lede">
+        This window is fine — the local server behind it isn't answering on port
+        <strong id="port">4460</strong>. It doesn't survive a restart unless you
+        tell it to.
+      </p>
+
+      <div class="card">
+        <h2>Start it</h2>
+        <p>Run this in a terminal, from any git checkout:</p>
+        <div class="cmd">
+          <code id="start-cmd">differ</code>
+          <button type="button" data-copy="start-cmd">Copy</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Or start it for good</h2>
+        <p>
+          Registers a launchd agent, so the server comes back on its own after
+          every restart and this screen stops happening.
+        </p>
+        <div class="cmd">
+          <code id="service-cmd">brew services start differ</code>
+          <button type="button" data-copy="service-cmd">Copy</button>
+        </div>
+      </div>
+
+      <div class="status" id="status">
+        <span class="spinner"></span>
+        <span id="status-text">Watching for the server…</span>
+        <button type="button" id="retry">Check now</button>
+      </div>
+
+      <details>
+        <summary>Running differ from a checkout instead?</summary>
+        <p>
+          <code>npm run build &amp;&amp; npm link</code> puts
+          <code>differ</code> on your PATH. Without that,
+          <code>npm run dev</code> in the differ repo serves it on port 3000.
+        </p>
+      </details>
+    </main>
+
+    <script>
+      // The port this window was opened on is the port the server has to come
+      // back on, so the command shown has to match it.
+      var port = location.port || "80";
+      document.getElementById("port").textContent = port;
+      if (port !== "4460") {
+        document.getElementById("start-cmd").textContent = "differ --port " + port;
+      }
+
+      document.querySelectorAll("button[data-copy]").forEach(function (button) {
+        button.addEventListener("click", function () {
+          var text = document.getElementById(button.dataset.copy).textContent;
+          navigator.clipboard.writeText(text).then(function () {
+            button.textContent = "Copied";
+            setTimeout(function () {
+              button.textContent = "Copy";
+            }, 1500);
+          });
+        });
+      });
+
+      var status = document.getElementById("status");
+      var statusText = document.getElementById("status-text");
+      var timer = null;
+
+      // Reload rather than redirect: the URL still carries the repo and
+      // comment the user was on, so coming back lands them where they were.
+      async function check() {
+        try {
+          var response = await fetch("/api/health", { cache: "no-store" });
+          var body = await response.json();
+          if (body && body.app === "differ") {
+            clearInterval(timer);
+            status.className = "status found";
+            statusText.textContent = "Server's up — reloading…";
+            location.reload();
+          }
+        } catch {
+          // Still down. The interval is the retry.
+        }
+      }
+
+      timer = setInterval(check, 2000);
+      document.getElementById("retry").addEventListener("click", check);
+      // A `differ` run in another window usually happens while this one is in
+      // the background; checking on focus makes the return feel instant.
+      window.addEventListener("focus", check);
+      check();
+    </script>
+  </body>
+</html>
