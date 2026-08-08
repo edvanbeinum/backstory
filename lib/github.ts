@@ -6,7 +6,20 @@ import type {
   ReviewComment,
   ReviewSummary,
   ReviewThread,
+  ThreadResponse,
 } from "./types";
+
+/**
+ * Threads arrive from GitHub with nothing attached; the session route reads
+ * the store and replaces this. Shared and frozen so a stray write can't leak
+ * one thread's state onto another.
+ */
+export const NO_RESPONSE: ThreadResponse = Object.freeze({
+  done: false,
+  doneAt: null,
+  reply: null,
+  commit: null,
+});
 
 function gh(cwd: string, args: string[]) {
   return run("gh", args, {
@@ -251,6 +264,8 @@ async function loadThreads(repo: RepoInfo, number: number) {
       originalLine: node.originalLine,
       startLine: node.startLine,
       side: node.diffSide,
+      // Filled in by the session route, which is where the store is read.
+      response: NO_RESPONSE,
       comments: node.comments.nodes.map(
         (c): ReviewComment => ({
           id: c.id,

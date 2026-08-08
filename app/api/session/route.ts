@@ -13,14 +13,14 @@ import {
   resolveBase,
   resolveRepo,
 } from "@/lib/git";
-import { getDrafts } from "@/lib/drafts";
-import { loadGitHubDataCached } from "@/lib/github";
+import { loadGitHubDataCached, NO_RESPONSE } from "@/lib/github";
 import {
-  getLinks,
+  getResponses,
   prKey,
-  updateLinks,
-  type LinkRecord,
-} from "@/lib/links";
+  updateResponses,
+  type ResponsePatch,
+  type ResponseRecord,
+} from "@/lib/responses";
 import type {
   ApiError,
   ReviewThread,
@@ -95,6 +95,7 @@ export async function GET(request: Request) {
       startLine: null,
       side: null,
       isReviewSummary: true,
+      response: NO_RESPONSE,
       comments: [
         {
           id: review.id,
@@ -109,24 +110,23 @@ export async function GET(request: Request) {
       ],
     }));
 
-    // Attach how each comment was handled. Nothing is inferred: differ used
-    // to guess which commit answered a comment, but a guess always found
-    // something, so no comment ever read as outstanding and the list
-    // couldn't work as a checklist.
+    // Attach your response to each comment. `done` is only ever what you set:
+    // differ used to guess which commit answered a comment, but a guess
+    // always found something, so no comment ever read as outstanding and the
+    // list couldn't work as a checklist.
     const allThreads = [...summaryThreads, ...rawGithub.threads];
     const github = { ...rawGithub, threads: allThreads };
     if (allThreads.length > 0) {
       const key = rawGithub.pr
         ? prKey(repo.owner, repo.name, rawGithub.pr.number)
         : null;
-      const [links, drafts] = key
-        ? await Promise.all([getLinks(key), getDrafts(key)])
-        : [{}, {}];
+      const responses: Record<string, ResponseRecord> = key
+        ? await getResponses(key)
+        : {};
 
-      /** Commit links only — acknowledgements have no sha to check. */
-      const commitLinks = Object.entries(links).filter(
-        (entry): entry is [string, Extract<LinkRecord, { kind: "commit" }>] =>
-          entry[1].kind === "commit",
+      const linked = Object.entries(responses).filter(
+        (entry): entry is [string, ResponseRecord & { commit: NonNullable<ResponseRecord["commit"]> }] =>
+          entry[1].commit !== null,
       );
 
       // A rebase rewrites shas, so a link can outlive its commit. Ask whether
@@ -134,26 +134,31 @@ export async function GET(request: Request) {
       // object exists, since rebased-away commits linger in the object
       // database and would otherwise pass as healthy.
       const alive = new Map<string, boolean>();
-      for (const [, link] of commitLinks) {
-        if (alive.has(link.sha)) continue;
-        alive.set(link.sha, await isOnBranch(repo.root, link.sha));
+      for (const [, record] of linked) {
+        if (alive.has(record.commit.sha)) continue;
+        alive.set(record.commit.sha, await isOnBranch(repo.root, record.commit.sha));
       }
 
       // Links made before patch-ids existed have none stored, which would
       // leave them unable to survive the next rebase. Backfill quietly while
       // the commit is still reachable. Collected then written in a single
       // batch: separate writes would race each other through the same file.
+      //
+      // Note what these patches never contain: `done`. Healing may move or
+      // break a link, but it must never touch the tick — a rebase can't undo
+      // a judgement you made.
       if (key) {
-        const backfill: Record<string, LinkRecord> = {};
-        for (const [threadId, link] of commitLinks) {
-          if (link.patchId || !alive.get(link.sha)) continue;
-          const patchId = await getPatchId(repo.root, link.sha);
-          if (patchId) {
-            links[threadId] = { kind: "commit", sha: link.sha, patchId };
-            backfill[threadId] = links[threadId];
+        const backfill: Record<string, ResponsePatch> = {};
+        for (const [threadId, record] of linked) {
+          const { sha, patchId } = record.commit;
+          if (patchId || !alive.get(sha)) continue;
+          const found = await getPatchId(repo.root, sha);
+          if (found) {
+            responses[threadId] = { ...record, commit: { sha, patchId: found } };
+            backfill[threadId] = { commit: { sha, patchId: found } };
           }
         }
-        await updateLinks(key, backfill);
+        await updateResponses(key, backfill);
       }
 
       // Anything still missing may just have been rebased. A commit's
@@ -161,48 +166,53 @@ export async function GET(request: Request) {
       // find the new sha rather than making the user re-link. Only computed
       // when something is actually broken.
       const healed = new Set<string>();
-      const stale = commitLinks.filter(
-        ([threadId, link]) =>
-          !alive.get(link.sha) &&
-          (links[threadId] as Extract<LinkRecord, { kind: "commit" }>).patchId,
+      const stale = linked.filter(
+        ([threadId, record]) =>
+          !alive.get(record.commit.sha) &&
+          responses[threadId].commit?.patchId,
       );
       if (stale.length > 0 && branchDiff && key) {
         const patchIds = await getPatchIdMap(
           repo.root,
           `${branchDiff.baseSha}..HEAD`,
         );
-        const moves: Record<string, LinkRecord> = {};
+        const moves: Record<string, ResponsePatch> = {};
         for (const [threadId] of stale) {
-          const link = links[threadId];
-          if (link.kind !== "commit" || !link.patchId) continue;
+          const record = responses[threadId];
+          const patchId = record.commit?.patchId;
+          if (!patchId) continue;
           // null = the patch-id appears more than once on the branch, so the
           // match is ambiguous; leave it broken and let the user decide.
-          const match = patchIds.get(link.patchId);
+          const match = patchIds.get(patchId);
           if (match) {
-            links[threadId] = {
-              kind: "commit",
-              sha: match,
-              patchId: link.patchId,
-            };
-            moves[threadId] = links[threadId];
+            responses[threadId] = { ...record, commit: { sha: match, patchId } };
+            moves[threadId] = { commit: { sha: match, patchId } };
             alive.set(match, true);
             healed.add(threadId);
           }
         }
-        await updateLinks(key, moves);
+        await updateResponses(key, moves);
       }
 
       github.threads = allThreads.map((thread) => {
-        const link = links[thread.id];
-        const linkedSha = link?.kind === "commit" ? link.sha : null;
+        const record = responses[thread.id];
+        if (!record) return { ...thread, response: NO_RESPONSE };
 
         return {
           ...thread,
-          linkedSha,
-          linkedShaMissing: linkedSha ? !alive.get(linkedSha) : false,
-          linkedShaHealed: healed.has(thread.id),
-          acknowledged: link?.kind === "ack",
-          draft: drafts[thread.id] ?? null,
+          response: {
+            done: record.done,
+            doneAt: record.doneAt,
+            reply: record.reply,
+            commit: record.commit
+              ? {
+                  sha: record.commit.sha,
+                  shortSha: record.commit.sha.slice(0, 7),
+                  missing: !alive.get(record.commit.sha),
+                  healed: healed.has(thread.id),
+                }
+              : null,
+          },
         };
       });
     }

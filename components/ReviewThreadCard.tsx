@@ -193,15 +193,15 @@ export function ReviewThreadCard({
               pr={pr}
               commit={commit}
               threadUrl={threadUrl}
-              linkedSha={thread.linkedSha}
-              linkedShaMissing={thread.linkedShaMissing}
-              linkedShaHealed={thread.linkedShaHealed}
-              acknowledged={thread.acknowledged}
+              linkedSha={thread.response.commit?.sha ?? null}
+              linkedShaMissing={thread.response.commit?.missing}
+              linkedShaHealed={thread.response.commit?.healed}
+              acknowledged={thread.response.done && !thread.response.commit}
               onPin={
                 onPin ? (sha) => onPin(thread.id, sha) : undefined
               }
               pinCandidates={pinCandidates}
-              draft={thread.draft}
+              draft={thread.response.reply}
               onDraftChange={
                 onDraftChange
                   ? (text) => onDraftChange(thread.id, text)

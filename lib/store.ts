@@ -16,10 +16,17 @@ import path from "node:path";
  * swapping in SQLite is a change here and nowhere else.
  */
 
-const DIR = path.join(homedir(), ".differ");
+/**
+ * Resolved per call, not once at import, so a test can point the store at a
+ * temp directory. Without that, testing the migration would mean writing to
+ * the real `~/.differ` — which holds the only copy of your drafts.
+ */
+function dir(): string {
+  return process.env.DIFFER_HOME || path.join(homedir(), ".differ");
+}
 
 export function storePath(name: string): string {
-  return path.join(DIR, `${name}.json`);
+  return path.join(dir(), `${name}.json`);
 }
 
 /**
@@ -56,14 +63,45 @@ export async function readNamespaced<T>(
   }
 }
 
+/**
+ * Serialise everything that touches one store file.
+ *
+ * A store operation is read-modify-write, and two of them interleaved lose the
+ * first writer's changes. That used to be impossible by accident — pins and
+ * drafts lived in separate files, so their writers could never meet. Now that
+ * one record holds the tick, the reply and the linked commit, a debounced
+ * draft save and a tick click land on the same file, and the collision is
+ * real.
+ *
+ * A promise chain is enough because there is exactly one local server process.
+ * A rejection must not poison the chain, so the tail always settles.
+ */
+const queues = new Map<string, Promise<unknown>>();
+
+export function withStore<T>(name: string, fn: () => Promise<T>): Promise<T> {
+  const prior = queues.get(name) ?? Promise.resolve();
+  const next = prior.then(fn, fn);
+  queues.set(
+    name,
+    next.catch(() => {}),
+  );
+  return next;
+}
+
+/** Distinguishes concurrent writes within one process. */
+let tmpCounter = 0;
+
 export async function writeNamespaced<T>(
   name: string,
   data: Record<string, Record<string, T>>,
 ): Promise<void> {
-  await fs.mkdir(DIR, { recursive: true });
+  await fs.mkdir(dir(), { recursive: true });
   // Write-then-rename, so a crash mid-write can't truncate what's there.
+  // The counter matters: with only the pid in the name, two overlapping
+  // writes to one store share a temp path, and the loser can be renamed into
+  // place half-written — the exact corruption rename is meant to prevent.
   const target = storePath(name);
-  const tmp = `${target}.${process.pid}.tmp`;
+  const tmp = `${target}.${process.pid}.${tmpCounter++}.tmp`;
   await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
   await fs.rename(tmp, target);
 }

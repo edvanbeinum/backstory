@@ -129,6 +129,40 @@ export interface ReviewComment {
   diffHunk: string | null;
 }
 
+/**
+ * What you've done about one comment, as the client sees it.
+ *
+ * Non-optional on `ReviewThread`, so nothing has to guard on its absence.
+ */
+export interface ThreadResponse {
+  /**
+   * The tick, and the only thing that means handled. Nothing infers it:
+   * not a linked commit, not a drafted reply, not a reply spotted on GitHub.
+   * differ used to guess which commit answered a comment, and a guess always
+   * found *something*, so no comment ever read as outstanding and the list
+   * couldn't work as a checklist.
+   */
+  done: boolean;
+  /** ms epoch of the tick, for "handled 2 minutes ago". */
+  doneAt: number | null;
+  /** The reply you're drafting. differ never posts it. */
+  reply: string | null;
+  /** The change you say answers the comment. Optional, and never implies done. */
+  commit: {
+    sha: string;
+    shortSha: string;
+    /**
+     * Not reachable from HEAD and no patch-id match — a squash, an amend, or
+     * a rebase through a conflict changed the diff. The link is kept rather
+     * than silently dropped, and the UI asks for a new one. It does *not*
+     * untick the comment: a rebase can't undo a judgement you made.
+     */
+    missing: boolean;
+    /** Re-matched to a rewritten commit by patch-id this load, so it's said once. */
+    healed: boolean;
+  } | null;
+}
+
 export interface ReviewThread {
   id: string;
   isResolved: boolean;
@@ -142,37 +176,11 @@ export interface ReviewThread {
   side: string | null;
   comments: ReviewComment[];
   /**
-   * The commit you linked to this comment. Never inferred: differ used to
-   * guess (the newest commit touching the file), but a guess always found
-   * *something*, so no comment ever read as outstanding and the list
-   * couldn't work as a checklist. Asserting the link is also the moment you
-   * actually check the change against the comment.
-   */
-  linkedSha?: string | null;
-  /**
-   * Handled without a code change — the comment only wanted a reply. Counts
-   * as addressed alongside a commit link.
-   */
-  acknowledged?: boolean;
-  /**
    * A top-level review body rather than an inline thread. It has no file or
    * line, but it still needs addressing, so it belongs in the checklist.
    */
   isReviewSummary?: boolean;
-  /** A saved reply the user was part-way through writing. */
-  draft?: string | null;
-  /**
-   * True when `linkedSha` no longer exists on the branch and couldn't be
-   * re-matched — a squash, an amend, or a conflict-resolved rebase changed
-   * the diff, so the patch-id matches nothing. The link is kept (not
-   * silently dropped) and the UI asks you to re-link.
-   */
-  linkedShaMissing?: boolean;
-  /**
-   * The link was re-matched to a rewritten commit by patch-id this load.
-   * Shown once so a silent re-point is never invisible.
-   */
-  linkedShaHealed?: boolean;
+  response: ThreadResponse;
 }
 
 export interface ReviewSummary {

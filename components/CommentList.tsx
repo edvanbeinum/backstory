@@ -140,10 +140,9 @@ export function CommentList({
   );
 }
 
-/** A comment is handled by a commit, by an acknowledgement, or not yet. */
+/** Handled means you said so. Nothing else sets it. */
 export function isHandled(thread: ReviewThread): boolean {
-  if (thread.acknowledged) return true;
-  return Boolean(thread.linkedSha && !thread.linkedShaMissing);
+  return thread.response.done;
 }
 
 /**
@@ -158,32 +157,38 @@ export function AnswerState({
   thread: ReviewThread;
   workingPaths: Set<string>;
 }) {
-  if (thread.linkedSha && thread.linkedShaMissing) {
+  const { commit, done, reply } = thread.response;
+  if (commit?.missing) {
     return (
       <span className="flex items-center gap-1 text-[11px] text-[var(--attention)]">
         <LinkIcon size={10} />
-        <span className="mono">{thread.linkedSha.slice(0, 7)}</span>
+        <span className="mono">{commit.shortSha}</span>
         <span>gone — re-link</span>
       </span>
     );
   }
-  if (thread.linkedSha) {
+  if (commit) {
     return (
       <span className="flex items-center gap-1 text-[11px] text-[var(--done)]">
         <CheckIcon size={10} />
-        <span className="mono">{thread.linkedSha.slice(0, 7)}</span>
-        {thread.linkedShaHealed && (
+        <span className="mono">{commit.shortSha}</span>
+        {commit.healed && (
           <span className="text-[var(--fg-subtle)]">re-matched</span>
         )}
       </span>
     );
   }
-  if (thread.acknowledged) {
+  if (done) {
     return (
       <span className="flex items-center gap-1 text-[11px] text-[var(--done)]">
         <CheckIcon size={10} />
-        <span>acknowledged</span>
+        <span>handled</span>
       </span>
+    );
+  }
+  if (reply) {
+    return (
+      <span className="text-[11px] text-[var(--fg-muted)]">reply drafted</span>
     );
   }
   // Not an answer — just a nudge that the file you'd need to look at has

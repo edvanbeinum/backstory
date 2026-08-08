@@ -64,7 +64,8 @@ export function changesFor(
 
   // A commit already linked to this comment stays offered, so returning to a
   // handled comment shows the change you said answers it.
-  const linked = thread?.linkedShaMissing ? null : thread?.linkedSha;
+  const link = thread?.response.commit;
+  const linked = link && !link.missing ? link.sha : null;
   if (linked) {
     const commit =
       session.commits.find((c) => c.sha === linked) ??
@@ -92,8 +93,8 @@ export function openingChangeFor(
   thread: ReviewThread | null,
   session: SessionResponse,
 ): string | null {
-  const linked = thread?.linkedShaMissing ? null : thread?.linkedSha;
-  if (linked) return linked;
+  const link = thread?.response.commit;
+  if (link && !link.missing) return link.sha;
   if (session.branchDiff) return BRANCH_REV;
   return session.working.hasChanges ? WORKING_REV : null;
 }
@@ -148,7 +149,8 @@ export function ChangePane({
   const landing = useMemo(
     () =>
       threads.filter(
-        (t) => !t.linkedShaMissing && t.linkedSha === rev,
+        (t) => t.response.commit && !t.response.commit.missing &&
+          t.response.commit.sha === rev,
       ),
     [threads, rev],
   );
@@ -254,13 +256,14 @@ function LinkActions({
 }) {
   if (!onLink) return null;
 
-  const linkedHere = !thread.linkedShaMissing && thread.linkedSha === rev;
+  const link = thread.response.commit;
+  const linkedHere = Boolean(link && !link.missing && link.sha === rev);
   // Only a real commit can be linked: uncommitted work and the combined
   // branch diff have no sha to point a reply at.
   const linkable =
     commit !== null && rev !== WORKING_REV && rev !== BRANCH_REV;
 
-  if (thread.acknowledged) {
+  if (thread.response.done && !link) {
     return (
       <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--done)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
         <CheckIcon size={13} className="text-[var(--done)]" />
@@ -300,7 +303,7 @@ function LinkActions({
   return (
     <div className="flex flex-wrap items-center gap-2 rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2">
       <span className="flex-1 text-[12px] text-[var(--fg-muted)]">
-        {thread.linkedSha && thread.linkedShaMissing
+        {link?.missing
           ? "Its linked commit was rebased away — link it again."
           : "Does this change answer the comment?"}
       </span>

@@ -430,11 +430,9 @@ export default function Page() {
   const linkedCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const thread of threads) {
-      if (thread.linkedShaMissing || !thread.linkedSha) continue;
-      counts.set(
-        thread.linkedSha,
-        (counts.get(thread.linkedSha) ?? 0) + 1,
-      );
+      const commit = thread.response.commit;
+      if (!commit || commit.missing) continue;
+      counts.set(commit.sha, (counts.get(commit.sha) ?? 0) + 1);
     }
     return counts;
   }, [threads]);
@@ -459,7 +457,8 @@ export default function Page() {
     (thread: ReviewThread) => {
       setFocusedThreadId(thread.id);
 
-      const linked = thread.linkedShaMissing ? null : (thread.linkedSha ?? null);
+      const commit = thread.response.commit;
+      const linked = commit && !commit.missing ? commit.sha : null;
       const known =
         linked !== null &&
         (session?.commits.some((c) => c.sha === linked) ||
@@ -536,6 +535,47 @@ export default function Page() {
   );
 
   /**
+   * `owner/repo#42` — the response store's key. Sent with every write rather
+   * than derived server-side, which used to cost a repo resolve and a GitHub
+   * lookup on each one, and meant drafts were dropped whenever GitHub was
+   * unreachable.
+   */
+  const responseKey = useMemo(() => {
+    const repo = session?.repo;
+    const pr = session?.github.pr;
+    if (!repo?.owner || !repo.name || !pr) return null;
+    return `${repo.owner}/${repo.name}#${pr.number}`;
+  }, [session]);
+
+  const writeResponse = useCallback(
+    (
+      threadId: string,
+      patch: {
+        done?: boolean;
+        reply?: string | null;
+        sha?: string | null;
+        clear?: boolean;
+      },
+      opts: { keepalive?: boolean } = {},
+    ) => {
+      if (!responseKey) return Promise.resolve();
+      // `repo` rides along only so the server can compute a patch-id when a
+      // commit is linked; ticks and drafts need no subprocess at all.
+      const params = new URLSearchParams({ key: responseKey });
+      if (patch.sha) params.set("repo", repoPath);
+      return fetch(`/api/responses?${params}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ threadId, ...patch }),
+        keepalive: opts.keepalive,
+      }).catch(() => {
+        // A failed write shouldn't break the view; the next action retries.
+      });
+    },
+    [responseKey, repoPath],
+  );
+
+  /**
    * Save a thread's draft reply. Fire-and-forget: no session refresh, since
    * one would echo the text back into a box you're still typing in. The
    * saved copy is picked up on the next load, which is exactly when it's
@@ -543,42 +583,30 @@ export default function Page() {
    */
   const saveDraft = useCallback(
     (threadId: string, text: string | null) => {
-      void fetch(`/api/drafts?repo=${encodeURIComponent(repoPath)}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threadId, text }),
-        // Survive the tab closing mid-save
-        keepalive: true,
-      }).catch(() => {
-        // Drafts are best-effort; the text is still on screen.
-      });
+      // keepalive so it survives the tab closing mid-save.
+      void writeResponse(threadId, { reply: text }, { keepalive: true });
     },
-    [repoPath],
+    [writeResponse],
   );
 
   /**
-   * Record how a comment was handled — a commit, an acknowledgement, or
-   * cleared — then refresh so the rail's progress agrees.
+   * Record part of a response — a linked commit, the tick, or a clear — then
+   * refresh so the checklist's progress agrees.
    */
   const linkThread = useCallback(
     async (
       threadId: string,
       link: { sha?: string; ack?: boolean } | null,
     ) => {
-      try {
-        await fetch(`/api/links?repo=${encodeURIComponent(repoPath)}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ threadId, ...(link ?? {}) }),
-        });
-      } catch {
-        // A failed write shouldn't break the view; the next action retries.
-      }
-      // Links are re-read from disk on every session load, so the cached
+      if (link?.sha) await writeResponse(threadId, { sha: link.sha, done: true });
+      else if (link?.ack) await writeResponse(threadId, { done: true });
+      else await writeResponse(threadId, { done: false, sha: null });
+
+      // Responses are re-read from disk on every session load, so the cached
       // GitHub data is still fine — no need to spend an API call here.
       void loadSession(repoPath, { background: true });
     },
-    [repoPath, loadSession],
+    [writeResponse, repoPath, loadSession],
   );
 
   /** The composer's commit picker speaks in shas. */
