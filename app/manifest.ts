@@ -18,8 +18,12 @@ export default function manifest(): MetadataRoute.Manifest {
     background_color: "#0d1117",
     theme_color: "#0d1117",
     icons: [
+      { src: "/icon.svg", sizes: "any", type: "image/svg+xml" },
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
       { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
     ],
+    // Not declared `maskable`: the icon is a bordered rounded tile, so a
+    // launcher cropping it to a circle would cut the border off. Better to
+    // let the OS letterbox it than to promise padding that isn't there.
   };
 }

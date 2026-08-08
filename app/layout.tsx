@@ -8,9 +8,15 @@ export const metadata: Metadata = {
   description:
     "Local pre-push review: unpushed commits and their PR review comments, side by side.",
   // Safari's "Add to Dock" takes its icon from apple-touch-icon, not the
-  // manifest; the OS rounds the corners itself, so that file ships square.
+  // manifest. The SVG is listed first for browsers that take it — it stays
+  // sharp at any tab size — with the PNGs behind it for those that don't, and
+  // app/favicon.ico (16/32/64) as the last resort.
   icons: {
-    icon: [{ url: "/icon-192.png", sizes: "192x192", type: "image/png" }],
+    icon: [
+      { url: "/icon.svg", type: "image/svg+xml" },
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
     apple: "/apple-touch-icon.png",
   },
   appleWebApp: {
