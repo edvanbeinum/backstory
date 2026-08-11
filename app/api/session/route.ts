@@ -153,17 +153,23 @@ export async function GET(request: Request) {
     // differ used to guess which commit answered a comment, but a guess
     // always found something, so no comment ever read as outstanding and the
     // list couldn't work as a checklist.
-    // Ordered by file here rather than in the client, so the checklist, the
-    // ‹ › stepper, `j`/`k` and the "first open comment" fallback can't
-    // disagree about what "next" means. Review summaries have no file and
-    // sort last.
+    // Oldest first — the order the reviewer left them, which is the order
+    // they read in on the pull request's conversation. Sorting by file and
+    // line instead would have been the Files-changed tab's order, and would
+    // reshuffle a review into an order nobody wrote or read it in.
+    //
+    // A review's own body is timestamped too, so it lands where it was
+    // submitted rather than being tacked on at the end — which is also where
+    // GitHub puts it, above the comments that came with it.
+    //
+    // Ordered here rather than in the client so the spine, the ‹ › stepper,
+    // `j`/`k` and the "first open comment" fallback can't disagree about what
+    // "next" means.
     const allThreads = [...rawGithub.threads, ...summaryThreads].sort(
-      (a, b) => {
-        if (!a.path && !b.path) return 0;
-        if (!a.path) return 1;
-        if (!b.path) return -1;
-        return a.path.localeCompare(b.path) || (a.line ?? 0) - (b.line ?? 0);
-      },
+      (a, b) =>
+        (a.comments[0]?.createdAt ?? "").localeCompare(
+          b.comments[0]?.createdAt ?? "",
+        ),
     );
     const github = { ...rawGithub, threads: allThreads };
     if (allThreads.length > 0) {

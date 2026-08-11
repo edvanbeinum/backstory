@@ -15,6 +15,11 @@ import { TickCheck, useTickPulse } from "./Tick";
  * A square *selects*. Ticking is the button in the response panel, or `x`.
  * Selection has to stay the default here or the column stops being
  * navigation, and a 22px target can't safely mean two things.
+ *
+ * Top to bottom is oldest to newest — the order the reviewer left them. They
+ * used to be grouped by file with a gap between groups, which only reads as
+ * grouping while the order is spatial; against a chronological list the gaps
+ * fire almost every row and mean nothing.
  */
 export function TickSpine({
   threads,
@@ -41,17 +46,12 @@ export function TickSpine({
         {done}/{threads.length}
       </span>
 
-      {threads.map((thread, index) => (
+      {threads.map((thread) => (
         <SpineTick
           key={thread.id}
           thread={thread}
           selected={selectedId === thread.id}
           onSelect={() => onSelect(thread)}
-          // A gap where the file changes. It's the only grouping cue left at
-          // this width, which is the price of the column.
-          startsGroup={
-            index > 0 && threads[index - 1].path !== thread.path
-          }
         />
       ))}
 
@@ -70,12 +70,10 @@ function SpineTick({
   thread,
   selected,
   onSelect,
-  startsGroup,
 }: {
   thread: ReviewThread;
   selected: boolean;
   onSelect: () => void;
-  startsGroup: boolean;
 }) {
   const done = thread.response.done;
   // Ticking happens elsewhere, so this is where you *watch* it happen — the
@@ -97,7 +95,7 @@ function SpineTick({
         done
           ? "border-[var(--handled)] bg-[var(--handled)] text-white"
           : "border-[var(--border)] bg-[var(--canvas)] text-transparent hover:border-[var(--fg-muted)]"
-      } ${startsGroup ? "mt-2.5" : ""}`}
+      }`}
       style={
         selected
           ? {
@@ -139,13 +137,12 @@ export function TickStrip({
       <span className="mono shrink-0 pr-1 text-[10px] text-[var(--fg-muted)]">
         {done}/{threads.length}
       </span>
-      {threads.map((thread, index) => (
+      {threads.map((thread) => (
         <SpineTick
           key={thread.id}
           thread={thread}
           selected={selectedId === thread.id}
           onSelect={() => onSelect(thread)}
-          startsGroup={index > 0 && threads[index - 1].path !== thread.path}
         />
       ))}
     </nav>
