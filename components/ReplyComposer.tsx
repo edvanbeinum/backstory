@@ -113,10 +113,19 @@ export function ReplyComposer({
   /** Persist the draft; null clears it. Absent = drafts not saved. */
   onDraftChange?: (text: string | null) => void;
 }) {
-  // A saved draft is text you wrote and haven't sent — resume straight into
-  // it rather than showing a template and burying it.
-  const [template, setTemplate] = useState<Template>(draft ? "custom" : "url");
+  // Always your own words by default. The wordings are one click away and
+  // the box is seeded from the linked commit, so nothing is lost — but a
+  // template selected *for* you is differ deciding what you think, and the
+  // one it used to fall back to was "Noted — no change needed here", which
+  // is a position on a comment you haven't read yet.
+  const [template, setTemplate] = useState<Template>("custom");
   const [custom, setCustom] = useState(draft ?? "");
+  /**
+   * Whether you've actually typed. Seeded text is a starting point, not a
+   * draft — without this, merely opening a comment with a commit linked
+   * would save a reply you never wrote and light up "reply drafted".
+   */
+  const touched = useRef(false);
 
   const selectedIsReal =
     commit !== null &&
@@ -163,6 +172,7 @@ export function ReplyComposer({
 
   useEffect(() => {
     if (!onDraftChange || template !== "custom") return;
+    if (!touched.current) return;
     if (custom === savedRef.current) return;
 
     const timer = setTimeout(() => {
@@ -179,10 +189,13 @@ export function ReplyComposer({
 
 
   // Unlinking a commit while an "Addressed in <sha>" template is selected
-  // would otherwise leave an empty box that looks broken.
+  // would otherwise leave an empty box that looks broken. Back to your own
+  // words, not to a stance differ picked.
   useEffect(() => {
     if (!commitTemplatesDisabled) return;
-    if (template === "url" || template === "sha") setTemplate("noChange");
+    if (template === "url" || template === "sha" || template === "thumbsUp") {
+      setTemplate("custom");
+    }
   }, [commitTemplatesDisabled, template]);
 
   return (
@@ -231,7 +244,10 @@ export function ReplyComposer({
           <textarea
             value={text}
             readOnly={template !== "custom"}
-            onChange={(event) => setCustom(event.target.value)}
+            onChange={(event) => {
+              touched.current = true;
+              setCustom(event.target.value);
+            }}
             rows={template === "custom" ? 3 : 2}
             className={`mono w-full resize-y bg-transparent px-3 py-2 text-[12px] leading-5 outline-none ${
               template === "custom" ? "" : "text-[var(--fg-muted)]"
@@ -264,8 +280,8 @@ export function ReplyComposer({
                 onClick={() => {
                   setCustom("");
                   savedRef.current = "";
+                  touched.current = false;
                   onDraftChange(null);
-                  setTemplate("url");
                 }}
                 className="text-[11px] text-[var(--accent)] hover:underline"
               >
