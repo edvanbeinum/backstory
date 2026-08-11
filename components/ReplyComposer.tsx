@@ -212,18 +212,9 @@ export function ReplyComposer({
               </span>
             )}
 
-            {pinned ? (
-              <span className="text-[var(--fg)]">
-                <LinkIcon size={11} className="text-[var(--done)]" /> Linked to{" "}
-                <span className="mono">{pinned.shortSha}</span>
-                {linkedShaHealed && (
-                  <span className="text-[var(--fg-muted)]">
-                    {" "}
-                    · re-matched after a rebase
-                  </span>
-                )}
-              </span>
-            ) : target ? (
+            {/* The card above already names the linked commit; saying it
+                again here was the same fact twice in adjacent boxes. */}
+            {pinned ? null : target ? (
               <>
                 Drafting against{" "}
                 <span className="mono">{target.shortSha}</span>, the change on

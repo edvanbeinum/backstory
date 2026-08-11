@@ -25,6 +25,7 @@ export function CommitPicker({
   selected,
   onPick,
   align = "right",
+  variant = "link",
 }: {
   label: string;
   candidates: CommitSummary[];
@@ -32,6 +33,12 @@ export function CommitPicker({
   selected: string | null;
   onPick: (sha: string) => void;
   align?: "left" | "right";
+  /**
+   * `link` is the inline text form used in dense rows; `button` gives it the
+   * weight of a real control, for places where choosing a commit is the
+   * point rather than an aside.
+   */
+  variant?: "link" | "button";
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -60,10 +67,14 @@ export function CommitPicker({
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="inline-flex items-center gap-0.5 font-medium text-[var(--accent)] hover:underline"
+        className={
+          variant === "button"
+            ? "inline-flex items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--canvas)] px-2.5 py-1.5 text-[12px] font-medium hover:border-[var(--fg-muted)]"
+            : "inline-flex items-center gap-0.5 font-medium text-[var(--accent)] hover:underline"
+        }
       >
         {label}
-        <ChevronDownIcon size={10} />
+        <ChevronDownIcon size={variant === "button" ? 11 : 10} />
       </button>
 
       {open && (

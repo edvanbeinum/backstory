@@ -8,7 +8,7 @@ import type {
   ReviewThread,
 } from "@/lib/types";
 import { CommitPicker } from "./CommitPicker";
-import { AlertIcon, LinkIcon, XIcon } from "./icons";
+import { AlertIcon, CheckIcon, LinkIcon } from "./icons";
 import { ReplyComposer } from "./ReplyComposer";
 import { TickButton } from "./Tick";
 
@@ -47,6 +47,13 @@ export function ResponsePanel({
 
   return (
     <div className="space-y-2">
+      <CommitLink
+        thread={thread}
+        commit={commit}
+        candidates={commitCandidates ?? []}
+        onLink={onLinkCommit}
+      />
+
       {response.commit?.missing && (
         <StaleLink
           shortSha={response.commit.shortSha}
@@ -60,13 +67,6 @@ export function ResponsePanel({
         <p className="border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-muted)]">
           Your response
         </p>
-
-        <CommitLink
-          thread={thread}
-          commit={commit}
-          candidates={commitCandidates ?? []}
-          onLink={onLinkCommit}
-        />
 
         <ReplyComposer
           repo={repo}
@@ -174,58 +174,88 @@ function CommitLink({
       ? commit
       : null;
 
-  if (linked && !linked.missing) {
-    return (
-      <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-muted)] px-3 py-2 text-[11px]">
-        <LinkIcon size={11} className="text-[var(--handled)]" />
-        <span className="text-[var(--fg-muted)]">Answered by</span>
-        <span className="mono font-semibold">{linked.shortSha}</span>
-        {linked.healed && (
-          <span className="text-[var(--fg-subtle)]">· re-matched after a rebase</span>
-        )}
-        <span className="flex-1" />
-        <CommitPicker
-          label="Change…"
-          candidates={candidates}
-          selected={linked.sha}
-          onPick={(sha) => onLink(thread.id, sha)}
-        />
-        <button
-          type="button"
-          onClick={() => onLink(thread.id, null)}
-          className="inline-flex items-center gap-0.5 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-          title="Unlink"
-        >
-          <XIcon size={11} />
-        </button>
-      </div>
-    );
-  }
+  // A sha alone doesn't tell you whether you linked the right thing. The
+  // subject does, so find it — a sha pasted from outside the branch's recent
+  // commits won't be here, and then the sha is all there is to show.
+  const linkedDetail =
+    linked && (candidates.find((c) => c.sha === linked.sha) ?? null);
 
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-[var(--border-muted)] px-3 py-2 text-[11px]">
-      <LinkIcon size={11} className="text-[var(--fg-subtle)]" />
-      <span className="text-[var(--fg-muted)]">
-        {linked?.missing ? "Link needs replacing" : "No commit linked"}
-      </span>
-      <span className="flex-1" />
-      {onScreen && (
-        <button
-          type="button"
-          onClick={() => onLink(thread.id, onScreen.sha)}
-          className="inline-flex items-center gap-1 rounded border border-[var(--accent)] px-1.5 py-[1px] font-medium text-[var(--accent)] hover:bg-[var(--accent-subtle)]"
-          title={onScreen.subject}
-        >
-          Link <span className="mono">{onScreen.shortSha}</span>
-          <span className="text-[var(--fg-muted)]">on screen</span>
-        </button>
+    <section className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--canvas)]">
+      <p className="border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-[var(--fg-muted)]">
+        The change that answers it
+      </p>
+
+      {linked && !linked.missing ? (
+        <div className="p-3">
+          <div className="flex items-baseline gap-2">
+            <CheckIcon size={13} className="shrink-0 text-[var(--handled)]" />
+            <span className="mono text-[13px] font-semibold">
+              {linked.shortSha}
+            </span>
+            {linked.healed && (
+              <span className="text-[11px] text-[var(--fg-subtle)]">
+                re-matched after a rebase
+              </span>
+            )}
+          </div>
+          {linkedDetail && (
+            <p className="mt-1 pl-[21px] text-[12px] text-[var(--fg)]">
+              {linkedDetail.subject}
+            </p>
+          )}
+          <div className="mt-2.5 flex flex-wrap items-center gap-2 pl-[21px]">
+            <CommitPicker
+              label="Change…"
+              candidates={candidates}
+              selected={linked.sha}
+              onPick={(sha) => onLink(thread.id, sha)}
+              variant="button"
+              align="left"
+            />
+            <button
+              type="button"
+              onClick={() => onLink(thread.id, null)}
+              className="rounded-md border border-[var(--border)] bg-[var(--canvas)] px-2.5 py-1 text-[12px] font-medium text-[var(--fg-muted)] hover:border-[var(--fg-muted)] hover:text-[var(--fg)]"
+            >
+              Unlink
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="p-3">
+          <p className="text-[12px] text-[var(--fg-muted)]">
+            {linked?.missing
+              ? "Its commit was rebased away — pick the change that answers it now."
+              : "Nothing linked yet. Pick the change that answers this comment."}
+          </p>
+
+          <div className="mt-2.5 flex flex-wrap items-center gap-2">
+            {onScreen && (
+              <button
+                type="button"
+                onClick={() => onLink(thread.id, onScreen.sha)}
+                title={onScreen.subject}
+                className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-[var(--accent)] bg-[var(--accent-subtle)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--canvas)]"
+              >
+                <LinkIcon size={12} className="shrink-0" />
+                Link <span className="mono">{onScreen.shortSha}</span>
+                <span className="min-w-0 truncate font-normal opacity-80">
+                  — {onScreen.subject}
+                </span>
+              </button>
+            )}
+            <CommitPicker
+              label={onScreen ? "Another commit…" : "Choose a commit…"}
+              candidates={candidates}
+              selected={null}
+              onPick={(sha) => onLink(thread.id, sha)}
+              variant="button"
+              align="left"
+            />
+          </div>
+        </div>
       )}
-      <CommitPicker
-        label={onScreen ? "or pick…" : "Link a commit…"}
-        candidates={candidates}
-        selected={null}
-        onPick={(sha) => onLink(thread.id, sha)}
-      />
-    </div>
+    </section>
   );
 }
