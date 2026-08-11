@@ -181,8 +181,7 @@ export async function GET(request: Request) {
         : {};
 
       const linked = Object.entries(responses).filter(
-        (entry): entry is [string, ResponseRecord & { commit: NonNullable<ResponseRecord["commit"]> }] =>
-          entry[1].commit !== null,
+        ([, record]) => record.commits.length > 0,
       );
 
       // A rebase rewrites shas, so a link can outlive its commit. Ask whether
@@ -191,11 +190,10 @@ export async function GET(request: Request) {
       // database and would otherwise pass as healthy.
       const alive = new Map<string, boolean>();
       for (const [, record] of linked) {
-        if (alive.has(record.commit.sha)) continue;
-        alive.set(
-          record.commit.sha,
-          await isOnBranch(repo.root, record.commit.sha, repo.tip),
-        );
+        for (const { sha } of record.commits) {
+          if (alive.has(sha)) continue;
+          alive.set(sha, await isOnBranch(repo.root, sha, repo.tip));
+        }
       }
 
       // Links made before patch-ids existed have none stored, which would
@@ -209,12 +207,19 @@ export async function GET(request: Request) {
       if (key) {
         const backfill: Record<string, ResponsePatch> = {};
         for (const [threadId, record] of linked) {
-          const { sha, patchId } = record.commit;
-          if (patchId || !alive.get(sha)) continue;
-          const found = await getPatchId(repo.root, sha);
-          if (found) {
-            responses[threadId] = { ...record, commit: { sha, patchId: found } };
-            backfill[threadId] = { commit: { sha, patchId: found } };
+          let changed = false;
+          const filled = await Promise.all(
+            record.commits.map(async (commit) => {
+              if (commit.patchId || !alive.get(commit.sha)) return commit;
+              const found = await getPatchId(repo.root, commit.sha);
+              if (!found) return commit;
+              changed = true;
+              return { sha: commit.sha, patchId: found };
+            }),
+          );
+          if (changed) {
+            responses[threadId] = { ...record, commits: filled };
+            backfill[threadId] = { commits: filled };
           }
         }
         await updateResponses(key, backfill);
@@ -224,30 +229,34 @@ export async function GET(request: Request) {
       // patch-id hashes its diff alone, so a rewritten commit keeps it —
       // find the new sha rather than making the user re-link. Only computed
       // when something is actually broken.
+      // Healed shas, not thread ids: one comment can carry several links and
+      // only some of them will have been rebased away.
       const healed = new Set<string>();
-      const stale = linked.filter(
-        ([threadId, record]) =>
-          !alive.get(record.commit.sha) &&
-          responses[threadId].commit?.patchId,
+      const stale = Object.entries(responses).filter(([, record]) =>
+        record.commits.some((c) => !alive.get(c.sha) && c.patchId),
       );
       if (stale.length > 0 && branchDiff && key) {
         const patchIds = await getPatchIdMap(
           repo.root,
-          `${branchDiff.baseSha}..HEAD`,
+          `${branchDiff.baseSha}..${repo.tip}`,
         );
         const moves: Record<string, ResponsePatch> = {};
-        for (const [threadId] of stale) {
-          const record = responses[threadId];
-          const patchId = record.commit?.patchId;
-          if (!patchId) continue;
-          // null = the patch-id appears more than once on the branch, so the
-          // match is ambiguous; leave it broken and let the user decide.
-          const match = patchIds.get(patchId);
-          if (match) {
-            responses[threadId] = { ...record, commit: { sha: match, patchId } };
-            moves[threadId] = { commit: { sha: match, patchId } };
+        for (const [threadId, record] of stale) {
+          let changed = false;
+          const moved = record.commits.map((commit) => {
+            if (alive.get(commit.sha) || !commit.patchId) return commit;
+            // null = the patch-id appears more than once on the branch, so
+            // the match is ambiguous; leave it broken and let the user decide.
+            const match = patchIds.get(commit.patchId);
+            if (!match) return commit;
             alive.set(match, true);
-            healed.add(threadId);
+            healed.add(match);
+            changed = true;
+            return { sha: match, patchId: commit.patchId };
+          });
+          if (changed) {
+            responses[threadId] = { ...record, commits: moved };
+            moves[threadId] = { commits: moved };
           }
         }
         await updateResponses(key, moves);
@@ -263,14 +272,12 @@ export async function GET(request: Request) {
             done: record.done,
             doneAt: record.doneAt,
             reply: record.reply,
-            commit: record.commit
-              ? {
-                  sha: record.commit.sha,
-                  shortSha: record.commit.sha.slice(0, 7),
-                  missing: !alive.get(record.commit.sha),
-                  healed: healed.has(thread.id),
-                }
-              : null,
+            commits: record.commits.map((commit) => ({
+              sha: commit.sha,
+              shortSha: commit.sha.slice(0, 7),
+              missing: !alive.get(commit.sha),
+              healed: healed.has(commit.sha),
+            })),
           },
         };
       });

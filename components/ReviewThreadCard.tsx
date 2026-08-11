@@ -201,9 +201,9 @@ export function ReviewThreadCard({
                 pr={pr}
                 commit={commit}
                 threadUrl={threadUrl}
-                linkedSha={thread.response.commit?.sha ?? null}
-                linkedShaMissing={thread.response.commit?.missing}
-                linkedShaHealed={thread.response.commit?.healed}
+                linkedShas={thread.response.commits
+                  .filter((c) => !c.missing)
+                  .map((c) => c.sha)}
                 draft={thread.response.reply}
                 onDraftChange={
                   onDraftChange

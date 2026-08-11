@@ -9,7 +9,7 @@ const record = (over: Partial<ResponseRecord> = {}): ResponseRecord => ({
   done: false,
   doneAt: null,
   reply: null,
-  commit: null,
+  commits: [],
   ...over,
 });
 
@@ -93,7 +93,7 @@ test("more threads than one page returned is reported, not hidden", () => {
 test("neither a linked commit nor a draft counts as handled", () => {
   // The whole point: only the tick means done.
   const responses = {
-    t1: record({ commit: { sha: "abc1234", patchId: null } }),
+    t1: record({ commits: [{ sha: "abc1234", patchId: null }] }),
     t2: record({ reply: "Addressed in abc1234" }),
   };
   assert.equal(countProgress(["t1", "t2"], responses).done, 0);

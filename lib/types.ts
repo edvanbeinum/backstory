@@ -161,20 +161,25 @@ export interface ThreadResponse {
   doneAt: number | null;
   /** The reply you're drafting. differ never posts it. */
   reply: string | null;
-  /** The change you say answers the comment. Optional, and never implies done. */
-  commit: {
+  /**
+   * The changes you say answer the comment, in the order you linked them.
+   * A long comment often makes several points and takes several commits to
+   * answer. Never implies `done`.
+   */
+  commits: Array<{
     sha: string;
     shortSha: string;
     /**
-     * Not reachable from HEAD and no patch-id match — a squash, an amend, or
-     * a rebase through a conflict changed the diff. The link is kept rather
-     * than silently dropped, and the UI asks for a new one. It does *not*
-     * untick the comment: a rebase can't undo a judgement you made.
+     * Not reachable from the branch and no patch-id match — a squash, an
+     * amend, or a rebase through a conflict changed the diff. The link is
+     * kept rather than silently dropped, and the UI asks for a new one. It
+     * does *not* untick the comment: a rebase can't undo a judgement you
+     * made.
      */
     missing: boolean;
     /** Re-matched to a rewritten commit by patch-id this load, so it's said once. */
     healed: boolean;
-  } | null;
+  }>;
 }
 
 export interface ReviewThread {

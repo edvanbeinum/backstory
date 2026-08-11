@@ -64,9 +64,11 @@ export function changesFor(
 
   // A commit already linked to this comment stays offered, so returning to a
   // handled comment shows the change you said answers it.
-  const link = thread?.response.commit;
-  const linked = link && !link.missing ? link.sha : null;
-  if (linked) {
+  // Every change you said answers this comment stays offered, so returning
+  // to a handled comment can show any of them.
+  for (const link of thread?.response.commits ?? []) {
+    if (link.missing) continue;
+    const linked = link.sha;
     const commit =
       session.commits.find((c) => c.sha === linked) ??
       session.history.find((c) => c.sha === linked);
@@ -93,8 +95,8 @@ export function openingChangeFor(
   thread: ReviewThread | null,
   session: SessionResponse,
 ): string | null {
-  const link = thread?.response.commit;
-  if (link && !link.missing) return link.sha;
+  const link = thread?.response.commits.find((c) => !c.missing);
+  if (link) return link.sha;
   if (session.branchDiff) return BRANCH_REV;
   return session.working.hasChanges ? WORKING_REV : null;
 }
@@ -149,9 +151,8 @@ export function ChangePane({
   // missing: given a commit, which review comments land in it?
   const landing = useMemo(
     () =>
-      threads.filter(
-        (t) => t.response.commit && !t.response.commit.missing &&
-          t.response.commit.sha === rev,
+      threads.filter((t) =>
+        t.response.commits.some((c) => !c.missing && c.sha === rev),
       ),
     [threads, rev],
   );

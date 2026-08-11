@@ -46,7 +46,8 @@ export async function GET(request: Request) {
  * Record part of a response:
  *   `{threadId, done}`   — the tick. The only thing that means handled.
  *   `{threadId, reply}`  — the draft; "" or null clears it
- *   `{threadId, sha}`    — link a commit; null unlinks
+ *   `{threadId, sha}`    — link a commit; null unlinks all
+ *   `{threadId, unlink}` — unlink one by sha
  *   `{threadId, clear}`  — forget the comment entirely
  *
  * Fields are independent: sending one leaves the others alone, so the
@@ -76,6 +77,7 @@ export async function POST(request: Request) {
       done?: boolean;
       reply?: string | null;
       sha?: string | null;
+      unlink?: string;
       clear?: boolean;
     };
 
@@ -98,9 +100,11 @@ export async function POST(request: Request) {
     if (typeof body.done === "boolean") patch.done = body.done;
     if (body.reply !== undefined) patch.reply = body.reply;
 
+    if (body.unlink) patch.removeCommit = body.unlink;
+
     if (body.sha !== undefined) {
       if (body.sha === null) {
-        patch.commit = null;
+        patch.commits = [];
       } else {
         // Store the patch-id beside the sha: a rebase rewrites the sha but
         // not the patch-id, which is how the link survives one.
@@ -124,7 +128,7 @@ export async function POST(request: Request) {
             { status: 400 },
           );
         }
-        patch.commit = { sha, patchId: await getPatchId(repo.root, sha) };
+        patch.addCommit = { sha, patchId: await getPatchId(repo.root, sha) };
       }
     }
 

@@ -83,14 +83,15 @@ function allReplies(
         ? `${thread.path}${thread.line != null ? `:${thread.line}` : ""}`
         : "Review summary";
       const url = thread.comments[0]?.url;
-      const sha = thread.response.commit?.sha;
-      const link = sha ? buildPrCommitUrl(repo, pr, sha) : null;
+      const links = thread.response.commits
+        .map((c) => buildPrCommitUrl(repo, pr, c.sha))
+        .filter((u): u is string => Boolean(u));
       return [
         `## ${where}`,
         url ? `<${url}>` : null,
         "",
         thread.response.reply,
-        link ? `\n${link}` : null,
+        links.length > 0 ? `\n${links.join("\n")}` : null,
       ]
         .filter((line) => line !== null)
         .join("\n");

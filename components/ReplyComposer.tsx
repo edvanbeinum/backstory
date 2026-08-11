@@ -52,20 +52,32 @@ export function buildPrCommitUrl(
 /** The composer only needs a sha to link — not a full CommitSummary. */
 type LinkTarget = Pick<CommitSummary, "sha" | "shortSha">;
 
+/** "a", "a and b", "a, b and c" — how you'd say it, not how a machine would. */
+function joinNaturally(parts: string[]): string {
+  if (parts.length <= 1) return parts[0] ?? "";
+  return `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+}
+
 function templateText(
   template: Template,
-  commit: LinkTarget | null,
-  url: string | null,
+  commits: LinkTarget[],
+  urls: Array<string | null>,
 ): string {
+  const shas = commits.map((c) => c.shortSha);
+  // A reply naming several links reads better broken out than run together.
+  const links = commits.map((c, i) => urls[i] ?? c.sha);
+
   switch (template) {
     case "noChange":
       return "Noted — no change needed here, thanks.";
     case "thumbsUp":
-      return commit ? `👍 Addressed in ${commit.shortSha}` : "👍";
+      return shas.length > 0 ? `👍 Addressed in ${joinNaturally(shas)}` : "👍";
     case "url":
-      return commit ? `Addressed in ${url ?? commit.sha}` : "";
+      if (links.length === 0) return "";
+      if (links.length === 1) return `Addressed in ${links[0]}`;
+      return `Addressed in:\n${links.map((l) => `- ${l}`).join("\n")}`;
     case "sha":
-      return commit ? `Addressed in ${commit.shortSha}` : "";
+      return shas.length > 0 ? `Addressed in ${joinNaturally(shas)}` : "";
     default:
       return "";
   }
@@ -86,9 +98,7 @@ export function ReplyComposer({
   pr,
   commit,
   threadUrl,
-  linkedSha,
-  linkedShaMissing = false,
-  linkedShaHealed = false,
+  linkedShas = [],
   draft,
   onDraftChange,
 }: {
@@ -96,12 +106,8 @@ export function ReplyComposer({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   threadUrl: string | null;
-  /** The commit you linked to this comment */
-  linkedSha?: string | null;
-  /** The linked sha is gone and couldn't be re-matched */
-  linkedShaMissing?: boolean;
-  /** The link was re-matched to a rewritten commit by patch-id */
-  linkedShaHealed?: boolean;
+  /** The commits you linked to this comment, live ones only. */
+  linkedShas?: string[];
   /** A previously saved draft for this thread, if any */
   draft?: string | null;
   /** Persist the draft; null clears it. Absent = drafts not saved. */
@@ -117,31 +123,33 @@ export function ReplyComposer({
     commit.sha !== WORKING_REV &&
     commit.sha !== BRANCH_REV;
 
-  // A live link is the answer. One whose commit was rebased away is
-  // surfaced rather than obeyed.
-  const pinned: LinkTarget | null =
-    linkedSha && !linkedShaMissing
-      ? { sha: linkedSha, shortSha: linkedSha.slice(0, 7) }
-      : null;
+  // What the reply names: every commit you linked, or — before you've linked
+  // anything — the change on screen, so the wording is ready when you do.
+  const pinned: LinkTarget[] = linkedShas.map((sha) => ({
+    sha,
+    shortSha: sha.slice(0, 7),
+  }));
 
-  const target: LinkTarget | null =
-    pinned ?? (selectedIsReal ? commit : null);
+  const targets: LinkTarget[] =
+    pinned.length > 0 ? pinned : selectedIsReal && commit ? [commit] : [];
+  const target: LinkTarget | null = targets[0] ?? null;
 
-  const url = useMemo(
-    () => (target ? buildPrCommitUrl(repo, pr, target.sha) : null),
-    [repo, pr, target],
+  const urls = useMemo(
+    () => targets.map((t) => buildPrCommitUrl(repo, pr, t.sha)),
+    [repo, pr, targets],
   );
+  const url = urls[0] ?? null;
 
-  const generated = templateText(template, target, url);
+  const generated = templateText(template, targets, urls);
   const text = template === "custom" ? custom : generated;
 
   // Seed the custom box from whatever was last generated, so switching to
   // "write my own" is an edit rather than a blank page.
   useEffect(() => {
     if (template === "custom" && !custom) {
-      setCustom(templateText("url", target, url));
+      setCustom(templateText("url", targets, urls));
     }
-  }, [template, custom, target, url]);
+  }, [template, custom, targets, urls]);
 
 
   // Persist the draft, debounced — the point is that it survives a reload,
@@ -167,7 +175,7 @@ export function ReplyComposer({
   // No commit linked, so the templates that name one have nothing to say.
   // The box stays open regardless: you can always write a reply, and most
   // comments are answered without a commit at all.
-  const commitTemplatesDisabled = target === null;
+  const commitTemplatesDisabled = targets.length === 0;
 
 
   // Unlinking a commit while an "Addressed in <sha>" template is selected
@@ -203,18 +211,9 @@ export function ReplyComposer({
 
       <>
           <p className="flex flex-wrap items-center gap-x-2 border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1 text-[11px] text-[var(--fg-muted)]">
-            {linkedShaMissing && (
-              <span className="text-[var(--attention)]">
-                <LinkIcon size={11} /> Linked to{" "}
-                <span className="mono">{linkedSha?.slice(0, 7)}</span>, which
-                is no longer on this branch and doesn&apos;t match any commit
-                here — squashed, amended, or rebased through a conflict.
-              </span>
-            )}
-
-            {/* The card above already names the linked commit; saying it
+            {/* The card above already names the linked commits; saying it
                 again here was the same fact twice in adjacent boxes. */}
-            {pinned ? null : target ? (
+            {pinned.length > 0 ? null : target ? (
               <>
                 Drafting against{" "}
                 <span className="mono">{target.shortSha}</span>, the change on

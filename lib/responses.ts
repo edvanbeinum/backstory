@@ -45,8 +45,17 @@ export interface ResponseRecord {
   doneAt: number | null;
   /** Draft reply text. differ never posts it; it leaves via the clipboard. */
   reply: string | null;
-  /** The change you say answers the comment. Optional, and never implies done. */
-  commit: ResponseCommit | null;
+  /**
+   * The changes you say answer the comment, in the order you linked them.
+   *
+   * A list rather than one, because a long comment often makes several points
+   * and gets answered by several commits. With a single slot the second one
+   * was invisible: the reverse lookup said it answered nothing, and a rebase
+   * only healed the link differ knew about.
+   *
+   * Never implies `done`.
+   */
+  commits: ResponseCommit[];
 }
 
 /**
@@ -57,14 +66,19 @@ export interface ResponseRecord {
 export interface ResponsePatch {
   done?: boolean;
   reply?: string | null;
-  commit?: ResponseCommit | null;
+  /** Append one, ignoring a sha already linked. */
+  addCommit?: ResponseCommit;
+  /** Drop one by sha. */
+  removeCommit?: string;
+  /** Replace the list outright — how healing re-points a rebased link. */
+  commits?: ResponseCommit[];
 }
 
 export const EMPTY_RESPONSE: ResponseRecord = {
   done: false,
   doneAt: null,
   reply: null,
-  commit: null,
+  commits: [],
 };
 
 /** The file is meant to be hand-editable, so nothing in it is trusted. */
@@ -90,17 +104,34 @@ function normalize(value: StoredResponse): ResponseRecord {
     typeof value.reply === "string" && value.reply.length <= MAX_REPLY
       ? value.reply
       : null;
+
+  // `commit` is the shape this file held when a comment could only have one
+  // answer. Read either; whichever it was, it's written back as a list the
+  // next time this record is touched.
+  const list = Array.isArray(value.commits)
+    ? value.commits
+    : value.commit !== undefined
+      ? [value.commit]
+      : [];
+
+  const commits = list
+    .map(normalizeCommit)
+    .filter((c): c is ResponseCommit => c !== null);
+
   return {
     done: value.done === true,
     doneAt: typeof value.doneAt === "number" ? value.doneAt : null,
     reply,
-    commit: normalizeCommit(value.commit),
+    // A sha linked twice is one answer, not two.
+    commits: commits.filter(
+      (c, i) => commits.findIndex((o) => o.sha === c.sha) === i,
+    ),
   };
 }
 
 /** A record holding nothing is deleted rather than stored as noise. */
 function isEmpty(record: ResponseRecord): boolean {
-  return !record.done && record.reply === null && record.commit === null;
+  return !record.done && record.reply === null && record.commits.length === 0;
 }
 
 export function prKey(
@@ -146,12 +177,15 @@ function validate(patch: ResponsePatch): void {
   if (patch.reply != null && patch.reply.length > MAX_REPLY) {
     throw new Error("Invalid reply: too long");
   }
-  if (patch.commit) {
-    if (!SHA.test(patch.commit.sha)) throw new Error("Invalid commit sha");
-    if (
-      patch.commit.patchId !== null &&
-      !PATCH_ID.test(patch.commit.patchId)
-    ) {
+  if (patch.removeCommit && !SHA.test(patch.removeCommit)) {
+    throw new Error("Invalid commit sha");
+  }
+  for (const commit of [
+    ...(patch.addCommit ? [patch.addCommit] : []),
+    ...(patch.commits ?? []),
+  ]) {
+    if (!SHA.test(commit.sha)) throw new Error("Invalid commit sha");
+    if (commit.patchId !== null && !PATCH_ID.test(commit.patchId)) {
       throw new Error("Invalid patch id");
     }
   }
@@ -205,8 +239,19 @@ export async function updateResponses(
         ...(patch.reply !== undefined
           ? { reply: patch.reply === "" ? null : patch.reply }
           : {}),
-        ...(patch.commit !== undefined ? { commit: patch.commit } : {}),
+        ...(patch.commits !== undefined ? { commits: patch.commits } : {}),
       };
+
+      if (patch.addCommit) {
+        next.commits = next.commits.some((c) => c.sha === patch.addCommit!.sha)
+          ? next.commits
+          : [...next.commits, patch.addCommit];
+      }
+      if (patch.removeCommit) {
+        next.commits = next.commits.filter(
+          (c) => c.sha !== patch.removeCommit,
+        );
+      }
 
       if (isEmpty(next)) delete forPr[id];
       else forPr[id] = next;
@@ -255,13 +300,13 @@ const isDraft = (value: unknown): value is string =>
 function linkToResponse(link: StoredLink, at: number): ResponseRecord {
   const base = { done: true, doneAt: at, reply: null };
   if (typeof link === "string") {
-    return { ...base, commit: { sha: link, patchId: null } };
+    return { ...base, commits: [{ sha: link, patchId: null }] };
   }
-  if ("kind" in link && link.kind === "ack") return { ...base, commit: null };
+  if ("kind" in link && link.kind === "ack") return { ...base, commits: [] };
   const record = link as { sha: string; patchId?: string | null };
   return {
     ...base,
-    commit: { sha: record.sha, patchId: record.patchId ?? null },
+    commits: [{ sha: record.sha, patchId: record.patchId ?? null }],
   };
 }
 
@@ -324,7 +369,7 @@ async function migrate(): Promise<void> {
       const reply = draftsForPr[id] ?? null;
       const record = link
         ? { ...linkToResponse(link, at), reply }
-        : { done: false, doneAt: null, reply, commit: null };
+        : { done: false, doneAt: null, reply, commits: [] };
       if (!isEmpty(record)) forPr[id] = record;
     }
     if (Object.keys(forPr).length > 0) out[key] = forPr;

@@ -18,7 +18,7 @@ export const NO_RESPONSE: ThreadResponse = Object.freeze({
   done: false,
   doneAt: null,
   reply: null,
-  commit: null,
+  commits: [],
 });
 
 /** Exported so the inbox can issue its own batched query. */

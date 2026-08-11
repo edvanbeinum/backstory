@@ -80,25 +80,25 @@ test("migration carries all three link shapes plus drafts", async () => {
   );
 
   const ios = await getResponses("Indee/indee-ios#28");
-  assert.deepEqual(ios.legacy_untagged.commit, {
+  assert.deepEqual(ios.legacy_untagged.commits[0], {
     sha: SHA_A,
     patchId: PATCH_A,
   });
   assert.equal(ios.legacy_untagged.done, true, "a link was the done signal");
   assert.equal(ios.legacy_untagged.reply, "Addressed in 76c66de");
 
-  assert.deepEqual(ios.legacy_bare.commit, { sha: SHA_B, patchId: null });
+  assert.deepEqual(ios.legacy_bare.commits[0], { sha: SHA_B, patchId: null });
   assert.equal(ios.legacy_bare.done, true);
 
   assert.equal(ios.draft_only.done, false, "a draft alone is not handled");
   assert.equal(ios.draft_only.reply, "Still thinking about this one");
-  assert.equal(ios.draft_only.commit, null);
+  assert.equal(ios.draft_only.commits[0] ?? null, null);
 
   const rails = await getResponses("Indee/indee-rails#1589");
-  assert.deepEqual(rails.tagged_commit.commit, { sha: SHA_B, patchId: PATCH_B });
+  assert.deepEqual(rails.tagged_commit.commits[0], { sha: SHA_B, patchId: PATCH_B });
   assert.equal(rails.tagged_commit.done, true);
   assert.equal(rails.tagged_ack.done, true, "an ack was also a done signal");
-  assert.equal(rails.tagged_ack.commit, null, "but it never had a commit");
+  assert.equal(rails.tagged_ack.commits[0] ?? null, null, "but it never had a commit");
 
   // Renamed, not deleted — recovering a store by hand is why it's JSON.
   assert.equal(await exists(path.join(home, "links.json")), false);
@@ -156,14 +156,14 @@ test("a tick and a draft save on the same record don't clobber each other", asyn
     updateResponses("o/r#1", { t1: { done: true } }),
     updateResponses("o/r#1", { t1: { reply: "Addressed in abc1234" } }),
     updateResponses("o/r#1", {
-      t1: { commit: { sha: SHA_A, patchId: PATCH_A } },
+      t1: { addCommit: { sha: SHA_A, patchId: PATCH_A } },
     }),
   ]);
 
   const forPr = await getResponses("o/r#1");
   assert.equal(forPr.t1.done, true, "the tick survived");
   assert.equal(forPr.t1.reply, "Addressed in abc1234", "the draft survived");
-  assert.deepEqual(forPr.t1.commit, { sha: SHA_A, patchId: PATCH_A });
+  assert.deepEqual(forPr.t1.commits[0] ?? null, { sha: SHA_A, patchId: PATCH_A });
   assert.ok(await exists(path.join(home, "responses.json")));
 });
 
@@ -209,14 +209,14 @@ test("a patch leaves fields it doesn't mention alone", async () => {
   useTempHome();
 
   await updateResponses("o/r#1", {
-    t1: { done: true, reply: "draft", commit: { sha: SHA_A, patchId: null } },
+    t1: { done: true, reply: "draft", addCommit: { sha: SHA_A, patchId: null } },
   });
-  await updateResponses("o/r#1", { t1: { commit: null } });
+  await updateResponses("o/r#1", { t1: { commits: [] } });
 
   const forPr = await getResponses("o/r#1");
   assert.equal(forPr.t1.done, true, "clearing the link can't untick");
   assert.equal(forPr.t1.reply, "draft");
-  assert.equal(forPr.t1.commit, null);
+  assert.equal(forPr.t1.commits[0] ?? null, null);
 });
 
 test("garbage in the file is dropped, not thrown", async () => {
@@ -226,8 +226,8 @@ test("garbage in the file is dropped, not thrown", async () => {
     path.join(home, "responses.json"),
     JSON.stringify({
       "o/r#1": {
-        good: { done: true, doneAt: 1, reply: null, commit: null },
-        bad_commit: { done: true, commit: { sha: "nope" } },
+        good: { done: true, doneAt: 1, reply: null, commits: [] },
+        bad_commit: { done: true, commits: [{ sha: "nope" }] },
         "not a key!": { done: true },
       },
     }),
@@ -235,7 +235,7 @@ test("garbage in the file is dropped, not thrown", async () => {
 
   const forPr = await getResponses("o/r#1");
   assert.equal(forPr.good.done, true);
-  assert.equal(forPr.bad_commit.commit, null, "an unusable sha is dropped");
+  assert.equal(forPr.bad_commit.commits[0] ?? null, null, "an unusable sha is dropped");
   assert.equal(forPr.bad_commit.done, true, "without losing the tick");
   assert.ok(!("not a key!" in forPr));
 });
@@ -244,7 +244,7 @@ test("invalid input is rejected before anything is written", async () => {
   useTempHome();
 
   await assert.rejects(
-    () => updateResponses("o/r#1", { t1: { commit: { sha: "xyz", patchId: null } } }),
+    () => updateResponses("o/r#1", { t1: { addCommit: { sha: "xyz", patchId: null } } }),
     /Invalid commit sha/,
   );
   await assert.rejects(
@@ -255,4 +255,55 @@ test("invalid input is rejected before anything is written", async () => {
     () => updateResponses("o/r#1", { "bad id!": { done: true } }),
     /Invalid thread id/,
   );
+});
+
+test("a comment can hold several commits, and drop one without the others", async () => {
+  // A long comment often makes several points and takes more than one commit
+  // to answer. With a single slot the second one was invisible.
+  useTempHome();
+  await updateResponses("o/r#1", {
+    t1: { addCommit: { sha: SHA_A, patchId: PATCH_A } },
+  });
+  await updateResponses("o/r#1", {
+    t1: { addCommit: { sha: SHA_B, patchId: PATCH_B } },
+  });
+  assert.deepEqual(
+    (await getResponses("o/r#1")).t1.commits.map((c) => c.sha),
+    [SHA_A, SHA_B],
+    "kept in the order they were linked",
+  );
+
+  // Linking the same commit twice is one answer, not two.
+  await updateResponses("o/r#1", {
+    t1: { addCommit: { sha: SHA_A, patchId: PATCH_A } },
+  });
+  assert.equal((await getResponses("o/r#1")).t1.commits.length, 2);
+
+  await updateResponses("o/r#1", { t1: { removeCommit: SHA_A } });
+  assert.deepEqual(
+    (await getResponses("o/r#1")).t1.commits.map((c) => c.sha),
+    [SHA_B],
+  );
+});
+
+test("a record stored with the old single `commit` still reads", async () => {
+  const home = useTempHome();
+  await fs.mkdir(home, { recursive: true });
+  await fs.writeFile(
+    path.join(home, "responses.json"),
+    JSON.stringify({
+      "o/r#1": {
+        t1: {
+          done: true,
+          doneAt: 1,
+          reply: null,
+          commit: { sha: SHA_A, patchId: PATCH_A },
+        },
+      },
+    }),
+  );
+
+  const forPr = await getResponses("o/r#1");
+  assert.deepEqual(forPr.t1.commits, [{ sha: SHA_A, patchId: PATCH_A }]);
+  assert.equal(forPr.t1.done, true);
 });

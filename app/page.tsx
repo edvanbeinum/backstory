@@ -306,8 +306,8 @@ export default function Page() {
           // anything you pick later, wins.
           if (next === WORKING_REV && !data.working.hasChanges) {
             const thread = data.github.threads.find((t) => t.id === landedOn);
-            const linked = thread?.response.commit;
-            if (linked && !linked.missing) return linked.sha;
+            const linked = thread?.response.commits.find((c) => !c.missing);
+            if (linked) return linked.sha;
             if (data.branchDiff) return BRANCH_REV;
           }
           return next;
@@ -523,9 +523,12 @@ export default function Page() {
   const linkedCounts = useMemo(() => {
     const counts = new Map<string, number>();
     for (const thread of threads) {
-      const commit = thread.response.commit;
-      if (!commit || commit.missing) continue;
-      counts.set(commit.sha, (counts.get(commit.sha) ?? 0) + 1);
+      // A comment can answer to several commits, and each of them genuinely
+      // carries it — so each gets counted.
+      for (const commit of thread.response.commits) {
+        if (commit.missing) continue;
+        counts.set(commit.sha, (counts.get(commit.sha) ?? 0) + 1);
+      }
     }
     return counts;
   }, [threads]);
@@ -550,8 +553,8 @@ export default function Page() {
     (thread: ReviewThread) => {
       setFocusedThreadId(thread.id);
 
-      const commit = thread.response.commit;
-      const linked = commit && !commit.missing ? commit.sha : null;
+      const linked =
+        thread.response.commits.find((c) => !c.missing)?.sha ?? null;
       const known =
         linked !== null &&
         (session?.commits.some((c) => c.sha === linked) ||
@@ -647,6 +650,7 @@ export default function Page() {
         done?: boolean;
         reply?: string | null;
         sha?: string | null;
+        unlink?: string;
         clear?: boolean;
       },
       // keepalive by default: every one of these is a deliberate act you'd
@@ -727,8 +731,11 @@ export default function Page() {
    * rebase and the client has no way to know it.
    */
   const linkCommit = useCallback(
-    async (threadId: string, sha: string | null) => {
-      const response = await writeResponse(threadId, { sha });
+    async (threadId: string, sha: string | null, unlink?: string) => {
+      const response = await writeResponse(
+        threadId,
+        unlink ? { unlink } : { sha },
+      );
       // A pasted sha can simply not exist. Saying so beats a click that looks
       // like it worked and leaves the row unchanged.
       if (response && !response.ok) {
