@@ -649,7 +649,11 @@ export default function Page() {
         sha?: string | null;
         clear?: boolean;
       },
-      opts: { keepalive?: boolean } = {},
+      // keepalive by default: every one of these is a deliberate act you'd
+      // expect to have stuck. Without it, reloading in the same instant as a
+      // tick can cancel the request in flight — and because the tick is
+      // optimistic, the screen would have told you it saved.
+      { keepalive = true }: { keepalive?: boolean } = {},
     ) => {
       if (!responseKey) return Promise.resolve();
       // `repo` rides along only so the server can compute a patch-id when a
@@ -660,7 +664,7 @@ export default function Page() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ threadId, ...patch }),
-        keepalive: opts.keepalive,
+        keepalive,
       }).catch(() => null);
     },
     [responseKey, repoPath],
@@ -674,8 +678,7 @@ export default function Page() {
    */
   const saveDraft = useCallback(
     (threadId: string, text: string | null) => {
-      // keepalive so it survives the tab closing mid-save.
-      void writeResponse(threadId, { reply: text }, { keepalive: true });
+      void writeResponse(threadId, { reply: text });
     },
     [writeResponse],
   );
