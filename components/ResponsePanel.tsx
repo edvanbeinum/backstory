@@ -47,12 +47,6 @@ export function ResponsePanel({
 
   return (
     <div className="space-y-2">
-      <TickButton
-        done={response.done}
-        doneAt={response.doneAt}
-        onToggle={(next) => onToggleDone(thread.id, next)}
-      />
-
       {response.commit?.missing && (
         <StaleLink
           shortSha={response.commit.shortSha}
@@ -88,6 +82,12 @@ export function ResponsePanel({
           }
         />
       </div>
+
+      <TickButton
+        done={response.done}
+        doneAt={response.doneAt}
+        onToggle={(next) => onToggleDone(thread.id, next)}
+      />
     </div>
   );
 }

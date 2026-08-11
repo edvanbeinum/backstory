@@ -197,7 +197,7 @@ export function ReviewThreadCard({
             <Comment key={comment.id} comment={comment} />
           ))}
 
-          {hideComposer ? (
+          {hideComposer && onRespond ? (
             // Anchored in the diff, where the response panel beside it is
             // already answering this comment. A summary of where it stands,
             // and a way back to the one place that can change it.
@@ -231,7 +231,7 @@ export function ReviewThreadCard({
                 </button>
               )}
             </div>
-          ) : (
+          ) : hideComposer ? null : (
             <div className="border-t border-[var(--border-muted)] bg-[var(--canvas-subtle)] p-2">
               <ReplyComposer
                 repo={repo}

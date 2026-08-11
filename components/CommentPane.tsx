@@ -106,7 +106,20 @@ export function CommentPane({
       </div>
 
       {thread ? (
+        // Reading order is the working order: what was said, what you're
+        // saying back, and only then the tick. Deciding it's handled is the
+        // last thing you do, so it's the last thing on screen.
         <>
+          <ReviewThreadCard
+            key={thread.id}
+            thread={thread}
+            repo={repo}
+            pr={pr}
+            commit={commit}
+            showContext
+            defaultCollapsed={false}
+            hideComposer
+          />
           <ResponsePanel
             key={`${thread.id}-response`}
             thread={thread}
@@ -117,16 +130,6 @@ export function CommentPane({
             onToggleDone={onToggleDone}
             onLinkCommit={onLinkCommit}
             onDraftChange={onDraftChange}
-          />
-          <ReviewThreadCard
-            key={thread.id}
-            thread={thread}
-            repo={repo}
-            pr={pr}
-            commit={commit}
-            showContext
-            defaultCollapsed={false}
-            hideComposer
           />
         </>
       ) : (
