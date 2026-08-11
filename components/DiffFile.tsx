@@ -18,7 +18,6 @@ import {
   FileIcon,
   UnfoldIcon,
 } from "./icons";
-import { ReviewThreadCard } from "./ReviewThreadCard";
 import { Badge, copyToClipboard, CopyButton, Spinner } from "./ui";
 
 const STATUS_TONE: Record<string, string> = {
@@ -36,7 +35,6 @@ export function DiffFile({
   pr,
   commit,
   focusedThreadId,
-  onSelectThread,
 }: {
   file: DiffFileType;
   threads: ReviewThread[];
@@ -44,8 +42,6 @@ export function DiffFile({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
-  /** Hand a comment to the response panel, which owns answering it. */
-  onSelectThread?: (threadId: string) => void;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
@@ -58,12 +54,14 @@ export function DiffFile({
   // drops straight into the same rendering path.
   const shown = showWhole && whole ? whole.file : file;
 
-  const { byNewLine, byOldLine, unanchored } = useMemo(
+  // Anchoring survives only to mark where the comment you're reading points.
+  // The comments themselves live in the spine and the response panel; the
+  // diff column is the diff.
+  const { byNewLine, byOldLine } = useMemo(
     () => anchorThreads(shown, threads),
     [shown, threads],
   );
 
-  const anchoredCount = threads.length - unanchored.length;
   const canViewWhole =
     !file.isBinary && file.hunks.length > 0 && commit !== null;
 
@@ -191,12 +189,6 @@ export function DiffFile({
           className="!px-1"
         />
 
-        {anchoredCount > 0 && (
-          <Badge tone="attention">
-            {anchoredCount} {anchoredCount === 1 ? "comment" : "comments"}
-          </Badge>
-        )}
-
         <span className={`text-[11px] ${STATUS_TONE[file.status] ?? ""}`}>
           {file.status}
         </span>
@@ -273,7 +265,6 @@ export function DiffFile({
                         filePath={file.path}
                         copiedLine={copiedLine}
                         onCopyLine={copyLineRef}
-                        onSelectThread={onSelectThread}
                       />
                     ))}
                   </tbody>
@@ -303,32 +294,7 @@ export function DiffFile({
             </p>
           )}
 
-          {unanchored.length > 0 && (
-            <div className="space-y-2 border-t border-[var(--border-muted)] bg-[var(--canvas-subtle)] p-2 last:rounded-b-md">
-              <p className="text-[11px] text-[var(--fg-muted)]">
-                {unanchored.length} comment
-                {unanchored.length === 1 ? "" : "s"} on this file that
-                {unanchored.length === 1 ? " doesn't" : " don't"} land on a line
-                in this diff:
-              </p>
-              {unanchored.map((thread) => (
-                <ReviewThreadCard
-                  key={thread.id}
-                  thread={thread}
-                  repo={repo}
-                  pr={pr}
-                  commit={commit}
-                  showContext
-                  defaultCollapsed
-                  highlighted={focusedThreadId === thread.id}
-                  hideComposer
-                  onRespond={
-                    onSelectThread ? () => onSelectThread(thread.id) : undefined
-                  }
-                />
-              ))}
-            </div>
-          )}
+
         </>
       )}
     </section>
@@ -348,7 +314,6 @@ function HunkRows({
   filePath,
   copiedLine,
   onCopyLine,
-  onSelectThread,
 }: {
   hunk: DiffFileType["hunks"][number];
   hunkIndex: number;
@@ -362,8 +327,6 @@ function HunkRows({
   filePath: string;
   copiedLine: string | null;
   onCopyLine: (key: string, line: number) => void;
-  /** Hand a comment to the response panel, which owns answering it. */
-  onSelectThread?: (threadId: string) => void;
 }) {
   // Clicking a line number copies the editor-style "path:line" reference —
   // the thing you paste into a terminal, an editor, or a review reply. The
@@ -409,7 +372,11 @@ function HunkRows({
                   : line.type === "del"
                     ? "line-del"
                     : ""
-              } ${threads.length > 0 ? "line-anchored" : ""}`}
+              } ${
+                threads.some((t) => t.id === focusedThreadId)
+                  ? "line-anchored"
+                  : ""
+              }`}
             >
               {numCell(line.oldNo, "old")}
               {numCell(line.newNo, "new")}
@@ -422,23 +389,6 @@ function HunkRows({
               />
             </tr>
 
-            {threads.map((thread) => (
-              <tr key={thread.id}>
-                <td colSpan={4} className="bg-[var(--canvas-subtle)] p-2">
-                  <ReviewThreadCard
-                    thread={thread}
-                    repo={repo}
-                    pr={pr}
-                    commit={commit}
-                    highlighted={focusedThreadId === thread.id}
-                    hideComposer
-                    onRespond={
-                      onSelectThread ? () => onSelectThread(thread.id) : undefined
-                    }
-                  />
-                </td>
-              </tr>
-            ))}
           </Fragment>
         );
       })}

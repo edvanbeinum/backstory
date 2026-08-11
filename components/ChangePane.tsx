@@ -115,7 +115,6 @@ export function ChangePane({
   threads,
   thread,
   focusedThreadId,
-  onSelectThread,
   pushed,
 }: {
   session: SessionResponse;
@@ -129,8 +128,6 @@ export function ChangePane({
   /** The comment on the left, so its thread can be highlighted here */
   thread: ReviewThread | null;
   focusedThreadId: string | null;
-  /** Hand a comment to the response panel, which owns answering it. */
-  onSelectThread?: (threadId: string) => void;
   pushed: boolean;
 }) {
   const options = useMemo(
@@ -229,7 +226,6 @@ export function ChangePane({
         pr={session.github.pr}
         commit={commit}
         focusedThreadId={focusedThreadId}
-        onSelectThread={onSelectThread}
       />
     </div>
   );

@@ -1010,7 +1010,6 @@ export default function Page() {
                   threads={threads}
                   thread={selectedThread}
                   focusedThreadId={focusedThreadId}
-                  onSelectThread={selectComment}
                   pushed={revIsPushed}
                 />
               </div>

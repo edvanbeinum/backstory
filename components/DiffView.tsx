@@ -16,9 +16,10 @@ import { Spinner } from "./ui";
 
 /**
  * Group threads by the file they belong to, so each DiffFile only has to
- * consider its own. Threads on files this commit doesn't touch fall through to
- * "elsewhere" and are still shown — hiding them would quietly lose review
- * feedback, which is the one thing this app must never do.
+ * consider its own — and only to mark the line the comment you're reading
+ * points at. Nothing here renders a comment: the spine lists them all and the
+ * response panel answers them, so repeating them among the code was three
+ * copies of one list.
  */
 function partitionThreads(diff: DiffResponse | null, threads: ReviewThread[]) {
   const paths = new Set(
@@ -28,19 +29,12 @@ function partitionThreads(diff: DiffResponse | null, threads: ReviewThread[]) {
   );
 
   const perFile = new Map<string, ReviewThread[]>();
-  const elsewhere: ReviewThread[] = [];
-
   for (const thread of threads) {
     if (thread.path && paths.has(thread.path)) {
       perFile.set(thread.path, [...(perFile.get(thread.path) ?? []), thread]);
-    } else if (thread.path) {
-      elsewhere.push(thread);
     }
-    // Review summaries have no file, and the comment column already shows
-    // them — repeating them under the diff would just be noise.
   }
-
-  return { perFile, elsewhere };
+  return { perFile };
 }
 
 export function DiffView({
@@ -52,7 +46,6 @@ export function DiffView({
   pr,
   commit,
   focusedThreadId,
-  onSelectThread,
 }: {
   diff: DiffResponse | null;
   loading: boolean;
@@ -62,10 +55,8 @@ export function DiffView({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
-  /** Hand a comment to the response panel, which owns answering it. */
-  onSelectThread?: (threadId: string) => void;
 }) {
-  const { perFile, elsewhere } = useMemo(
+  const { perFile } = useMemo(
     () => partitionThreads(diff, threads),
     [diff, threads],
   );
@@ -118,23 +109,11 @@ export function DiffView({
             pr={pr}
             commit={commit}
             focusedThreadId={focusedThreadId}
-            onSelectThread={onSelectThread}
           />
         ))
       )}
 
-      {/* This used to re-render every off-file thread as a card, composer and
-          all. The spine already lists every comment, always visible — so the
-          section was the same list a third time, and a second live composer
-          per thread on top of it. One line is enough. */}
-      {elsewhere.length > 0 && (
-        <p className="flex items-center gap-1.5 px-1 pt-1 text-[12px] text-[var(--fg-muted)]">
-          <CommentIcon size={12} />
-          {elsewhere.length}{" "}
-          {elsewhere.length === 1 ? "comment is" : "comments are"}{" "}
-          on files this change doesn&apos;t touch — see the spine.
-        </p>
-      )}
+
     </div>
   );
 }

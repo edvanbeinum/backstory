@@ -113,7 +113,6 @@ export function ReviewThreadCard({
   pinCandidates,
   onDraftChange,
   hideComposer = false,
-  onRespond,
 }: {
   thread: ReviewThread;
   repo: RepoInfo;
@@ -132,8 +131,6 @@ export function ReviewThreadCard({
    * a second place to wonder which draft is the real one.
    */
   hideComposer?: boolean;
-  /** Offered instead of a composer: select this comment and answer it there. */
-  onRespond?: () => void;
 }) {
   const [collapsed, setCollapsed] = useState(
     defaultCollapsed ?? thread.isResolved,
@@ -197,41 +194,7 @@ export function ReviewThreadCard({
             <Comment key={comment.id} comment={comment} />
           ))}
 
-          {hideComposer && onRespond ? (
-            // Anchored in the diff, where the response panel beside it is
-            // already answering this comment. A summary of where it stands,
-            // and a way back to the one place that can change it.
-            <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1.5 text-[11px] text-[var(--fg-muted)]">
-              {thread.response.done && (
-                <span className="inline-flex items-center gap-1 text-[var(--handled)]">
-                  <CheckIcon size={11} /> handled
-                </span>
-              )}
-              {thread.response.commit && (
-                <span
-                  className={`mono ${
-                    thread.response.commit.missing
-                      ? "text-[var(--attention)]"
-                      : ""
-                  }`}
-                >
-                  {thread.response.commit.shortSha}
-                  {thread.response.commit.missing && " gone"}
-                </span>
-              )}
-              {thread.response.reply && <span>reply drafted</span>}
-              <span className="flex-1" />
-              {onRespond && (
-                <button
-                  type="button"
-                  onClick={onRespond}
-                  className="text-[var(--accent)] hover:underline"
-                >
-                  Respond →
-                </button>
-              )}
-            </div>
-          ) : hideComposer ? null : (
+          {hideComposer ? null : (
             <div className="border-t border-[var(--border-muted)] bg-[var(--canvas-subtle)] p-2">
               <ReplyComposer
                 repo={repo}
