@@ -23,16 +23,21 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
   // renames ago. A folder simply named after the repo isn't a disagreement.
   const slug = row.branch?.replace(/\//g, "-") ?? "";
   const folderDiffers =
-    row.branch !== null && !row.isMain && !row.name.endsWith(slug);
+    row.branch !== null &&
+    row.worktree !== null &&
+    !row.isMain &&
+    !row.worktree.name.endsWith(slug);
 
   return (
     <button
       type="button"
       onClick={onOpen}
-      disabled={row.missing}
-      className={`grid w-full grid-cols-[16px_minmax(0,1fr)_auto] items-start gap-x-3 rounded-md px-2 py-3 text-left hover:bg-[var(--canvas-subtle)] disabled:cursor-not-allowed ${
-        allHandled || row.missing ? "opacity-60" : ""
+      disabled={row.worktree?.missing}
+      className={`grid w-full grid-cols-[16px_minmax(0,1fr)_auto] items-start gap-x-3 rounded-md py-3 pr-2 text-left hover:bg-[var(--canvas-subtle)] disabled:cursor-not-allowed ${
+        allHandled || row.worktree?.missing ? "opacity-60" : ""
       }`}
+      // A stacked PR targets the branch below it, so the indent is the stack.
+      style={{ paddingLeft: 8 + row.depth * 18 }}
     >
       <span className="mt-[5px] grid place-items-center">
         <StatusGlyph row={row} allHandled={allHandled} />
@@ -48,7 +53,7 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
             {row.branch ?? "(detached HEAD)"}
           </span>
           {row.pr ? <PrPill pr={row.pr} /> : <NoPrPill />}
-          {row.missing && (
+          {row.worktree?.missing && (
             <span className="text-[11px] text-[var(--attention)]">
               registered but gone
             </span>
@@ -56,9 +61,20 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
         </span>
 
         {row.pr ? (
-          <span className="mt-0.5 block truncate text-[13px] text-[var(--fg)]">
-            {row.pr.title}
-          </span>
+          <>
+            <span className="mt-0.5 block truncate text-[13px] text-[var(--fg)]">
+              {row.pr.title}
+            </span>
+            {!row.worktree && (
+              // Reviewable all the same — differ reads any ref from any
+              // worktree of the repo. Worth saying only so you know why
+              // there's no uncommitted work to compare against.
+              <span className="mt-0.5 block text-[11px] text-[var(--fg-subtle)]">
+                not checked out
+                {row.depth > 0 && ` · on ${row.pr.baseRefName}`}
+              </span>
+            )}
+          </>
         ) : (
           <span className="mt-0.5 block text-[12px] text-[var(--fg-subtle)]">
             {row.ahead === null
@@ -72,7 +88,7 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
 
         {folderDiffers && (
           <span className="mono mt-0.5 block truncate text-[11px] text-[var(--fg-subtle)]">
-            ↳ in {row.name}
+            ↳ in {row.worktree?.name}
           </span>
         )}
       </span>

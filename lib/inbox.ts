@@ -25,20 +25,27 @@ export interface InboxPr {
   state: string;
   isDraft: boolean;
   url: string;
+  /** What this PR targets — another branch here, when it's a stack. */
+  baseRefName: string;
   /** Threads GitHub still calls unresolved. Shown, never used to tick. */
   unresolved: number;
 }
 
 export interface InboxRow {
-  /** Stable identity, and what the client opens. */
-  path: string;
-  name: string;
+  /** Stable identity: the branch, or the path for a detached worktree. */
+  id: string;
   branch: string | null;
+  /** The worktree holding it, when one does. */
+  worktree: { path: string; name: string; missing: boolean } | null;
+  /**
+   * The worktree differ reviews it from. Its own when checked out, otherwise
+   * the repo's main checkout — git reads any ref from any worktree, so a
+   * branch needs no checkout of its own to be reviewed.
+   */
+  reviewPath: string;
   head: string | null;
   /** Which repo group this belongs to. */
   repo: string;
-  /** Registered but the directory is gone. */
-  missing: boolean;
   /** The repo's own checkout rather than a sibling worktree. */
   isMain: boolean;
   /** Commits ahead of upstream, null when the branch has no upstream. */
@@ -46,6 +53,8 @@ export interface InboxRow {
   lastCommitAt: string | null;
   pr: InboxPr | null;
   progress: Progress | null;
+  /** How deep in a stack of PRs, from the base each one targets. */
+  depth: number;
 }
 
 export interface InboxRepo {
@@ -134,7 +143,7 @@ async function branchFacts(root: string): Promise<Map<string, BranchFacts>> {
 
 const FRAGMENT = `
 fragment F on PullRequest {
-  number title state isDraft url updatedAt
+  number title state isDraft url updatedAt baseRefName
   isCrossRepository
   headRepositoryOwner { login }
   reviewThreads(first: 100) { totalCount nodes { id isResolved } }
@@ -148,6 +157,7 @@ interface GqlInboxPr {
   isDraft: boolean;
   url: string;
   updatedAt: string;
+  baseRefName: string;
   isCrossRepository: boolean;
   headRepositoryOwner: { login: string } | null;
   reviewThreads: { totalCount: number; nodes: Array<{ id: string; isResolved: boolean }> };
@@ -293,9 +303,16 @@ async function buildRepo(
     stale: false,
   };
 
-  const branches = worktrees
-    .map((w) => w.branch)
-    .filter((b): b is string => Boolean(b));
+  // Every local branch, not just the checked-out ones. A stacked workflow
+  // keeps most of the stack as plain branches — asking only about worktrees
+  // hid five open PRs with review comments on them. It costs nothing extra:
+  // the query is one call however many aliases it carries.
+  const branches = [
+    ...new Set([
+      ...worktrees.map((w) => w.branch).filter((b): b is string => Boolean(b)),
+      ...facts.keys(),
+    ]),
+  ];
 
   let prs = new Map<string, GqlInboxPr[]>();
   if (!owner || !name) {
@@ -321,11 +338,17 @@ async function buildRepo(
     }
   }
 
-  const rows = worktrees.map((worktree): InboxRow => {
-    const fact = worktree.branch ? facts.get(worktree.branch) : undefined;
-    const chosen = worktree.branch
-      ? pickPullRequest(prs.get(worktree.branch) ?? [], owner)
-      : null;
+  const byBranch = new Map<string, (typeof worktrees)[number]>();
+  for (const worktree of worktrees) {
+    if (worktree.branch) byBranch.set(worktree.branch, worktree);
+  }
+
+  const build = (
+    branch: string | null,
+    worktree: (typeof worktrees)[number] | null,
+  ): InboxRow => {
+    const fact = branch ? facts.get(branch) : undefined;
+    const chosen = branch ? pickPullRequest(prs.get(branch) ?? [], owner) : null;
 
     let pr: InboxPr | null = null;
     let progress: Progress | null = null;
@@ -337,6 +360,7 @@ async function buildRepo(
         state: chosen.state,
         isDraft: chosen.isDraft,
         url: chosen.url,
+        baseRefName: chosen.baseRefName,
         unresolved: chosen.reviewThreads.nodes.filter((t) => !t.isResolved)
           .length,
       };
@@ -352,33 +376,106 @@ async function buildRepo(
       ];
       progress = countProgress(ids, key ? (responses[key] ?? {}) : {}, {
         reportedTotal:
-          chosen.reviewThreads.totalCount + (ids.length - chosen.reviewThreads.nodes.length),
+          chosen.reviewThreads.totalCount +
+          (ids.length - chosen.reviewThreads.nodes.length),
       });
     }
 
     return {
-      path: worktree.path,
-      name: worktree.name,
-      branch: worktree.branch,
-      head: worktree.head ?? null,
+      id: branch ?? worktree?.path ?? "",
+      branch,
+      worktree: worktree
+        ? {
+            path: worktree.path,
+            name: worktree.name,
+            missing: Boolean(worktree.missing),
+          }
+        : null,
+      // Without a checkout of its own, review it from the repo's own — git
+      // reads any ref from any worktree of the repo.
+      reviewPath: worktree?.path ?? root,
+      head: worktree?.head ?? null,
       repo: commonDir,
-      missing: Boolean(worktree.missing),
-      isMain: worktree.path === root,
+      isMain: worktree ? worktree.path === root : false,
       ahead: fact?.ahead ?? null,
       lastCommitAt: fact?.lastCommitAt ?? null,
       pr,
       progress,
+      depth: 0,
     };
-  });
+  };
 
-  // Outstanding work first, then whatever moved most recently. A finished
-  // branch shouldn't sit above one waiting on you.
-  rows.sort((a, b) => {
-    const aLeft = a.progress ? a.progress.total - a.progress.done : -1;
-    const bLeft = b.progress ? b.progress.total - b.progress.done : -1;
-    if (aLeft !== bLeft) return bLeft - aLeft;
-    return (b.lastCommitAt ?? "").localeCompare(a.lastCommitAt ?? "");
-  });
+  const rows: InboxRow[] = [
+    // Every worktree, so a branchless or PR-less checkout still shows.
+    ...worktrees.map((worktree) => build(worktree.branch, worktree)),
+    // Plus any branch with a PR that no worktree holds. Without a PR it's
+    // just a local branch — a `backup/*` or a scratch name — and listing
+    // those would bury the ones that need a response.
+    ...branches
+      .filter((branch) => !byBranch.has(branch))
+      .map((branch) => build(branch, null))
+      .filter((row) => row.pr !== null),
+  ];
 
-  return { repo, rows };
+  return { repo, rows: nest(rows) };
+}
+
+/**
+ * Order a repo's rows so a stack reads as a stack.
+ *
+ * A stacked PR targets the branch below it rather than the default branch, so
+ * `baseRefName` already describes the tree — it just has to be walked.
+ * Without this, seven dependent PRs sort as seven unrelated rows and nothing
+ * says which end to start from.
+ */
+function nest(rows: InboxRow[]): InboxRow[] {
+  // Only a row that is itself a PR can be a stack parent. Otherwise every PR
+  // targeting the default branch would indent under the trunk's own row,
+  // which adds a level of nesting that says nothing.
+  const byBranch = new Map(
+    rows
+      .filter((r) => r.branch && r.pr)
+      .map((r) => [r.branch as string, r]),
+  );
+  const children = new Map<string, InboxRow[]>();
+  const roots: InboxRow[] = [];
+
+  for (const row of rows) {
+    const base = row.pr?.baseRefName;
+    // A base that isn't itself listed here is the default branch, or a branch
+    // you don't have — either way this row is a root.
+    const parent = base && base !== row.branch ? byBranch.get(base) : undefined;
+    if (parent) {
+      children.set(parent.branch as string, [
+        ...(children.get(parent.branch as string) ?? []),
+        row,
+      ]);
+    } else {
+      roots.push(row);
+    }
+  }
+
+  const left = (row: InboxRow) =>
+    row.progress ? row.progress.total - row.progress.done : -1;
+  const order = (a: InboxRow, b: InboxRow) =>
+    left(b) - left(a) ||
+    (b.lastCommitAt ?? "").localeCompare(a.lastCommitAt ?? "");
+
+  const out: InboxRow[] = [];
+  const walk = (row: InboxRow, depth: number) => {
+    // A cycle can't happen through PR bases, but a malformed one shouldn't
+    // hang the home screen.
+    if (out.length > rows.length) return;
+    out.push({ ...row, depth });
+    for (const child of (children.get(row.branch ?? "") ?? []).sort(order)) {
+      walk(child, depth + 1);
+    }
+  };
+  for (const root of roots.sort(order)) walk(root, 0);
+
+  // Anything the walk missed (a cycle) still has to appear.
+  for (const row of rows) {
+    if (!out.some((r) => r.id === row.id)) out.push({ ...row, depth: 0 });
+  }
+  return out;
 }

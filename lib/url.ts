@@ -15,6 +15,12 @@ export type RailMode = "comments" | "commits";
 
 export interface UrlState {
   repo: string | null;
+  /**
+   * A branch to review instead of whatever the worktree has checked out.
+   * Stacked PRs mostly live as plain branches, and reviewing one needs no
+   * checkout — so which branch you're reading is part of the address.
+   */
+  ref?: string | null;
   rev: string | null;
   /** Rail mode; null means the default (comments) */
   mode: RailMode | null;
@@ -43,6 +49,7 @@ export function parseUrlState(search: string): UrlState {
 export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
   const params = new URLSearchParams();
   if (state.repo) params.set("repo", state.repo);
+  if (state.ref) params.set("ref", state.ref);
   // Only the non-default mode is worth spelling out.
   if (state.mode === "commits") params.set("mode", "commits");
 

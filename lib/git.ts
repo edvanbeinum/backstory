@@ -42,7 +42,10 @@ const PATCH_FLAGS = [
   "--find-copies",
 ];
 
-export async function resolveRepo(input: string): Promise<RepoInfo> {
+export async function resolveRepo(
+  input: string,
+  ref?: string | null,
+): Promise<RepoInfo> {
   const abs = expandPath(input);
   if (!abs) throw new RepoError("No repository path given", "missing-path");
 
@@ -69,15 +72,26 @@ export async function resolveRepo(input: string): Promise<RepoInfo> {
   ]);
 
   const detached = branchRaw === "HEAD" || branchRaw === null;
-  const branch = detached ? null : branchRaw;
+  const checkedOut = detached ? null : branchRaw;
   const { owner, name } = parseRemote(remoteUrl);
   const defaultBranch = await resolveDefaultBranch(root);
+
+  // A branch you asked for that isn't the one checked out here. Nothing about
+  // reviewing a pushed branch needs it checked out — git reads any ref from
+  // any worktree of the repo — and a stacked workflow leaves most of the
+  // stack as plain branches, so insisting on a checkout would hide them.
+  const reviewing = ref && ref !== checkedOut ? ref : null;
 
   return {
     input,
     root,
-    branch,
-    detached,
+    branch: reviewing ?? checkedOut,
+    checkedOut,
+    ref: reviewing,
+    // What the commit walks start from. HEAD when you're reviewing the
+    // checkout, the branch itself when you're reviewing anything else.
+    tip: reviewing ?? "HEAD",
+    detached: detached && !reviewing,
     remoteUrl,
     owner,
     name,
@@ -169,7 +183,7 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
     "rev-parse",
     "--abbrev-ref",
     "--symbolic-full-name",
-    "@{upstream}",
+    `${repo.tip}@{upstream}`,
   ]);
   if (upstream) {
     return finishBase(root, upstream, "upstream", `ahead of ${upstream}`);
@@ -275,11 +289,28 @@ export async function getCommits(
     "--format=%(refname)",
     "refs/remotes",
   ]);
+  // Reviewing a branch that isn't checked out is almost always a pushed
+  // stack entry, where "not on any remote" is empty and useless. Its own
+  // commits — the ones its PR is about — are what to show.
+  if (repo.ref) {
+    const range = base.ref ? `${base.ref}..${repo.ref}` : repo.ref;
+    return logRange(repo, [range], limit);
+  }
+
   if (hasRemoteRefs) {
     return logRange(repo, ["HEAD", "--not", "--remotes"], limit);
   }
 
   const range = base.ref ? `${base.ref}..HEAD` : "HEAD";
+  return logRange(repo, [range], limit);
+}
+
+/** The commits in an arbitrary range, newest first. */
+export async function getCommitRange(
+  repo: RepoInfo,
+  range: string,
+  limit = 200,
+): Promise<CommitSummary[]> {
   return logRange(repo, [range], limit);
 }
 
@@ -293,12 +324,13 @@ export async function getBoundarySha(
   root: string,
   commits: CommitSummary[],
   base: BaseInfo,
+  tip = "HEAD",
 ): Promise<string | null> {
   const oldest = commits[commits.length - 1];
   if (!oldest) {
     // Nothing unpushed — the boundary is HEAD itself.
     return (
-      (await gitLine(root, ["rev-parse", "--verify", "--quiet", "HEAD"])) ??
+      (await gitLine(root, ["rev-parse", "--verify", "--quiet", tip])) ??
       base.sha
     );
   }
@@ -420,6 +452,7 @@ async function logRange(
 async function forkPointFrom(
   root: string,
   branchName: string,
+  tip = "HEAD",
 ): Promise<string | null> {
   for (const ref of [
     `refs/remotes/origin/${branchName}`,
@@ -431,7 +464,7 @@ async function forkPointFrom(
       "--quiet",
       ref,
     ]);
-    if (exists) return gitLine(root, ["merge-base", ref, "HEAD"]);
+    if (exists) return gitLine(root, ["merge-base", ref, tip]);
   }
   return null;
 }
@@ -450,14 +483,14 @@ export async function getBranchDiffBase(
   const { root, branch, defaultBranch } = repo;
 
   if (prBaseRef && prBaseRef !== branch) {
-    const fork = await forkPointFrom(root, prBaseRef);
+    const fork = await forkPointFrom(root, prBaseRef, repo.tip);
     if (fork) return { baseSha: fork, label: `vs ${prBaseRef}` };
     // The base branch isn't checked out locally — fall through rather than
     // silently diffing against something else.
   }
 
   if (defaultBranch && branch && branch !== defaultBranch) {
-    const fork = await forkPointFrom(root, defaultBranch);
+    const fork = await forkPointFrom(root, defaultBranch, repo.tip);
     if (fork) return { baseSha: fork, label: `vs ${defaultBranch}` };
   }
 
@@ -477,7 +510,7 @@ export async function getBranchDiffSummary(
   const count = await gitLine(repo.root, [
     "rev-list",
     "--count",
-    `${info.baseSha}..HEAD`,
+    `${info.baseSha}..${repo.tip}`,
   ]);
   const commits = Number(count ?? "0");
   if (commits === 0) return null;
@@ -488,7 +521,7 @@ export async function getBranchDiffSummary(
       "--shortstat",
       ...PATCH_FLAGS,
       info.baseSha,
-      "HEAD",
+      repo.tip,
     ])) ?? "";
   // " 12 files changed, 540 insertions(+), 210 deletions(-)" — any of the
   // three clauses can be absent.
@@ -647,10 +680,11 @@ function pathspecArgs(opts: PatchOptions): string[] {
 export async function isOnBranch(
   root: string,
   sha: string,
+  tip = "HEAD",
 ): Promise<boolean> {
   const { code } = await run(
     "git",
-    ["merge-base", "--is-ancestor", sha, "HEAD"],
+    ["merge-base", "--is-ancestor", sha, tip],
     { cwd: root, allowExitCodes: [1, 128], timeout: 10_000 },
   ).catch(() => ({ code: 1 }));
   return code === 0;

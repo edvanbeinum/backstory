@@ -93,7 +93,21 @@ export interface RepoInfo {
   input: string;
   /** Worktree root as git reports it */
   root: string;
+  /**
+   * The branch being reviewed — the checked-out one, or `ref` when you asked
+   * for another. This is what a PR is matched against.
+   */
   branch: string | null;
+  /** What this worktree actually has checked out, whatever you're reviewing. */
+  checkedOut: string | null;
+  /**
+   * Set when reviewing a branch this worktree doesn't hold. Nothing about a
+   * pushed branch needs a checkout — git reads any ref from any worktree —
+   * and a stacked workflow leaves most of the stack as plain branches.
+   */
+  ref: string | null;
+  /** Where commit walks start: "HEAD", or the branch when reviewing a ref. */
+  tip: string;
   /** True when HEAD is detached */
   detached: boolean;
   remoteUrl: string | null;

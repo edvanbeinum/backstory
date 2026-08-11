@@ -73,6 +73,8 @@ async function getJson<T>(url: string): Promise<T> {
 
 export default function Page() {
   const [repoPath, setRepoPath] = useState("");
+  /** A branch to review instead of the worktree's own. Null = the checkout. */
+  const [ref, setRef] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
 
   const [session, setSession] = useState<SessionResponse | null>(null);
@@ -102,6 +104,7 @@ export default function Page() {
   const [workingTick, setWorkingTick] = useState(0);
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
+  const refRef = useRef(ref);
   /** Discards out-of-order session responses from overlapping refreshes. */
   const sessionSeq = useRef(0);
   /**
@@ -115,6 +118,9 @@ export default function Page() {
   useEffect(() => {
     repoRef.current = repoPath;
   }, [repoPath]);
+  useEffect(() => {
+    refRef.current = ref;
+  }, [ref]);
 
   // A bare `/` is the inbox. It used to reopen whatever you last had open,
   // which now hides the home screen behind a checkout you may be done with —
@@ -126,6 +132,7 @@ export default function Page() {
     const path = fromUrl.repo ?? "";
 
     setRepoPath(path);
+    setRef(fromUrl.ref ?? null);
     if (fromUrl.rev) setRev(fromUrl.rev);
     if (fromUrl.comment) setCommentId(fromUrl.comment);
     if (fromUrl.repo) window.localStorage.setItem(STORAGE_KEY, fromUrl.repo);
@@ -221,11 +228,11 @@ export default function Page() {
     if (!ready) return;
     const inWorkspace = Boolean(repoPath);
     writeUrlState(
-      { repo: repoPath || null, rev, mode: null, comment: commentId },
+      { repo: repoPath || null, ref, rev, mode: null, comment: commentId },
       { push: inWorkspace !== wasInWorkspace.current },
     );
     wasInWorkspace.current = inWorkspace;
-  }, [ready, repoPath, rev, commentId]);
+  }, [ready, repoPath, ref, rev, commentId]);
 
   // Someone navigating with the back/forward buttons, or editing the URL by
   // hand, should land on the view they asked for.
@@ -233,6 +240,7 @@ export default function Page() {
     const onPopState = () => {
       const fromUrl = readUrlState();
       setRepoPath(fromUrl.repo ?? "");
+      setRef(fromUrl.ref ?? null);
       setRev(fromUrl.rev ?? WORKING_REV);
       setCommentId(fromUrl.comment);
     };
@@ -261,7 +269,9 @@ export default function Page() {
       }
       try {
         const data = await getJson<SessionResponse>(
-          `/api/session?repo=${encodeURIComponent(path)}${opts.fresh ? "&fresh=1" : ""}`,
+          `/api/session?repo=${encodeURIComponent(path)}` +
+            (refRef.current ? `&ref=${encodeURIComponent(refRef.current)}` : "") +
+            (opts.fresh ? "&fresh=1" : ""),
         );
         if (seq !== sessionSeq.current) return; // superseded by a newer fetch
         setSession(data);
@@ -335,7 +345,10 @@ export default function Page() {
   useEffect(() => {
     if (!ready) return;
     void loadSession(repoPath);
-  }, [ready, repoPath, loadSession]);
+    // `ref` matters as much as the path: two branches of one stack are
+    // reviewed from the same worktree, so switching between them changes
+    // nothing else.
+  }, [ready, repoPath, ref, loadSession]);
 
   // The `differ` CLI parks a repo path on the server when run from a
   // checkout; the installed app window can't be deep-linked, so it collects
@@ -737,15 +750,23 @@ export default function Page() {
   /** Back to the home screen. Clearing the repo is what the inbox *is*. */
   const backToInbox = useCallback(() => {
     setRepoPath("");
+    setRef(null);
     setSession(null);
     setSessionError(null);
     setCommentId(null);
     setRev(WORKING_REV);
   }, []);
 
-  const selectRepo = useCallback((path: string) => {
+  /**
+   * Open a checkout, optionally reviewing a branch other than the one it has
+   * checked out. The ref is always set, never left alone: typing a new path
+   * with a stale branch still applied would review something that isn't
+   * there.
+   */
+  const selectRepo = useCallback((path: string, branch?: string | null) => {
     const trimmed = path.trim();
     window.localStorage.setItem(STORAGE_KEY, trimmed);
+    setRef(branch ?? null);
     setRepoPath(trimmed);
   }, []);
 

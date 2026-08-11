@@ -4,6 +4,7 @@ import { errorResponse } from "@/lib/api";
 import {
   getBoundarySha,
   getBranchDiffSummary,
+  getCommitRange,
   getCommits,
   getHistory,
   getPatchId,
@@ -27,6 +28,16 @@ import type {
   SessionResponse,
 } from "@/lib/types";
 
+/** A branch you're only reading has no working tree of its own. */
+const EMPTY_WORKING_TREE = {
+  hasChanges: false,
+  staged: 0,
+  unstaged: 0,
+  untracked: 0,
+  untrackedPaths: [],
+  changedPaths: [],
+};
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
@@ -36,6 +47,11 @@ export async function GET(request: Request) {
   // fresh=1 bypasses the GitHub cache: the manual refresh button, and
   // watcher events that saw refs/remotes move (a push landed).
   const fresh = searchParams.get("fresh") === "1";
+  // A branch to review instead of whatever this worktree has checked out.
+  // Reviewing a pushed branch needs no checkout, and a stacked workflow
+  // leaves most of the stack as plain branches — without this they're
+  // invisible however many review comments they've collected.
+  const ref = searchParams.get("ref");
 
   if (!repoPath) {
     return NextResponse.json<ApiError>(
@@ -45,15 +61,20 @@ export async function GET(request: Request) {
   }
 
   try {
-    const repo = await resolveRepo(repoPath);
+    const repo = await resolveRepo(repoPath, ref);
     const rawBase = await resolveBase(repo);
 
     // Commits first: the boundary (and so the history walk) is defined by
     // the oldest unpushed commit, not by the raw merge base — after a rebase
     // those differ, and the boundary is the honest one.
-    const commits = await getCommits(repo, rawBase);
-    const boundarySha = await getBoundarySha(repo.root, commits, rawBase);
-    const base = {
+    let commits = await getCommits(repo, rawBase);
+    const boundarySha = await getBoundarySha(
+      repo.root,
+      commits,
+      rawBase,
+      repo.tip,
+    );
+    const base: typeof rawBase = {
       ...rawBase,
       boundarySha,
       // When the boundary has moved off the merge base, "ahead of
@@ -66,11 +87,16 @@ export async function GET(request: Request) {
 
     // GitHub is the slow part and the only one that can fail softly, so let
     // it run alongside the remaining local git work.
-    const [history, working, rawGithub] = await Promise.all([
+    const [history, workingTree, rawGithub] = await Promise.all([
       getHistory(repo, base),
       getWorkingTree(repo),
       loadGitHubDataCached(repo, { fresh }),
     ]);
+
+    // Uncommitted work belongs to whatever is checked out here, not to some
+    // other branch you happen to be reading. Offering it as an answer to a
+    // comment on a different branch would be a lie.
+    const working = repo.ref ? EMPTY_WORKING_TREE : workingTree;
 
     // The branch diff needs the PR's base branch, so it waits on GitHub —
     // a couple of local git commands once that resolves. On a stacked PR
@@ -80,6 +106,19 @@ export async function GET(request: Request) {
       base,
       rawGithub.pr?.baseRefName ?? null,
     );
+
+    // "Not yet pushed" is the wrong axis for a branch you're only reading —
+    // it's pushed, that's why it has review comments. What matters is which
+    // commits the PR is actually made of, which needs the base GitHub just
+    // told us.
+    if (repo.ref && branchDiff) {
+      commits = await getCommitRange(
+        repo,
+        `${branchDiff.baseSha}..${repo.ref}`,
+      );
+      base.label = branchDiff.label;
+      base.boundarySha = branchDiff.baseSha;
+    }
 
     // A review left as a top-level body — no inline thread — is still
     // something to address, so it joins the checklist as a thread with no
@@ -147,7 +186,10 @@ export async function GET(request: Request) {
       const alive = new Map<string, boolean>();
       for (const [, record] of linked) {
         if (alive.has(record.commit.sha)) continue;
-        alive.set(record.commit.sha, await isOnBranch(repo.root, record.commit.sha));
+        alive.set(
+          record.commit.sha,
+          await isOnBranch(repo.root, record.commit.sha, repo.tip),
+        );
       }
 
       // Links made before patch-ids existed have none stored, which would
