@@ -55,6 +55,13 @@ export interface InboxRow {
   progress: Progress | null;
   /** How deep in a stack of PRs, from the base each one targets. */
   depth: number;
+  /**
+   * Merged or closed: the review is over, so it can't need a response. Kept
+   * rather than dropped — three of these are worktrees still on disk, and
+   * this is the only screen that lists what you have checked out — but it
+   * doesn't count and doesn't compete for the top of the list.
+   */
+  archived: boolean;
 }
 
 export interface InboxRepo {
@@ -260,9 +267,15 @@ export async function buildInbox(
 
   // Most outstanding first, then alphabetically — Promise.all resolves in
   // whatever order the network felt like, which is no order at all.
+  // Only live PRs count. A merged one can't need a response, and letting it
+  // count made the headline three times the real number.
   const outstanding = (rows: InboxRow[]) =>
     rows.reduce(
-      (n, row) => n + (row.progress ? row.progress.total - row.progress.done : 0),
+      (n, row) =>
+        n +
+        (row.archived || !row.progress
+          ? 0
+          : row.progress.total - row.progress.done),
       0,
     );
   results.sort(
@@ -402,6 +415,7 @@ async function buildRepo(
       pr,
       progress,
       depth: 0,
+      archived: pr !== null && (pr.state === "MERGED" || pr.state === "CLOSED"),
     };
   };
 
@@ -417,7 +431,16 @@ async function buildRepo(
       .filter((row) => row.pr !== null),
   ];
 
-  return { repo, rows: nest(rows) };
+  // Nested separately so an open PR whose base has already merged still
+  // reads at the top level rather than indenting under something that isn't
+  // in the list any more.
+  return {
+    repo,
+    rows: [
+      ...nest(rows.filter((r) => !r.archived)),
+      ...nest(rows.filter((r) => r.archived)),
+    ],
+  };
 }
 
 /**
@@ -456,7 +479,7 @@ function nest(rows: InboxRow[]): InboxRow[] {
   }
 
   const left = (row: InboxRow) =>
-    row.progress ? row.progress.total - row.progress.done : -1;
+    row.archived || !row.progress ? -1 : row.progress.total - row.progress.done;
   const order = (a: InboxRow, b: InboxRow) =>
     left(b) - left(a) ||
     (b.lastCommitAt ?? "").localeCompare(a.lastCommitAt ?? "");
