@@ -502,6 +502,13 @@ export default function Page() {
    */
   const threads = useMemo(() => session?.github.threads ?? [], [session]);
 
+  /**
+   * Whether there's a checklist to show at all. Not "is there a PR": this
+   * branch has a draft PR nobody has reviewed, which is exactly the case
+   * where the comment columns are dead weight.
+   */
+  const hasComments = threads.length > 0;
+
   /** Thread ids whose file is touched by the diff currently on screen. */
   const anchoredIds = useMemo(() => {
     const paths = new Set(
@@ -878,17 +885,24 @@ export default function Page() {
         </div>
       ) : session ? (
         <div className="flex items-start">
-          <TickSpine
-            threads={threads}
-            selectedId={commentId}
-            onSelect={(thread) => selectComment(thread.id)}
-          />
+          {/* No comments, no checklist. A branch nobody has reviewed yet —
+              often work an agent just wrote, which you're reading before it
+              goes anywhere — was giving up the spine and a 440px column to
+              say "no review comments" twice. The diff is what you came for;
+              it gets the window. */}
+          {hasComments && (
+            <TickSpine
+              threads={threads}
+              selectedId={commentId}
+              onSelect={(thread) => selectComment(thread.id)}
+            />
+          )}
 
           <main className="min-w-0 flex-1 space-y-3 pb-16">
             {/* Below lg the spine can't sit beside the content, and the old
                 rail simply vanished at this width — leaving the checklist
                 unreachable. Same squares, laid out sideways. */}
-            {threads.length > 0 && (
+            {hasComments && (
               <TickStrip
                 threads={threads}
                 selectedId={commentId}
@@ -964,6 +978,7 @@ export default function Page() {
                 the right. Stacks below xl, where side-by-side would squeeze
                 the diff too hard. */}
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
+              {hasComments && (
               <div
                 className="thin-scroll min-w-0 xl:sticky xl:w-[440px] xl:shrink-0 xl:overflow-y-auto"
                 style={{
@@ -986,6 +1001,7 @@ export default function Page() {
                   onDraftChange={saveDraft}
                 />
               </div>
+              )}
 
               <div className="min-w-0 flex-1">
                 <ChangePane
