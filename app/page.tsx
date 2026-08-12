@@ -644,7 +644,7 @@ export default function Page() {
   }, [session]);
 
   const writeResponse = useCallback(
-    (
+    async (
       threadId: string,
       patch: {
         done?: boolean;
@@ -653,23 +653,42 @@ export default function Page() {
         unlink?: string;
         clear?: boolean;
       },
-      // keepalive by default: every one of these is a deliberate act you'd
-      // expect to have stuck. Without it, reloading in the same instant as a
-      // tick can cancel the request in flight — and because the tick is
-      // optimistic, the screen would have told you it saved.
-      { keepalive = true }: { keepalive?: boolean } = {},
-    ) => {
-      if (!responseKey) return Promise.resolve();
+      // keepalive only where the write is fire-and-forget — a draft save or
+      // a tick, which the UI has already reflected optimistically and never
+      // waits on.
+      { keepalive = false }: { keepalive?: boolean } = {},
+    ): Promise<{ ok: boolean; error: string | null }> => {
+      if (!responseKey) return { ok: false, error: null };
       // `repo` rides along only so the server can compute a patch-id when a
       // commit is linked; ticks and drafts need no subprocess at all.
       const params = new URLSearchParams({ key: responseKey });
       if (patch.sha) params.set("repo", repoPath);
-      return fetch(`/api/responses?${params}`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ threadId, ...patch }),
-        keepalive,
-      }).catch(() => null);
+
+      try {
+        const response = await fetch(`/api/responses?${params}`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ threadId, ...patch }),
+          keepalive,
+          // Nothing here should take ten seconds. A write that does has gone
+          // wrong, and the UI needs to hear about it rather than wait.
+          signal: keepalive ? undefined : AbortSignal.timeout(10_000),
+        });
+
+        // Always drain the body, even when there's nothing in it we need.
+        // `fetch` resolves as soon as the headers land, so a response left
+        // unread keeps the request open — it shows as "pending" in the
+        // network inspector indefinitely, which reads exactly like a server
+        // that never answered.
+        const body = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+
+        return { ok: response.ok, error: body?.error ?? null };
+      } catch {
+        // A failed write shouldn't break the view; the next action retries.
+        return { ok: false, error: null };
+      }
     },
     [responseKey, repoPath],
   );
@@ -682,7 +701,8 @@ export default function Page() {
    */
   const saveDraft = useCallback(
     (threadId: string, text: string | null) => {
-      void writeResponse(threadId, { reply: text });
+      // keepalive so it survives the tab closing mid-save.
+      void writeResponse(threadId, { reply: text }, { keepalive: true });
     },
     [writeResponse],
   );
@@ -720,7 +740,9 @@ export default function Page() {
           },
         };
       });
-      void writeResponse(threadId, { done });
+      // Fire-and-forget, and keepalive so a reload in the same instant as the
+      // click can't cancel a tick the screen has already shown as saved.
+      void writeResponse(threadId, { done }, { keepalive: true });
     },
     [writeResponse],
   );
@@ -732,17 +754,14 @@ export default function Page() {
    */
   const linkCommit = useCallback(
     async (threadId: string, sha: string | null, unlink?: string) => {
-      const response = await writeResponse(
+      const { ok, error } = await writeResponse(
         threadId,
         unlink ? { unlink } : { sha },
       );
       // A pasted sha can simply not exist. Saying so beats a click that looks
       // like it worked and leaves the row unchanged.
-      if (response && !response.ok) {
-        const body = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-        setLinkNotice(body?.error ?? "Couldn't link that commit.");
+      if (!ok) {
+        setLinkNotice(error ?? "That didn't reach differ — try again.");
         return;
       }
       setLinkNotice(null);
