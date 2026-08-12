@@ -174,41 +174,59 @@ function CommitLink({
       )}
 
       <div className="p-3">
-        {linked.length === 0 && (
+        {onScreen && !alreadyLinked && (
+          // The same row shape as a linked commit, differing only in its
+          // trailing control — so linking reads as this row changing state
+          // rather than as two unrelated pieces of UI. The commit is
+          // information; "Link" is the one thing to press.
+          <div className="mb-2.5">
+            <p className="mb-1 text-[11px] text-[var(--fg-subtle)]">
+              The change on screen
+            </p>
+            <div className="flex items-center gap-2 rounded-md border border-dashed border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2">
+              <span className="mono shrink-0 text-[13px] font-semibold">
+                {onScreen.shortSha}
+              </span>
+              <span
+                className="min-w-0 flex-1 truncate text-[12px] text-[var(--fg-muted)]"
+                title={onScreen.subject}
+              >
+                {onScreen.subject}
+              </span>
+              <button
+                type="button"
+                onClick={() => onLink(thread.id, onScreen.sha)}
+                // No fill at all: a filled accent is what "selected" looks
+                // like elsewhere, and green is what "merged" looks like. A
+                // bordered button with an accent label can only be a button.
+                className="shrink-0 rounded-md border border-[var(--border)] bg-[var(--canvas)] px-3 py-1 text-[12px] font-semibold text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-subtle)]"
+              >
+                Link
+              </button>
+            </div>
+          </div>
+        )}
+
+        {linked.length === 0 && !onScreen && (
           <p className="mb-2.5 text-[12px] text-[var(--fg-muted)]">
             Nothing linked yet. Pick the change that answers this comment.
           </p>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          {onScreen && !alreadyLinked && (
-            <button
-              type="button"
-              onClick={() => onLink(thread.id, onScreen.sha)}
-              title={onScreen.subject}
-              // Deliberately not the accent-subtle chip: that's what a
-              // *selected* thing looks like everywhere else in differ, so an
-              // unlinked comment was wearing the linked state's clothes.
-              className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-[#1f883d] bg-[#1f883d] px-2.5 py-1.5 text-[12px] font-medium text-white hover:bg-[#1a7f37]"
-            >
-              <LinkIcon size={12} className="shrink-0" />
-              Link <span className="mono">{onScreen.shortSha}</span>
-              <span className="min-w-0 truncate font-normal opacity-85">
-                — {onScreen.subject}
-              </span>
-            </button>
-          )}
-          <CommitPicker
-            label={
-              linked.length > 0 ? "Link another…" : "Choose a commit…"
-            }
-            candidates={candidates}
-            selected={null}
-            onPick={(sha) => onLink(thread.id, sha)}
-            variant="button"
-            align="left"
-          />
-        </div>
+        <CommitPicker
+          label={
+            linked.length > 0
+              ? "Link another…"
+              : onScreen
+                ? "Or another commit…"
+                : "Choose a commit…"
+          }
+          candidates={candidates}
+          selected={null}
+          onPick={(sha) => onLink(thread.id, sha)}
+          variant="button"
+          align="left"
+        />
       </div>
     </section>
   );
