@@ -84,21 +84,22 @@ export function changesFor(
 }
 
 /**
- * Where the change column opens for a comment.
+ * Which change to show when you move to a comment — or `null` for "leave the
+ * diff exactly where it is".
  *
- * Deliberately not a guess about which commit answers it — differ doesn't
- * make that call any more. A comment you've already handled reopens on its
- * linked commit; anything else opens on the whole branch diff, which shows
- * everything without asserting anything.
+ * A comment you linked reopens on the change you linked it to. That isn't a
+ * guess; it's the answer you already gave, played back.
+ *
+ * An unlinked comment moves nothing. It used to fall back to the whole branch
+ * diff, which threw away the commit you were reading the moment you stepped
+ * to the next comment — precisely when you were most likely to want it still
+ * on screen. differ has no idea which change answers an unhandled comment,
+ * and behaving as though it might is worse than doing nothing.
  */
 export function openingChangeFor(
   thread: ReviewThread | null,
-  session: SessionResponse,
 ): string | null {
-  const link = thread?.response.commits.find((c) => !c.missing);
-  if (link) return link.sha;
-  if (session.branchDiff) return BRANCH_REV;
-  return session.working.hasChanges ? WORKING_REV : null;
+  return thread?.response.commits.find((c) => !c.missing)?.sha ?? null;
 }
 
 /**

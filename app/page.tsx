@@ -544,37 +544,6 @@ export default function Page() {
     [rev, threads, anchoredIds, linkedCounts],
   );
 
-  /**
-   * Clicking a thread takes you to the commit it's linked to, then scrolls
-   * to the thread. With eight threads spread across several commits, hunting
-   * for the right commit by hand was the confusing part.
-   */
-  const focusThread = useCallback(
-    (thread: ReviewThread) => {
-      setFocusedThreadId(thread.id);
-
-      const linked =
-        thread.response.commits.find((c) => !c.missing)?.sha ?? null;
-      const known =
-        linked !== null &&
-        (session?.commits.some((c) => c.sha === linked) ||
-          session?.history.some((c) => c.sha === linked));
-      if (known && linked !== rev) setRev(linked);
-
-      // Two frames: one for the rev switch to render, one for the thread to
-      // exist in the new diff. When the rev didn't change this is still fine.
-      requestAnimationFrame(() =>
-        requestAnimationFrame(() => {
-          const element = document.getElementById(`thread-${thread.id}`);
-          if (!element) return;
-          element.scrollIntoView({ behavior: "smooth", block: "center" });
-          element.classList.add("flash");
-          setTimeout(() => element.classList.remove("flash"), 1500);
-        }),
-      );
-    },
-    [session, rev],
-  );
 
   /**
    * Commits a thread can be pinned to: the unpushed ones first, then a slice
@@ -608,11 +577,14 @@ export default function Page() {
       setCommentId(id);
       setFocusedThreadId(id);
       const thread = threads.find((t) => t.id === id) ?? null;
-      const best = session ? openingChangeFor(thread, session) : null;
-      if (best) setRev(best);
+      // null means leave the change column alone — the two panes are separate
+      // axes, and an unlinked comment has nothing to say about which change
+      // you should be looking at.
+      const linked = openingChangeFor(thread);
+      if (linked) setRev(linked);
       window.scrollTo({ top: 0 });
     },
-    [threads, session],
+    [threads],
   );
 
   const stepComment = useCallback(
