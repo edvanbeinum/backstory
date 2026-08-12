@@ -8,7 +8,7 @@ import type {
   ReviewThread,
 } from "@/lib/types";
 import { CommitPicker } from "./CommitPicker";
-import { AlertIcon, CheckIcon, LinkIcon, XIcon } from "./icons";
+import { AlertIcon, LinkIcon, XIcon } from "./icons";
 import { ReplyComposer } from "./ReplyComposer";
 import { TickButton } from "./Tick";
 
@@ -132,9 +132,9 @@ function CommitLink({
                   className="mt-0.5 shrink-0 text-[var(--attention)]"
                 />
               ) : (
-                <CheckIcon
+                <LinkIcon
                   size={13}
-                  className="mt-0.5 shrink-0 text-[var(--handled)]"
+                  className="mt-0.5 shrink-0 text-[var(--fg-muted)]"
                 />
               )}
               <span className="min-w-0 flex-1">
@@ -186,11 +186,14 @@ function CommitLink({
               type="button"
               onClick={() => onLink(thread.id, onScreen.sha)}
               title={onScreen.subject}
-              className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-[var(--accent)] bg-[var(--accent-subtle)] px-2.5 py-1.5 text-[12px] font-medium text-[var(--accent)] hover:bg-[var(--canvas)]"
+              // Deliberately not the accent-subtle chip: that's what a
+              // *selected* thing looks like everywhere else in differ, so an
+              // unlinked comment was wearing the linked state's clothes.
+              className="inline-flex min-w-0 items-center gap-1.5 rounded-md border border-[#1f883d] bg-[#1f883d] px-2.5 py-1.5 text-[12px] font-medium text-white hover:bg-[#1a7f37]"
             >
               <LinkIcon size={12} className="shrink-0" />
               Link <span className="mono">{onScreen.shortSha}</span>
-              <span className="min-w-0 truncate font-normal opacity-80">
+              <span className="min-w-0 truncate font-normal opacity-85">
                 — {onScreen.subject}
               </span>
             </button>
