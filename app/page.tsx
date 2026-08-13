@@ -195,9 +195,10 @@ export default function Page() {
     });
   }, []);
 
-  const forgetRoot = useCallback((root: string) => {
+  const forgetRoot = useCallback((roots: string[]) => {
+    const drop = new Set(roots);
     setInboxRoots((current) => {
-      const next = current.filter((r) => r !== root);
+      const next = current.filter((r) => !drop.has(r));
       try {
         window.localStorage.setItem(INBOX_ROOTS_KEY, JSON.stringify(next));
       } catch {
