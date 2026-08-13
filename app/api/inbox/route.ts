@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse } from "@/lib/api";
+import { expandPath } from "@/lib/git";
 import { buildInbox } from "@/lib/inbox";
 import type { ApiError } from "@/lib/types";
 
@@ -19,7 +20,9 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
-  const roots = searchParams.getAll("root").filter(Boolean);
+  // Expanded here so a hand-typed "~/code/thing" resolves, the same as
+  // every other path differ accepts.
+  const roots = searchParams.getAll("root").filter(Boolean).map(expandPath);
   const fresh = searchParams.get("fresh") === "1";
 
   if (roots.length === 0) {

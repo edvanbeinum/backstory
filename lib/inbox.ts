@@ -295,7 +295,14 @@ async function buildRepo(
   identity: { commonDir: string; root: string },
   opts: { fresh?: boolean },
 ): Promise<{ repo: InboxRepo; rows: InboxRow[] }> {
-  const { commonDir, root } = identity;
+  const { commonDir } = identity;
+  // The repo's own checkout, derived from the common dir rather than from
+  // whichever path happened to be scanned. Remembering a linked worktree
+  // instead would mean deleting that worktree quietly drops the whole repo
+  // off the inbox.
+  const root = commonDir.endsWith("/.git")
+    ? path.dirname(commonDir)
+    : identity.root;
   const label = path.basename(root);
 
   const [worktrees, facts, remoteUrl, responses] = await Promise.all([

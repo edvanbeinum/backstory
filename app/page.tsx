@@ -863,6 +863,7 @@ export default function Page() {
           <Inbox
             roots={inboxRoots}
             onOpen={selectRepo}
+            onAdd={rememberRoot}
             onBrowse={() => setBrowsing(true)}
             onForget={forgetRoot}
           />
