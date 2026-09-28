@@ -2,9 +2,12 @@
 
 import { useMemo } from "react";
 
+import { fileForNote } from "@/lib/feedback";
 import type {
   CommitSummary,
+  DiffFile as DiffFileType,
   DiffResponse,
+  Note,
   PullRequestInfo,
   RepoInfo,
   ReviewThread,
@@ -13,6 +16,7 @@ import { DiffFile } from "./DiffFile";
 import { FileNav } from "./FileNav";
 import { AlertIcon, CommentIcon } from "./icons";
 import { Spinner } from "./ui";
+import type { NotesApi } from "./useNotes";
 
 /**
  * Group threads by the file they belong to, so each DiffFile only has to
@@ -37,6 +41,9 @@ function partitionThreads(diff: DiffResponse | null, threads: ReviewThread[]) {
   return { perFile };
 }
 
+/** One shared empty list, so files without notes keep a stable prop. */
+const NO_NOTES: Note[] = [];
+
 export function DiffView({
   diff,
   loading,
@@ -46,6 +53,7 @@ export function DiffView({
   pr,
   commit,
   focusedThreadId,
+  notes = null,
 }: {
   diff: DiffResponse | null;
   loading: boolean;
@@ -55,11 +63,24 @@ export function DiffView({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
+  /** Set when this diff takes notes — only uncommitted work does */
+  notes?: NotesApi | null;
 }) {
   const { perFile } = useMemo(
     () => partitionThreads(diff, threads),
     [diff, threads],
   );
+
+  const noteList = notes?.notes;
+  const notesPerFile = useMemo(() => {
+    const map = new Map<DiffFileType, Note[]>();
+    if (!diff || !noteList) return map;
+    for (const note of noteList) {
+      const file = fileForNote(diff.files, note);
+      if (file) map.set(file, [...(map.get(file) ?? []), note]);
+    }
+    return map;
+  }, [diff, noteList]);
 
   if (error) {
     return (
@@ -109,6 +130,8 @@ export function DiffView({
             pr={pr}
             commit={commit}
             focusedThreadId={focusedThreadId}
+            notes={notes}
+            fileNotes={notesPerFile.get(file) ?? NO_NOTES}
           />
         ))
       )}

@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api";
 import { gitLine } from "@/lib/exec";
 import { resolveRepo } from "@/lib/git";
+import { onReviewChange } from "@/lib/review";
 import type { ApiError } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -26,7 +27,8 @@ export const dynamic = "force-dynamic";
  *
  * Events carry a coarse kind so the client can decide how hard to refresh:
  * "remote" (refs/remotes moved — bypass the GitHub cache), "git" (local git
- * state), "worktree" (file edits).
+ * state), "worktree" (file edits), and "review" — not the filesystem at all,
+ * but an agent starting or stopping waiting for your notes on this checkout.
  */
 
 const DEBOUNCE_MS = 400;
@@ -154,6 +156,12 @@ export async function GET(request: Request) {
         });
       }
 
+      // Sent straight away, not debounced: nothing floods this, and the
+      // window should offer "Send to agent" the moment an agent asks.
+      const stopReviews = onReviewChange((changedRoot) => {
+        if (changedRoot === root) send({ kinds: ["review"] });
+      });
+
       // Keep intermediaries from reaping the idle connection.
       const heartbeat = setInterval(() => {
         if (!closed) {
@@ -167,6 +175,7 @@ export async function GET(request: Request) {
 
       const cleanup = () => {
         closed = true;
+        stopReviews();
         clearInterval(heartbeat);
         if (debounce) clearTimeout(debounce);
         for (const w of watchers) w.close();

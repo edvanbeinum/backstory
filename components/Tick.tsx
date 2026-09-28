@@ -126,7 +126,7 @@ export function TickButton({
   );
 }
 
-function sinceLabel(at: number): string {
+export function sinceLabel(at: number): string {
   const seconds = Math.max(0, Math.round((Date.now() - at) / 1000));
   if (seconds < 60) return "just now";
   const minutes = Math.round(seconds / 60);

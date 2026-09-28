@@ -12,6 +12,9 @@ import type {
 import { CommitHeader } from "./CommitHeader";
 import { DiffView } from "./DiffView";
 import { CommitPicker } from "./CommitPicker";
+import { FeedbackBar } from "./FeedbackBar";
+import { useNotes } from "./useNotes";
+import { useReview } from "./useReview";
 import {
   CommentIcon,
   FileDiffIcon,
@@ -119,6 +122,7 @@ export function ChangePane({
   thread,
   focusedThreadId,
   pushed,
+  reviewTick,
 }: {
   session: SessionResponse;
   rev: string;
@@ -132,7 +136,15 @@ export function ChangePane({
   thread: ReviewThread | null;
   focusedThreadId: string | null;
   pushed: boolean;
+  /** Moves when an agent starts or stops waiting for a review */
+  reviewTick: number;
 }) {
+  // Loaded whichever change is showing, so the count is ready the moment you
+  // switch to uncommitted work; only that view takes notes.
+  const notes = useNotes(session.repo.root);
+  const takesNotes = rev === WORKING_REV;
+  const review = useReview(session.repo.root, reviewTick);
+
   const options = useMemo(
     () => changesFor(thread, session),
     [thread, session],
@@ -228,7 +240,25 @@ export function ChangePane({
         pr={session.github.pr}
         commit={commit}
         focusedThreadId={focusedThreadId}
+        notes={takesNotes ? notes : null}
       />
+
+      {/* Pinned to the bottom of the window while the diff scrolls, so a
+          general note or Send is always a click away. */}
+      {(takesNotes || review.waiting || review.error) && (
+        <div className="sticky bottom-4 z-20">
+          <FeedbackBar
+            notes={notes}
+            diff={takesNotes ? diff : null}
+            review={review}
+            onShowUncommitted={
+              takesNotes || !session.working.hasChanges
+                ? null
+                : () => onRevChange(WORKING_REV)
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }

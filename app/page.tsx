@@ -9,6 +9,7 @@ import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
 import { PrTitle } from "@/components/PrTitle";
 import { TickSpine, TickStrip } from "@/components/TickSpine";
+import { useStaleReload } from "@/components/useStaleReload";
 import { RepoBar } from "@/components/RepoBar";
 import {
   BRANCH_REV,
@@ -84,6 +85,7 @@ export default function Page() {
   /** A branch to review instead of the worktree's own. Null = the checkout. */
   const [ref, setRef] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const checkBuild = useStaleReload();
 
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
@@ -110,6 +112,8 @@ export default function Page() {
   const [linkNotice, setLinkNotice] = useState<string | null>(null);
   /** Bumped by watcher events; retriggers the working-tree diff fetch. */
   const [workingTick, setWorkingTick] = useState(0);
+  /** Bumped when an agent starts or stops waiting for a review. */
+  const [reviewTick, setReviewTick] = useState(0);
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
   const refRef = useRef(ref);
@@ -388,6 +392,7 @@ export default function Page() {
 
     let cancelled = false;
     const collect = async () => {
+      void checkBuild();
       try {
         const response = await fetch("/api/open", { cache: "no-store" });
         const data = (await response.json()) as { repo: string | null };
@@ -400,6 +405,7 @@ export default function Page() {
           // No handoff waiting — still a Cmd-Tab back in, so catch up on
           // anything that changed while the window was in the background.
           setWorkingTick((t) => t + 1);
+          setReviewTick((t) => t + 1);
           void loadSession(repoRef.current, { background: true });
         }
       } catch {
@@ -413,7 +419,7 @@ export default function Page() {
       cancelled = true;
       window.removeEventListener("focus", collect);
     };
-  }, [ready, loadSession]);
+  }, [ready, loadSession, checkBuild]);
 
   // Live updates: one SSE stream per repo. The server watches the repo's
   // filesystem and pushes a debounced event when git state or the working
@@ -427,9 +433,11 @@ export default function Page() {
 
     source.onopen = () => {
       setLive(true);
+      void checkBuild();
       // Reconnects (server restarted, laptop woke) mean missed events —
       // catch up once, bypassing the GitHub cache since time has passed.
       setWorkingTick((t) => t + 1);
+      setReviewTick((t) => t + 1);
       void loadSession(repoPath, { background: true, fresh: true });
     };
 
@@ -442,6 +450,10 @@ export default function Page() {
         return;
       }
       if (kinds.length === 0) return;
+
+      if (kinds.includes("review")) setReviewTick((t) => t + 1);
+      // A review request alone changes nothing on disk.
+      if (kinds.every((kind) => kind === "review")) return;
 
       setWorkingTick((t) => t + 1);
       void loadSession(repoPath, {
@@ -459,7 +471,7 @@ export default function Page() {
       source.close();
       setLive(false);
     };
-  }, [ready, repoPath, loadSession]);
+  }, [ready, repoPath, loadSession, checkBuild]);
 
   const haveSession = session !== null;
   // A commit's diff is immutable, so watcher ticks only matter for the two
@@ -1165,6 +1177,7 @@ export default function Page() {
                   thread={selectedThread}
                   focusedThreadId={focusedThreadId}
                   pushed={revIsPushed}
+                  reviewTick={reviewTick}
                 />
               </div>
             </div>

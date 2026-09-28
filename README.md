@@ -83,6 +83,45 @@ cached, because everything else differ serves is git state that changes under
 it. The one gap is a browser that has never loaded differ successfully —
 there's no worker to install until the server has been up once.
 
+## Reviewing an agent's work
+
+When an agent is making the change, the review happens on the working tree —
+before anything is committed. On the **Uncommitted** view, hover a line and
+press **+** to leave a note on it; **Add a general note** covers the change as
+a whole. Notes remember the text of their line, so they follow it when the
+agent's next edit moves it — and when they can't be sure where it went, they
+say so rather than guess.
+
+Notes leave differ the same way replies do. **Copy for agent** puts them on
+the clipboard as one markdown message, each note under the `path:line` it
+refers to with the line quoted.
+
+Or let the agent ask. `differ review` opens the uncommitted changes and waits;
+the window says an agent is waiting and offers **Send to agent** (or **Looks
+good**). Sending prints your notes to the command's stdout and exits it — so an
+agent that runs it reads your review as the command's output. For Claude Code,
+copy the command in:
+
+```bash
+mkdir -p ~/.claude/commands
+cp packaging/claude/differ-review.md ~/.claude/commands/
+```
+
+and type `/differ-review` in a session. The agent runs `differ review` in the
+background and picks up where it left off once you send.
+
+Sent notes don't vanish. Whichever way they left — sent or copied — they
+become a **round**: fixed, since that's what the agent read, each with a tick.
+When the agent's edits land, check each note against the diff and tick it
+yourself; nothing else marks a note handled, not even the agent touching its
+line. The bar keeps every round's count ("2 of 3 handled"), so an open note
+can't slip away just because its line moved, and **Clear handled** forgets the
+ones you've ticked.
+
+If no server is running, `differ review` starts one detached (logging to
+`~/.differ/server.log`), because it exits the moment you answer and the window
+you answered in shouldn't die with it.
+
 ## Live updates
 
 The window follows the repo without reloading: the server watches the
@@ -95,6 +134,11 @@ connected.
 Local events (saves, commits, branch switches) refresh from git only; the
 GitHub API is consulted at most every 30s unless a push lands
 (refs/remotes moved) or you hit refresh, which both bypass the cache.
+
+The one thing that does reload the window is differ itself changing. After a
+rebuild or `brew upgrade`, a window left open would keep running the old code
+against the new server; it notices the server's build has changed when it
+reconnects or regains focus, and reloads.
 
 ## Shareable URLs
 
