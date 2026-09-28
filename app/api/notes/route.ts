@@ -3,8 +3,8 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 
 import { errorResponse } from "@/lib/api";
-import { changeNotes, getNotes, type NotesChange } from "@/lib/notes";
-import type { ApiError, Note } from "@/lib/types";
+import { changeNotes, getNotes, parseChange } from "@/lib/notes";
+import type { ApiError } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,33 +38,13 @@ export async function GET(request: Request) {
   }
 }
 
-/**
- *   `{save: Note}`   — add or edit one
- *   `{remove: id}`   — delete one
- *   `{clear: true}`  — delete them all, e.g. once they've been sent
- */
+/** Body: one `NotesChange` — `{op: "save", note}`, `{op: "tick", id, done}`, … */
 export async function POST(request: Request) {
   const root = rootParam(request);
   if (!root) return noRoot();
 
   try {
-    const body = (await request.json()) as {
-      save?: Note;
-      remove?: string;
-      clear?: boolean;
-    };
-
-    let change: NotesChange;
-    if (body.save) change = { save: body.save };
-    else if (typeof body.remove === "string") change = { remove: body.remove };
-    else if (body.clear === true) change = { clear: true };
-    else {
-      return NextResponse.json<ApiError>(
-        { error: "Send one of `save`, `remove` or `clear`." },
-        { status: 400 },
-      );
-    }
-
+    const change = parseChange(await request.json());
     return NextResponse.json(
       { notes: await changeNotes(root, change) },
       { headers: { "Cache-Control": "no-store" } },

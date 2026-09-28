@@ -86,7 +86,10 @@ function fence(text: string): string {
   return "`".repeat(longest + 1);
 }
 
-function heading(note: Note, at: number | null): string {
+function heading(note: Note, at: number | null, inDiff: boolean): string {
+  if (!inDiff) {
+    return `${note.path} (was line ${note.line}; the file has no uncommitted changes now)`;
+  }
   if (note.side === "old") {
     return `${note.path} — removed line ${at ?? note.line}`;
   }
@@ -133,7 +136,7 @@ export function formatFeedback(notes: Note[], files: DiffFile[]): string {
   ];
 
   for (const { note, file, at } of placed) {
-    const lines = [`## ${heading(note, at)}`];
+    const lines = [`## ${heading(note, at, file !== undefined)}`];
     if (note.quote !== null) {
       const f = fence(note.quote);
       lines.push(`${f}${file?.lang ?? ""}`, note.quote, f);
@@ -149,4 +152,18 @@ export function formatFeedback(notes: Note[], files: DiffFile[]): string {
   }
 
   return parts.join("\n\n") + "\n";
+}
+
+/** A new draft note; everything about rounds and ticks starts empty. */
+export function draftNote(
+  fields: Pick<Note, "path" | "side" | "line" | "quote" | "body">,
+): Note {
+  return {
+    ...fields,
+    id: crypto.randomUUID(),
+    createdAt: Date.now(),
+    sentAt: null,
+    done: false,
+    doneAt: null,
+  };
 }

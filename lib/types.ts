@@ -294,6 +294,14 @@ export interface Note {
   body: string;
   /** ms epoch */
   createdAt: number;
+  /**
+   * When it was handed over — sent to a waiting agent, or copied. Null while
+   * it's a draft. Notes sent together share it, which is what makes a round.
+   */
+  sentAt: number | null;
+  /** The tick. Only you set it; the agent editing the line doesn't. */
+  done: boolean;
+  doneAt: number | null;
 }
 
 export interface ApiError {

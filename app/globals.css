@@ -233,13 +233,19 @@ tr.line-anchored .diff-code {
   box-shadow: inset 3px 0 0 var(--attention);
 }
 
-/* Notes on uncommitted work: the marker swaps for an add button on hover,
-   the way GitHub's comment "+" appears in its gutter. */
+/* Notes on uncommitted work: an add button over the marker on hover, the way
+   GitHub's comment "+" appears in its gutter. Laid over the cell rather than
+   in it — taking width would widen the column and shift every line. */
+.diff-marker:has(.note-add) {
+  position: relative;
+}
 .note-add {
   display: none;
+  position: absolute;
+  top: 2px;
+  left: 4px;
   width: 16px;
   height: 16px;
-  margin-top: 2px;
   align-items: center;
   justify-content: center;
   border-radius: 4px;
@@ -253,7 +259,7 @@ tr:hover .note-add,
   display: inline-flex;
 }
 tr:hover .diff-marker-text {
-  display: none;
+  visibility: hidden;
 }
 
 tr.note-row td {

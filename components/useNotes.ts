@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import { NOTES_API } from "@/lib/constants";
+import type { NotesChange } from "@/lib/notes";
 import type { ApiError, Note } from "@/lib/types";
 
 export interface NotesApi {
@@ -10,7 +11,11 @@ export interface NotesApi {
   error: string | null;
   save: (note: Note) => void;
   remove: (id: string) => void;
-  clear: () => void;
+  /** Turn these drafts into a round, stamped `at` */
+  send: (ids: string[], at: number) => void;
+  tick: (id: string, done: boolean) => void;
+  clearDrafts: () => void;
+  clearDone: () => void;
 }
 
 /**
@@ -51,7 +56,7 @@ export function useNotes(root: string): NotesApi {
   }, [load]);
 
   const send = useCallback(
-    async (body: object) => {
+    async (body: NotesChange) => {
       const mine = ++seq.current;
       try {
         const response = await fetch(url, {
@@ -82,7 +87,7 @@ export function useNotes(root: string): NotesApi {
           ? prev.map((n) => (n.id === note.id ? note : n))
           : [...prev, note],
       );
-      void send({ save: note });
+      void send({ op: "save", note });
     },
     [send],
   );
@@ -90,15 +95,56 @@ export function useNotes(root: string): NotesApi {
   const remove = useCallback(
     (id: string) => {
       setNotes((prev) => prev.filter((n) => n.id !== id));
-      void send({ remove: id });
+      void send({ op: "remove", id });
     },
     [send],
   );
 
-  const clear = useCallback(() => {
-    setNotes([]);
-    void send({ clear: true });
+  const sendRound = useCallback(
+    (ids: string[], at: number) => {
+      const sending = new Set(ids);
+      setNotes((prev) =>
+        prev.map((n) =>
+          sending.has(n.id) && n.sentAt === null ? { ...n, sentAt: at } : n,
+        ),
+      );
+      void send({ op: "send", ids, at });
+    },
+    [send],
+  );
+
+  const tick = useCallback(
+    (id: string, done: boolean) => {
+      setNotes((prev) =>
+        prev.map((n) =>
+          n.id === id
+            ? { ...n, done, doneAt: done ? (n.doneAt ?? Date.now()) : null }
+            : n,
+        ),
+      );
+      void send({ op: "tick", id, done });
+    },
+    [send],
+  );
+
+  const clearDrafts = useCallback(() => {
+    setNotes((prev) => prev.filter((n) => n.sentAt !== null));
+    void send({ op: "clearDrafts" });
   }, [send]);
 
-  return { notes, error, save, remove, clear };
+  const clearDone = useCallback(() => {
+    setNotes((prev) => prev.filter((n) => !n.done));
+    void send({ op: "clearDone" });
+  }, [send]);
+
+  return {
+    notes,
+    error,
+    save,
+    remove,
+    send: sendRound,
+    tick,
+    clearDrafts,
+    clearDone,
+  };
 }

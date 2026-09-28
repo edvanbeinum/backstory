@@ -231,19 +231,6 @@ export function ChangePane({
         pushed={pushed}
       />
 
-      {(takesNotes || review.waiting || review.error) && (
-        <FeedbackBar
-          notes={notes}
-          diff={takesNotes ? diff : null}
-          review={review}
-          onShowUncommitted={
-            takesNotes || !session.working.hasChanges
-              ? null
-              : () => onRevChange(WORKING_REV)
-          }
-        />
-      )}
-
       <DiffView
         diff={diff}
         loading={loading}
@@ -255,6 +242,23 @@ export function ChangePane({
         focusedThreadId={focusedThreadId}
         notes={takesNotes ? notes : null}
       />
+
+      {/* Pinned to the bottom of the window while the diff scrolls, so a
+          general note or Send is always a click away. */}
+      {(takesNotes || review.waiting || review.error) && (
+        <div className="sticky bottom-4 z-20">
+          <FeedbackBar
+            notes={notes}
+            diff={takesNotes ? diff : null}
+            review={review}
+            onShowUncommitted={
+              takesNotes || !session.working.hasChanges
+                ? null
+                : () => onRevChange(WORKING_REV)
+            }
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -110,6 +110,14 @@ cp packaging/claude/differ-review.md ~/.claude/commands/
 and type `/differ-review` in a session. The agent runs `differ review` in the
 background and picks up where it left off once you send.
 
+Sent notes don't vanish. Whichever way they left — sent or copied — they
+become a **round**: fixed, since that's what the agent read, each with a tick.
+When the agent's edits land, check each note against the diff and tick it
+yourself; nothing else marks a note handled, not even the agent touching its
+line. The bar keeps every round's count ("2 of 3 handled"), so an open note
+can't slip away just because its line moved, and **Clear handled** forgets the
+ones you've ticked.
+
 If no server is running, `differ review` starts one detached (logging to
 `~/.differ/server.log`), because it exits the moment you answer and the window
 you answered in shouldn't die with it.

@@ -3,7 +3,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { anchorThreads } from "@/lib/anchor";
-import { anchorNotes } from "@/lib/feedback";
+import { anchorNotes, draftNote } from "@/lib/feedback";
 import type {
   ApiError,
   CommitSummary,
@@ -86,15 +86,15 @@ export function DiffFile({
   const [drafting, setDrafting] = useState<NoteTarget | null>(null);
 
   const saveNew = (target: NoteTarget, body: string) => {
-    notes?.save({
-      id: crypto.randomUUID(),
-      path: file.path,
-      side: target.side,
-      line: target.line,
-      quote: target.quote,
-      body,
-      createdAt: Date.now(),
-    });
+    notes?.save(
+      draftNote({
+        path: file.path,
+        side: target.side,
+        line: target.line,
+        quote: target.quote,
+        body,
+      }),
+    );
     setDrafting(null);
   };
 
@@ -346,11 +346,12 @@ export function DiffFile({
                   note={note}
                   onSave={notes.save}
                   onRemove={notes.remove}
+                  onTick={notes.tick}
                   context={
                     <>
                       {note.side === "old" ? "Removed line" : "Line"}{" "}
                       {note.line} isn&apos;t in the diff as shown — it may have
-                      changed since.
+                      changed since {note.sentAt !== null ? "you sent this" : "you wrote this"}.
                       {note.quote !== null && (
                         <code className="mono mt-1 block truncate text-[var(--fg)]">
                           {note.quote}
@@ -512,6 +513,7 @@ function HunkRows({
                         note={note}
                         onSave={notes.save}
                         onRemove={notes.remove}
+                        onTick={notes.tick}
                       />
                     ))}
                     {isDrafting && target && (

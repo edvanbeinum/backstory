@@ -3,7 +3,37 @@
 import { useState } from "react";
 
 import type { Note } from "@/lib/types";
+import { sinceLabel, TickCheck, TickRing, useTickPulse } from "./Tick";
 import { Button } from "./ui";
+
+/** The tick on a sent note: the small square version of the review tick. */
+export function NoteTick({
+  done,
+  onToggle,
+}: {
+  done: boolean;
+  onToggle: (next: boolean) => void;
+}) {
+  const pulse = useTickPulse(done);
+  return (
+    <button
+      type="button"
+      onClick={() => onToggle(!done)}
+      aria-pressed={done}
+      title={done ? "Handled — click to reopen" : "Mark as handled"}
+      className={`tick-spring relative mt-[2px] inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-[4px] border ${
+        done
+          ? "border-[var(--handled)] bg-[var(--handled)] text-white"
+          : "border-[var(--border)] bg-[var(--canvas)] text-transparent hover:border-[var(--handled)]"
+      }`}
+    >
+      <span key={pulse} className={pulse > 0 && done ? "tick-pop" : undefined}>
+        <TickCheck size={11} pulse={pulse} />
+      </span>
+      <TickRing pulse={done ? pulse : 0} />
+    </button>
+  );
+}
 
 /**
  * Write or edit a note. ⌘/Ctrl-Enter saves and Escape cancels, so a note can
@@ -66,16 +96,21 @@ export function NoteComposer({
   );
 }
 
-/** A saved note, editable in place. */
+/**
+ * A saved note. A draft is editable in place; a sent one is what the agent
+ * read, so it's fixed, and gets a tick instead.
+ */
 export function NoteCard({
   note,
   onSave,
   onRemove,
+  onTick,
   context,
 }: {
   note: Note;
   onSave: (note: Note) => void;
   onRemove: (id: string) => void;
+  onTick: (id: string, done: boolean) => void;
   /** Shown above the body, e.g. where a note that lost its line used to be */
   context?: React.ReactNode;
 }) {
@@ -94,19 +129,37 @@ export function NoteCard({
     );
   }
 
+  const sent = note.sentAt !== null;
+
   return (
-    <div className="group rounded-md border border-[var(--border)] bg-[var(--canvas)] px-3 py-2 font-sans">
+    <div
+      id={`note-${note.id}`}
+      className={`group rounded-md border bg-[var(--canvas)] px-3 py-2 font-sans ${
+        sent ? "border-[var(--border-muted)]" : "border-[var(--border)]"
+      } ${note.done ? "opacity-60" : ""}`}
+      style={{ scrollMarginTop: "calc(var(--header-height, 0px) + 48px)" }}
+    >
       {context && (
         <div className="mb-1 text-[11px] text-[var(--fg-muted)]">{context}</div>
       )}
       <div className="flex items-start gap-2">
+        {sent && (
+          <NoteTick done={note.done} onToggle={(done) => onTick(note.id, done)} />
+        )}
         <p className="min-w-0 flex-1 whitespace-pre-wrap text-[13px] leading-5">
           {note.body}
         </p>
+        {sent && (
+          <span className="shrink-0 pt-[2px] text-[11px] text-[var(--fg-subtle)]">
+            sent {sinceLabel(note.sentAt!)}
+          </span>
+        )}
         <div className="flex shrink-0 gap-1 opacity-60 group-hover:opacity-100">
-          <Button size="sm" variant="invisible" onClick={() => setEditing(true)}>
-            Edit
-          </Button>
+          {!sent && (
+            <Button size="sm" variant="invisible" onClick={() => setEditing(true)}>
+              Edit
+            </Button>
+          )}
           <Button size="sm" variant="invisible" onClick={() => onRemove(note.id)}>
             Delete
           </Button>
