@@ -248,8 +248,14 @@ export interface SessionResponse {
   repo: RepoInfo;
   base: BaseInfo;
   commits: CommitSummary[];
-  /** Already-pushed commits at and below the push boundary, newest first */
+  /**
+   * Commits at and below the boundary, newest first. Pushed only when the
+   * repo has remotes — see `pushedState`; with none, the boundary is a local
+   * branch and nothing here has left the machine.
+   */
   history: CommitSummary[];
+  /** Whether the repo has any remote-tracking refs at all */
+  hasRemote: boolean;
   working: WorkingTreeInfo;
   github: GitHubData;
   /** Null when there's nothing to diff (on the default branch tip, no base) */
@@ -283,6 +289,12 @@ export interface FileViewResponse {
  */
 export interface Note {
   id: string;
+  /**
+   * The change it was left on: WORKING_REV, BRANCH_REV, or a commit's full
+   * sha. A commit's diff never moves, so a note on one stays exactly where it
+   * was put.
+   */
+  rev: string;
   /** Null for a general note about the change as a whole */
   path: string | null;
   /** Which side of the diff the line is on: removed lines only exist on "old" */

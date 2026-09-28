@@ -139,11 +139,19 @@ export function ChangePane({
   /** Moves when an agent starts or stops waiting for a review */
   reviewTick: number;
 }) {
-  // Loaded whichever change is showing, so the count is ready the moment you
-  // switch to uncommitted work; only that view takes notes.
   const notes = useNotes(session.repo.root);
-  const takesNotes = rev === WORKING_REV;
   const review = useReview(session.repo.root, reviewTick);
+
+  // The change on screen as a note records it: a commit by its full sha,
+  // which is what stays comparable across views. Null until the diff showing
+  // is this change's — for a moment after switching it's still the last one,
+  // and a note left then would be filed against the wrong change.
+  const noteRev = useMemo(() => {
+    if (!diff || diff.rev !== rev) return null;
+    if (rev === WORKING_REV || rev === BRANCH_REV) return rev;
+    if (commit && /^[0-9a-f]{40}$/.test(commit.sha)) return commit.sha;
+    return /^[0-9a-f]{40}$/.test(rev) ? rev : null;
+  }, [diff, rev, commit]);
 
   const options = useMemo(
     () => changesFor(thread, session),
@@ -240,22 +248,21 @@ export function ChangePane({
         pr={session.github.pr}
         commit={commit}
         focusedThreadId={focusedThreadId}
-        notes={takesNotes ? notes : null}
+        notes={noteRev ? notes : null}
+        noteRev={noteRev}
       />
 
       {/* Pinned to the bottom of the window while the diff scrolls, so a
           general note or Send is always a click away. */}
-      {(takesNotes || review.waiting || review.error) && (
+      {(noteRev || notes.notes.length > 0 || review.waiting || review.error) && (
         <div className="sticky bottom-4 z-20">
           <FeedbackBar
             notes={notes}
-            diff={takesNotes ? diff : null}
+            noteRev={noteRev}
+            diff={noteRev ? diff : null}
+            session={session}
             review={review}
-            onShowUncommitted={
-              takesNotes || !session.working.hasChanges
-                ? null
-                : () => onRevChange(WORKING_REV)
-            }
+            onRevChange={onRevChange}
           />
         </div>
       )}

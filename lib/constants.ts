@@ -8,6 +8,7 @@ export const WORKING_REV = "working";
  */
 export const BRANCH_REV = "branch";
 
+export const DIFF_API = "/api/diff";
 export const NOTES_API = "/api/notes";
 export const REVIEW_API = "/api/review";
 

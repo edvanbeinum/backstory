@@ -1,4 +1,6 @@
 import { filePaths } from "./anchor";
+import { BRANCH_REV, WORKING_REV } from "./constants";
+import { langForPath } from "./lang";
 import type { DiffFile, Note } from "./types";
 
 /**
@@ -86,17 +88,92 @@ function fence(text: string): string {
   return "`".repeat(longest + 1);
 }
 
-function heading(note: Note, at: number | null, inDiff: boolean): string {
-  if (!inDiff) {
-    return `${note.path} (was line ${note.line}; the file has no uncommitted changes now)`;
+/** A commit notes may have been left on, as the session knows it. */
+export interface NoteCommit {
+  sha: string;
+  subject: string;
+  /** Null when differ can't tell — then the message doesn't say */
+  pushed: boolean | null;
+}
+
+/** What the formatter knows about the changes the notes were left on. */
+export interface FeedbackContext {
+  /**
+   * Diffs by rev, for finding where a note's line is now. A commit's needn't
+   * be here — its lines can't move — but uncommitted work and the branch
+   * diff should be, or their notes can only give the line they were left on.
+   */
+  diffs: Map<string, DiffFile[]>;
+  /** The branch's commits, oldest first — the order the message follows */
+  commits: NoteCommit[];
+}
+
+/**
+ * Where a note's change sits, as a fact rather than advice: which commit, and
+ * whether it's been pushed. How to fix it — a fixup, a new commit — depends on
+ * how you and the agent are working, which differ can't see.
+ */
+function whereQualifier(
+  note: Note,
+  commits: NoteCommit[],
+  mixed: boolean,
+): string | null {
+  if (note.rev === WORKING_REV) return mixed ? "uncommitted" : null;
+  if (note.rev === BRANCH_REV) return "committed, at HEAD";
+  const commit = commits.find((c) => c.sha === note.rev);
+  const short = note.rev.slice(0, 7);
+  if (!commit) return `in ${short}, which is no longer on this branch`;
+  const subject = `in ${short} "${commit.subject}"`;
+  if (commit.pushed === null) return subject;
+  return `${subject}, ${commit.pushed ? "already pushed" : "not yet pushed"}`;
+}
+
+function heading(
+  note: Note,
+  files: DiffFile[] | null,
+  at: number | null,
+  where: string | null,
+): string {
+  const qualifiers: string[] = [];
+  let location: string;
+
+  if (files === null) {
+    // Not loaded, so the line it was left on is all there is — exact for a
+    // commit, whose diff can't have moved.
+    location =
+      note.side === "old"
+        ? `${note.path} — removed line ${note.line}`
+        : `${note.path}:${note.line}`;
+  } else if (!fileForNote(files, note)) {
+    location = note.path!;
+    qualifiers.push(
+      `was line ${note.line}`,
+      note.rev === WORKING_REV
+        ? "the file has no uncommitted changes now"
+        : "the file is no longer in this change",
+    );
+  } else if (at === null) {
+    // Said plainly rather than guessed at: the quote is what lets the reader
+    // find it, and the number is only where it used to be.
+    location = note.path!;
+    qualifiers.push(`was line ${note.line}`, "it has changed since");
+  } else {
+    location =
+      note.side === "old"
+        ? `${note.path} — removed line ${at}`
+        : `${note.path}:${at}`;
   }
-  if (note.side === "old") {
-    return `${note.path} — removed line ${at ?? note.line}`;
-  }
-  if (at !== null) return `${note.path}:${at}`;
-  // Said plainly rather than guessed at: the quote is what lets the reader
-  // find it, and the number is only where it used to be.
-  return `${note.path} (was line ${note.line}; it has changed since)`;
+
+  if (where) qualifiers.push(where);
+  return qualifiers.length > 0 ? `${location} (${qualifiers.join("; ")})` : location;
+}
+
+/** Commits oldest first, then the branch as a whole, then uncommitted work. */
+function revRank(rev: string, commits: NoteCommit[]): number {
+  if (rev === WORKING_REV) return commits.length + 2;
+  if (rev === BRANCH_REV) return commits.length + 1;
+  const index = commits.findIndex((c) => c.sha === rev);
+  return index === -1 ? commits.length : index;
 }
 
 /**
@@ -104,42 +181,52 @@ function heading(note: Note, at: number | null, inDiff: boolean): string {
  *
  * Each line note carries its quoted line, not just a number: by the time it's
  * read the file may have moved again, and the text is what survives. Notes
- * are grouped in diff order so the message reads top to bottom like the
- * change does; general notes go last, as the summing-up.
+ * read in the order the work happened — the branch's commits oldest first,
+ * then uncommitted work — and in diff order within each; general notes go
+ * last, as the summing-up.
  */
-export function formatFeedback(notes: Note[], files: DiffFile[]): string {
+export function formatFeedback(notes: Note[], context: FeedbackContext): string {
+  const { diffs, commits } = context;
   const general = notes.filter((n) => !n.path);
   const onLines = notes.filter((n) => n.path);
+  const mixed = notes.some((n) => n.rev !== WORKING_REV);
 
-  const order = new Map(files.map((f, i) => [f.path, i]));
   const placed = onLines
     .map((note) => {
-      const file = fileForNote(files, note);
+      const files = diffs.get(note.rev) ?? null;
+      const file = files ? fileForNote(files, note) : undefined;
       return {
         note,
+        files,
         file,
+        fileIndex: file && files ? files.indexOf(file) : Infinity,
         at: file ? locateNote(file, note) : null,
       };
     })
     .sort(
       (a, b) =>
-        (a.file ? (order.get(a.file.path) ?? 0) : Infinity) -
-          (b.file ? (order.get(b.file.path) ?? 0) : Infinity) ||
+        revRank(a.note.rev, commits) - revRank(b.note.rev, commits) ||
+        // Infinity - Infinity is NaN, which is falsy: falls through to path.
+        a.fileIndex - b.fileIndex ||
         (a.note.path ?? "").localeCompare(b.note.path ?? "") ||
         (a.at ?? a.note.line ?? 0) - (b.at ?? b.note.line ?? 0) ||
         a.note.createdAt - b.note.createdAt,
     );
 
   const count = notes.length;
+  const noun = `${count} ${count === 1 ? "note" : "notes"}`;
   const parts = [
-    `Feedback on the uncommitted changes (${count} ${count === 1 ? "note" : "notes"}):`,
+    mixed
+      ? `Review feedback (${noun}):`
+      : `Feedback on the uncommitted changes (${noun}):`,
   ];
 
-  for (const { note, file, at } of placed) {
-    const lines = [`## ${heading(note, at, file !== undefined)}`];
+  for (const { note, files, file, at } of placed) {
+    const where = whereQualifier(note, commits, mixed);
+    const lines = [`## ${heading(note, files, at, where)}`];
     if (note.quote !== null) {
       const f = fence(note.quote);
-      lines.push(`${f}${file?.lang ?? ""}`, note.quote, f);
+      lines.push(`${f}${file?.lang ?? langForPath(note.path) ?? ""}`, note.quote, f);
     }
     lines.push(note.body.trim());
     parts.push(lines.join("\n"));
@@ -156,7 +243,7 @@ export function formatFeedback(notes: Note[], files: DiffFile[]): string {
 
 /** A new draft note; everything about rounds and ticks starts empty. */
 export function draftNote(
-  fields: Pick<Note, "path" | "side" | "line" | "quote" | "body">,
+  fields: Pick<Note, "rev" | "path" | "side" | "line" | "quote" | "body">,
 ): Note {
   return {
     ...fields,

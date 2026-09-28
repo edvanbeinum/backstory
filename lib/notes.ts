@@ -1,3 +1,4 @@
+import { BRANCH_REV, WORKING_REV } from "./constants";
 import { KEY, readNamespaced, withStore, writeNamespaced } from "./store";
 import type { Note } from "./types";
 
@@ -22,16 +23,22 @@ const MAX_PATH = 1_000;
 
 const isTime = (value: unknown) => value === null || typeof value === "number";
 
+const isRev = (value: unknown) =>
+  value === WORKING_REV ||
+  value === BRANCH_REV ||
+  (typeof value === "string" && /^[0-9a-f]{40}$/.test(value));
+
 /**
- * The file is meant to be hand-editable, so nothing in it is trusted. The
- * round and tick fields may be absent — notes written before rounds existed
- * are drafts.
+ * The file is meant to be hand-editable, so nothing in it is trusted. Fields
+ * added since the first notes may be absent: no round or tick means a draft,
+ * and no rev means uncommitted work, the only place notes could once go.
  */
 function isStoredNote(value: unknown): value is Note {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const n = value as Record<string, unknown>;
   return (
     typeof n.id === "string" &&
+    (n.rev === undefined || isRev(n.rev)) &&
     (n.path === null || (typeof n.path === "string" && n.path.length <= MAX_PATH)) &&
     (n.side === "old" || n.side === "new") &&
     (n.line === null || (Number.isInteger(n.line) && (n.line as number) > 0)) &&
@@ -49,7 +56,13 @@ function normalize(note: Note): Note {
   const sentAt = note.sentAt ?? null;
   // A draft can't be handled; there's nothing yet to have handled it.
   const done = sentAt !== null && note.done === true;
-  return { ...note, sentAt, done, doneAt: done ? (note.doneAt ?? null) : null };
+  return {
+    ...note,
+    rev: note.rev ?? WORKING_REV,
+    sentAt,
+    done,
+    doneAt: done ? (note.doneAt ?? null) : null,
+  };
 }
 
 /** Oldest first, which is the order you wrote them in. */

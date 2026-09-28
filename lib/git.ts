@@ -278,17 +278,24 @@ const LOG_FORMAT = ["%H", "%h", "%an", "%ae", "%aI", "%P", "%s", "%b"].join(
  * pushed on *their* branches' remotes. Only when the repo has no remote refs
  * at all does the old range fallback apply.
  */
+/** Does this repo know about any remote branch at all? */
+export async function hasRemoteRefs(root: string): Promise<boolean> {
+  return Boolean(
+    await gitLine(root, [
+      "for-each-ref",
+      "--count=1",
+      "--format=%(refname)",
+      "refs/remotes",
+    ]),
+  );
+}
+
 export async function getCommits(
   repo: RepoInfo,
   base: BaseInfo,
   limit = 200,
 ): Promise<CommitSummary[]> {
-  const hasRemoteRefs = await gitLine(repo.root, [
-    "for-each-ref",
-    "--count=1",
-    "--format=%(refname)",
-    "refs/remotes",
-  ]);
+  const remote = await hasRemoteRefs(repo.root);
   // Reviewing a branch that isn't checked out is almost always a pushed
   // stack entry, where "not on any remote" is empty and useless. Its own
   // commits — the ones its PR is about — are what to show.
@@ -297,7 +304,7 @@ export async function getCommits(
     return logRange(repo, [range], limit);
   }
 
-  if (hasRemoteRefs) {
+  if (remote) {
     return logRange(repo, ["HEAD", "--not", "--remotes"], limit);
   }
 

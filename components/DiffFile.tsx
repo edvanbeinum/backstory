@@ -47,6 +47,7 @@ export function DiffFile({
   commit,
   focusedThreadId,
   notes = null,
+  noteRev = null,
   fileNotes = [],
 }: {
   file: DiffFileType;
@@ -55,9 +56,11 @@ export function DiffFile({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
-  /** Set when this diff takes notes — only uncommitted work does */
+  /** Set when this diff takes notes */
   notes?: NotesApi | null;
-  /** This file's notes */
+  /** The change a note written here is left on */
+  noteRev?: string | null;
+  /** This file's notes, on this change */
   fileNotes?: Note[];
 }) {
   const [collapsed, setCollapsed] = useState(false);
@@ -86,8 +89,10 @@ export function DiffFile({
   const [drafting, setDrafting] = useState<NoteTarget | null>(null);
 
   const saveNew = (target: NoteTarget, body: string) => {
-    notes?.save(
+    if (!notes || !noteRev) return;
+    notes.save(
       draftNote({
+        rev: noteRev,
         path: file.path,
         side: target.side,
         line: target.line,

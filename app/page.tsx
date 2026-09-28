@@ -10,6 +10,7 @@ import { RepoBrowser } from "@/components/RepoBrowser";
 import { PrTitle } from "@/components/PrTitle";
 import { TickSpine, TickStrip } from "@/components/TickSpine";
 import { useStaleReload } from "@/components/useStaleReload";
+import { pushedState } from "@/lib/pushed";
 import { RepoBar } from "@/components/RepoBar";
 import {
   BRANCH_REV,
@@ -531,9 +532,8 @@ export default function Page() {
     );
   }, [rev, session]);
 
-  /** True when the selected commit is below the push boundary. */
   const revIsPushed = useMemo(
-    () => Boolean(session?.history.some((c) => c.sha === rev)),
+    () => (session ? pushedState(session, rev) === true : false),
     [session, rev],
   );
 

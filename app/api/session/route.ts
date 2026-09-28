@@ -6,6 +6,7 @@ import {
   getBranchDiffSummary,
   getCommitRange,
   getCommits,
+  hasRemoteRefs,
   getHistory,
   getPatchId,
   getPatchIdMap,
@@ -87,10 +88,11 @@ export async function GET(request: Request) {
 
     // GitHub is the slow part and the only one that can fail softly, so let
     // it run alongside the remaining local git work.
-    const [history, workingTree, rawGithub] = await Promise.all([
+    const [history, workingTree, rawGithub, hasRemote] = await Promise.all([
       getHistory(repo, base),
       getWorkingTree(repo),
       loadGitHubDataCached(repo, { fresh }),
+      hasRemoteRefs(repo.root),
     ]);
 
     // Uncommitted work belongs to whatever is checked out here, not to some
@@ -288,6 +290,7 @@ export async function GET(request: Request) {
       base,
       commits,
       history,
+      hasRemote,
       working,
       github,
       branchDiff,

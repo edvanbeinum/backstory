@@ -54,6 +54,7 @@ export function DiffView({
   commit,
   focusedThreadId,
   notes = null,
+  noteRev = null,
 }: {
   diff: DiffResponse | null;
   loading: boolean;
@@ -63,8 +64,10 @@ export function DiffView({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
-  /** Set when this diff takes notes — only uncommitted work does */
+  /** Set when this diff takes notes */
   notes?: NotesApi | null;
+  /** The change on screen, as notes record it: a full sha, or a pseudo-rev */
+  noteRev?: string | null;
 }) {
   const { perFile } = useMemo(
     () => partitionThreads(diff, threads),
@@ -75,12 +78,15 @@ export function DiffView({
   const notesPerFile = useMemo(() => {
     const map = new Map<DiffFileType, Note[]>();
     if (!diff || !noteList) return map;
+    // Only this change's notes: the same line number in another commit is a
+    // different line.
     for (const note of noteList) {
+      if (note.rev !== noteRev) continue;
       const file = fileForNote(diff.files, note);
       if (file) map.set(file, [...(map.get(file) ?? []), note]);
     }
     return map;
-  }, [diff, noteList]);
+  }, [diff, noteList, noteRev]);
 
   if (error) {
     return (
@@ -131,6 +137,7 @@ export function DiffView({
             commit={commit}
             focusedThreadId={focusedThreadId}
             notes={notes}
+            noteRev={noteRev}
             fileNotes={notesPerFile.get(file) ?? NO_NOTES}
           />
         ))

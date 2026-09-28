@@ -191,7 +191,7 @@ async function review() {
   if (!(await handOff())) process.exit(1);
   console.error(
     `differ: waiting for your review of ${opened.body.repo} — ` +
-      "leave notes on the Uncommitted changes and press Send to agent.",
+      "leave notes on its changes and press Send to agent.",
   );
 
   let failures = 0;

@@ -85,10 +85,17 @@ there's no worker to install until the server has been up once.
 
 ## Reviewing an agent's work
 
-When an agent is making the change, the review happens on the working tree —
-before anything is committed. On the **Uncommitted** view, hover a line and
-press **+** to leave a note on it; **Add a general note** covers the change as
-a whole. Notes remember the text of their line, so they follow it when the
+When an agent is making the change, you review what it made — uncommitted
+work, or the commits it made on its own if you let it run. Notes go on any
+change: hover a line of **Uncommitted**, **All changes**, or any one commit,
+and press **+**; **Add a general note** covers the work as a whole. Review a
+stack of commits one at a time and the notes collect as you go — the bar lists
+the ones on other changes — to send together.
+
+A note on a commit is sent naming the commit, and whether it's been pushed.
+Not how to fix it: a fixup for work that's still local, a new commit for work
+that's out, or whatever else suits — that's for you and the agent to settle,
+and differ can't see how you're working. Notes remember the text of their line, so they follow it when the
 agent's next edit moves it — and when they can't be sure where it went, they
 say so rather than guess.
 
