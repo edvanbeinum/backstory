@@ -6,6 +6,8 @@
  *   differ <path>       open a specific repo
  *   differ --no-open    make sure the server is running, don't open a window
  *   differ --port N     use a specific port (default 4460, env DIFFER_PORT)
+ *                       (the installed app window is used on the default port;
+ *                       env DIFFER_APP points at a different app)
  *   differ review [path]
  *                       wait for you to review the uncommitted changes, then
  *                       print your notes to stdout and exit — for an agent
@@ -81,12 +83,39 @@ async function differRunningAt(port) {
   }
 }
 
+/**
+ * The installed app window — Chrome's "Install page as app" or Safari's "Add
+ * to Dock" — if there is one for this port. `open <url>` only ever reaches the
+ * default browser, even with the app already running, so the app has to be
+ * launched by name. It opens at its start_url and collects the repo from the
+ * /api/open handoff, like any other launch.
+ *
+ * Only on the default port: the app is bound to the address it was installed
+ * from, and launching it for another port would show a different server.
+ * DIFFER_APP names an app explicitly.
+ */
+function findApp(port) {
+  if (process.env.DIFFER_APP) return process.env.DIFFER_APP;
+  if (port !== DEFAULT_PORT) return null;
+  const apps = path.join(homedir(), "Applications");
+  return (
+    [
+      path.join(apps, "Chrome Apps.localized", "differ.app"),
+      path.join(apps, "differ.app"),
+    ].find((p) => existsSync(p)) ?? null
+  );
+}
+
 function openWindow(url) {
-  // `open` uses the default browser; the installed app window (Chrome
-  // "Install page as app" / Safari "Add to Dock") is focused by the OS when
-  // its origin is already open there. Either way a window appears.
-  execFile("open", [url], (err) => {
-    if (err) console.error(`couldn't open a browser — visit ${url}`);
+  const inBrowser = () =>
+    execFile("open", [url], (err) => {
+      if (err) console.error(`couldn't open a browser — visit ${url}`);
+    });
+
+  const app = findApp(args.port);
+  if (!app) return inBrowser();
+  execFile("open", ["-a", app], (err) => {
+    if (err) inBrowser();
   });
 }
 
