@@ -135,6 +135,11 @@ Local events (saves, commits, branch switches) refresh from git only; the
 GitHub API is consulted at most every 30s unless a push lands
 (refs/remotes moved) or you hit refresh, which both bypass the cache.
 
+The one thing that does reload the window is differ itself changing. After a
+rebuild or `brew upgrade`, a window left open would keep running the old code
+against the new server; it notices the server's build has changed when it
+reconnects or regains focus, and reloads.
+
 ## Shareable URLs
 
 The repo and the selected commit live in the address bar, so a view can be
