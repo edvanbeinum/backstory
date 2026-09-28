@@ -102,6 +102,8 @@ export default function Page() {
   const [linkNotice, setLinkNotice] = useState<string | null>(null);
   /** Bumped by watcher events; retriggers the working-tree diff fetch. */
   const [workingTick, setWorkingTick] = useState(0);
+  /** Bumped when an agent starts or stops waiting for a review. */
+  const [reviewTick, setReviewTick] = useState(0);
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
   const refRef = useRef(ref);
@@ -372,6 +374,7 @@ export default function Page() {
           // No handoff waiting — still a Cmd-Tab back in, so catch up on
           // anything that changed while the window was in the background.
           setWorkingTick((t) => t + 1);
+          setReviewTick((t) => t + 1);
           void loadSession(repoRef.current, { background: true });
         }
       } catch {
@@ -402,6 +405,7 @@ export default function Page() {
       // Reconnects (server restarted, laptop woke) mean missed events —
       // catch up once, bypassing the GitHub cache since time has passed.
       setWorkingTick((t) => t + 1);
+      setReviewTick((t) => t + 1);
       void loadSession(repoPath, { background: true, fresh: true });
     };
 
@@ -414,6 +418,10 @@ export default function Page() {
         return;
       }
       if (kinds.length === 0) return;
+
+      if (kinds.includes("review")) setReviewTick((t) => t + 1);
+      // A review request alone changes nothing on disk.
+      if (kinds.every((kind) => kind === "review")) return;
 
       setWorkingTick((t) => t + 1);
       void loadSession(repoPath, {
@@ -1030,6 +1038,7 @@ export default function Page() {
                   thread={selectedThread}
                   focusedThreadId={focusedThreadId}
                   pushed={revIsPushed}
+                  reviewTick={reviewTick}
                 />
               </div>
             </div>

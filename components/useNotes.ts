@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { NOTES_API } from "@/lib/constants";
 import type { ApiError, Note } from "@/lib/types";
 
 export interface NotesApi {
@@ -25,7 +26,7 @@ export function useNotes(root: string): NotesApi {
   // Answers can land out of order; only the newest request's is kept.
   const seq = useRef(0);
 
-  const url = `/api/notes?repo=${encodeURIComponent(root)}`;
+  const url = `${NOTES_API}?${new URLSearchParams({ repo: root })}`;
 
   const load = useCallback(async () => {
     const mine = ++seq.current;
