@@ -17,6 +17,12 @@ import {
   WORKING_REV,
 } from "@/lib/constants";
 import {
+  confirmedDrafts,
+  keyFor,
+  withDrafts,
+  type PendingDraft,
+} from "@/lib/drafts";
+import {
   loadRecents,
   removeFromList,
   saveRecents,
@@ -48,6 +54,8 @@ const WORKING_COMMIT: CommitSummary = {
   url: null,
   isMerge: false,
 };
+
+const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 class ApiFetchError extends Error {
   constructor(
@@ -114,6 +122,19 @@ export default function Page() {
    * exist and bounce you off it.
    */
   const pickedRevs = useRef<string[]>([]);
+  /**
+   * Drafts you've typed that the store hasn't confirmed yet.
+   *
+   * The client, not the disk, is what the box reads from between a keystroke
+   * and the write landing — so this is where a draft lives while it's in
+   * flight, and where it stays if the write fails. Entries only leave once
+   * the store has acknowledged that exact text, which is also what makes it
+   * safe for a background refresh to overwrite everything else.
+   */
+  const pendingDrafts = useRef(new Map<string, PendingDraft>());
+  const flushingDrafts = useRef(new Set<string>());
+  /** Set when a draft has run out of retries and is still only in memory. */
+  const [draftNotice, setDraftNotice] = useState(false);
 
   useEffect(() => {
     repoRef.current = repoPath;
@@ -275,7 +296,14 @@ export default function Page() {
             (opts.fresh ? "&fresh=1" : ""),
         );
         if (seq !== sessionSeq.current) return; // superseded by a newer fetch
-        setSession(data);
+        // Anything you've typed that this data doesn't already show outranks
+        // what came back: either the store hadn't been told yet, or it had
+        // and this read was already in flight when it was.
+        const key = keyFor(data);
+        for (const id of confirmedDrafts(data, pendingDrafts.current, key)) {
+          pendingDrafts.current.delete(id);
+        }
+        setSession(withDrafts(data, pendingDrafts.current, key));
         setSessionError(null);
 
         let landedOn: string | null = null;
@@ -610,18 +638,8 @@ export default function Page() {
     [session],
   );
 
-  /**
-   * `owner/repo#42` — the response store's key. Sent with every write rather
-   * than derived server-side, which used to cost a repo resolve and a GitHub
-   * lookup on each one, and meant drafts were dropped whenever GitHub was
-   * unreachable.
-   */
-  const responseKey = useMemo(() => {
-    const repo = session?.repo;
-    const pr = session?.github.pr;
-    if (!repo?.owner || !repo.name || !pr) return null;
-    return `${repo.owner}/${repo.name}#${pr.number}`;
-  }, [session]);
+  /** Sent with every write; see `keyFor`. */
+  const responseKey = useMemo(() => keyFor(session), [session]);
 
   const writeResponse = useCallback(
     async (
@@ -633,15 +651,21 @@ export default function Page() {
         unlink?: string;
         clear?: boolean;
       },
-      // keepalive only where the write is fire-and-forget — a draft save or
-      // a tick, which the UI has already reflected optimistically and never
-      // waits on.
-      { keepalive = false }: { keepalive?: boolean } = {},
+      {
+        // keepalive only where the write is fire-and-forget — a draft save or
+        // a tick, which the UI has already reflected optimistically and never
+        // waits on.
+        keepalive = false,
+        // A retry names the PR the text was typed on. Without that it would
+        // use whatever is open when it finally succeeds, filing your reply
+        // under a pull request it has nothing to do with.
+        key = responseKey,
+      }: { keepalive?: boolean; key?: string | null } = {},
     ): Promise<{ ok: boolean; error: string | null }> => {
-      if (!responseKey) return { ok: false, error: null };
+      if (!key) return { ok: false, error: null };
       // `repo` rides along only so the server can compute a patch-id when a
       // commit is linked; ticks and drafts need no subprocess at all.
-      const params = new URLSearchParams({ key: responseKey });
+      const params = new URLSearchParams({ key });
       if (patch.sha) params.set("repo", repoPath);
 
       try {
@@ -674,18 +698,112 @@ export default function Page() {
   );
 
   /**
-   * Save a thread's draft reply. Fire-and-forget: no session refresh, since
-   * one would echo the text back into a box you're still typing in. The
-   * saved copy is picked up on the next load, which is exactly when it's
-   * needed — after a reload, a collapse, or switching commits.
+   * Get a thread's pending draft onto disk, retrying a failure rather than
+   * shrugging at it. A draft is the one thing here you can't reconstruct: a
+   * tick is one click to redo and a link is one pick, but nobody can retype
+   * what they wrote from memory.
    */
-  const saveDraft = useCallback(
-    (threadId: string, text: string | null) => {
-      // keepalive so it survives the tab closing mid-save.
-      void writeResponse(threadId, { reply: text }, { keepalive: true });
+  const flushDraft = useCallback(
+    async (threadId: string) => {
+      // A pass is already looping on this thread; it re-reads the pending
+      // text each time round, so it will pick up whatever was just typed.
+      if (flushingDrafts.current.has(threadId)) return;
+      flushingDrafts.current.add(threadId);
+
+      try {
+        for (let attempt = 0; ; ) {
+          const pending = pendingDrafts.current.get(threadId);
+          if (!pending || pending.saved) return; // written, or discarded
+
+          // keepalive so it survives the window closing mid-save.
+          const { ok } = await writeResponse(
+            threadId,
+            { reply: pending.text },
+            { keepalive: true, key: pending.key },
+          );
+
+          if (ok) {
+            setDraftNotice(false);
+            // Anything typed while that was in flight is now the draft, and
+            // it needs a write of its own before this thread is clear.
+            if (pendingDrafts.current.get(threadId) !== pending) {
+              attempt = 0;
+              continue;
+            }
+            // Kept, not dropped: the window goes on holding the text until a
+            // session load comes back agreeing with it. Dropping it here
+            // leaves a read that was already in flight free to paint the
+            // older text back over the box.
+            pendingDrafts.current.set(threadId, { ...pending, saved: true });
+            return;
+          }
+
+          // Four goes over about eight seconds, then leave it pending: the
+          // text is still on screen and in `pendingDrafts`, so the next
+          // keystroke, the next focus, or a reconnect will try again.
+          if (attempt >= 3) {
+            setDraftNotice(true);
+            return;
+          }
+          await sleep(500 * 2 ** attempt);
+          attempt++;
+        }
+      } finally {
+        flushingDrafts.current.delete(threadId);
+      }
     },
     [writeResponse],
   );
+
+  /** Retry everything still unwritten — on regaining focus, say. */
+  const flushDrafts = useCallback(() => {
+    for (const [threadId, pending] of pendingDrafts.current) {
+      if (!pending.saved) void flushDraft(threadId);
+    }
+  }, [flushDraft]);
+
+  /**
+   * Save a thread's draft reply.
+   *
+   * Into state first, disk second. The composer is keyed on the thread, so it
+   * unmounts the moment you step to the next comment — state is the only
+   * place the text survives that, and it's what the box is refilled from when
+   * you come back. Waiting for the store instead meant a draft that had been
+   * written but not yet re-read came back as an empty box.
+   *
+   * No session refresh: one would echo the text back into a box you're still
+   * typing in.
+   */
+  const saveDraft = useCallback(
+    (threadId: string, text: string | null) => {
+      if (!responseKey) return;
+      pendingDrafts.current.set(threadId, { key: responseKey, text });
+      setSession((current) =>
+        current
+          ? withDrafts(current, pendingDrafts.current, responseKey)
+          : current,
+      );
+      void flushDraft(threadId);
+    },
+    [flushDraft, responseKey],
+  );
+
+  // Coming back to the window is the moment to retry anything the store never
+  // confirmed — differ's own server may simply have been restarting when you
+  // typed it.
+  useEffect(() => {
+    window.addEventListener("focus", flushDrafts);
+    return () => window.removeEventListener("focus", flushDrafts);
+  }, [flushDrafts]);
+
+  // And once a draft is stuck, keep knocking on its own. The likeliest reason
+  // is a server that went away, which usually comes back — and the person who
+  // typed the reply shouldn't have to do anything to get it saved.
+  useEffect(() => {
+    if (!draftNotice) return;
+    const timer = setInterval(flushDrafts, 15_000);
+    return () => clearInterval(timer);
+  }, [draftNotice, flushDrafts]);
 
   /**
    * The tick.
@@ -952,6 +1070,23 @@ export default function Page() {
                 >
                   Dismiss
                 </button>
+              </p>
+            )}
+
+            {/* Not dismissible, and it stays until a write actually lands:
+                the whole point is that you find out your words are only in
+                this window before you close it. */}
+            {draftNotice && (
+              <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                <AlertIcon
+                  size={13}
+                  className="mt-0.5 shrink-0 text-[var(--attention)]"
+                />
+                <span className="flex-1">
+                  A draft reply hasn&apos;t reached differ — it&apos;s still
+                  here and still being retried, but copy it somewhere safe
+                  before closing this window.
+                </span>
               </p>
             )}
 

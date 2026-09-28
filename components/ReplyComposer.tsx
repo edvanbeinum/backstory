@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
 import type { CommitSummary, PullRequestInfo, RepoInfo } from "@/lib/types";
@@ -153,9 +153,11 @@ export function ReplyComposer({
   const text = template === "custom" ? custom : generated;
 
   // Seed the custom box from whatever was last generated, so switching to
-  // "write my own" is an edit rather than a blank page.
+  // "write my own" is an edit rather than a blank page. Only before you've
+  // typed: seeding a box you deliberately emptied puts words back that you
+  // just took out, and the save below would then store them as your draft.
   useEffect(() => {
-    if (template === "custom" && !custom) {
+    if (template === "custom" && !custom && !touched.current) {
       setCustom(templateText("url", targets, urls));
     }
   }, [template, custom, targets, urls]);
@@ -170,17 +172,59 @@ export function ReplyComposer({
     savedRef.current = draft ?? "";
   }, [draft]);
 
+  /**
+   * Hand the current text up, now, if it isn't already saved.
+   *
+   * Reads through a ref rather than closing over the render's values, so the
+   * unmount cleanup below — which runs once, long after the render that
+   * registered it — still flushes the latest keystroke rather than a stale one.
+   */
+  const latest = useRef({ custom, onDraftChange });
+  useEffect(() => {
+    latest.current = { custom, onDraftChange };
+  });
+
+  const flush = useCallback(() => {
+    const { custom: text, onDraftChange: save } = latest.current;
+    if (!save || !touched.current) return;
+    if (text === savedRef.current) return;
+    savedRef.current = text;
+    save(text.trim() === "" ? null : text);
+  }, []);
+
   useEffect(() => {
     if (!onDraftChange || template !== "custom") return;
     if (!touched.current) return;
     if (custom === savedRef.current) return;
 
-    const timer = setTimeout(() => {
-      savedRef.current = custom;
-      onDraftChange(custom.trim() === "" ? null : custom);
-    }, 600);
+    const timer = setTimeout(flush, 600);
     return () => clearTimeout(timer);
-  }, [custom, template, onDraftChange]);
+  }, [custom, template, onDraftChange, flush]);
+
+  /**
+   * The last 600ms of typing, saved rather than dropped.
+   *
+   * This box is keyed on the thread, so stepping to the next comment unmounts
+   * it — and a pending debounce timer dies with it. That is exactly how a
+   * reply typed and immediately stepped away from used to disappear. The same
+   * goes for the window being hidden or closed mid-sentence; the write itself
+   * is `keepalive`, so it survives the page going away.
+   *
+   * Deliberately not gated on the template: if you typed your own words and
+   * then clicked a wording, the words are still yours and still kept.
+   */
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    window.addEventListener("pagehide", flush);
+    document.addEventListener("visibilitychange", onHide);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      document.removeEventListener("visibilitychange", onHide);
+      flush();
+    };
+  }, [flush]);
 
   // No commit linked, so the templates that name one have nothing to say.
   // The box stays open regardless: you can always write a reply, and most
