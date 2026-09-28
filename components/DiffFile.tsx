@@ -3,11 +3,13 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { anchorThreads } from "@/lib/anchor";
+import { anchorNotes } from "@/lib/feedback";
 import type {
   ApiError,
   CommitSummary,
   DiffFile as DiffFileType,
   FileViewResponse,
+  Note,
   PullRequestInfo,
   RepoInfo,
   ReviewThread,
@@ -18,7 +20,16 @@ import {
   FileIcon,
   UnfoldIcon,
 } from "./icons";
+import { NoteCard, NoteComposer } from "./NoteCard";
 import { Badge, copyToClipboard, CopyButton, Spinner } from "./ui";
+import type { NotesApi } from "./useNotes";
+
+/** The line a note is being written on. */
+interface NoteTarget {
+  side: "old" | "new";
+  line: number;
+  quote: string;
+}
 
 const STATUS_TONE: Record<string, string> = {
   added: "text-[var(--success)]",
@@ -35,6 +46,8 @@ export function DiffFile({
   pr,
   commit,
   focusedThreadId,
+  notes = null,
+  fileNotes = [],
 }: {
   file: DiffFileType;
   threads: ReviewThread[];
@@ -42,6 +55,10 @@ export function DiffFile({
   pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
+  /** Set when this diff takes notes — only uncommitted work does */
+  notes?: NotesApi | null;
+  /** This file's notes */
+  fileNotes?: Note[];
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
@@ -61,6 +78,25 @@ export function DiffFile({
     () => anchorThreads(shown, threads),
     [shown, threads],
   );
+
+  const anchoredNotes = useMemo(
+    () => anchorNotes(shown, fileNotes),
+    [shown, fileNotes],
+  );
+  const [drafting, setDrafting] = useState<NoteTarget | null>(null);
+
+  const saveNew = (target: NoteTarget, body: string) => {
+    notes?.save({
+      id: crypto.randomUUID(),
+      path: file.path,
+      side: target.side,
+      line: target.line,
+      quote: target.quote,
+      body,
+      createdAt: Date.now(),
+    });
+    setDrafting(null);
+  };
 
   const canViewWhole =
     !file.isBinary && file.hunks.length > 0 && commit !== null;
@@ -265,6 +301,12 @@ export function DiffFile({
                         filePath={file.path}
                         copiedLine={copiedLine}
                         onCopyLine={copyLineRef}
+                        notes={notes}
+                        notesByNewLine={anchoredNotes.byNewLine}
+                        notesByOldLine={anchoredNotes.byOldLine}
+                        drafting={drafting}
+                        onDraft={setDrafting}
+                        onSaveNew={saveNew}
                       />
                     ))}
                   </tbody>
@@ -294,6 +336,32 @@ export function DiffFile({
             </p>
           )}
 
+          {/* A note whose line has moved out of view or changed. Kept in
+              sight, never dropped: it's still something you asked for. */}
+          {notes && anchoredNotes.unanchored.length > 0 && (
+            <div className="space-y-2 border-t border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-2 last:rounded-b-md">
+              {anchoredNotes.unanchored.map((note) => (
+                <NoteCard
+                  key={note.id}
+                  note={note}
+                  onSave={notes.save}
+                  onRemove={notes.remove}
+                  context={
+                    <>
+                      {note.side === "old" ? "Removed line" : "Line"}{" "}
+                      {note.line} isn&apos;t in the diff as shown — it may have
+                      changed since.
+                      {note.quote !== null && (
+                        <code className="mono mt-1 block truncate text-[var(--fg)]">
+                          {note.quote}
+                        </code>
+                      )}
+                    </>
+                  }
+                />
+              ))}
+            </div>
+          )}
 
         </>
       )}
@@ -314,6 +382,12 @@ function HunkRows({
   filePath,
   copiedLine,
   onCopyLine,
+  notes,
+  notesByNewLine,
+  notesByOldLine,
+  drafting,
+  onDraft,
+  onSaveNew,
 }: {
   hunk: DiffFileType["hunks"][number];
   hunkIndex: number;
@@ -327,6 +401,12 @@ function HunkRows({
   filePath: string;
   copiedLine: string | null;
   onCopyLine: (key: string, line: number) => void;
+  notes: NotesApi | null;
+  notesByNewLine: Map<number, Note[]>;
+  notesByOldLine: Map<number, Note[]>;
+  drafting: NoteTarget | null;
+  onDraft: (target: NoteTarget | null) => void;
+  onSaveNew: (target: NoteTarget, body: string) => void;
 }) {
   // Clicking a line number copies the editor-style "path:line" reference —
   // the thing you paste into a terminal, an editor, or a review reply. The
@@ -363,6 +443,26 @@ function HunkRows({
             : []),
         ];
 
+        // A removed line only exists on the old side; everything else is
+        // noted where it lives now.
+        const target: NoteTarget | null =
+          line.type === "del"
+            ? line.oldNo != null
+              ? { side: "old", line: line.oldNo, quote: line.content }
+              : null
+            : line.newNo != null
+              ? { side: "new", line: line.newNo, quote: line.content }
+              : null;
+        const lineNotes = target
+          ? ((target.side === "old" ? notesByOldLine : notesByNewLine).get(
+              target.line,
+            ) ?? [])
+          : [];
+        const isDrafting =
+          target !== null &&
+          drafting?.side === target.side &&
+          drafting.line === target.line;
+
         return (
           <Fragment key={index}>
             <tr
@@ -381,7 +481,20 @@ function HunkRows({
               {numCell(line.oldNo, "old")}
               {numCell(line.newNo, "new")}
               <td className="diff-marker">
-                {line.type === "add" ? "+" : line.type === "del" ? "-" : ""}
+                <span className={notes && target ? "diff-marker-text" : ""}>
+                  {line.type === "add" ? "+" : line.type === "del" ? "-" : ""}
+                </span>
+                {notes && target && (
+                  <button
+                    type="button"
+                    className="note-add"
+                    title={`Add a note on ${filePath}:${target.line}`}
+                    aria-label="Add a note on this line"
+                    onClick={() => onDraft(target)}
+                  >
+                    +
+                  </button>
+                )}
               </td>
               <td
                 className="diff-code"
@@ -389,6 +502,28 @@ function HunkRows({
               />
             </tr>
 
+            {notes && (lineNotes.length > 0 || isDrafting) && (
+              <tr className="note-row">
+                <td colSpan={4}>
+                  <div className="space-y-2">
+                    {lineNotes.map((note) => (
+                      <NoteCard
+                        key={note.id}
+                        note={note}
+                        onSave={notes.save}
+                        onRemove={notes.remove}
+                      />
+                    ))}
+                    {isDrafting && target && (
+                      <NoteComposer
+                        onCancel={() => onDraft(null)}
+                        onSave={(body) => onSaveNew(target, body)}
+                      />
+                    )}
+                  </div>
+                </td>
+              </tr>
+            )}
           </Fragment>
         );
       })}

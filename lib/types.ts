@@ -275,6 +275,27 @@ export interface FileViewResponse {
   highlightSkipped?: boolean;
 }
 
+/**
+ * A note you've written on your uncommitted changes, for handing to whoever —
+ * or whatever — is making them. Unlike a review thread it has no commit to
+ * hang off: the working tree moves under it, so it remembers the text of the
+ * line as well as the number, and is re-found by that text.
+ */
+export interface Note {
+  id: string;
+  /** Null for a general note about the change as a whole */
+  path: string | null;
+  /** Which side of the diff the line is on: removed lines only exist on "old" */
+  side: "old" | "new";
+  /** 1-based, on `side`, as of when the note was written */
+  line: number | null;
+  /** The line's content when the note was written */
+  quote: string | null;
+  body: string;
+  /** ms epoch */
+  createdAt: number;
+}
+
 export interface ApiError {
   error: string;
   detail?: string;
