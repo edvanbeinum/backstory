@@ -53,6 +53,13 @@ npm link          # puts `differ` on PATH
 differ            # from any checkout — starts the server, opens a window
 ```
 
+On macOS the first `differ` installs a login agent
+(`~/Library/LaunchAgents/dev.differ.server.plist`), so from then on the server
+is simply running — at login, after a crash, with no terminal open. It logs
+to `~/.differ/server.log`. After a rebuild, the next `differ` restarts it onto
+the new build. `differ uninstall` removes the agent; `differ --foreground`
+runs a server tied to the terminal instead, as it does on other platforms.
+
 Then install the window: in Chrome ⋮ → *Cast, save and share* → *Install
 page as app…* (Safari: *File → Add to Dock*). From now on differ has its own
 dock icon and Cmd-Tab entry.
@@ -62,14 +69,16 @@ repo, Cmd-Tab to the differ window, and it's already showing that repo — the
 CLI hands the repo to the running server and the window picks it up on
 focus. One server handles all your checkouts (default port 4460).
 
-`packaging/` has the Homebrew formula skeleton for `brew install differ` +
-`brew services start differ` (an always-on background server, so the window
-works even with no terminal open).
+`packaging/` has the Homebrew formula skeleton for `brew install differ`. If
+you use `brew services start differ` instead, the CLI sees Homebrew's agent
+and doesn't install its own.
 
 ### When the server isn't running
 
-The installed window outlives the server — restart your laptop, open differ
-from the dock, and the browser's own "refused to connect" is all you'd get.
+The installed window can outlive the server — before the login agent is
+installed, or when the agent can't start it (a node upgrade that moved it off
+the PATH the agent recorded) — and the browser's own "refused to connect" is
+all you'd get.
 So differ registers a small service worker (`public/sw.js`), which lives in
 the browser rather than on the server and catches that failed navigation to
 serve `public/offline.html` instead: what's wrong, the command that fixes it

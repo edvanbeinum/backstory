@@ -12,40 +12,59 @@
  *                       wait for you to review the uncommitted changes, then
  *                       print your notes to stdout and exit — for an agent
  *                       session to run and read
+ *   differ install      (re)install the login agent and restart the server
+ *   differ uninstall    stop the server and remove the login agent
+ *   differ --foreground run the server in this terminal instead
  *
- * One server serves every repo. If a differ is already running (the terminal
- * one, or the `brew services` launchd one), this reuses it: the repo is
- * handed to the running server and the app window/browser is focused on it.
- * Only when nothing is running does this start a server of its own, in the
- * foreground, tied to this terminal.
+ * One server serves every repo. If a differ is already running (the login
+ * agent, the `brew services` one, or a terminal's), this reuses it: the repo
+ * is handed to the running server and the app window/browser is focused on
+ * it. When nothing is running, on macOS this installs a login agent that
+ * keeps a server running from then on (bin/launchd.mjs); elsewhere, or with
+ * --foreground, it starts one tied to this terminal.
  */
 import { spawn, execFile } from "node:child_process";
-import { existsSync, mkdirSync, openSync } from "node:fs";
+import { existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+
+import * as launchd from "./launchd.mjs";
 
 const DEFAULT_PORT = 4460;
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(HERE, "..");
 
 function parseArgs(argv) {
-  const args = { repo: process.cwd(), open: true, port: null, review: false };
+  const args = {
+    repo: process.cwd(),
+    open: true,
+    port: null,
+    review: false,
+    command: null,
+    foreground: false,
+  };
   if (argv[0] === "review") {
     args.review = true;
+    argv = argv.slice(1);
+  } else if (argv[0] === "install" || argv[0] === "uninstall") {
+    args.command = argv[0];
     argv = argv.slice(1);
   }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--no-open") args.open = false;
+    else if (a === "--foreground") args.foreground = true;
     else if (a === "--port") args.port = Number(argv[++i]);
     else if (a === "--help" || a === "-h") {
       console.log(
-        "usage: differ [path] [--port N] [--no-open]\n" +
+        "usage: differ [path] [--port N] [--no-open] [--foreground]\n" +
           "       differ review [path] [--port N] [--no-open]\n" +
+          "       differ install [--port N] | differ uninstall\n" +
           "Opens the repo (default: cwd) in the differ review app.\n" +
           "`review` then waits for you to send notes on the uncommitted\n" +
-          "changes, prints them to stdout, and exits.",
+          "changes, prints them to stdout, and exits.\n" +
+          "On macOS the server runs as a login agent, installed on first use.",
       );
       process.exit(0);
     } else if (!a.startsWith("-")) args.repo = path.resolve(a);
@@ -73,13 +92,16 @@ async function getJson(url, timeoutMs = 1500, method = "GET") {
   }
 }
 
-/** Is a *differ* answering on this port (vs some unrelated dev server)? */
-async function differRunningAt(port) {
+/**
+ * The health of a *differ* answering on this port (vs some unrelated dev
+ * server), or null.
+ */
+async function differAt(port) {
   try {
     const { body } = await getJson(`http://127.0.0.1:${port}/api/health`);
-    return body?.app === "differ";
+    return body?.app === "differ" ? body : null;
   } catch {
-    return false;
+    return null;
   }
 }
 
@@ -119,19 +141,31 @@ function openWindow(url) {
   });
 }
 
+/** The standalone server.js to run, or null when there's no build. */
 function findServer() {
   // Homebrew layout: bin/differ.mjs next to a standalone build.
   const standalone = path.join(APP_ROOT, "standalone", "server.js");
-  if (existsSync(standalone)) return { cmd: "node", args: [standalone] };
+  if (existsSync(standalone)) return standalone;
   // Repo checkout: the postbuild step assembles .next/standalone.
   const local = path.join(APP_ROOT, ".next", "standalone", "server.js");
-  if (existsSync(local)) return { cmd: "node", args: [local] };
+  if (existsSync(local)) return local;
   return null;
 }
 
-async function waitForHealth(port, tries = 60) {
+/** The build a fresh server would run — what /api/health reports as `build`. */
+function builtId(server) {
+  try {
+    return readFileSync(path.join(path.dirname(server), ".next", "BUILD_ID"), "utf8").trim();
+  } catch {
+    return null;
+  }
+}
+
+/** Wait for a differ on `port`, optionally one running a particular build. */
+async function waitForHealth(port, build = null, tries = 60) {
   for (let i = 0; i < tries; i++) {
-    if (await differRunningAt(port)) return true;
+    const health = await differAt(port);
+    if (health && (build === null || health.build === build)) return true;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   return false;
@@ -235,7 +269,85 @@ async function review() {
   }
 }
 
-if (await differRunningAt(args.port)) {
+const server = findServer();
+const serverLog = path.join(differHome(), "server.log");
+
+/** The login agent's plist, for this build on this port. */
+function agentSpec() {
+  return {
+    server,
+    port: args.port,
+    pathEnv: process.env.PATH ?? "",
+    log: serverLog,
+    differHome: process.env.DIFFER_HOME,
+  };
+}
+
+/**
+ * Whether the login agent should own the server on this port. Not when
+ * Homebrew's service does, and not for a port other than the one an installed
+ * agent already serves — the window open on that port would lose its server.
+ */
+function agentManaged() {
+  if (!launchd.supported() || args.foreground) return false;
+  if (launchd.brewServiceInstalled()) return false;
+  const port = launchd.installedPort();
+  return port === null || port === args.port;
+}
+
+function requireServer() {
+  if (server) return;
+  console.error(
+    "differ: no server build found. In a checkout, run `npm run build` first.",
+  );
+  process.exit(1);
+}
+
+if (args.command === "uninstall") {
+  const had = launchd.supported() && (await launchd.uninstallAgent());
+  console.log(had ? "differ: login agent removed, server stopped." : "differ: no login agent installed.");
+  process.exit(0);
+}
+
+if (args.command === "install") {
+  if (!launchd.supported()) {
+    console.error("differ: the login agent is macOS only.");
+    process.exit(1);
+  }
+  requireServer();
+  // Reinstalling is also how to restart onto a rebuild.
+  if ((await launchd.ensureAgent(agentSpec())) === "started") await launchd.restartAgent();
+  if (!(await waitForHealth(args.port, builtId(server)))) {
+    console.error(`differ: server didn't come up on :${args.port} — see ${serverLog}`);
+    process.exit(1);
+  }
+  console.log(`differ: login agent installed — serving ${base} (log: ${serverLog})`);
+  process.exit(0);
+}
+
+const running = await differAt(args.port);
+
+// A server that outlives every terminal also outlives rebuilds; without this
+// it would serve the old build until the next login.
+if (
+  running &&
+  server &&
+  launchd.installedPort() === args.port &&
+  agentManaged() &&
+  (await launchd.agentLoaded())
+) {
+  const build = builtId(server);
+  if (build && running.build !== build) {
+    say(`differ: restarting the server onto the new build…`);
+    if ((await launchd.ensureAgent(agentSpec())) === "started") await launchd.restartAgent();
+    if (!(await waitForHealth(args.port, build))) {
+      console.error(`differ: server didn't come back on :${args.port} — see ${serverLog}`);
+      process.exit(1);
+    }
+  }
+}
+
+if (running) {
   if (args.review) await review();
   const repo = await handOff();
   if (!repo) process.exit(1);
@@ -243,12 +355,25 @@ if (await differRunningAt(args.port)) {
   process.exit(0);
 }
 
-const server = findServer();
-if (!server) {
-  console.error(
-    "differ: no server build found. In a checkout, run `npm run build` first.",
-  );
-  process.exit(1);
+requireServer();
+
+if (agentManaged()) {
+  const result = await launchd.ensureAgent(agentSpec());
+  if (result === "installed") {
+    say(
+      "differ: installed a login agent, so the server now starts on its own — " +
+        "`differ uninstall` removes it.",
+    );
+  }
+  if (!(await waitForHealth(args.port))) {
+    console.error(`differ: server didn't come up on :${args.port} — see ${serverLog}`);
+    process.exit(1);
+  }
+  if (args.review) await review();
+  const repo = await handOff();
+  if (!repo) process.exit(1);
+  say(`differ serving ${base} — ${repo}`);
+  process.exit(0);
 }
 
 const env = {
@@ -261,23 +386,21 @@ if (args.review) {
   // Detached: `differ review` exits the moment you answer, and the window
   // you're answering in mustn't die with it. The next `differ` reuses it.
   mkdirSync(differHome(), { recursive: true });
-  const log = openSync(path.join(differHome(), "server.log"), "a");
-  const child = spawn(server.cmd, server.args, {
+  const log = openSync(serverLog, "a");
+  const child = spawn("node", [server], {
     env,
     detached: true,
     stdio: ["ignore", log, log],
   });
   child.unref();
   if (!(await waitForHealth(args.port))) {
-    console.error(
-      `differ: server didn't come up on :${args.port} — see ${path.join(differHome(), "server.log")}`,
-    );
+    console.error(`differ: server didn't come up on :${args.port} — see ${serverLog}`);
     process.exit(1);
   }
   await review();
 }
 
-const child = spawn(server.cmd, server.args, {
+const child = spawn("node", [server], {
   env,
   stdio: ["ignore", "inherit", "inherit"],
 });

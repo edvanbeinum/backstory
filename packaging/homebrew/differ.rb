@@ -6,7 +6,8 @@
 #
 #   brew tap edvanbeinum/differ
 #   brew install differ
-#   brew services start differ    # optional: keep the server always running
+#   brew services start differ    # optional: plain `differ` installs its own
+#                                 # login agent otherwise; with this, it defers
 #
 # The release tarball this expects is the standalone build plus the launcher:
 #   npm ci && npm run build

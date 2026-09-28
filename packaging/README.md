@@ -14,11 +14,15 @@ you're standing in.
    The installed window gets its own dock icon and Cmd-Tab entry. It always
    opens at `/`; repo selection reaches it through the handoff below.
 
-2. **The always-on server.** `brew services start differ` registers a launchd
-   agent running the standalone build on `127.0.0.1:4460`, kept alive across
-   logins. Without the service, the `differ` CLI starts a foreground server
-   tied to the terminal instead — everything still works, the window just
-   dies with the terminal.
+2. **The always-on server.** The first `differ` that finds no server running
+   installs a launchd agent (`dev.differ.server`, see `bin/launchd.mjs`)
+   running the standalone build on `127.0.0.1:4460`, kept alive across
+   logins. It records the PATH of the shell it was installed from, so it
+   finds the same `node`, `git` and `gh`; whenever that or the build moves,
+   the next `differ` rewrites it. `brew services start differ` does the same
+   job under Homebrew's label, and the CLI defers to it when it's installed.
+   `--foreground` (and non-macOS) keeps the old behaviour: a server tied to
+   the terminal.
 
    Because the window can outlive the server either way, a service worker
    (`public/sw.js`) catches the failed navigation and serves
@@ -43,7 +47,9 @@ differ                       # from any repo
 ```
 
 Then install the window from the browser as above. This is the full
-experience minus launchd; the CLI's foreground server fills in.
+experience, launchd included — the agent points at this checkout's
+`.next/standalone`, and the next `differ` after an `npm run build` restarts it
+onto the new build.
 
 ## Publishing the Homebrew formula
 
