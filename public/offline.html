@@ -176,7 +176,8 @@
       details p {
         margin: 10px 0 0;
       }
-      details code {
+      details code,
+      .card p code {
         font-family:
           ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
         font-size: 11px;
@@ -192,13 +193,15 @@
       <h1><span class="dot"></span> differ isn't running</h1>
       <p class="lede">
         This window is fine — the local server behind it isn't answering on port
-        <strong id="port">4460</strong>. It doesn't survive a restart unless you
-        tell it to.
+        <strong id="port">4460</strong>.
       </p>
 
       <div class="card">
         <h2>Start it</h2>
-        <p>Run this in a terminal, from any git checkout:</p>
+        <p>
+          Run this in a terminal, from any git checkout. On a Mac it also
+          installs a login agent, so you won't see this screen again.
+        </p>
         <div class="cmd">
           <code id="start-cmd">differ</code>
           <button type="button" data-copy="start-cmd">Copy</button>
@@ -206,14 +209,15 @@
       </div>
 
       <div class="card">
-        <h2>Or start it for good</h2>
+        <h2>Seen this before?</h2>
         <p>
-          Registers a launchd agent, so the server comes back on its own after
-          every restart and this screen stops happening.
+          Then the login agent is installed but couldn't start the server —
+          usually a node upgrade moved node off the PATH it recorded. Running
+          <code>differ</code> again rewrites it; the log says what went wrong:
         </p>
         <div class="cmd">
-          <code id="service-cmd">brew services start differ</code>
-          <button type="button" data-copy="service-cmd">Copy</button>
+          <code id="log-cmd">tail ~/.differ/server.log</code>
+          <button type="button" data-copy="log-cmd">Copy</button>
         </div>
       </div>
 

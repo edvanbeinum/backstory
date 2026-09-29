@@ -13,21 +13,26 @@ import { useCallback, useEffect, useRef } from "react";
  *
  * The first build seen is the one this page came from. Returns a check to run
  * whenever the server may have changed: a reconnect, or the window regaining
- * focus.
+ * focus. It resolves true when it has started a reload, so the caller can
+ * leave anything it would have taken from the server to the reloaded page.
  */
-export function useStaleReload(): () => void {
+export function useStaleReload(): () => Promise<boolean> {
   const loadedFrom = useRef<string | null>(null);
 
   const check = useCallback(async () => {
     try {
       const response = await fetch("/api/health", { cache: "no-store" });
       const { build } = (await response.json()) as { build?: string };
-      if (!build) return;
+      if (!build) return false;
       if (loadedFrom.current === null) loadedFrom.current = build;
-      else if (build !== loadedFrom.current) window.location.reload();
+      else if (build !== loadedFrom.current) {
+        window.location.reload();
+        return true;
+      }
     } catch {
       // Server away; the next reconnect checks again.
     }
+    return false;
   }, []);
 
   useEffect(() => {

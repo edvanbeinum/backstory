@@ -14,7 +14,7 @@
  */
 
 // Bump when offline.html changes, or the old copy stays installed.
-const CACHE = "differ-offline-v1";
+const CACHE = "differ-offline-v2";
 const OFFLINE_URL = "/offline.html";
 
 self.addEventListener("install", (event) => {

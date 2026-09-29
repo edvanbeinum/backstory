@@ -393,7 +393,9 @@ export default function Page() {
 
     let cancelled = false;
     const collect = async () => {
-      void checkBuild();
+      // The handoff is taken once. A window reloading onto a new build would
+      // take it and then lose it in the reload, so leave it for the new page.
+      if (await checkBuild()) return;
       try {
         const response = await fetch("/api/open", { cache: "no-store" });
         const data = (await response.json()) as { repo: string | null };
