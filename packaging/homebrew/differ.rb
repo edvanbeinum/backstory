@@ -11,7 +11,7 @@
 #
 # The release tarball this expects is the standalone build plus the launcher:
 #   npm ci && npm run build
-#   tar -czf differ-<version>.tar.gz -C .next standalone -C ../.. bin/differ.mjs
+#   tar -czf differ-<version>.tar.gz -C .next standalone -C ../.. bin
 #
 class Differ < Formula
   desc "Local pre-push PR review: unpushed commits beside their review comments"

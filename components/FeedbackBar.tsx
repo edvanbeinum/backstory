@@ -21,17 +21,20 @@ import { NoteCard, NoteComposer, NoteTick } from "./NoteCard";
 import { sinceLabel } from "./Tick";
 import { Button, copyToClipboard } from "./ui";
 import type { NotesApi } from "./useNotes";
+import type { OutboxApi } from "./useOutbox";
 import type { ReviewApi } from "./useReview";
+import type { OutboxRound } from "@/lib/outbox";
 
 /**
  * The notes you've left on this branch's changes, and the way out for them.
  *
  * Notes go on any change — a commit, the branch as a whole, uncommitted work
  * — so a stack of an agent's commits can be reviewed one at a time and sent
- * in one go. Drafts leave either by the clipboard ("Copy for agent") or, when
- * an agent is waiting on `differ review`, straight to it. Either way they
- * become a round: fixed, since that's what the agent read, and each with a
- * tick that only you set once you've seen it handled.
+ * in one go. Drafts leave by Send — straight to an agent waiting on `differ
+ * review`, or else queued for the agent's Stop hook to collect — or by the
+ * clipboard ("Copy for agent"). Either way they become a round: fixed, since
+ * that's what the agent read, and each with a tick that only you set once
+ * you've seen it handled.
  *
  * Line notes live on their lines in the diff. This holds the rest — general
  * notes, notes on a file this change no longer touches, and drafts left on
@@ -44,6 +47,7 @@ export function FeedbackBar({
   diff,
   session,
   review,
+  outbox,
   onRevChange,
 }: {
   notes: NotesApi;
@@ -53,6 +57,7 @@ export function FeedbackBar({
   diff: DiffResponse | null;
   session: SessionResponse;
   review: ReviewApi;
+  outbox: OutboxApi;
   onRevChange: (rev: string) => void;
 }) {
   const [writing, setWriting] = useState(false);
@@ -104,21 +109,24 @@ export function FeedbackBar({
     return formatFeedback(drafts, { diffs, commits });
   };
 
-  const handOver = () =>
-    notes.send(
-      drafts.map((n) => n.id),
-      Date.now(),
-    );
-
+  /**
+   * The server decides where it goes — a waiting `differ review` if there is
+   * one, the queue otherwise — so the two can't race. It also moves the notes
+   * into their round.
+   */
   const sendToAgent = async () => {
     setSending(true);
     setSendError(null);
     try {
-      const answer =
-        count > 0
-          ? await buildMessage()
-          : "No changes requested — this looks good.\n";
-      if ((await review.send(answer)) && count > 0) handOver();
+      if (count === 0) {
+        await review.send("No changes requested — this looks good.\n");
+        return;
+      }
+      await outbox.send({
+        noteIds: drafts.map((n) => n.id),
+        message: await buildMessage(),
+        at: Date.now(),
+      });
     } catch (err) {
       setSendError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -129,8 +137,14 @@ export function FeedbackBar({
   const copyForAgent = async () => {
     setSendError(null);
     try {
-      if (await copyToClipboard(await buildMessage())) {
-        handOver();
+      const message = await buildMessage();
+      if (await copyToClipboard(message)) {
+        const at = Date.now();
+        const noteIds = drafts.map((n) => n.id);
+        // Not recording how it left is no reason to leave it a draft.
+        if (!(await outbox.send({ noteIds, message, at, via: "clipboard" }))) {
+          notes.send(noteIds, at);
+        }
         setCopied(true);
       }
     } catch (err) {
@@ -222,7 +236,7 @@ export function FeedbackBar({
           {(count > 0 || copied) && (
             <Button
               size="sm"
-              variant={review.waiting ? "default" : "primary"}
+              variant="default"
               disabled={copied}
               onClick={() => void copyForAgent()}
               title="Copy the notes as one markdown message to paste into an agent session. They move into a sent round."
@@ -232,7 +246,7 @@ export function FeedbackBar({
               ) : (
                 <CopyIcon size={14} />
               )}
-              {copied ? "Copied" : review.waiting ? "Copy" : "Copy for agent"}
+              {copied ? "Copied" : "Copy"}
             </Button>
           )}
           {review.waiting && count > 0 && (
@@ -240,16 +254,18 @@ export function FeedbackBar({
               Dismiss
             </Button>
           )}
-          {review.waiting && (
+          {(review.waiting || count > 0) && (
             <Button
               size="sm"
               variant="primary"
               disabled={sending}
               onClick={() => void sendToAgent()}
               title={
-                count > 0
-                  ? "Send the notes to the waiting agent. They move into a sent round."
-                  : "Tell the waiting agent there's nothing to change"
+                count === 0
+                  ? "Tell the waiting agent there's nothing to change"
+                  : review.waiting
+                    ? "Send the notes to the waiting agent. They move into a sent round."
+                    : `${queueTarget(outbox.lastSeen)} — its Stop hook collects them when it next finishes a turn. They move into a sent round.`
               }
             >
               {count > 0
@@ -263,9 +279,9 @@ export function FeedbackBar({
       {notes.error && (
         <p className="text-[12px] text-[var(--danger)]">{notes.error}</p>
       )}
-      {(review.error || sendError) && (
+      {(review.error || outbox.error || sendError) && (
         <p className="text-[12px] text-[var(--danger)]">
-          {review.error ?? sendError} Your notes are still here.
+          {review.error ?? outbox.error ?? sendError} Your notes are still here.
         </p>
       )}
 
@@ -363,6 +379,10 @@ export function FeedbackBar({
               <Round
                 key={round.sentAt}
                 round={round}
+                sent={sentAs(round, outbox.rounds)}
+                seen={outbox.seen}
+                onRetarget={(id) => void outbox.retarget(id)}
+                onCancel={(id) => void outbox.cancel(id)}
                 label={label}
                 noteRev={noteRev}
                 onJump={jumpTo}
@@ -408,6 +428,41 @@ function changeLabel(rev: string, commits: NoteCommit[]): string {
   return rev.slice(0, 7) + (commits.some((c) => c.sha === rev) ? "" : " (gone)");
 }
 
+/** Who Send will reach, said the way the window says it. */
+function queueTarget(lastSeen: OutboxApi["lastSeen"]): string {
+  return lastSeen
+    ? `Queued for the session active here ${sinceLabel(lastSeen.at)}`
+    : "Queued for the next session to stop here";
+}
+
+/** How a round left, if differ recorded it — rounds from before it did aren't. */
+function sentAs(round: RoundGroup, sent: OutboxRound[]): OutboxRound | null {
+  const ids = new Set(round.notes.map((n) => n.id));
+  return sent.find((r) => r.noteIds.some((id) => ids.has(id))) ?? null;
+}
+
+const shortSession = (session: string) => session.slice(0, 8);
+
+/** The round's header: where it went, or where it's waiting to go. */
+function roundStatus(
+  round: RoundGroup,
+  sent: OutboxRound | null,
+  seen: Record<string, number>,
+): string {
+  if (!sent) return `Sent ${sinceLabel(round.sentAt)}`;
+  if (sent.deliveredAt === null) {
+    if (sent.forSession === null) return "Queued for the next session to stop here";
+    const at = seen[sent.forSession];
+    return at
+      ? `Queued for the session active here ${sinceLabel(at)}`
+      : `Queued for session ${shortSession(sent.forSession)}`;
+  }
+  const when = sinceLabel(sent.deliveredAt);
+  if (sent.deliveredTo === "clipboard") return `Copied ${when}`;
+  if (sent.deliveredTo === "differ review") return `Sent to the waiting agent ${when}`;
+  return `Delivered ${when} to session ${shortSession(sent.deliveredTo ?? "")}`;
+}
+
 interface RoundGroup {
   sentAt: number;
   notes: Note[];
@@ -431,12 +486,21 @@ function groupRounds(notes: Note[]): RoundGroup[] {
  */
 function Round({
   round,
+  sent,
+  seen,
+  onRetarget,
+  onCancel,
   label,
   noteRev,
   onJump,
   onTick,
 }: {
   round: RoundGroup;
+  /** Its record in the outbox, when there is one */
+  sent: OutboxRound | null;
+  seen: Record<string, number>;
+  onRetarget: (id: string) => void;
+  onCancel: (id: string) => void;
   label: (rev: string) => string;
   noteRev: string | null;
   onJump: (note: Note) => void;
@@ -458,12 +522,36 @@ function Round({
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center gap-2 text-left text-[12px] text-[var(--fg-muted)] hover:text-[var(--fg)]"
       >
-        <span className="font-medium">Sent {sinceLabel(round.sentAt)}</span>
+        <span className="font-medium">{roundStatus(round, sent, seen)}</span>
         <span className={complete ? "text-[var(--handled)]" : ""}>
           · {done} of {total} handled
         </span>
         <span className="ml-auto">{open ? "Hide" : "Show"}</span>
       </button>
+      {sent && sent.deliveredAt === null && (
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          {/* Never delivered anywhere it wasn't aimed without you saying so:
+              this is for when the session it was aimed at has ended. */}
+          {sent.forSession !== null && (
+            <Button
+              size="sm"
+              variant="invisible"
+              title="For when that session has ended: whichever session stops here next collects it"
+              onClick={() => onRetarget(sent.id)}
+            >
+              Send to the next session instead
+            </Button>
+          )}
+          <Button
+            size="sm"
+            variant="invisible"
+            title="Withdraw this round; its notes go back to drafts"
+            onClick={() => onCancel(sent.id)}
+          >
+            Cancel
+          </Button>
+        </div>
+      )}
       {open && (
         <ul className="mt-1 space-y-1">
           {round.notes.map((note) => (

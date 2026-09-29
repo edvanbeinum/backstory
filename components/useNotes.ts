@@ -16,6 +16,8 @@ export interface NotesApi {
   tick: (id: string, done: boolean) => void;
   clearDrafts: () => void;
   clearDone: () => void;
+  /** Re-read the store, after something else changed it (Send, Cancel) */
+  reload: () => void;
 }
 
 /**
@@ -146,5 +148,6 @@ export function useNotes(root: string): NotesApi {
     tick,
     clearDrafts,
     clearDone,
+    reload: load,
   };
 }
