@@ -104,3 +104,51 @@ test("a short name that two lanes would share stays long", () => {
   const labels = shortLabels(["HistoryView", "HistoryModel", "ExerciseView", "ExerciseModel"].map(lane));
   assert.deepEqual([...labels.values()], ["HistoryView", "HistoryModel", "ExerciseView", "ExerciseModel"]);
 });
+
+test("coverage counts the diff's own hunks, on a flow or not", async () => {
+  const { coverage } = await import("../lib/flows/coverage");
+  const set = {
+    base: "b",
+    head: "h",
+    generatedAt: 0,
+    flows: [],
+    hunks: [
+      { id: "H1", file: "a.ts", oldStart: 3, oldLines: 1, newStart: 3, newLines: 1, flows: ["f"] },
+      { id: "H2", file: "a.ts", oldStart: 40, oldLines: 0, newStart: 41, newLines: 1, flows: [], reason: "a comment" },
+    ],
+    appFiles: ["a.ts"],
+    costUsd: 0,
+    durationMs: 0,
+  };
+  const line = (type: "add" | "del" | "context", oldNo: number | null, newNo: number | null) => ({
+    type,
+    oldNo,
+    newNo,
+    content: "",
+  });
+  const files = [
+    {
+      oldPath: "a.ts",
+      newPath: "a.ts",
+      path: "a.ts",
+      status: "modified" as const,
+      isBinary: false,
+      additions: 2,
+      deletions: 1,
+      lang: null,
+      hunks: [
+        { header: "", oldStart: 1, oldLines: 5, newStart: 1, newLines: 5, lines: [line("context", 2, 2), line("del", 3, null), line("add", null, 3), line("context", 4, 4)] },
+        { header: "", oldStart: 38, oldLines: 4, newStart: 39, newLines: 5, lines: [line("context", 40, 40), line("add", null, 41), line("context", 41, 42)] },
+      ],
+    },
+    { ...{ oldPath: "t.test.ts", newPath: "t.test.ts", path: "t.test.ts" }, status: "added" as const, isBinary: false, additions: 1, deletions: 0, lang: null, hunks: [] },
+  ];
+  const result = coverage(set, files);
+  assert.deepEqual(
+    result.map((h) => [h.line, h.onFlow, h.offFlow.map((z) => z.id)]),
+    [
+      [3, true, []],
+      [41, false, ["H2"]],
+    ],
+  );
+});

@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChangePane, openingChangeFor } from "@/components/ChangePane";
 import { CommentPane } from "@/components/CommentPane";
 import type { FileMarks } from "@/components/DiffFile";
+import { FlowCoverage } from "@/components/FlowCoverage";
 import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
 import { MapStrip } from "@/components/MapStrip";
 import type { MapResponse } from "@/lib/map";
@@ -1259,7 +1260,18 @@ export default function Page() {
                       rows={rows}
                       filesInDiff={filesInDiff}
                       navRef={flowNavRef}
-                      coverage={null}
+                      coverage={
+                        flowSet && diff && diff.rev === rev ? (
+                          <FlowCoverage
+                            set={flowSet}
+                            files={diff.files}
+                            tracing={
+                              flows.status?.status === "ready" ? flows.status.tracing : []
+                            }
+                            onTrace={flows.trace}
+                          />
+                        ) : null
+                      }
                     />
                   }
                   comments={
