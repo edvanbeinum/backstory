@@ -1063,7 +1063,6 @@ tr.flow-inview td.diff-num {
 .map-node {
   position: absolute;
   z-index: 1;
-  overflow: hidden;
   padding: 8px 11px 7px;
   border: 1px solid var(--fg-subtle);
   border-radius: 6px;
@@ -1083,11 +1082,63 @@ tr.flow-inview td.diff-num {
 }
 .map-node p {
   margin: 1px 0 0;
-  overflow: hidden;
   font-size: 12px;
   line-height: 16px;
-  white-space: nowrap;
+  color: var(--fg-muted);
+}
+.map-node.jumps {
+  cursor: pointer;
+}
+.map-files {
+  margin: 6px 0 0;
+  padding: 2px 0 0;
+  border-top: 1px solid var(--border-muted);
+}
+.map-files button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+}
+.map-files .name {
+  min-width: 0;
+  overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 11.5px;
+  color: var(--accent);
+}
+.map-files button:hover .name {
+  text-decoration: underline;
+}
+.map-files .new,
+.map-files .gone {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.map-files .new {
+  color: var(--success);
+}
+.map-files .gone {
+  color: var(--danger);
+}
+.map-files .stat {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+.map-files .more {
   color: var(--fg-muted);
 }
 .map-node .foot {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
 import { AlertIcon, ChevronDownIcon } from "./icons";
@@ -11,8 +11,11 @@ import { AlertIcon, ChevronDownIcon } from "./icons";
  * pushes the flow down.
  */
 
-const NODE_H = { full: 74, slim: 50 };
-const ROW_GAP = 60;
+const ROW_GAP = 56;
+const MIN_NODE_W = 190;
+const MAX_NODE_W = 280;
+/** Files named in a box before the rest fold into "+N more". */
+const MAX_FILES = 4;
 const COL_GAP = 18;
 const PAD = 14;
 
@@ -28,7 +31,25 @@ interface Placed extends MapNode {
  * leading to it, so callers sit above what they call. Within a row, nodes
  * follow their callers' order.
  */
-function layout(nodes: MapNode[], edges: MapEdge[], width: number) {
+/**
+ * A box's height before it's measured: name, the description wrapped, and
+ * one line per file named. The real height replaces it after the first paint.
+ */
+function estimateHeight(n: MapNode, w: number) {
+  const inner = w - 24;
+  const descLines = n.description ? Math.ceil((n.description.length * 6.4) / inner) : 0;
+  const nameLines = Math.ceil((n.name.length * 7.6 + (n.state === "added" || n.state === "removed" ? 60 : 0)) / inner);
+  const files = Math.min(n.files.length, MAX_FILES + 1);
+  const foot = n.state === "touched" || n.state === "added" ? 24 : 0;
+  return 16 + nameLines * 18 + descLines * 16 + (files ? 8 + files * 18 : 0) + foot;
+}
+
+function layout(
+  nodes: MapNode[],
+  edges: MapEdge[],
+  width: number,
+  heights: Map<string, number> = new Map(),
+) {
   const ids = nodes.map((n) => n.id);
   const into = new Map<string, string[]>(ids.map((id) => [id, []]));
   for (const e of edges) if (e.source !== e.destination) into.get(e.destination)?.push(e.source);
@@ -59,18 +80,18 @@ function layout(nodes: MapNode[], edges: MapEdge[], width: number) {
       return xs.length ? xs.reduce((a, p) => a + p.x + p.w / 2, 0) / xs.length : Infinity;
     };
     row.sort((a, b) => pos(a) - pos(b));
-    const perLine = Math.max(1, Math.min(row.length, Math.floor((width - 2 * PAD + COL_GAP) / (140 + COL_GAP))));
+    const perLine = Math.max(1, Math.min(row.length, Math.floor((width - 2 * PAD + COL_GAP) / (MIN_NODE_W + COL_GAP))));
     for (let start = 0; start < row.length; start += perLine) {
       const line = row.slice(start, start + perLine);
-      const w = Math.min(210, (width - 2 * PAD - (line.length - 1) * COL_GAP) / line.length);
+      const w = Math.min(MAX_NODE_W, (width - 2 * PAD - (line.length - 1) * COL_GAP) / line.length);
       const total = line.length * w + (line.length - 1) * COL_GAP;
       let x = (width - total) / 2;
-      const h = Math.max(...line.map((n) => (n.state === "neighbour" ? NODE_H.slim : NODE_H.full)));
-      for (const n of line) {
-        placed.set(n.id, { ...n, x, y, w, h: n.state === "neighbour" ? NODE_H.slim : NODE_H.full });
+      const hs = line.map((n) => heights.get(n.id) ?? estimateHeight(n, w));
+      line.forEach((n, i) => {
+        placed.set(n.id, { ...n, x, y, w, h: hs[i] });
         x += w + COL_GAP;
-      }
-      y += h + ROW_GAP;
+      });
+      y += Math.max(...hs) + ROW_GAP;
     }
   }
   return { placed, height: y - ROW_GAP + PAD };
@@ -111,16 +132,48 @@ function Squares({ add, del }: { add: number; del: number }) {
   );
 }
 
+/** Scroll the diff to a file and flash its header. */
+function jumpToFile(path: string) {
+  const section = document.getElementById(`file-${encodeURIComponent(path)}`);
+  if (!section) return;
+  section.scrollIntoView({ block: "start" });
+  section.classList.remove("flash");
+  void section.offsetWidth;
+  section.classList.add("flash");
+}
+
+const fileName = (path: string) => path.split("/").pop() ?? path;
+
 function MapCanvas({
   map,
   width,
   onHover,
+  onJump,
 }: {
   map: MapResponse;
   width: number;
   onHover: (component: string | null) => void;
+  onJump: (path: string) => void;
 }) {
-  const { placed, height } = useMemo(() => layout(map.nodes, map.edges, width), [map, width]);
+  const [heights, setHeights] = useState<Map<string, number>>(new Map());
+  const { placed, height } = useMemo(
+    () => layout(map.nodes, map.edges, width, heights),
+    [map, width, heights],
+  );
+  const boxes = useRef(new Map<string, HTMLDivElement>());
+
+  // Boxes size to what they say; lay out again once their real heights are
+  // known, so arrows meet their edges.
+  useLayoutEffect(() => {
+    const next = new Map<string, number>();
+    let changed = false;
+    for (const [id, el] of boxes.current) {
+      const h = el.offsetHeight;
+      next.set(id, h);
+      if (Math.abs((heights.get(id) ?? -1) - h) > 1) changed = true;
+    }
+    if (changed) setHeights(next);
+  }, [placed, heights]);
   const [hoverEdge, setHoverEdge] = useState<string | null>(null);
 
   // Spread several arrows along a node's edge rather than stacking them.
@@ -191,41 +244,83 @@ function MapCanvas({
         );
       })}
 
-      {[...placed.values()].map((n) => (
-        <div
-          key={n.id}
-          className={`map-node ${n.state}`}
-          style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
-          onMouseEnter={() => onHover(n.state === "neighbour" ? null : n.name)}
-          onMouseLeave={() => onHover(null)}
-          title={
-            n.files.length
-              ? `${n.files.length} ${n.files.length === 1 ? "file" : "files"} · ${n.files.map((f) => f.split("/").pop()).join(", ")}`
-              : n.description
-          }
-        >
-          <h4>
-            <span className="truncate">{n.name}</span>
-            {n.state === "added" && <span className="map-tag new">New</span>}
-            {n.state === "removed" && <span className="map-tag removed">Removed</span>}
-          </h4>
-          {n.description && <p>{n.description}</p>}
-          {n.state !== "neighbour" && n.state !== "removed" && (
-            <div className="foot">
-              <span className="mono">
-                <span className="text-[var(--success)]">+{n.additions}</span>
-                {n.deletions > 0 && <span className="text-[var(--danger)]"> −{n.deletions}</span>}
-              </span>
-              <Squares add={n.additions} del={n.deletions} />
-              <span className="truncate">
-                {n.newFiles === n.files.length && n.newFiles > 0
-                  ? `${n.newFiles} new ${n.newFiles === 1 ? "file" : "files"}`
-                  : `${n.files.length} ${n.files.length === 1 ? "file" : "files"}`}
-              </span>
-            </div>
-          )}
-        </div>
-      ))}
+      {[...placed.values()].map((n) => {
+        // "+1 more" takes a line anyway: name the file instead.
+        const shown = n.fileStats.slice(0, n.fileStats.length === MAX_FILES + 1 ? MAX_FILES + 1 : MAX_FILES);
+        const more = n.fileStats.length - shown.length;
+        return (
+          <div
+            key={n.id}
+            ref={(el) => {
+              if (el) boxes.current.set(n.id, el);
+              else boxes.current.delete(n.id);
+            }}
+            className={`map-node ${n.state} ${n.files.length ? "jumps" : ""}`}
+            style={{ left: n.x, top: n.y, width: n.w }}
+            onMouseEnter={() => onHover(n.state === "neighbour" ? null : n.name)}
+            onMouseLeave={() => onHover(null)}
+            onClick={() => n.files[0] && onJump(n.files[0])}
+          >
+            <h4>
+              <span>{n.name}</span>
+              {n.state === "added" && <span className="map-tag new">New</span>}
+              {n.state === "removed" && <span className="map-tag removed">Removed</span>}
+            </h4>
+            {n.description && <p>{n.description}</p>}
+            {shown.length > 0 && (
+              <ul className="map-files">
+                {shown.map((f) => (
+                  <li key={f.path}>
+                    <button
+                      type="button"
+                      title={`${f.path} — show it in the diff`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onJump(f.path);
+                      }}
+                    >
+                      <span className="name">{fileName(f.path)}</span>
+                      {f.status === "A" && <span className="new">new</span>}
+                      {f.status === "D" && <span className="gone">deleted</span>}
+                      <span className="stat">
+                        <span className="text-[var(--success)]">+{f.additions}</span>
+                        {f.deletions > 0 && <span className="text-[var(--danger)]"> −{f.deletions}</span>}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+                {more > 0 && (
+                  <li>
+                    <button
+                      type="button"
+                      className="more"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onJump(n.fileStats[shown.length].path);
+                      }}
+                    >
+                      +{more} more {more === 1 ? "file" : "files"}
+                    </button>
+                  </li>
+                )}
+              </ul>
+            )}
+            {(n.state === "touched" || n.state === "added") && (
+              <div className="foot">
+                <span className="mono">
+                  <span className="text-[var(--success)]">+{n.additions}</span>
+                  {n.deletions > 0 && <span className="text-[var(--danger)]"> −{n.deletions}</span>}
+                </span>
+                <Squares add={n.additions} del={n.deletions} />
+                <span>
+                  {n.files.length} {n.files.length === 1 ? "file" : "files"}
+                  {n.newFiles > 0 && n.newFiles < n.files.length && `, ${n.newFiles} new`}
+                </span>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -411,7 +506,17 @@ export function MapStrip({
       {open && (
         <div className="map-overlay">
           <div className="map-card">
-            <MapCanvas map={map} width={width} onHover={onHover} />
+            <MapCanvas
+              map={map}
+              width={width}
+              onHover={onHover}
+              onJump={(path) => {
+                setOpen(false);
+                onHover(null);
+                // After the overlay is gone, so the jump lands where you can see it.
+                requestAnimationFrame(() => jumpToFile(path));
+              }}
+            />
             <div className="map-foot">
               {map.hidden > 0 && (
                 <span className="map-chip">

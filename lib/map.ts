@@ -21,6 +21,8 @@ export interface MapNode {
   type: string;
   state: NodeState;
   files: string[];
+  /** Each file's own change, in `files` order */
+  fileStats: { path: string; additions: number; deletions: number; status: string }[];
   additions: number;
   deletions: number;
   newFiles: number;
@@ -135,7 +137,10 @@ export async function buildMap(
 
   // Files: each to its one leaf element. A deleted file maps by the base
   // model, where its element may still exist.
-  const touched = new Map<string, { files: string[]; additions: number; deletions: number; newFiles: number }>();
+  const touched = new Map<
+    string,
+    { files: string[]; fileStats: MapNode["fileStats"]; additions: number; deletions: number; newFiles: number }
+  >();
   const fileComponents: Record<string, string> = {};
   const unmapped: string[] = [];
   const ambiguous: { file: string; ids: string[] }[] = [];
@@ -152,8 +157,9 @@ export async function buildMap(
       ambiguous.push({ file: f.path, ids });
       continue;
     }
-    const entry = touched.get(ids[0]) ?? { files: [], additions: 0, deletions: 0, newFiles: 0 };
+    const entry = touched.get(ids[0]) ?? { files: [], fileStats: [], additions: 0, deletions: 0, newFiles: 0 };
     entry.files.push(f.path);
+    entry.fileStats.push({ path: f.path, additions: f.additions, deletions: f.deletions, status: f.status });
     entry.additions += f.additions;
     entry.deletions += f.deletions;
     if (f.status === "A") entry.newFiles++;
@@ -242,6 +248,7 @@ export async function buildMap(
             ? "touched"
             : "neighbour",
       files: t?.files ?? [],
+      fileStats: t?.fileStats ?? [],
       additions: t?.additions ?? 0,
       deletions: t?.deletions ?? 0,
       newFiles: t?.newFiles ?? 0,
