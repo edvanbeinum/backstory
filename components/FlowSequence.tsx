@@ -9,7 +9,9 @@ import type { FlowParticipant } from "@/lib/flows/types";
 const ROW = 40;
 const ARROW_Y = 30;
 const GUTTER = 76;
-const MIN_LANE = 120;
+const MIN_LANE = 84;
+/** Below this, lane names alternate between two rows so they can be wider. */
+const STAGGER_BELOW = 150;
 
 /**
  * The sequence diagram: participants across the top, one call per row,
@@ -46,6 +48,8 @@ export function FlowSequence({
   const labels = useMemo(() => shortLabels(lanes), [lanes]);
   const laneW = Math.max(MIN_LANE, (width - GUTTER) / Math.max(lanes.length, 1));
   const inner = GUTTER + laneW * lanes.length;
+  const stagger = lanes.length > 1 && laneW < STAGGER_BELOW;
+  const chipW = (stagger ? 2 * laneW : laneW) - 12;
   const x = (name: string) => {
     const i = lanes.findIndex((l) => l.name === name);
     return laneW * ((i === -1 ? 0 : i) + 0.5);
@@ -53,21 +57,26 @@ export function FlowSequence({
   const height = rows.length * ROW;
 
   const marker = (kind: string) => `url(#${id}-${kind})`;
+  // A name chip is centred on its lane, but kept inside the lanes' area.
+  const chipLeft = (p: FlowParticipant) => {
+    const half = Math.min(chipW, (labels.get(p.name) ?? p.label).length * 7 + 18) / 2;
+    return Math.min(Math.max(x(p.name), half), laneW * lanes.length - half);
+  };
 
   return (
     <div className="flow-seq">
       <div ref={measure} className="thin-scroll overflow-x-auto">
-        <div style={{ minWidth: inner, ["--lane-w" as string]: `${laneW - 12}px` }}>
+        <div style={{ minWidth: inner, ["--lane-w" as string]: `${chipW}px` }}>
           <div className="flow-grid flow-head">
             <span className="oh">{mode === "after" ? "now" : "was"}</span>
             <span className="oh">{mode === "diff" ? "now" : ""}</span>
             <span />
-            <div className="flow-lanes">
-              {lanes.map((p) => (
+            <div className="flow-lanes" style={{ height: stagger ? 58 : 36 }}>
+              {lanes.map((p, i) => (
                 <span
                   key={p.name}
                   className={`flow-who ${p.external ? "external" : ""}`}
-                  style={{ left: x(p.name) }}
+                  style={{ left: chipLeft(p), top: stagger && i % 2 === 1 ? 31 : 6 }}
                   title={[p.name, p.component && `in ${p.component}`, p.external && "external"]
                     .filter(Boolean)
                     .join(" · ")}
@@ -147,7 +156,15 @@ export function FlowSequence({
               const from = x(row.step.from);
               const to = x(row.step.to);
               // The rows' lane cell starts where the SVG does, so they share x.
-              const left = from === to ? from + 28 : Math.min(from, to) + 8;
+              // A label that won't fit to the right of its arrow ends at the
+              // card's edge instead, reading back over the lanes to its left.
+              const area = laneW * lanes.length;
+              const start = from === to ? from + 28 : Math.min(from, to) + 8;
+              const text = [row.step.label, row.step.returns ? `→ ${row.step.returns}` : ""].join(" ");
+              const fits = start + text.length * 7.3 + 8 <= area;
+              const place = fits
+                ? { left: start, maxWidth: `calc(100% - ${start + 8}px)` }
+                : { right: 8, maxWidth: area - 16 };
               const first = mode === "after" ? row.now : row.was;
               const second = mode === "diff" ? row.now : null;
               return (
@@ -163,7 +180,7 @@ export function FlowSequence({
                   <span className="n">{second ?? ""}</span>
                   <span className="m" />
                   <span className="l">
-                    <span className="lab" style={{ left, maxWidth: `calc(100% - ${left + 8}px)` }}>
+                    <span className="lab" style={place}>
                       <span className="min-w-0 truncate">{row.step.label}</span>
                       {row.step.returns && (
                         <span className="ret min-w-0 shrink-[2] truncate">→ {row.step.returns}</span>
