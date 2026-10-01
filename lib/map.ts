@@ -41,6 +41,8 @@ export interface MapResponse {
   baseModel: boolean;
   /** The committed JSON wasn't re-exported after the DSL changed */
   stale: boolean;
+  /** The model is kept on this machine, not in the repo: no structural diff */
+  local: boolean;
   nodes: MapNode[];
   edges: MapEdge[];
   /** Elements in the model that the focused map leaves out */
@@ -116,6 +118,7 @@ export async function buildMap(
     status: "none",
     baseModel: false,
     stale: false,
+    local: false,
     nodes: [],
     edges: [],
     hidden: 0,
@@ -125,7 +128,10 @@ export async function buildMap(
   };
   if (!headRead) return empty;
   const model = headRead.model;
-  const baseModel = base ? ((await readModelAt(root, base))?.model ?? null) : null;
+  // A local model is the same for every commit; comparing it with itself
+  // would claim "no structural change" when nothing was checked.
+  const baseRead = base && !headRead.local ? await readModelAt(root, base) : null;
+  const baseModel = baseRead && !baseRead.local ? baseRead.model : null;
 
   // Files: each to its one leaf element. A deleted file maps by the base
   // model, where its element may still exist.
@@ -250,6 +256,7 @@ export async function buildMap(
     status: "ok",
     baseModel: baseModel !== null,
     stale: headRead.stale,
+    local: headRead.local,
     nodes,
     edges: [...edges.values()].filter((e) => shown.has(e.source) && shown.has(e.destination)),
     hidden: Math.max(0, leaves - nodes.filter((n) => n.state !== "removed").length),

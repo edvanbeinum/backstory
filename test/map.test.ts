@@ -130,3 +130,40 @@ test("a base with no model adds nothing", async () => {
   assert.equal(map.baseModel, false);
   assert.ok(map.nodes.every((n) => n.state !== "added"));
 });
+
+test("a repo with no model uses one kept locally, without a structural diff", async () => {
+  const plain = mkdtempSync(path.join(os.tmpdir(), "differ-local-model-"));
+  const home = mkdtempSync(path.join(os.tmpdir(), "differ-home-"));
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", plain, ...args], { encoding: "utf8" }).trim();
+  try {
+    git("init", "-q");
+    git("config", "user.email", "t@example.com");
+    git("config", "user.name", "Test");
+    writeFileSync(path.join(plain, "README"), "x\n");
+    git("add", ".");
+    git("commit", "-qm", "base");
+    const base = git("rev-parse", "HEAD");
+    mkdirSync(path.join(plain, "src", "a"), { recursive: true });
+    writeFileSync(path.join(plain, "src", "a", "one.ts"), "1\n");
+    git("add", ".");
+    git("commit", "-qm", "head");
+
+    const dir = path.join(home, "models", path.basename(plain));
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(path.join(dir, "workspace.json"), workspace([a, b], [["a", "b", "Calls"]], "v1"));
+    writeFileSync(path.join(dir, "workspace.dsl"), "v1");
+
+    process.env.DIFFER_HOME = home;
+    const map = await buildMap(plain, base, git("rev-parse", "HEAD"));
+    assert.equal(map.status, "ok");
+    assert.equal(map.local, true);
+    assert.equal(map.baseModel, false);
+    assert.equal(map.stale, false);
+    assert.equal(map.fileComponents["src/a/one.ts"], "Alpha");
+  } finally {
+    delete process.env.DIFFER_HOME;
+    rmSync(plain, { recursive: true, force: true });
+    rmSync(home, { recursive: true, force: true });
+  }
+});

@@ -1,6 +1,10 @@
+import { promises as fs } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+
 import picomatch from "picomatch";
 
-import { gitTry } from "./exec";
+import { gitLine, gitTry } from "./exec";
 
 /**
  * The repo's C4 model: `architecture/workspace.json`, exported by Structurizr
@@ -144,26 +148,56 @@ export async function showFile(
   return gitTry(root, ["show", `${rev}:${path}`], { maxBuffer: 32 * 1024 * 1024 });
 }
 
+/**
+ * A model kept on this machine for a repo that doesn't commit one:
+ * `~/.differ/models/<repo>/workspace.json`, named after the main checkout's
+ * folder so every worktree finds it. One model for every commit, so it can
+ * say where a change landed but not what it added or removed.
+ */
+export async function localModelDir(root: string): Promise<string> {
+  const common =
+    (await gitLine(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"])) ??
+    path.join(root, ".git");
+  const home = process.env.DIFFER_HOME || path.join(homedir(), ".differ");
+  return path.join(home, "models", path.basename(path.dirname(common)));
+}
+
+async function readLocalModel(root: string) {
+  const dir = await localModelDir(root);
+  const json = await fs.readFile(path.join(dir, "workspace.json"), "utf8").catch(() => null);
+  if (!json) return null;
+  const dsl = await fs.readFile(path.join(dir, "workspace.dsl"), "utf8").catch(() => null);
+  return { json, dsl };
+}
+
 export async function readModelAt(
   root: string,
   rev: string,
-): Promise<{ model: Model; stale: boolean } | null> {
-  const json = await showFile(root, rev, MODEL_JSON);
-  if (!json) return null;
+): Promise<{ model: Model; stale: boolean; local: boolean } | null> {
+  let json = await showFile(root, rev, MODEL_JSON);
+  let dsl: string | null = null;
+  let local = false;
+  if (json) {
+    dsl = await showFile(root, rev, MODEL_DSL);
+  } else {
+    const found = await readLocalModel(root);
+    if (!found) return null;
+    ({ json, dsl } = found);
+    local = true;
+  }
   let model: Model;
   try {
     model = parseModel(json);
   } catch {
     return null;
   }
-  // The JSON carries the DSL it was exported from. If the committed DSL has
-  // moved on, an agent edited the model and didn't re-export.
-  const dsl = await showFile(root, rev, MODEL_DSL);
+  // The JSON carries the DSL it was exported from. If the DSL has moved on,
+  // someone edited the model and didn't re-export.
   const stale =
     dsl !== null &&
     model.embeddedDsl !== null &&
     dsl.trim() !== model.embeddedDsl.trim();
-  return { model, stale };
+  return { model, stale, local };
 }
 
 /**

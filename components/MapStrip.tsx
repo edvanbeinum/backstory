@@ -300,7 +300,11 @@ function summary(map: MapResponse) {
         <b>{changed.length}</b> touched
       </>,
       names(changed),
-      map.baseModel ? "no structural change" : "no model at base",
+      map.local
+        ? "local model, no structural diff"
+        : map.baseModel
+          ? "no structural change"
+          : "no model at base",
     );
     return parts;
   }
@@ -358,7 +362,7 @@ export function MapStrip({
         <span className="text-[13px] font-semibold">Map</span>
         <span className="text-[12px] text-[var(--fg-muted)]">
           {map.status === "none"
-            ? "· no architecture/workspace.json in this repo"
+            ? "· no architecture/workspace.json in this repo, and no local model"
             : "· this change touches no mapped component"}
         </span>
       </div>
@@ -390,7 +394,10 @@ export function MapStrip({
             className="text-[11px] text-[var(--fg-subtle)]"
             title={[...map.unmapped, ...map.ambiguous.map((a) => `${a.file} ← ${a.ids.join(", ")}`)].join("\n")}
           >
-            {map.unmapped.length > 0 && `${map.unmapped.length} unmapped`}
+            {map.unmapped.length > 0 &&
+              (map.local
+                ? `${map.unmapped.length} ${map.unmapped.length === 1 ? "file" : "files"} the local model has no place for`
+                : `${map.unmapped.length} unmapped`)}
             {map.unmapped.length > 0 && map.ambiguous.length > 0 && " · "}
             {map.ambiguous.length > 0 && `${map.ambiguous.length} ambiguous`}
           </div>
