@@ -742,7 +742,7 @@ tr.note-row td {
 }
 .flow-svg path {
   fill: none;
-  stroke-width: 1.4;
+  stroke-width: 2;
   transition: stroke 160ms ease, stroke-width 160ms ease;
 }
 .flow-svg path.k-ctx {
@@ -750,7 +750,6 @@ tr.note-row td {
 }
 .flow-svg path.k-add {
   stroke: var(--success);
-  stroke-width: 1.6;
 }
 .flow-svg path.k-del {
   stroke: var(--danger);
@@ -762,7 +761,7 @@ tr.note-row td {
 }
 .flow-svg path.inview {
   stroke: var(--accent);
-  stroke-width: 2;
+  stroke-width: 2.6;
 }
 
 .flow-row {

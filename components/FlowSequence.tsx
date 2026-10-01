@@ -214,8 +214,8 @@ export function FlowSequence({
                     viewBox="0 0 10 10"
                     refX="9"
                     refY="5"
-                    markerWidth="6"
-                    markerHeight="6"
+                    markerWidth="4.5"
+                    markerHeight="4.5"
                     orient="auto-start-reverse"
                   >
                     <path d="M0 1 9 5 0 9z" style={{ fill }} />
@@ -226,8 +226,8 @@ export function FlowSequence({
                   viewBox="0 0 10 10"
                   refX="9"
                   refY="5"
-                  markerWidth="6"
-                  markerHeight="6"
+                  markerWidth="4.5"
+                  markerHeight="4.5"
                   orient="auto-start-reverse"
                 >
                   <path d="M1 1 9 5 1 9" fill="none" strokeWidth="1.5" style={{ stroke: "var(--danger)" }} />
