@@ -105,8 +105,10 @@ async function withSnapshot<T>(root: string, rev: string, fn: (dir: string) => P
   }
 }
 
+type LineReader = (file: string, line: number) => Promise<string | null>;
+
 /** Reads lines from a snapshot, a file at a time. */
-function lineReader(dir: string) {
+function lineReader(dir: string): LineReader {
   const cache = new Map<string, string[] | null>();
   return async (file: string, line: number): Promise<string | null> => {
     if (!cache.has(file)) {
@@ -120,16 +122,55 @@ function lineReader(dir: string) {
   };
 }
 
+/** How far from the cited line a symbol may be found: Claude is often a line or two out. */
+const NEAR = 3;
+/** How many lines a call may run over, as a chained query does. */
+const SPAN = 4;
+
+const squash = (text: string) => text.replace(/\s+/g, "");
+
+/**
+ * Does the symbol start on this line? On the line itself, or, ignoring
+ * whitespace, running on over the next few lines.
+ */
+async function startsOn(read: LineReader, file: string, line: number, symbol: string) {
+  const first = await read(file, line);
+  if (first === null || symbol.length === 0) return false;
+  if (first.includes(symbol)) return true;
+  const want = squash(symbol);
+  const head = squash(first);
+  let joined = head;
+  for (let k = 1; k < SPAN; k++) joined += squash((await read(file, line + k)) ?? "");
+  const at = joined.indexOf(want);
+  return at !== -1 && at < head.length;
+}
+
+/**
+ * The line the symbol is really on: the cited one, or the nearest within a
+ * few lines. Null when it isn't there, and the step stays unverified.
+ */
+export async function locate(
+  read: LineReader,
+  file: string,
+  line: number,
+  symbol: string,
+  near = NEAR,
+): Promise<number | null> {
+  for (let d = 0; d <= near; d++) {
+    for (const candidate of d === 0 ? [line] : [line - d, line + d]) {
+      if (candidate >= 1 && (await startsOn(read, file, candidate, symbol))) return candidate;
+    }
+  }
+  return null;
+}
+
 async function verifySteps(dir: string, steps: RawStep[]): Promise<FlowStep[]> {
   const read = lineReader(dir);
   const out: FlowStep[] = [];
   for (const s of steps) {
-    const text = await read(normalisePath(s.file), s.line);
-    out.push({
-      ...s,
-      file: normalisePath(s.file),
-      verified: text !== null && s.symbol.length > 0 && text.includes(s.symbol),
-    });
+    const file = normalisePath(s.file);
+    const found = await locate(read, file, s.line, s.symbol);
+    out.push({ ...s, file, line: found ?? s.line, verified: found !== null });
   }
   return out;
 }
@@ -192,8 +233,8 @@ async function traceBefore(
       const steps = [];
       for (const s of after) {
         const at = baseLineOf(ctx, s.file, s.line);
-        const text = at ? await read(at.file, at.line) : null;
-        const carried = at !== null && text !== null && text.includes(s.symbol);
+        // A carried step's line is proven by the mapping, so no searching nearby.
+        const carried = at !== null && (await startsOn(read, at.file, at.line, s.symbol));
         const { verified: _verified, ...rest } = s;
         steps.push(
           carried

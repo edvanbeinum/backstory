@@ -217,3 +217,32 @@ test("a change with no app code makes no runs", async () => {
   });
   assert.equal(set.flows.length, 0);
 });
+
+test("a symbol is found on a nearby line, or running over several", async () => {
+  const { locate } = await import("../lib/flows/generate");
+  const lines = [
+    "def grants",
+    "  user.access_grants",
+    "    .where(grantable_type: \"Container\")",
+    "    .group(:grantable_id)",
+    "end",
+    "",
+    "def plays",
+    "  Ahoy::Event.where(name: \"play\")",
+  ];
+  const read = async (_file: string, line: number) => lines[line - 1] ?? null;
+  // Claude cited the line before the call: the step moves to where it is.
+  assert.equal(await locate(read, "f.rb", 7, 'Ahoy::Event.where(name: "play")'), 8);
+  // A chained call split across lines starts on its first line.
+  assert.equal(await locate(read, "f.rb", 2, 'user.access_grants.where(grantable_type: "Container")'), 2);
+  // Too far away stays unverified.
+  assert.equal(await locate(read, "f.rb", 1, 'Ahoy::Event.where(name: "play")'), null);
+  assert.equal(await locate(read, "f.rb", 3, "nowhere()"), null);
+});
+
+test("generated files are not app code", async () => {
+  const { isAppCode } = await import("../lib/model");
+  assert.equal(isAppCode(null, "archspec_facts/rails.yml"), false);
+  assert.equal(isAppCode(null, "archspec_todo.yml"), false);
+  assert.equal(isAppCode(null, "app/models/user.rb"), true);
+});
