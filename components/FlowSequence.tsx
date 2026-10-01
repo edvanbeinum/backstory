@@ -229,7 +229,7 @@ export function FlowSequence({
                   <span className="m" />
                   <span className="l">
                     <span className="lab" style={place}>
-                      <span className="min-w-0 truncate">{row.step.label}</span>
+                      <span className="call min-w-0 truncate">{row.step.label}</span>
                       {row.step.returns && (
                         <span className="ret min-w-0 shrink-[2] truncate">→ {row.step.returns}</span>
                       )}

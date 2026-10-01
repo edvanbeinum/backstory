@@ -820,6 +820,21 @@ tr.note-row td {
   white-space: nowrap;
   color: var(--fg);
 }
+/* The call itself reads as a label, its return as a plain note after it. */
+.flow-row .lab .call {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--fg-muted) 11%, var(--canvas));
+}
+.flow-row.k-add .lab .call {
+  background: var(--diff-add-num-bg);
+}
+.flow-row.k-del .lab .call {
+  background: var(--diff-del-bg);
+}
+.flow-row.inview .lab .call {
+  background: color-mix(in srgb, var(--accent) 16%, var(--canvas));
+}
 .flow-row .lab .ret {
   color: var(--fg-muted);
 }
