@@ -4,6 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChangePane, openingChangeFor } from "@/components/ChangePane";
 import { CommentPane } from "@/components/CommentPane";
+import type { FileMarks } from "@/components/DiffFile";
+import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
+import { SideColumn, type ColumnTab } from "@/components/SideColumn";
+import { useFlows } from "@/components/useFlows";
+import { flowRows } from "@/lib/flows/rows";
 import { AlertIcon, FileDiffIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
@@ -115,6 +120,11 @@ export default function Page() {
   const [workingTick, setWorkingTick] = useState(0);
   /** Bumped when an agent starts or stops waiting for a review. */
   const [reviewTick, setReviewTick] = useState(0);
+  /** Bumped when a flow run finishes. */
+  const [flowsTick, setFlowsTick] = useState(0);
+  const [columnTab, setColumnTab] = useState<ColumnTab>("flows");
+  const [flowSel, setFlowSel] = useState<FlowSelection>({ index: 0, mode: "diff" });
+  const flowNavRef = useRef<((delta: number) => void) | null>(null);
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
   const refRef = useRef(ref);
@@ -160,7 +170,10 @@ export default function Page() {
     setRepoPath(path);
     setRef(fromUrl.ref ?? null);
     if (fromUrl.rev) setRev(fromUrl.rev);
-    if (fromUrl.comment) setCommentId(fromUrl.comment);
+    if (fromUrl.comment) {
+      setCommentId(fromUrl.comment);
+      setColumnTab("comments");
+    }
     if (fromUrl.repo) window.localStorage.setItem(STORAGE_KEY, fromUrl.repo);
     setRecents(loadRecents());
     setReady(true);
@@ -455,8 +468,9 @@ export default function Page() {
       if (kinds.length === 0) return;
 
       if (kinds.includes("review")) setReviewTick((t) => t + 1);
-      // A review request alone changes nothing on disk.
-      if (kinds.every((kind) => kind === "review")) return;
+      if (kinds.includes("flows")) setFlowsTick((t) => t + 1);
+      // A review request or a finished flow run changes nothing on disk.
+      if (kinds.every((kind) => kind === "review" || kind === "flows")) return;
 
       setWorkingTick((t) => t + 1);
       void loadSession(repoPath, {
@@ -551,6 +565,67 @@ export default function Page() {
    * where the comment columns are dead weight.
    */
   const hasComments = threads.length > 0;
+
+  /**
+   * The diagram column shows for any commit or the whole branch, where there
+   * are flows to trace, and wherever there are comments to work through.
+   */
+  const showColumn = hasComments || rev !== WORKING_REV;
+  useEffect(() => {
+    if (!hasComments && columnTab === "comments") setColumnTab("flows");
+  }, [hasComments, columnTab]);
+
+  const flows = useFlows(
+    session ? repoPath : "",
+    rev,
+    showColumn && columnTab === "flows",
+    flowsTick,
+  );
+  const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
+
+  // Each view starts on its first flow, as a diff.
+  useEffect(() => {
+    setFlowSel({ index: 0, mode: "diff" });
+  }, [repoPath, rev]);
+
+  const selectedFlow = flowSet?.flows[flowSel.index] ?? null;
+  const flowMode =
+    selectedFlow?.before === null && flowSel.mode === "before" ? "diff" : flowSel.mode;
+  const rows = useMemo(
+    () => (selectedFlow && flowSet ? flowRows(selectedFlow, flowMode, flowSet.hunks) : []),
+    [selectedFlow, flowMode, flowSet],
+  );
+
+  /** The selected flow's steps, by the diff line each sits on. */
+  const flowMarks = useMemo(() => {
+    if (!showColumn || columnTab !== "flows" || rows.length === 0) return null;
+    const marks = new Map<string, FileMarks>();
+    for (const row of rows) {
+      const entry = marks.get(row.step.file) ?? { old: new Map(), new: new Map() };
+      const side = entry[row.side];
+      const number = row.kind === "del" ? row.was : (row.now ?? row.was);
+      side.set(row.step.line, [
+        ...(side.get(row.step.line) ?? []),
+        {
+          key: row.key,
+          chip: row.kind === "del" ? `was step ${number}` : `step ${number}`,
+          was: row.kind === "del",
+        },
+      ]);
+      marks.set(row.step.file, entry);
+    }
+    return marks;
+  }, [rows, showColumn, columnTab]);
+
+  const filesInDiff = useMemo(
+    () =>
+      new Set(
+        (diff?.files ?? []).flatMap((f) =>
+          [f.newPath, f.oldPath].filter((p): p is string => Boolean(p)),
+        ),
+      ),
+    [diff],
+  );
 
   /** Thread ids whose file is touched by the diff currently on screen. */
   const anchoredIds = useMemo(() => {
@@ -929,6 +1004,18 @@ export default function Page() {
       }
       if (!session) return;
 
+      // With the Flows tab open, j/k walk the flow's steps instead.
+      if (
+        showColumn &&
+        columnTab === "flows" &&
+        event.key !== "x" &&
+        flowNavRef.current
+      ) {
+        event.preventDefault();
+        flowNavRef.current(event.key === "j" ? 1 : -1);
+        return;
+      }
+
       // `x` ticks in place and deliberately does not advance: auto-advancing
       // steals the moment you just earned and makes a mis-tick awkward to
       // undo. `j` is right there.
@@ -972,7 +1059,7 @@ export default function Page() {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session, rev, threads, commentId, toggleDone, selectComment]);
+  }, [session, rev, threads, commentId, toggleDone, selectComment, showColumn, columnTab]);
 
   return (
     <div className="min-h-screen">
@@ -1124,34 +1211,46 @@ export default function Page() {
               </p>
             )}
 
-            {/* Two columns, two independent selections: the comment you're
-                working on stays put on the left while you browse changes on
-                the right. Stacks below xl, where side-by-side would squeeze
-                the diff too hard. */}
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
-              {hasComments && (
-              <div
-                className="thin-scroll min-w-0 xl:sticky xl:w-[440px] xl:shrink-0 xl:overflow-y-auto"
-                style={{
-                  top: "calc(var(--header-height, 0px) + 1rem)",
-                  maxHeight: "calc(100vh - var(--header-height, 0px) - 2rem)",
-                }}
-              >
-                <CommentPane
-                  threads={threads}
-                  thread={selectedThread}
-                  index={commentIndex}
-                  onStep={stepComment}
-                  repo={session.repo}
-                  pr={session.github.pr}
-                  commit={commitForRev}
-                  branch={session.repo.branch}
-                  commitCandidates={pinCandidates}
-                  onToggleDone={toggleDone}
-                  onLinkCommit={linkCommit}
-                  onDraftChange={saveDraft}
+            {/* Two columns, two independent selections: the flow or comment
+                you're working on stays put on the left while you browse
+                changes on the right. Stacks below xl, where side-by-side would
+                squeeze the diff too hard. */}
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-0">
+              {showColumn && (
+                <SideColumn
+                  tab={columnTab}
+                  onTab={setColumnTab}
+                  flowCount={flowSet ? flowSet.flows.length : null}
+                  commentCount={threads.length}
+                  showComments={hasComments}
+                  flows={
+                    <FlowPanel
+                      api={flows}
+                      selection={{ ...flowSel, mode: flowMode }}
+                      onSelect={setFlowSel}
+                      rows={rows}
+                      filesInDiff={filesInDiff}
+                      navRef={flowNavRef}
+                      coverage={null}
+                    />
+                  }
+                  comments={
+                    <CommentPane
+                      threads={threads}
+                      thread={selectedThread}
+                      index={commentIndex}
+                      onStep={stepComment}
+                      repo={session.repo}
+                      pr={session.github.pr}
+                      commit={commitForRev}
+                      branch={session.repo.branch}
+                      commitCandidates={pinCandidates}
+                      onToggleDone={toggleDone}
+                      onLinkCommit={linkCommit}
+                      onDraftChange={saveDraft}
+                    />
+                  }
                 />
-              </div>
               )}
 
               <div className="min-w-0 flex-1">
@@ -1180,6 +1279,7 @@ export default function Page() {
                   focusedThreadId={focusedThreadId}
                   pushed={revIsPushed}
                   reviewTick={reviewTick}
+                  flowMarks={flowMarks}
                 />
               </div>
             </div>

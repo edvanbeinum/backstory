@@ -10,6 +10,7 @@ import type {
   SessionResponse,
 } from "@/lib/types";
 import { CommitHeader } from "./CommitHeader";
+import type { FileMarks } from "./DiffFile";
 import { DiffView } from "./DiffView";
 import { CommitPicker } from "./CommitPicker";
 import { FeedbackBar } from "./FeedbackBar";
@@ -123,6 +124,7 @@ export function ChangePane({
   focusedThreadId,
   pushed,
   reviewTick,
+  flowMarks = null,
 }: {
   session: SessionResponse;
   rev: string;
@@ -138,6 +140,8 @@ export function ChangePane({
   pushed: boolean;
   /** Moves when an agent starts or stops waiting for a review */
   reviewTick: number;
+  /** The selected flow's steps, anchored on the diff's lines */
+  flowMarks?: Map<string, FileMarks> | null;
 }) {
   const notes = useNotes(session.repo.root);
   const review = useReview(session.repo.root, reviewTick);
@@ -250,6 +254,7 @@ export function ChangePane({
         focusedThreadId={focusedThreadId}
         notes={noteRev ? notes : null}
         noteRev={noteRev}
+        marks={flowMarks}
       />
 
       {/* Pinned to the bottom of the window while the diff scrolls, so a

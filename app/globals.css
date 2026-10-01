@@ -35,6 +35,12 @@
 
   --overlay-shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
 
+  /* For the flow and map views: Primer's emphasis green (diffstat squares),
+     the UnderlineNav's active tab, and an empty diffstat square. */
+  --success-emphasis: #1f883d;
+  --tab-active: #fd8c73;
+  --square-empty: #d1d9e0;
+
   color-scheme: light;
 }
 
@@ -67,6 +73,10 @@
 
     --overlay-shadow: 0 8px 24px rgba(1, 4, 9, 0.8);
 
+    --success-emphasis: #238636;
+    --tab-active: #f78166;
+    --square-empty: #3d444d;
+
     color-scheme: dark;
   }
 }
@@ -96,6 +106,10 @@
   --diff-hunk-fg: #9198a1;
 
   --overlay-shadow: 0 8px 24px rgba(1, 4, 9, 0.8);
+
+  --success-emphasis: #238636;
+  --tab-active: #f78166;
+  --square-empty: #3d444d;
 
   color-scheme: dark;
 }
@@ -546,5 +560,375 @@ tr.note-row td {
 @media (prefers-reduced-motion: reduce) {
   .tick-strike {
     text-decoration: line-through;
+  }
+}
+
+/* --- Flows ------------------------------------------------------------- */
+
+/*
+ * A sequence diagram on a row grid, drawn to read like the diff beside it:
+ * a gutter of step numbers (was, now), a +/− marker, and one call per row.
+ * Lanes, lifelines and arrows are one SVG laid over the rows.
+ */
+
+.flow-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 10px;
+  font-size: 14px;
+  color: var(--fg);
+}
+.flow-tab svg {
+  color: var(--fg-muted);
+}
+.flow-tab[aria-selected="true"] {
+  font-weight: 600;
+}
+.flow-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 6px;
+  background: var(--tab-active);
+}
+.counter {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 2em;
+  background: color-mix(in srgb, var(--fg-muted) 18%, transparent);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+  color: var(--fg);
+}
+
+.flow-pick {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.flow-pick:hover {
+  color: var(--fg);
+}
+.flow-pick[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+.flow-pick.changed::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--attention);
+  box-shadow: 0 0 0 2px var(--canvas);
+}
+
+.seg {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--fg-muted) 12%, transparent);
+}
+.seg button {
+  padding: 2px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.seg button[aria-pressed="true"] {
+  background: var(--canvas);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.seg button:disabled {
+  opacity: 0.4;
+}
+
+.flow-seq {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+.flow-grid {
+  display: grid;
+  grid-template-columns: 28px 28px 20px 1fr;
+}
+.flow-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--canvas-subtle);
+}
+.flow-head .oh {
+  align-self: center;
+  padding-right: 6px;
+  text-align: right;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.flow-lanes {
+  position: relative;
+  height: 36px;
+}
+.flow-who {
+  position: absolute;
+  top: 8px;
+  max-width: var(--lane-w, 120px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 2em;
+  background: var(--canvas);
+  font-size: 12px;
+  font-weight: 600;
+}
+.flow-who.external {
+  font-weight: 500;
+  color: var(--fg-muted);
+  border-style: dashed;
+}
+
+.flow-rows {
+  position: relative;
+}
+.flow-svg {
+  position: absolute;
+  left: 76px;
+  top: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+.flow-svg .lifeline {
+  stroke: var(--border-muted);
+}
+.flow-svg path {
+  fill: none;
+  stroke-width: 1.4;
+  transition: stroke 160ms ease, stroke-width 160ms ease;
+}
+.flow-svg path.k-ctx {
+  stroke: var(--fg);
+}
+.flow-svg path.k-add {
+  stroke: var(--success);
+  stroke-width: 1.6;
+}
+.flow-svg path.k-del {
+  stroke: var(--danger);
+  stroke-dasharray: 4 3;
+}
+.flow-svg path.unverified {
+  stroke: var(--fg-subtle);
+  stroke-dasharray: 2 3;
+}
+.flow-svg path.inview {
+  stroke: var(--accent);
+  stroke-width: 2;
+}
+
+.flow-row {
+  height: 40px;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.flow-row + .flow-row {
+  box-shadow: inset 0 1px 0 var(--border-muted);
+}
+.flow-row .n {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 5px 6px 0 0;
+  color: var(--fg-subtle);
+}
+.flow-row .m {
+  display: flex;
+  justify-content: center;
+  padding-top: 5px;
+  font-weight: 600;
+}
+.flow-row .n,
+.flow-row .m,
+.flow-row .lab {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 18px;
+}
+.flow-row .l {
+  position: relative;
+}
+.flow-row.k-add .m::before {
+  content: "+";
+  color: var(--success);
+}
+.flow-row.k-del .m::before {
+  content: "−";
+  color: var(--danger);
+}
+.flow-row.k-del .lab {
+  color: var(--fg-muted);
+}
+.flow-row:hover .l,
+.flow-row:hover .m,
+.flow-row:hover .n {
+  background: color-mix(in srgb, var(--accent-subtle) 55%, transparent);
+}
+.flow-row.inview .n {
+  color: var(--accent);
+  font-weight: 600;
+}
+.flow-row.inview .n:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.flow-row.inview .l,
+.flow-row.inview .m {
+  background: color-mix(in srgb, var(--accent-subtle) 70%, transparent);
+}
+.flow-row .lab {
+  position: absolute;
+  z-index: 2;
+  top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  color: var(--fg);
+}
+.flow-row .lab .ret {
+  color: var(--fg-muted);
+}
+.flow-row .lab .flow-badge {
+  flex-shrink: 0;
+}
+.flow-badge {
+  padding: 0 6px;
+  border-radius: 2em;
+  background: color-mix(in srgb, var(--fg-muted) 16%, transparent);
+  color: var(--fg-muted);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica,
+    Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+}
+.flow-badge.warn {
+  background: none;
+  border: 1px dashed var(--attention);
+  color: var(--attention);
+}
+
+.flow-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-muted);
+  background: var(--canvas-subtle);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.flow-here {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.flow-here i {
+  width: 3px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* The diff's side of the sync: a chip on each anchored line, and the line
+   nearest the reading line lit. */
+.flow-chip {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 2em;
+  color: var(--accent);
+  font:
+    600 10px/16px -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  font-style: normal;
+  vertical-align: 1px;
+  white-space: nowrap;
+}
+.flow-chip.was {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+}
+tr.flow-inview td {
+  background: color-mix(in srgb, var(--accent-subtle) 80%, var(--canvas)) !important;
+}
+tr.line-add.flow-inview td {
+  background: color-mix(in srgb, var(--accent-subtle) 80%, var(--diff-add-bg)) !important;
+}
+tr.line-del.flow-inview td {
+  background: color-mix(in srgb, var(--accent-subtle) 70%, var(--diff-del-bg)) !important;
+}
+tr.flow-inview td.diff-num {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.col-resizer {
+  width: 16px;
+  align-self: stretch;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+}
+.col-resizer::before {
+  content: "";
+  width: 1px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+.col-resizer:hover::before,
+.col-resizer[data-dragging="true"]::before {
+  background: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-row,
+  .flow-svg path {
+    transition: none;
   }
 }
