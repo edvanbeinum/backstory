@@ -17,7 +17,7 @@ const STAGGER_BELOW = 150;
 const BOX_NAME_H = 30;
 const BOX_DESC_LINES = 6;
 /** The box's padding below the lane names. */
-const BOX_PAD = 6;
+const BOX_PAD = 16;
 const NONE_OPEN = new Set<string>();
 
 /**

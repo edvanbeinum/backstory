@@ -1301,11 +1301,10 @@ section.file-linked .file-owner {
 .flow-comp {
   position: absolute;
   top: 6px;
-  bottom: 0;
+  bottom: 8px;
   padding: 6px 10px;
   border: 1px solid var(--fg-subtle);
-  border-bottom: 0;
-  border-radius: 6px 6px 0 0;
+  border-radius: 6px;
   background: var(--canvas);
 }
 .flow-comp h4 {
@@ -1329,7 +1328,6 @@ section.file-linked .file-owner {
 }
 .flow-comp.touched {
   border: 1.5px solid var(--fg-muted);
-  border-bottom: 0;
   padding: 5.5px 9.5px;
 }
 .flow-comp.added {
@@ -1351,7 +1349,6 @@ section.file-linked .file-owner {
 }
 .flow-comp.plain {
   border: 1px dashed var(--border);
-  border-bottom: 0;
   background: transparent;
 }
 .flow-comp.plain h4 {
