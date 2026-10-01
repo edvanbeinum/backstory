@@ -697,7 +697,6 @@ tr.note-row td {
 .flow-who {
   position: absolute;
   top: 8px;
-  max-width: var(--lane-w, 120px);
   overflow: hidden;
   text-overflow: ellipsis;
   transform: translateX(-50%);
@@ -1291,4 +1290,63 @@ section.file-linked {
 section.file-linked .file-owner {
   border-color: var(--accent);
   color: var(--accent);
+}
+
+/* Components on a flow: a band over each component's lanes, a line where
+   one component's lanes end, and the path through them under the title. */
+.flow-band {
+  position: absolute;
+  top: 6px;
+  height: 18px;
+  display: flex;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-bottom: 0;
+  border-radius: 5px 5px 0 0;
+}
+.flow-band > span {
+  margin-top: -9px;
+  max-width: calc(100% - 12px);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 6px;
+  background: var(--canvas-subtle);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--fg-muted);
+}
+.flow-band.plain {
+  border-style: dashed;
+}
+.flow-band.plain > span {
+  font-weight: 500;
+  font-style: italic;
+  color: var(--fg-subtle);
+}
+.flow-svg .boundary {
+  stroke: var(--border);
+  stroke-dasharray: 3 4;
+}
+.flow-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.flow-path .name {
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 2em;
+  background: var(--canvas);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.flow-path .arrow {
+  padding: 0 4px;
+  color: var(--fg-subtle);
 }

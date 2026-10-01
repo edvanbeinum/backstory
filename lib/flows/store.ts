@@ -6,6 +6,7 @@ import path from "node:path";
 
 import { gitLine } from "../exec";
 import { claudeAvailable } from "./claude";
+import { attachComponents } from "./components";
 import { generateFlows, traceHunk } from "./generate";
 import { fromSarif, toSarif, type SarifLog } from "./sarif";
 import type { FlowSet, FlowsStatus } from "./types";
@@ -96,7 +97,7 @@ export async function flowsStatus(view: View): Promise<FlowsStatus> {
   if (cached) {
     return {
       status: "ready",
-      flows: cached,
+      flows: await attachComponents(view.root, cached),
       tracing: [...(registry.tracing.get(key) ?? [])],
       traceError: registry.failures.get(key),
     };

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { flowRows, shortLabels, summarise } from "../lib/flows/rows";
+import { componentPath, flowRows, groupLanes, shortLabels, summarise } from "../lib/flows/rows";
 import type { Flow, FlowHunk, FlowStep } from "../lib/flows/types";
 
 const step = (id: string, line: number, extra: Partial<FlowStep> = {}): FlowStep => ({
@@ -151,4 +151,39 @@ test("coverage counts the diff's own hunks, on a flow or not", async () => {
       [41, false, ["H2"]],
     ],
   );
+});
+
+test("lanes group by component, in the order the flow reaches them", () => {
+  const call = (id: string, from: string, to: string) => step(id, 1, { from, to });
+  const f: Flow = {
+    ...flow(null, [
+      call("route", "Router", "Controller"),
+      call("scope", "Controller", "Scope"),
+      call("load", "Controller", "Library"),
+      call("rows", "Library", "Listing"),
+    ]),
+    participants: [
+      { name: "Router", label: "Router", external: true },
+      { name: "Controller", label: "Controller", external: false, component: "Native API" },
+      { name: "Scope", label: "Scope", external: false, component: "Access" },
+      { name: "Library", label: "Library", external: false, component: "Native API" },
+      { name: "Listing", label: "Listing", external: false, component: "Catalog" },
+    ],
+  };
+  const rows = flowRows(f, "after", hunks);
+  const { lanes, groups } = groupLanes(f, rows);
+  assert.deepEqual(
+    lanes.map((l) => l.name),
+    ["Controller", "Library", "Scope", "Listing", "Router"],
+  );
+  assert.deepEqual(
+    groups.map((g) => [g.component, g.start, g.end]),
+    [
+      ["Native API", 0, 1],
+      ["Access", 2, 2],
+      ["Catalog", 3, 3],
+      [null, 4, 4],
+    ],
+  );
+  assert.deepEqual(componentPath(f, rows), ["Native API", "Access", "Catalog"]);
 });

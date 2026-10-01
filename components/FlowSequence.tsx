@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { shortLabels, type FlowMode, type FlowRow } from "@/lib/flows/rows";
+import { shortLabels, type FlowMode, type FlowRow, type LaneGroup } from "@/lib/flows/rows";
 import type { FlowParticipant } from "@/lib/flows/types";
 
 /** Row height, and where in the row the arrow runs. Matches the mockup. */
@@ -12,6 +12,8 @@ const GUTTER = 76;
 const MIN_LANE = 84;
 /** Below this, lane names alternate between two rows so they can be wider. */
 const STAGGER_BELOW = 150;
+/** The component bands above the lane names. */
+const BAND_H = 24;
 
 /**
  * The sequence diagram: participants across the top, one call per row,
@@ -21,6 +23,7 @@ const STAGGER_BELOW = 150;
 export function FlowSequence({
   rows,
   lanes,
+  groups,
   mode,
   activeKeys,
   onRowClick,
@@ -28,6 +31,8 @@ export function FlowSequence({
 }: {
   rows: FlowRow[];
   lanes: FlowParticipant[];
+  /** Lanes by component, in lane order */
+  groups: LaneGroup[];
   mode: FlowMode;
   activeKeys: Set<string>;
   onRowClick: (row: FlowRow) => void;
@@ -46,37 +51,76 @@ export function FlowSequence({
   }, []);
 
   const labels = useMemo(() => shortLabels(lanes), [lanes]);
+  const bandName = (g: LaneGroup) =>
+    g.component ?? (g.external ? "Framework" : "Not on the map");
+
+  // Lanes share the width; a component group gets at least the room its
+  // name needs, so the name is never cut. Wider than the column scrolls.
   const laneW = Math.max(MIN_LANE, (width - GUTTER) / Math.max(lanes.length, 1));
-  const inner = GUTTER + laneW * lanes.length;
-  const stagger = lanes.length > 1 && laneW < STAGGER_BELOW;
-  const chipW = (stagger ? 2 * laneW : laneW) - 12;
-  const x = (name: string) => {
-    const i = lanes.findIndex((l) => l.name === name);
-    return laneW * ((i === -1 ? 0 : i) + 0.5);
-  };
+  const spans: { g: LaneGroup; left: number; width: number }[] = [];
+  const centre = new Map<string, number>();
+  const laneWidth = new Map<string, number>();
+  let cursor = 0;
+  for (const g of groups) {
+    const n = g.end - g.start + 1;
+    const w = Math.max(n * laneW, bandName(g).length * 6.6 + 28);
+    spans.push({ g, left: cursor, width: w });
+    for (let k = 0; k < n; k++) {
+      const lane = lanes[g.start + k];
+      centre.set(lane.name, cursor + (w * (k + 0.5)) / n);
+      laneWidth.set(lane.name, w / n);
+    }
+    cursor += w;
+  }
+  const area = Math.max(cursor, laneW * lanes.length);
+  const inner = GUTTER + area;
+  const narrowest = Math.min(...[...laneWidth.values(), laneW]);
+  const stagger = lanes.length > 1 && narrowest < STAGGER_BELOW;
+  const x = (name: string) => centre.get(name) ?? laneW / 2;
+  const chipWidth = (name: string) => (stagger ? 2 : 1) * (laneWidth.get(name) ?? laneW) - 12;
   const height = rows.length * ROW;
 
   const marker = (kind: string) => `url(#${id}-${kind})`;
   // A name chip is centred on its lane, but kept inside the lanes' area.
   const chipLeft = (p: FlowParticipant) => {
-    const half = Math.min(chipW, (labels.get(p.name) ?? p.label).length * 7 + 18) / 2;
-    return Math.min(Math.max(x(p.name), half), laneW * lanes.length - half);
+    const half = Math.min(chipWidth(p.name), (labels.get(p.name) ?? p.label).length * 7 + 18) / 2;
+    return Math.min(Math.max(x(p.name), half), area - half);
   };
 
   return (
     <div className="flow-seq">
       <div ref={measure} className="thin-scroll overflow-x-auto">
-        <div style={{ minWidth: inner, ["--lane-w" as string]: `${chipW}px` }}>
+        <div style={{ minWidth: inner }}>
           <div className="flow-grid flow-head">
             <span className="oh">{mode === "after" ? "now" : "was"}</span>
             <span className="oh">{mode === "diff" ? "now" : ""}</span>
             <span />
-            <div className="flow-lanes" style={{ height: stagger ? 58 : 36 }}>
+            <div className="flow-lanes" style={{ height: (stagger ? 58 : 36) + BAND_H }}>
+              {spans.map(({ g, left, width: w }) => (
+                <span
+                  key={g.start}
+                  className={`flow-band ${g.component ? "" : "plain"}`}
+                  style={{ left: left + 3, width: w - 6 }}
+                  title={
+                    g.component
+                      ? `${g.component}: a component on the map`
+                      : g.external
+                        ? "Framework and library types"
+                        : "Code the map doesn't place"
+                  }
+                >
+                  <span>{bandName(g)}</span>
+                </span>
+              ))}
               {lanes.map((p, i) => (
                 <span
                   key={p.name}
                   className={`flow-who ${p.external ? "external" : ""}`}
-                  style={{ left: chipLeft(p), top: stagger && i % 2 === 1 ? 31 : 6 }}
+                  style={{
+                    left: chipLeft(p),
+                    top: BAND_H + (stagger && i % 2 === 1 ? 31 : 6),
+                    maxWidth: chipWidth(p.name),
+                  }}
                   title={[p.name, p.component && `in ${p.component}`, p.external && "external"]
                     .filter(Boolean)
                     .join(" · ")}
@@ -90,7 +134,7 @@ export function FlowSequence({
           <div className="flow-rows">
             <svg
               className="flow-svg"
-              width={laneW * lanes.length}
+              width={area}
               height={height}
               aria-hidden="true"
             >
@@ -129,6 +173,11 @@ export function FlowSequence({
               {lanes.map((p) => (
                 <line key={p.name} className="lifeline" x1={x(p.name)} x2={x(p.name)} y1={0} y2={height} />
               ))}
+              {/* Where one component ends and the next begins: a call that
+                  crosses this line is one component calling another. */}
+              {spans.slice(1).map(({ g, left }) => (
+                <line key={g.start} className="boundary" x1={left} x2={left} y1={0} y2={height} />
+              ))}
               {rows.map((row, i) => {
                 const from = x(row.step.from);
                 const to = x(row.step.to);
@@ -158,7 +207,6 @@ export function FlowSequence({
               // The rows' lane cell starts where the SVG does, so they share x.
               // A label that won't fit to the right of its arrow ends at the
               // card's edge instead, reading back over the lanes to its left.
-              const area = laneW * lanes.length;
               const start = from === to ? from + 28 : Math.min(from, to) + 8;
               const text = [row.step.label, row.step.returns ? `→ ${row.step.returns}` : ""].join(" ");
               const fits = start + text.length * 7.3 + 8 <= area;

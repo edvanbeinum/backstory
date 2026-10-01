@@ -182,3 +182,63 @@ export function shortLabels(lanes: { name: string; label: string }[]): Map<strin
     lanes.map((l, i) => [l.name, (seen.get(short[i]) ?? 0) > 1 ? l.label : short[i]]),
   );
 }
+
+export interface LaneGroup {
+  /** The component's name; null for framework types and for code the model doesn't place */
+  component: string | null;
+  external: boolean;
+  /** Lane indexes, inclusive */
+  start: number;
+  end: number;
+}
+
+const groupKey = (p: Flow["participants"][number]) =>
+  p.external ? "\u0000external" : (p.component ?? "\u0000unplaced");
+
+/**
+ * Lanes ordered so each component's types sit side by side, components in
+ * the order the flow first reaches them, framework types at the far edge.
+ * A call that crosses a group's edge is one component calling another.
+ */
+export function groupLanes(
+  flow: Flow,
+  rows: FlowRow[],
+): { lanes: Flow["participants"]; groups: LaneGroup[] } {
+  const lanes = lanesFor(flow, rows);
+  const firstSeen = new Map<string, number>();
+  rows.forEach((r, i) => {
+    for (const name of [r.step.from, r.step.to]) if (!firstSeen.has(name)) firstSeen.set(name, i);
+  });
+  const order = new Map<string, number>();
+  for (const p of [...lanes].sort((a, b) => (firstSeen.get(a.name) ?? 0) - (firstSeen.get(b.name) ?? 0))) {
+    const key = groupKey(p);
+    if (!order.has(key)) order.set(key, order.size);
+  }
+  const rank = (p: Flow["participants"][number]) =>
+    p.external ? Number.MAX_SAFE_INTEGER : (order.get(groupKey(p)) ?? 0);
+  const sorted = lanes
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i)
+    .map(({ p }) => p);
+
+  const groups: LaneGroup[] = [];
+  sorted.forEach((p, i) => {
+    const last = groups[groups.length - 1];
+    if (last && groupKey(sorted[last.start]) === groupKey(p)) last.end = i;
+    else groups.push({ component: p.external ? null : (p.component ?? null), external: p.external, start: i, end: i });
+  });
+  return { lanes: sorted, groups };
+}
+
+/** The components a flow passes through, in the order it first reaches them. */
+export function componentPath(flow: Flow, rows: FlowRow[]): string[] {
+  const byName = new Map(flow.participants.map((p) => [p.name, p]));
+  const path: string[] = [];
+  for (const r of rows) {
+    for (const name of [r.step.from, r.step.to]) {
+      const c = byName.get(name);
+      if (c && !c.external && c.component && !path.includes(c.component)) path.push(c.component);
+    }
+  }
+  return path;
+}

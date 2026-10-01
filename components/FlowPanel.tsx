@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { lanesFor, summarise, type FlowMode, type FlowRow } from "@/lib/flows/rows";
+import { componentPath, groupLanes, summarise, type FlowMode, type FlowRow } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
 import { FlowSequence } from "./FlowSequence";
 import { AlertIcon, ChevronRightIcon, SyncIcon } from "./icons";
@@ -141,7 +141,11 @@ function ReadyFlows({
 }) {
   const flow = set.flows[selection.index] ?? null;
   const summaries = useMemo(() => set.flows.map((f) => summarise(f, set.hunks)), [set]);
-  const lanes = useMemo(() => (flow ? lanesFor(flow, rows) : []), [flow, rows]);
+  const { lanes, groups } = useMemo(
+    () => (flow ? groupLanes(flow, rows) : { lanes: [], groups: [] }),
+    [flow, rows],
+  );
+  const path = useMemo(() => (flow ? componentPath(flow, rows) : []), [flow, rows]);
 
   const [active, setActive] = useState<string[]>([]);
   const [missing, setMissing] = useState<string | null>(null);
@@ -326,6 +330,16 @@ function ReadyFlows({
                 <>Same steps · {stepWord(summary.afterSteps)}</>
               )}
             </div>
+            {path.length > 0 && (
+              <div className="flow-path" title="The map's components this flow passes through, in order">
+                {path.map((c, i) => (
+                  <span key={c}>
+                    {i > 0 && <span className="arrow">→</span>}
+                    <span className="name">{c}</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <span className="seg" role="group" aria-label="Show">
@@ -347,6 +361,7 @@ function ReadyFlows({
         <FlowSequence
           rows={rows}
           lanes={lanes}
+          groups={groups}
           mode={selection.mode}
           activeKeys={activeKeys}
           onRowClick={goTo}

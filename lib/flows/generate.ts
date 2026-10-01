@@ -160,9 +160,9 @@ function baseLineOf(ctx: Context, file: string, line: number) {
   return mapped === null ? null : { file: baseFile, line: mapped };
 }
 
-/** Each participant's component: where the code that calls out from it lives. */
+/** Every participant, declared or only named by a step. Components are attached when shown. */
 function participantsFor(
-  ctx: Context,
+  _ctx: Context,
   raw: RawFlow["participants"][],
   steps: FlowStep[],
 ): FlowParticipant[] {
@@ -174,19 +174,6 @@ function participantsFor(
   for (const s of steps) {
     for (const name of [s.from, s.to]) {
       if (!byName.has(name)) byName.set(name, { name, label: name, external: false, component: null });
-    }
-  }
-  if (ctx.model) {
-    for (const p of byName.values()) {
-      const votes = new Map<string, number>();
-      for (const s of steps) {
-        if (s.from !== p.name) continue;
-        const ids = ctx.model.match(s.file);
-        if (ids.length !== 1) continue;
-        votes.set(ids[0], (votes.get(ids[0]) ?? 0) + 1);
-      }
-      const best = [...votes].sort((a, b) => b[1] - a[1])[0]?.[0];
-      if (best) p.component = ctx.model.elements.get(best)?.name ?? best;
     }
   }
   return [...byName.values()];
