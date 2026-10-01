@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api";
 import { gitLine } from "@/lib/exec";
 import { resolveRepo } from "@/lib/git";
+import { onFlowsChange } from "@/lib/flows/store";
 import { onReviewChange } from "@/lib/review";
 import type { ApiError } from "@/lib/types";
 
@@ -29,6 +30,7 @@ export const dynamic = "force-dynamic";
  * "remote" (refs/remotes moved — bypass the GitHub cache), "git" (local git
  * state), "worktree" (file edits), and "review" — not the filesystem at all,
  * but an agent starting or stopping waiting for your notes on this checkout.
+ * "flows" is the other non-filesystem kind: a flow run finished.
  */
 
 const DEBOUNCE_MS = 400;
@@ -161,6 +163,9 @@ export async function GET(request: Request) {
       const stopReviews = onReviewChange((changedRoot) => {
         if (changedRoot === root) send({ kinds: ["review"] });
       });
+      const stopFlows = onFlowsChange((changedRoot) => {
+        if (changedRoot === root) send({ kinds: ["flows"] });
+      });
 
       // Keep intermediaries from reaping the idle connection.
       const heartbeat = setInterval(() => {
@@ -176,6 +181,7 @@ export async function GET(request: Request) {
       const cleanup = () => {
         closed = true;
         stopReviews();
+        stopFlows();
         clearInterval(heartbeat);
         if (debounce) clearTimeout(debounce);
         for (const w of watchers) w.close();

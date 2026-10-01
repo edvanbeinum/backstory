@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
+import { homedir } from "node:os";
 import path from "node:path";
 
 /**
@@ -12,6 +13,7 @@ import path from "node:path";
 const EXTRA_PATH_DIRS = [
   "/opt/homebrew/bin", // Homebrew on Apple silicon
   "/usr/local/bin", // Homebrew on Intel, and general local installs
+  path.join(homedir(), ".local", "bin"), // Claude Code's native installer
 ];
 
 {
