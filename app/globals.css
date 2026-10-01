@@ -711,6 +711,11 @@ tr.note-row td {
   font-size: 12px;
   font-weight: 600;
 }
+.flow-who {
+  border-color: var(--fg-subtle);
+  font-size: 12.5px;
+  box-shadow: 0 1px 0 rgba(31, 35, 40, 0.04);
+}
 .flow-who.external {
   font-weight: 500;
   color: var(--fg-muted);
@@ -1309,23 +1314,28 @@ section.file-linked .file-owner {
 
 /* Components on a flow: a band over each component's lanes, a line where
    one component's lanes end, and the path through them under the title. */
+/* Component boxes are context, so they stay quiet: the types inside
+   them, and their calls, are what's read. */
 .flow-comp {
   position: absolute;
   top: 6px;
   bottom: 8px;
   padding: 6px 10px;
-  border: 1px solid var(--fg-subtle);
+  border: 1px solid var(--border-muted);
   border-radius: 6px;
-  background: var(--canvas);
+  background: color-mix(in srgb, var(--canvas-subtle) 60%, var(--canvas));
 }
 .flow-comp h4 {
   display: flex;
   align-items: center;
   gap: 6px;
   margin: 0;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 18px;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
 }
 .flow-comp p {
   display: -webkit-box;
@@ -1333,37 +1343,26 @@ section.file-linked .file-owner {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 6;
-  font-size: 12px;
+  font-size: 11px;
   line-height: 16px;
-  color: var(--fg-muted);
-}
-.flow-comp.touched {
-  border: 1.5px solid var(--fg-muted);
-  padding: 5.5px 9.5px;
-}
-.flow-comp.added {
-  border-color: var(--success);
-  background: color-mix(in srgb, var(--diff-add-bg) 70%, var(--canvas));
-  box-shadow: inset 3px 0 0 var(--success);
-}
-.flow-comp.neighbour {
-  border-color: var(--border);
-  background: var(--canvas-subtle);
-}
-.flow-comp.neighbour h4 {
-  font-weight: 500;
-  color: var(--fg-muted);
-}
-.flow-comp.neighbour p,
-.flow-comp.plain p {
   color: var(--fg-subtle);
 }
+/* Touched by the change: the name darkens a step, nothing louder. */
+.flow-comp.touched h4 {
+  color: var(--fg);
+}
+.flow-comp.added {
+  border-color: color-mix(in srgb, var(--success) 40%, var(--border-muted));
+  background: color-mix(in srgb, var(--diff-add-bg) 45%, var(--canvas));
+}
+.flow-comp.added h4 {
+  color: var(--fg);
+}
 .flow-comp.plain {
-  border: 1px dashed var(--border);
+  border: 1px dashed var(--border-muted);
   background: transparent;
 }
 .flow-comp.plain h4 {
-  font-weight: 500;
   font-style: italic;
   color: var(--fg-subtle);
 }
