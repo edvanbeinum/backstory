@@ -71,6 +71,8 @@ export function DiffView({
   notes = null,
   noteRev = null,
   marks = null,
+  fileComponents = null,
+  hoveredComponent = null,
 }: {
   diff: DiffResponse | null;
   loading: boolean;
@@ -86,6 +88,8 @@ export function DiffView({
   noteRev?: string | null;
   /** The selected flow's steps, by file */
   marks?: Map<string, FileMarks> | null;
+  fileComponents?: Record<string, string> | null;
+  hoveredComponent?: string | null;
 }) {
   const { perFile } = useMemo(
     () => partitionThreads(diff, threads),
@@ -158,6 +162,11 @@ export function DiffView({
             noteRev={noteRev}
             fileNotes={notesPerFile.get(file) ?? NO_NOTES}
             marks={marksFor(marks, file)}
+            component={fileComponents?.[file.path] ?? null}
+            linked={
+              hoveredComponent !== null &&
+              fileComponents?.[file.path] === hoveredComponent
+            }
           />
         ))
       )}

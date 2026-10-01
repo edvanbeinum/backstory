@@ -6,6 +6,8 @@ import { ChangePane, openingChangeFor } from "@/components/ChangePane";
 import { CommentPane } from "@/components/CommentPane";
 import type { FileMarks } from "@/components/DiffFile";
 import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
+import { MapStrip } from "@/components/MapStrip";
+import type { MapResponse } from "@/lib/map";
 import { SideColumn, type ColumnTab } from "@/components/SideColumn";
 import { useFlows } from "@/components/useFlows";
 import { flowRows } from "@/lib/flows/rows";
@@ -125,6 +127,9 @@ export default function Page() {
   const [columnTab, setColumnTab] = useState<ColumnTab>("flows");
   const [flowSel, setFlowSel] = useState<FlowSelection>({ index: 0, mode: "diff" });
   const flowNavRef = useRef<((delta: number) => void) | null>(null);
+  const [map, setMap] = useState<MapResponse | null>(null);
+  /** The map component under the pointer: its files are outlined in the diff. */
+  const [hoveredComponent, setHoveredComponent] = useState<string | null>(null);
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
   const refRef = useRef(ref);
@@ -524,6 +529,24 @@ export default function Page() {
         if (!cancelled) setDiffLoading(false);
       });
 
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath, rev, haveSession, workingDiffKey]);
+
+  // The map follows the diff: a commit's never changes; the branch's moves
+  // with HEAD.
+  useEffect(() => {
+    if (!repoPath || !haveSession || rev === WORKING_REV) {
+      setMap(null);
+      return;
+    }
+    let cancelled = false;
+    getJson<MapResponse>(
+      `/api/map?repo=${encodeURIComponent(repoPath)}&rev=${encodeURIComponent(rev)}`,
+    )
+      .then((data) => !cancelled && setMap(data))
+      .catch(() => !cancelled && setMap(null));
     return () => {
       cancelled = true;
     };
@@ -1223,6 +1246,11 @@ export default function Page() {
                   flowCount={flowSet ? flowSet.flows.length : null}
                   commentCount={threads.length}
                   showComments={hasComments}
+                  header={
+                    rev !== WORKING_REV ? (
+                      <MapStrip map={map} onHover={setHoveredComponent} />
+                    ) : null
+                  }
                   flows={
                     <FlowPanel
                       api={flows}
@@ -1280,6 +1308,8 @@ export default function Page() {
                   pushed={revIsPushed}
                   reviewTick={reviewTick}
                   flowMarks={flowMarks}
+                  fileComponents={map?.fileComponents ?? null}
+                  hoveredComponent={hoveredComponent}
                 />
               </div>
             </div>

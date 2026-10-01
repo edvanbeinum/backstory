@@ -125,6 +125,8 @@ export function ChangePane({
   pushed,
   reviewTick,
   flowMarks = null,
+  fileComponents = null,
+  hoveredComponent = null,
 }: {
   session: SessionResponse;
   rev: string;
@@ -142,6 +144,9 @@ export function ChangePane({
   reviewTick: number;
   /** The selected flow's steps, anchored on the diff's lines */
   flowMarks?: Map<string, FileMarks> | null;
+  /** Each file's C4 component, from the map */
+  fileComponents?: Record<string, string> | null;
+  hoveredComponent?: string | null;
 }) {
   const notes = useNotes(session.repo.root);
   const review = useReview(session.repo.root, reviewTick);
@@ -255,6 +260,8 @@ export function ChangePane({
         notes={noteRev ? notes : null}
         noteRev={noteRev}
         marks={flowMarks}
+        fileComponents={fileComponents}
+        hoveredComponent={hoveredComponent}
       />
 
       {/* Pinned to the bottom of the window while the diff scrolls, so a

@@ -158,7 +158,9 @@ export function SideColumn({
         style={{
           width: `${width}%`,
           top: "calc(var(--header-height, 0px) + 1rem)",
-          maxHeight: "calc(100vh - var(--header-height, 0px) - 2rem)",
+          // Always the window's height, not the content's: the map overlay
+          // opens over the column and must not be clipped by it.
+          height: "calc(100vh - var(--header-height, 0px) - 2rem)",
         }}
       >
         {body}

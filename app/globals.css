@@ -932,3 +932,312 @@ tr.flow-inview td.diff-num {
     transition: none;
   }
 }
+
+/* --- The map ----------------------------------------------------------- */
+
+.map-strip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+.map-strip.quiet {
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--canvas-subtle);
+}
+.map-thumb {
+  flex-shrink: 0;
+  border-radius: 4px;
+  background-image: radial-gradient(circle, var(--border-muted) 1px, transparent 1.2px);
+  background-size: 8px 8px;
+}
+.map-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.map-btn:hover {
+  border-color: var(--fg-subtle);
+}
+.map-overlay {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: calc(100% + 6px);
+  z-index: 30;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--canvas);
+  box-shadow: var(--overlay-shadow);
+}
+.map-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.map-canvas {
+  position: relative;
+  background-image: radial-gradient(circle, var(--border-muted) 1px, transparent 1.2px);
+  background-size: 16px 16px;
+  background-position: 8px 8px;
+}
+.map-edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.map-edge {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1.25;
+  pointer-events: none;
+}
+.map-edge.hover {
+  stroke: var(--fg-subtle);
+}
+.map-edge.added {
+  stroke: var(--success);
+  stroke-width: 1.75;
+}
+.map-edge.changed {
+  stroke: var(--attention);
+  stroke-width: 1.75;
+}
+.map-edge.removed {
+  stroke: var(--danger);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.map-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 10;
+  cursor: default;
+}
+.map-label {
+  position: absolute;
+  z-index: 2;
+  max-width: 150px;
+  transform: translate(-50%, -50%);
+  padding: 0 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--canvas) 88%, transparent);
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  color: var(--fg-muted);
+  pointer-events: none;
+}
+.map-label.added {
+  color: var(--success);
+}
+.map-label.added::before {
+  content: "+ ";
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.8;
+}
+.map-label.changed span {
+  color: var(--attention);
+}
+.map-label.changed s,
+.map-label.removed {
+  color: var(--danger);
+}
+.map-label.removed {
+  text-decoration: line-through;
+}
+.map-node {
+  position: absolute;
+  z-index: 1;
+  overflow: hidden;
+  padding: 8px 11px 7px;
+  border: 1px solid var(--fg-subtle);
+  border-radius: 6px;
+  background: var(--canvas);
+  transition:
+    box-shadow 120ms ease,
+    border-color 120ms ease;
+}
+.map-node h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.map-node p {
+  margin: 1px 0 0;
+  overflow: hidden;
+  font-size: 12px;
+  line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--fg-muted);
+}
+.map-node .foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--fg-muted);
+}
+.map-node.touched {
+  border: 1.5px solid var(--fg-muted);
+  padding: 7.5px 10.5px 6.5px;
+}
+.map-node.added {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--diff-add-bg) 70%, var(--canvas));
+  box-shadow: inset 3px 0 0 var(--success);
+}
+.map-node.removed {
+  border: 1px dashed var(--danger);
+  background: color-mix(in srgb, var(--diff-del-bg) 70%, var(--canvas));
+}
+.map-node.neighbour {
+  border-color: var(--border);
+  background: var(--canvas-subtle);
+}
+.map-node.neighbour h4 {
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.map-node.neighbour p {
+  color: var(--fg-subtle);
+}
+.map-node:not(.neighbour):hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.map-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border: 1px solid currentColor;
+  border-radius: 2em;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+}
+.map-tag.new {
+  color: var(--success);
+}
+.map-tag.removed {
+  color: var(--danger);
+}
+.map-squares {
+  display: inline-flex;
+  gap: 2px;
+}
+.map-squares i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--square-empty);
+}
+.map-squares i.g {
+  background: var(--success-emphasis);
+}
+.map-squares i.r {
+  background: var(--danger);
+}
+.map-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-muted);
+  background: var(--canvas-subtle);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.map-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 2em;
+  background: var(--canvas);
+  font-size: 12px;
+}
+.map-chip b {
+  color: var(--fg);
+  font-weight: 600;
+}
+.map-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 10px 2px 0;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.map-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.map-key .box {
+  width: 18px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--fg-subtle);
+  background: var(--canvas);
+}
+.map-key .box.touched {
+  border: 1.5px solid var(--fg-muted);
+}
+.map-key .box.added {
+  border-color: var(--success);
+  background: var(--diff-add-bg);
+  box-shadow: inset 2px 0 0 var(--success);
+}
+.map-key .box.removed {
+  border: 1px dashed var(--danger);
+  background: var(--diff-del-bg);
+}
+.map-key .box.neighbour {
+  border-color: var(--border);
+  background: var(--canvas-subtle);
+}
+
+/* A file's component, on its header; outlined while its box is hovered. */
+.file-owner {
+  flex-shrink: 0;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 2em;
+  background: var(--canvas);
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--fg-muted);
+}
+section.file-linked {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+section.file-linked .file-owner {
+  border-color: var(--accent);
+  color: var(--accent);
+}

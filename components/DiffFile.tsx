@@ -64,6 +64,8 @@ export function DiffFile({
   noteRev = null,
   fileNotes = [],
   marks = null,
+  component = null,
+  linked = false,
 }: {
   file: DiffFileType;
   threads: ReviewThread[];
@@ -79,6 +81,10 @@ export function DiffFile({
   fileNotes?: Note[];
   /** Flow steps anchored in this file */
   marks?: FileMarks | null;
+  /** The C4 component this file belongs to */
+  component?: string | null;
+  /** Its component is hovered on the map */
+  linked?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
@@ -221,7 +227,7 @@ export function DiffFile({
       // header's containing scrollport, and since the section itself never
       // scrolls, the filename would never actually stick. Corners are
       // rounded per-edge instead.
-      className="rounded-md border border-[var(--border)] bg-[var(--canvas)]"
+      className={`rounded-md border border-[var(--border)] bg-[var(--canvas)] ${linked ? "file-linked" : ""}`}
       // Jump targets must clear the sticky app bar, or FileNav's scroll
       // lands the section header underneath it.
       style={{ scrollMarginTop: "calc(var(--header-height, 0px) + 8px)" }}
@@ -261,6 +267,8 @@ export function DiffFile({
           variant="invisible"
           className="!px-1"
         />
+
+        {component && <span className="file-owner">{component}</span>}
 
         <span className={`text-[11px] ${STATUS_TONE[file.status] ?? ""}`}>
           {file.status}

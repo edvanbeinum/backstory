@@ -195,6 +195,8 @@ const DEFAULT_IGNORE = matcher([
 ]);
 
 export function isAppCode(model: Model | null, path: string): boolean {
+  // The model describes the code; it never is the code.
+  if (path.startsWith("architecture/")) return false;
   if (model) return !model.isTest(path) && !model.isIgnored(path);
   return !DEFAULT_TESTS(path) && !DEFAULT_IGNORE(path);
 }
