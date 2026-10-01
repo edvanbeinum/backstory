@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { componentPath, groupLanes, summarise, type FlowMode, type FlowRow } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
-import { FlowSequence } from "./FlowSequence";
+import { FlowSequence, type ComponentInfo } from "./FlowSequence";
 import { StepCode } from "./StepCode";
 import { AlertIcon, ChevronRightIcon, SyncIcon } from "./icons";
 import { Spinner } from "./ui";
@@ -53,6 +53,7 @@ export function FlowPanel({
   code = null,
   jumpTo = null,
   onJumped,
+  components,
 }: {
   api: FlowsApi;
   selection: FlowSelection;
@@ -68,6 +69,7 @@ export function FlowPanel({
   /** A step to bring into view once the diff has rendered */
   jumpTo?: string | null;
   onJumped?: () => void;
+  components?: Map<string, ComponentInfo>;
 }) {
   const { status, error } = api;
 
@@ -133,6 +135,7 @@ export function FlowPanel({
       code={code}
       jumpTo={jumpTo}
       onJumped={onJumped}
+      components={components}
     />
   );
 }
@@ -150,6 +153,7 @@ function ReadyFlows({
   code,
   jumpTo,
   onJumped,
+  components,
 }: {
   set: FlowSet;
   api: FlowsApi;
@@ -163,6 +167,7 @@ function ReadyFlows({
   code: InlineCode | null;
   jumpTo: string | null;
   onJumped?: () => void;
+  components?: Map<string, ComponentInfo>;
 }) {
   const flow = set.flows[selection.index] ?? null;
   const summaries = useMemo(() => set.flows.map((f) => summarise(f, set.hunks)), [set]);
@@ -436,6 +441,7 @@ function ReadyFlows({
           activeKeys={code ? open : activeKeys}
           onRowClick={code ? toggle : goTo}
           open={code ? open : undefined}
+          components={components}
           renderCode={
             code
               ? (row) => (

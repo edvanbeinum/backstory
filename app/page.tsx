@@ -7,6 +7,7 @@ import { CommentPane } from "@/components/CommentPane";
 import type { FileMarks } from "@/components/DiffFile";
 import { FlowCoverage } from "@/components/FlowCoverage";
 import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
+import type { ComponentInfo } from "@/components/FlowSequence";
 import { MapStrip } from "@/components/MapStrip";
 import type { MapResponse } from "@/lib/map";
 import { SideColumn, type ColumnTab } from "@/components/SideColumn";
@@ -655,6 +656,18 @@ export default function Page() {
         }
       : null;
   const pendingJump = layout === "code" ? jumpTo : null;
+
+  /** What the map says of each component, for the flow's component boxes. */
+  const componentInfo = useMemo(() => {
+    const info = new Map<string, ComponentInfo>();
+    for (const [name, description] of Object.entries(map?.descriptions ?? {})) {
+      info.set(name, { description, state: "neighbour" });
+    }
+    for (const n of map?.nodes ?? []) {
+      if (n.state !== "neighbour") info.set(n.name, { description: n.description, state: n.state });
+    }
+    return info;
+  }, [map]);
 
   // Each view starts on its first flow, as a diff.
   useEffect(() => {
@@ -1341,6 +1354,7 @@ export default function Page() {
                         navRef={flowNavRef}
                         code={inlineCode}
                         jumpTo={pendingJump}
+                        components={componentInfo}
                         onJumped={() => setJumpTo(null)}
                         coverage={
                           flowSet && diff && diff.rev === rev ? (
@@ -1403,6 +1417,7 @@ export default function Page() {
                       navRef={flowNavRef}
                       code={inlineCode}
                       jumpTo={pendingJump}
+                      components={componentInfo}
                       onJumped={() => setJumpTo(null)}
                       coverage={
                         flowSet && diff && diff.rev === rev ? (

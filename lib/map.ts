@@ -53,6 +53,8 @@ export interface MapResponse {
   fileComponents: Record<string, string>;
   unmapped: string[];
   ambiguous: { file: string; ids: string[] }[];
+  /** Every element's description, by name, for the flow's component boxes */
+  descriptions: Record<string, string>;
 }
 
 interface FileStat {
@@ -127,6 +129,7 @@ export async function buildMap(
     fileComponents: {},
     unmapped: [],
     ambiguous: [],
+    descriptions: {},
   };
   if (!headRead) return empty;
   const model = headRead.model;
@@ -270,5 +273,8 @@ export async function buildMap(
     fileComponents,
     unmapped,
     ambiguous,
+    descriptions: Object.fromEntries(
+      [...model.elements.values()].map((e) => [e.name, e.description]),
+    ),
   };
 }

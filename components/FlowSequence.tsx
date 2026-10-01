@@ -13,8 +13,10 @@ const GUTTER = 76;
 const MIN_LANE = 84;
 /** Below this, lane names alternate between two rows so they can be wider. */
 const STAGGER_BELOW = 150;
-/** The component bands above the lane names. */
-const BAND_H = 24;
+/** The component box's title area, above its lanes' names. */
+const BAND_H = 50;
+/** The box's padding below the lane names. */
+const BOX_PAD = 6;
 const NONE_OPEN = new Set<string>();
 
 /**
@@ -22,6 +24,11 @@ const NONE_OPEN = new Set<string>();
  * drawn as custom SVG on a row grid. No library: the rows are the diff's
  * rows, and a layout engine would only fight that.
  */
+export interface ComponentInfo {
+  description: string;
+  state: "touched" | "added" | "removed" | "neighbour";
+}
+
 export function FlowSequence({
   rows,
   lanes,
@@ -32,6 +39,7 @@ export function FlowSequence({
   footer,
   open = NONE_OPEN,
   renderCode,
+  components,
 }: {
   rows: FlowRow[];
   lanes: FlowParticipant[];
@@ -44,6 +52,8 @@ export function FlowSequence({
   /** Rows whose code is open beneath them */
   open?: Set<string>;
   renderCode?: (row: FlowRow) => React.ReactNode;
+  /** What the map says of each component: its description, and what the change did to it */
+  components?: Map<string, ComponentInfo>;
 }) {
   const id = useId().replace(/:/g, "");
   const measure = useRef<HTMLDivElement>(null);
@@ -70,7 +80,7 @@ export function FlowSequence({
   let cursor = 0;
   for (const g of groups) {
     const n = g.end - g.start + 1;
-    const w = Math.max(n * laneW, bandName(g).length * 6.6 + 28);
+    const w = Math.max(n * laneW, bandName(g).length * 7.6 + 32);
     spans.push({ g, left: cursor, width: w });
     for (let k = 0; k < n; k++) {
       const lane = lanes[g.start + k];
@@ -110,23 +120,32 @@ export function FlowSequence({
             <span className="oh">{mode === "after" ? "now" : "was"}</span>
             <span className="oh">{mode === "diff" ? "now" : ""}</span>
             <span />
-            <div className="flow-lanes" style={{ height: (stagger ? 58 : 36) + BAND_H }}>
-              {spans.map(({ g, left, width: w }) => (
-                <span
-                  key={g.start}
-                  className={`flow-band ${g.component ? "" : "plain"}`}
-                  style={{ left: left + 3, width: w - 6 }}
-                  title={
-                    g.component
-                      ? `${g.component}: a component on the map`
-                      : g.external
-                        ? "Framework and library types"
-                        : "Code the map doesn't place"
-                  }
-                >
-                  <span>{bandName(g)}</span>
-                </span>
-              ))}
+            <div className="flow-lanes" style={{ height: (stagger ? 58 : 36) + BAND_H + BOX_PAD }}>
+              {/* Each component drawn as the map draws it: a box holding its
+                  lanes, named and described, marked by what the change did. */}
+              {spans.map(({ g, left, width: w }) => {
+                const info = g.component ? components?.get(g.component) : undefined;
+                const state = !g.component ? "plain" : (info?.state ?? "neighbour");
+                const description = g.component
+                  ? info?.description
+                  : g.external
+                    ? "Framework and library types"
+                    : "Code the map doesn't place";
+                return (
+                  <div
+                    key={g.start}
+                    className={`flow-comp ${state}`}
+                    style={{ left: left + 4, width: w - 8 }}
+                    title={description ?? g.component ?? undefined}
+                  >
+                    <h4>
+                      <span className="truncate">{bandName(g)}</span>
+                      {state === "added" && <span className="map-tag new">New</span>}
+                    </h4>
+                    {description && <p>{description}</p>}
+                  </div>
+                );
+              })}
               {lanes.map((p, i) => (
                 <span
                   key={p.name}

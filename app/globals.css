@@ -1298,36 +1298,68 @@ section.file-linked .file-owner {
 
 /* Components on a flow: a band over each component's lanes, a line where
    one component's lanes end, and the path through them under the title. */
-.flow-band {
+.flow-comp {
   position: absolute;
   top: 6px;
-  height: 18px;
-  display: flex;
-  justify-content: center;
-  border: 1px solid var(--border);
+  bottom: 0;
+  padding: 6px 10px;
+  border: 1px solid var(--fg-subtle);
   border-bottom: 0;
-  border-radius: 5px 5px 0 0;
+  border-radius: 6px 6px 0 0;
+  background: var(--canvas);
 }
-.flow-band > span {
-  margin-top: -9px;
-  max-width: calc(100% - 12px);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  padding: 0 6px;
-  background: var(--canvas-subtle);
-  font-size: 11px;
+.flow-comp h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
   font-weight: 600;
+  line-height: 18px;
+}
+.flow-comp p {
+  margin: 1px 0 0;
+  overflow: hidden;
+  font-size: 12px;
   line-height: 16px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   color: var(--fg-muted);
 }
-.flow-band.plain {
-  border-style: dashed;
+.flow-comp.touched {
+  border: 1.5px solid var(--fg-muted);
+  border-bottom: 0;
+  padding: 5.5px 9.5px;
 }
-.flow-band.plain > span {
+.flow-comp.added {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--diff-add-bg) 70%, var(--canvas));
+  box-shadow: inset 3px 0 0 var(--success);
+}
+.flow-comp.neighbour {
+  border-color: var(--border);
+  background: var(--canvas-subtle);
+}
+.flow-comp.neighbour h4 {
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.flow-comp.neighbour p,
+.flow-comp.plain p {
+  color: var(--fg-subtle);
+}
+.flow-comp.plain {
+  border: 1px dashed var(--border);
+  border-bottom: 0;
+  background: transparent;
+}
+.flow-comp.plain h4 {
   font-weight: 500;
   font-style: italic;
   color: var(--fg-subtle);
+}
+.flow-who {
+  z-index: 1;
 }
 .flow-svg .boundary {
   stroke: var(--border);
