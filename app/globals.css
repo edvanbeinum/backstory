@@ -758,9 +758,6 @@ tr.note-row td {
   cursor: pointer;
   transition: background-color 160ms ease;
 }
-.flow-row + .flow-row {
-  box-shadow: inset 0 1px 0 var(--border-muted);
-}
 .flow-row .n {
   display: flex;
   align-items: flex-start;
