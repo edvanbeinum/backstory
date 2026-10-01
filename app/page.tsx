@@ -11,7 +11,7 @@ import { MapStrip } from "@/components/MapStrip";
 import type { MapResponse } from "@/lib/map";
 import { SideColumn, type ColumnTab } from "@/components/SideColumn";
 import { useFlows } from "@/components/useFlows";
-import { flowRows } from "@/lib/flows/rows";
+import { flowRows, type FlowRow } from "@/lib/flows/rows";
 import { AlertIcon, FileDiffIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
@@ -64,6 +64,9 @@ const WORKING_COMMIT: CommitSummary = {
   url: null,
   isMerge: false,
 };
+
+/** This viewer's layout: "diagrams" (the default) or "code". */
+const LAYOUT_KEY = "differ.layout";
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
@@ -595,6 +598,35 @@ export default function Page() {
    * are flows to trace, and wherever there are comments to work through.
    */
   const showColumn = hasComments || rev !== WORKING_REV;
+
+  /**
+   * Diagrams or code. The flows lead wherever there are any: uncommitted
+   * work, and a change with no flows, stay on the diff. The choice is this
+   * viewer's own; "Show in diff" from a step switches for this view only.
+   */
+  const [layoutPref, setLayoutPref] = useState<"diagrams" | "code">("diagrams");
+  const [layoutOverride, setLayoutOverride] = useState<"diagrams" | "code" | null>(null);
+  const [jumpTo, setJumpTo] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(LAYOUT_KEY) === "code") setLayoutPref("code");
+    } catch {
+      // Storage blocked: lead with the diagrams.
+    }
+  }, []);
+  useEffect(() => {
+    setLayoutOverride(null);
+    setJumpTo(null);
+  }, [repoPath, rev]);
+  const chooseLayout = useCallback((next: "diagrams" | "code") => {
+    setLayoutPref(next);
+    setLayoutOverride(null);
+    try {
+      window.localStorage.setItem(LAYOUT_KEY, next);
+    } catch {
+      // As above.
+    }
+  }, []);
   useEffect(() => {
     if (!hasComments && columnTab === "comments") setColumnTab("flows");
   }, [hasComments, columnTab]);
@@ -606,6 +638,23 @@ export default function Page() {
     flowsTick,
   );
   const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
+  const flowsLead =
+    rev !== WORKING_REV &&
+    flows.status?.status !== "unavailable" &&
+    !(flowSet && flowSet.flows.length === 0);
+  const layout = flowsLead ? (layoutOverride ?? layoutPref) : "code";
+  const inlineCode =
+    layout === "diagrams"
+      ? {
+          repo: repoPath,
+          rev,
+          onShowInDiff: (row: FlowRow) => {
+            setLayoutOverride("code");
+            setJumpTo(row.key);
+          },
+        }
+      : null;
+  const pendingJump = layout === "code" ? jumpTo : null;
 
   // Each view starts on its first flow, as a diff.
   useEffect(() => {
@@ -1235,10 +1284,102 @@ export default function Page() {
               </p>
             )}
 
-            {/* Two columns, two independent selections: the flow or comment
+            {layout === "diagrams" ? (
+              // Flow-first: the change, then where it landed and what it does.
+              // The diff is a click away, from any step.
+              <div className="mx-auto w-full max-w-[1280px] space-y-4">
+                <ChangePane
+                    session={session}
+                    rev={rev}
+                    onRevChange={(next) => {
+                      // Remember anything that isn't in the offered list, so a
+                      // pasted sha survives the next refresh.
+                      if (
+                        !session.commits.some((c) => c.sha === next) &&
+                        !session.history.some((c) => c.sha === next)
+                      ) {
+                        pickedRevs.current = [
+                          ...new Set([...pickedRevs.current, next]),
+                        ];
+                      }
+                      setRev(next);
+                    }}
+                    commit={commitForRev}
+                    diff={diff}
+                    loading={diffLoading}
+                    error={diffError}
+                    threads={threads}
+                    thread={selectedThread}
+                    focusedThreadId={focusedThreadId}
+                    pushed={revIsPushed}
+                    reviewTick={reviewTick}
+                    flowMarks={flowMarks}
+                    fileComponents={map?.fileComponents ?? null}
+                    hoveredComponent={hoveredComponent}
+                    layout={layout}
+                    onLayout={flowsLead ? chooseLayout : null}
+                  />
+                <SideColumn
+                    full
+                    tab={columnTab}
+                    onTab={setColumnTab}
+                    flowCount={flowSet ? flowSet.flows.length : null}
+                    commentCount={threads.length}
+                    showComments={hasComments}
+                    header={
+                      rev !== WORKING_REV ? (
+                        <MapStrip map={map} onHover={setHoveredComponent} />
+                      ) : null
+                    }
+                    flows={
+                      <FlowPanel
+                        api={flows}
+                        selection={{ ...flowSel, mode: flowMode }}
+                        onSelect={setFlowSel}
+                        rows={rows}
+                        filesInDiff={filesInDiff}
+                        navRef={flowNavRef}
+                        code={inlineCode}
+                        jumpTo={pendingJump}
+                        onJumped={() => setJumpTo(null)}
+                        coverage={
+                          flowSet && diff && diff.rev === rev ? (
+                            <FlowCoverage
+                              set={flowSet}
+                              files={diff.files}
+                              tracing={
+                                flows.status?.status === "ready" ? flows.status.tracing : []
+                              }
+                              onTrace={flows.trace}
+                              inline={inlineCode && { repo: repoPath, rev }}
+                            />
+                          ) : null
+                        }
+                      />
+                    }
+                    comments={
+                      <CommentPane
+                        threads={threads}
+                        thread={selectedThread}
+                        index={commentIndex}
+                        onStep={stepComment}
+                        repo={session.repo}
+                        pr={session.github.pr}
+                        commit={commitForRev}
+                        branch={session.repo.branch}
+                        commitCandidates={pinCandidates}
+                        onToggleDone={toggleDone}
+                        onLinkCommit={linkCommit}
+                        onDraftChange={saveDraft}
+                      />
+                    }
+                  />
+              </div>
+            ) : (
+            /* Two columns, two independent selections: the flow or comment
                 you're working on stays put on the left while you browse
                 changes on the right. Stacks below xl, where side-by-side would
-                squeeze the diff too hard. */}
+                squeeze the diff too hard. */
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-0">
               {showColumn && (
                 <SideColumn
@@ -1260,6 +1401,9 @@ export default function Page() {
                       rows={rows}
                       filesInDiff={filesInDiff}
                       navRef={flowNavRef}
+                      code={inlineCode}
+                      jumpTo={pendingJump}
+                      onJumped={() => setJumpTo(null)}
                       coverage={
                         flowSet && diff && diff.rev === rev ? (
                           <FlowCoverage
@@ -1269,6 +1413,7 @@ export default function Page() {
                               flows.status?.status === "ready" ? flows.status.tracing : []
                             }
                             onTrace={flows.trace}
+                            inline={inlineCode && { repo: repoPath, rev }}
                           />
                         ) : null
                       }
@@ -1322,9 +1467,12 @@ export default function Page() {
                   flowMarks={flowMarks}
                   fileComponents={map?.fileComponents ?? null}
                   hoveredComponent={hoveredComponent}
+                  layout={layout}
+                  onLayout={flowsLead ? chooseLayout : null}
                 />
               </div>
             </div>
+            )}
             </div>
           </main>
         </div>

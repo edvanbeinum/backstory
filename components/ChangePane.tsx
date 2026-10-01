@@ -127,6 +127,8 @@ export function ChangePane({
   flowMarks = null,
   fileComponents = null,
   hoveredComponent = null,
+  layout = "code",
+  onLayout,
 }: {
   session: SessionResponse;
   rev: string;
@@ -147,6 +149,10 @@ export function ChangePane({
   /** Each file's C4 component, from the map */
   fileComponents?: Record<string, string> | null;
   hoveredComponent?: string | null;
+  /** "diagrams" hides the diff: the flows lead, the code is opened from them */
+  layout?: "diagrams" | "code";
+  /** Offered only where there are flows to lead with */
+  onLayout?: ((layout: "diagrams" | "code") => void) | null;
 }) {
   const notes = useNotes(session.repo.root);
   const review = useReview(session.repo.root, reviewTick);
@@ -225,6 +231,25 @@ export function ChangePane({
               align="left"
             />
           )}
+          {onLayout && (
+            <span className="seg ml-auto" role="group" aria-label="Layout">
+              {(["diagrams", "code"] as const).map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  aria-pressed={layout === l}
+                  onClick={() => onLayout(l)}
+                  title={
+                    l === "diagrams"
+                      ? "Lead with the map and the flows; open code from a step"
+                      : "The flow beside the full diff"
+                  }
+                >
+                  {l === "diagrams" ? "Diagrams" : "Code"}
+                </button>
+              ))}
+            </span>
+          )}
       </div>
 
       {landing.length > 0 && (
@@ -248,6 +273,7 @@ export function ChangePane({
         pushed={pushed}
       />
 
+      {layout === "code" && (
       <DiffView
         diff={diff}
         loading={loading}
@@ -263,10 +289,11 @@ export function ChangePane({
         fileComponents={fileComponents}
         hoveredComponent={hoveredComponent}
       />
+      )}
 
       {/* Pinned to the bottom of the window while the diff scrolls, so a
           general note or Send is always a click away. */}
-      {(noteRev || notes.notes.length > 0 || review.waiting || review.error) && (
+      {layout === "code" && (noteRev || notes.notes.length > 0 || review.waiting || review.error) && (
         <div className="sticky bottom-4 z-20">
           <FeedbackBar
             notes={notes}

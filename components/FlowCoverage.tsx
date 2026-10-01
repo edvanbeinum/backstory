@@ -6,6 +6,7 @@ import { coverage } from "@/lib/flows/coverage";
 import type { FlowSet } from "@/lib/flows/types";
 import type { DiffFile } from "@/lib/types";
 import { ChevronDownIcon, ChevronRightIcon } from "./icons";
+import { StepCode } from "./StepCode";
 import { Spinner } from "./ui";
 
 /**
@@ -18,14 +19,21 @@ export function FlowCoverage({
   files,
   tracing,
   onTrace,
+  inline = null,
 }: {
   set: FlowSet;
   files: DiffFile[];
   tracing: string[];
   onTrace: (hunkId: string) => void;
+  /**
+   * The flow-first layout: the list is the code still to read, so it starts
+   * open, and each hunk opens its code in place rather than in the diff.
+   */
+  inline?: { repo: string; rev: string } | null;
 }) {
   const hunks = useMemo(() => coverage(set, files), [set, files]);
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(inline !== null);
+  const [reading, setReading] = useState<string | null>(null);
   if (hunks.length === 0) return null;
   const on = hunks.filter((h) => h.onFlow).length;
   const off = hunks.filter((h) => !h.onFlow);
@@ -49,7 +57,15 @@ export function FlowCoverage({
         <span>
           <b className="font-semibold text-[var(--fg)]">{on}</b> of {hunks.length} changed{" "}
           {hunks.length === 1 ? "hunk is" : "hunks are"} on a flow
-          {off.length > 0 && <> · {off.length} not</>}
+          {off.length > 0 &&
+            (inline ? (
+              <span className="text-[var(--attention)]">
+                {" "}
+                · read {off.length === 1 ? "this one" : `these ${off.length}`} yourself
+              </span>
+            ) : (
+              <> · {off.length} not</>
+            ))}
         </span>
       </button>
       {open && off.length > 0 && (
@@ -57,13 +73,17 @@ export function FlowCoverage({
           {off.map((h) => {
             const target = h.offFlow[0];
             const busy = target ? tracing.includes(target.id) : false;
+            const key = `${h.file}:${h.side}:${h.line}`;
             return (
-              <li key={`${h.file}:${h.side}:${h.line}`} className="flex items-start gap-2 px-3 py-2">
+              <li key={key}>
+              <div className="flex items-start gap-2 px-3 py-2">
                 <div className="min-w-0 flex-1">
                   <button
                     type="button"
                     className="mono truncate text-[var(--accent)] hover:underline"
-                    onClick={() => jump(h.file, h.side, h.line)}
+                    onClick={() =>
+                      inline ? setReading((r) => (r === key ? null : key)) : jump(h.file, h.side, h.line)
+                    }
                   >
                     {h.file.split("/").pop()}:{h.line}
                   </button>
@@ -87,6 +107,10 @@ export function FlowCoverage({
                     )}
                   </button>
                 )}
+              </div>
+              {inline && reading === key && (
+                <StepCode repo={inline.repo} rev={inline.rev} path={h.file} side={h.side} line={h.line} height={220} />
+              )}
               </li>
             );
           })}

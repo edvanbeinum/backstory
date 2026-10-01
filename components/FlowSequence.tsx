@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import { shortLabels, type FlowMode, type FlowRow, type LaneGroup } from "@/lib/flows/rows";
 import type { FlowParticipant } from "@/lib/flows/types";
+import { STEP_CODE_H } from "./StepCode";
 
 /** Row height, and where in the row the arrow runs. Matches the mockup. */
 const ROW = 40;
@@ -14,6 +15,7 @@ const MIN_LANE = 84;
 const STAGGER_BELOW = 150;
 /** The component bands above the lane names. */
 const BAND_H = 24;
+const NONE_OPEN = new Set<string>();
 
 /**
  * The sequence diagram: participants across the top, one call per row,
@@ -28,6 +30,8 @@ export function FlowSequence({
   activeKeys,
   onRowClick,
   footer,
+  open = NONE_OPEN,
+  renderCode,
 }: {
   rows: FlowRow[];
   lanes: FlowParticipant[];
@@ -37,6 +41,9 @@ export function FlowSequence({
   activeKeys: Set<string>;
   onRowClick: (row: FlowRow) => void;
   footer: React.ReactNode;
+  /** Rows whose code is open beneath them */
+  open?: Set<string>;
+  renderCode?: (row: FlowRow) => React.ReactNode;
 }) {
   const id = useId().replace(/:/g, "");
   const measure = useRef<HTMLDivElement>(null);
@@ -78,7 +85,15 @@ export function FlowSequence({
   const stagger = lanes.length > 1 && narrowest < STAGGER_BELOW;
   const x = (name: string) => centre.get(name) ?? laneW / 2;
   const chipWidth = (name: string) => (stagger ? 2 : 1) * (laneWidth.get(name) ?? laneW) - 12;
-  const height = rows.length * ROW;
+  // An open row's code sits under it at a fixed height, so every row below
+  // moves down by the same amount and the arrows keep to their rows.
+  const tops: number[] = [];
+  let y = 0;
+  for (const row of rows) {
+    tops.push(y);
+    y += ROW + (open.has(row.key) ? STEP_CODE_H : 0);
+  }
+  const height = y;
 
   const marker = (kind: string) => `url(#${id}-${kind})`;
   // A name chip is centred on its lane, but kept inside the lanes' area.
@@ -181,7 +196,7 @@ export function FlowSequence({
               {rows.map((row, i) => {
                 const from = x(row.step.from);
                 const to = x(row.step.to);
-                const top = i * ROW;
+                const top = tops[i];
                 const d =
                   from === to
                     ? `M${from} ${top + 22} h20 v12 h-18`
@@ -216,8 +231,8 @@ export function FlowSequence({
               const first = mode === "after" ? row.now : row.was;
               const second = mode === "diff" ? row.now : null;
               return (
+                <Fragment key={row.key}>
                 <div
-                  key={row.key}
                   role="button"
                   tabIndex={-1}
                   className={`flow-grid flow-row k-${row.kind} ${activeKeys.has(row.key) ? "inview" : ""}`}
@@ -246,6 +261,13 @@ export function FlowSequence({
                     </span>
                   </span>
                 </div>
+                {open.has(row.key) && (
+                  // Pinned to the visible part of a card that scrolls sideways.
+                  <div className="step-code-slot" style={{ width: width || undefined }}>
+                    {renderCode?.(row)}
+                  </div>
+                )}
+                </Fragment>
               );
             })}
           </div>

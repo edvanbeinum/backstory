@@ -44,6 +44,7 @@ export function SideColumn({
   header,
   flows,
   comments,
+  full = false,
 }: {
   tab: ColumnTab;
   onTab: (tab: ColumnTab) => void;
@@ -54,6 +55,8 @@ export function SideColumn({
   header?: React.ReactNode;
   flows: React.ReactNode;
   comments: React.ReactNode;
+  /** The flow-first layout: the page's main column, not a side column */
+  full?: boolean;
 }) {
   const wide = useWide();
   const [open, setOpen] = useState(false);
@@ -147,6 +150,15 @@ export function SideColumn({
     </div>
   );
 
+  if (full) {
+    return (
+      <div className="min-w-0 space-y-3">
+        {header}
+        {tabs}
+        {tab === "flows" ? flows : comments}
+      </div>
+    );
+  }
   if (!wide) return <div className="min-w-0">{body}</div>;
 
   return (

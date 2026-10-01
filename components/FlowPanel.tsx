@@ -5,12 +5,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { componentPath, groupLanes, summarise, type FlowMode, type FlowRow } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
 import { FlowSequence } from "./FlowSequence";
+import { StepCode } from "./StepCode";
 import { AlertIcon, ChevronRightIcon, SyncIcon } from "./icons";
 import { Spinner } from "./ui";
 import type { FlowsApi } from "./useFlows";
 
 /** The reading line: where in the window the diff is being read. */
 const READING_LINE = 0.4;
+
+/** Set in the flow-first layout: steps open their code inline. */
+export interface InlineCode {
+  repo: string;
+  rev: string;
+  /** Switch to the diff, at this step's line */
+  onShowInDiff: (row: FlowRow) => void;
+}
 
 export interface FlowSelection {
   index: number;
@@ -41,6 +50,9 @@ export function FlowPanel({
   filesInDiff,
   navRef,
   coverage,
+  code = null,
+  jumpTo = null,
+  onJumped,
 }: {
   api: FlowsApi;
   selection: FlowSelection;
@@ -52,6 +64,10 @@ export function FlowPanel({
   /** j/k move through steps while the Flows tab is open */
   navRef: React.MutableRefObject<((delta: number) => void) | null>;
   coverage: React.ReactNode;
+  code?: InlineCode | null;
+  /** A step to bring into view once the diff has rendered */
+  jumpTo?: string | null;
+  onJumped?: () => void;
 }) {
   const { status, error } = api;
 
@@ -114,6 +130,9 @@ export function FlowPanel({
       navRef={navRef}
       coverage={coverage}
       traceError={status.traceError}
+      code={code}
+      jumpTo={jumpTo}
+      onJumped={onJumped}
     />
   );
 }
@@ -128,6 +147,9 @@ function ReadyFlows({
   navRef,
   coverage,
   traceError,
+  code,
+  jumpTo,
+  onJumped,
 }: {
   set: FlowSet;
   api: FlowsApi;
@@ -138,6 +160,9 @@ function ReadyFlows({
   navRef: React.MutableRefObject<((delta: number) => void) | null>;
   coverage: React.ReactNode;
   traceError?: string;
+  code: InlineCode | null;
+  jumpTo: string | null;
+  onJumped?: () => void;
 }) {
   const flow = set.flows[selection.index] ?? null;
   const summaries = useMemo(() => set.flows.map((f) => summarise(f, set.hunks)), [set]);
@@ -238,9 +263,53 @@ function ReadyFlows({
     [filesInDiff],
   );
 
+  // Flow-first: a step opens its code beneath it, rather than scrolling a diff.
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const cursor = useRef<string | null>(null);
+  useEffect(() => {
+    setOpen(new Set());
+    cursor.current = null;
+  }, [selection.index, selection.mode]);
+  const toggle = useCallback((row: FlowRow) => {
+    cursor.current = row.key;
+    setOpen((current) => {
+      const next = new Set(current);
+      if (next.has(row.key)) next.delete(row.key);
+      else next.add(row.key);
+      return next;
+    });
+  }, []);
+
+  // Arriving from "Show in diff": the diff renders after this does, so wait
+  // for the step's line before scrolling to it.
+  useEffect(() => {
+    if (!jumpTo || code) return;
+    const row = rows.find((r) => r.key === jumpTo);
+    if (!row) return;
+    let tries = 0;
+    const poll = setInterval(() => {
+      const tr = anchorFor(row.key);
+      if (tr || ++tries > 40) {
+        clearInterval(poll);
+        if (tr) scrollToReadingLine(tr);
+        else goTo(row);
+        onJumped?.();
+      }
+    }, 100);
+    return () => clearInterval(poll);
+  }, [jumpTo, code, rows, goTo, onJumped]);
+
   useEffect(() => {
     navRef.current = (delta) => {
       if (rows.length === 0) return;
+      if (code) {
+        const at = rows.findIndex((r) => r.key === cursor.current);
+        const next = rows[Math.min(rows.length - 1, Math.max(0, at === -1 ? 0 : at + delta))];
+        if (!next) return;
+        cursor.current = next.key;
+        setOpen(new Set([next.key]));
+        return;
+      }
       const at = rows.findIndex((r) => activeKeys.has(r.key));
       const next = rows[Math.min(rows.length - 1, Math.max(0, at === -1 ? 0 : at + delta))];
       if (next) goTo(next);
@@ -248,7 +317,7 @@ function ReadyFlows({
     return () => {
       navRef.current = null;
     };
-  }, [navRef, rows, activeKeys, goTo]);
+  }, [navRef, rows, activeKeys, goTo, code]);
 
   if (set.flows.length === 0) {
     return (
@@ -357,15 +426,45 @@ function ReadyFlows({
         </span>
       </div>
 
+      {code && coverage}
       {flow && (
         <FlowSequence
           rows={rows}
           lanes={lanes}
           groups={groups}
           mode={selection.mode}
-          activeKeys={activeKeys}
-          onRowClick={goTo}
+          activeKeys={code ? open : activeKeys}
+          onRowClick={code ? toggle : goTo}
+          open={code ? open : undefined}
+          renderCode={
+            code
+              ? (row) => (
+                  <StepCode
+                    repo={code.repo}
+                    rev={code.rev}
+                    path={row.step.file}
+                    side={row.side}
+                    line={row.step.line}
+                    onShowInDiff={() => code.onShowInDiff(row)}
+                  />
+                )
+              : undefined
+          }
           footer={
+            code ? (
+              <>
+                <span className="flow-here">
+                  <i />
+                  <span className="truncate">
+                    {open.size > 0
+                      ? `${open.size} ${open.size === 1 ? "step's" : "steps'"} code open`
+                      : "The code stays out of the way until you ask for it"}
+                  </span>
+                </span>
+                <span className="flex-1" />
+                <span className="shrink-0">Click a step, or press j / k, to see its code</span>
+              </>
+            ) : (
             <>
               <span className="flow-here">
                 <i />
@@ -381,12 +480,13 @@ function ReadyFlows({
               <span className="flex-1" />
               <span className="shrink-0">Click a step to jump to its line</span>
             </>
+            )
           }
         />
       )}
 
       {traceError && <Notice tone="danger">Tracing that flow failed: {traceError}</Notice>}
-      {coverage}
+      {!code && coverage}
       <Regenerate set={set} onRegenerate={api.regenerate} />
     </section>
   );
