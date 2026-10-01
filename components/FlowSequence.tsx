@@ -117,6 +117,7 @@ export function FlowSequence({
   const inner = GUTTER + area;
   const narrowest = Math.min(...[...laneWidth.values(), laneW]);
   const stagger = lanes.length > 1 && narrowest < STAGGER_BELOW;
+  const headH = (stagger ? 58 : 36) + BAND_H + BOX_PAD;
   const x = (name: string) => centre.get(name) ?? laneW / 2;
   const chipWidth = (name: string) => (stagger ? 2 : 1) * (laneWidth.get(name) ?? laneW) - 12;
   // An open row's code sits under it at a fixed height, so every row below
@@ -144,7 +145,7 @@ export function FlowSequence({
             <span className="oh">{mode === "after" ? "now" : "was"}</span>
             <span className="oh">{mode === "diff" ? "now" : ""}</span>
             <span />
-            <div className="flow-lanes" style={{ height: (stagger ? 58 : 36) + BAND_H + BOX_PAD }}>
+            <div className="flow-lanes" style={{ height: headH }}>
               {/* Each component drawn as the map draws it: a box holding its
                   lanes, named and described, marked by what the change did. */}
               {boxes.map(({ g, left, width: w, state, description }) => {
@@ -161,6 +162,17 @@ export function FlowSequence({
                     </h4>
                     {description && <p>{description}</p>}
                   </div>
+                );
+              })}
+              {/* Each lifeline starts at its type's name, through the box. */}
+              {lanes.map((p, i) => {
+                const top = BAND_H + (stagger && i % 2 === 1 ? 31 : 6) + 11;
+                return (
+                  <span
+                    key={`line-${p.name}`}
+                    className="flow-lifeline"
+                    style={{ left: x(p.name), top, height: headH - top }}
+                  />
                 );
               })}
               {lanes.map((p, i) => (
@@ -223,11 +235,6 @@ export function FlowSequence({
               </defs>
               {lanes.map((p) => (
                 <line key={p.name} className="lifeline" x1={x(p.name)} x2={x(p.name)} y1={0} y2={height} />
-              ))}
-              {/* Where one component ends and the next begins: a call that
-                  crosses this line is one component calling another. */}
-              {spans.slice(1).map(({ g, left }) => (
-                <line key={g.start} className="boundary" x1={left} x2={left} y1={0} y2={height} />
               ))}
               {rows.map((row, i) => {
                 const from = x(row.step.from);

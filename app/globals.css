@@ -40,6 +40,7 @@
   --success-emphasis: #1f883d;
   --tab-active: #fd8c73;
   --square-empty: #d1d9e0;
+  --lifeline: #c4ccd5;
 
   color-scheme: light;
 }
@@ -76,6 +77,7 @@
     --success-emphasis: #238636;
     --tab-active: #f78166;
     --square-empty: #3d444d;
+    --lifeline: #4b535d;
 
     color-scheme: dark;
   }
@@ -110,6 +112,7 @@
   --success-emphasis: #238636;
   --tab-active: #f78166;
   --square-empty: #3d444d;
+  --lifeline: #4b535d;
 
   color-scheme: dark;
 }
@@ -725,8 +728,17 @@ tr.note-row td {
   pointer-events: none;
   overflow: visible;
 }
+/* Lifelines: firm enough to follow from a type's name down to its calls. */
 .flow-svg .lifeline {
-  stroke: var(--border-muted);
+  stroke: var(--lifeline);
+  stroke-width: 1.5;
+}
+.flow-lifeline {
+  position: absolute;
+  z-index: 1;
+  width: 1.5px;
+  margin-left: -0.75px;
+  background: var(--lifeline);
 }
 .flow-svg path {
   fill: none;
@@ -1358,10 +1370,6 @@ section.file-linked .file-owner {
 }
 .flow-who {
   z-index: 1;
-}
-.flow-svg .boundary {
-  stroke: var(--border);
-  stroke-dasharray: 3 4;
 }
 .flow-path {
   display: flex;
