@@ -13,8 +13,9 @@ const GUTTER = 76;
 const MIN_LANE = 84;
 /** Below this, lane names alternate between two rows so they can be wider. */
 const STAGGER_BELOW = 150;
-/** The component box's title area, above its lanes' names. */
-const BAND_H = 50;
+/** A component box's name line, and the most lines its description may take. */
+const BOX_NAME_H = 30;
+const BOX_DESC_LINES = 6;
 /** The box's padding below the lane names. */
 const BOX_PAD = 6;
 const NONE_OPEN = new Set<string>();
@@ -80,7 +81,12 @@ export function FlowSequence({
   let cursor = 0;
   for (const g of groups) {
     const n = g.end - g.start + 1;
-    const w = Math.max(n * laneW, bandName(g).length * 7.6 + 32);
+    // Wide enough for the component's name and for its widest lane name.
+    const widestLane = Math.max(
+      0,
+      ...lanes.slice(g.start, g.end + 1).map((l) => (labels.get(l.name) ?? l.label).length * 7.2 + 34),
+    );
+    const w = Math.max(n * laneW, bandName(g).length * 7.6 + 32, widestLane);
     spans.push({ g, left: cursor, width: w });
     for (let k = 0; k < n; k++) {
       const lane = lanes[g.start + k];
@@ -90,6 +96,24 @@ export function FlowSequence({
     cursor += w;
   }
   const area = Math.max(cursor, laneW * lanes.length);
+
+  // The boxes' title area is as tall as the longest description needs, so
+  // nothing a box says is cut off.
+  const boxes = spans.map((span) => {
+    const { g, width: w } = span;
+    const info = g.component ? components?.get(g.component) : undefined;
+    const state = !g.component ? "plain" : (info?.state ?? "neighbour");
+    const description = g.component
+      ? info?.description
+      : g.external
+        ? "Framework and library types"
+        : "Code the map doesn't place";
+    const lines = description
+      ? Math.min(BOX_DESC_LINES, Math.ceil((description.length * 6.5) / Math.max(40, w - 30)))
+      : 0;
+    return { ...span, state, description, lines };
+  });
+  const BAND_H = BOX_NAME_H + Math.max(0, ...boxes.map((b) => b.lines)) * 16 + 6;
   const inner = GUTTER + area;
   const narrowest = Math.min(...[...laneWidth.values(), laneW]);
   const stagger = lanes.length > 1 && narrowest < STAGGER_BELOW;
@@ -123,14 +147,7 @@ export function FlowSequence({
             <div className="flow-lanes" style={{ height: (stagger ? 58 : 36) + BAND_H + BOX_PAD }}>
               {/* Each component drawn as the map draws it: a box holding its
                   lanes, named and described, marked by what the change did. */}
-              {spans.map(({ g, left, width: w }) => {
-                const info = g.component ? components?.get(g.component) : undefined;
-                const state = !g.component ? "plain" : (info?.state ?? "neighbour");
-                const description = g.component
-                  ? info?.description
-                  : g.external
-                    ? "Framework and library types"
-                    : "Code the map doesn't place";
+              {boxes.map(({ g, left, width: w, state, description }) => {
                 return (
                   <div
                     key={g.start}

@@ -1318,12 +1318,13 @@ section.file-linked .file-owner {
   line-height: 18px;
 }
 .flow-comp p {
+  display: -webkit-box;
   margin: 1px 0 0;
   overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
   font-size: 12px;
   line-height: 16px;
-  white-space: nowrap;
-  text-overflow: ellipsis;
   color: var(--fg-muted);
 }
 .flow-comp.touched {
