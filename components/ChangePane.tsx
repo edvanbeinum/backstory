@@ -293,7 +293,8 @@ export function ChangePane({
 
       {/* Pinned to the bottom of the window while the diff scrolls, so a
           general note or Send is always a click away. */}
-      {layout === "code" && (noteRev || notes.notes.length > 0 || review.waiting || review.error) && (
+      {/* In either layout: an agent waiting on review must never be invisible. */}
+      {(noteRev || notes.notes.length > 0 || review.waiting || review.error) && (
         <div className="sticky bottom-4 z-20">
           <FeedbackBar
             notes={notes}

@@ -636,8 +636,10 @@ export default function Page() {
     }
   }, []);
   useEffect(() => {
-    if (!hasComments && columnTab === "comments") setColumnTab("flows");
-  }, [hasComments, columnTab]);
+    // Only once the session says there are none: before it loads, a
+    // ?comment= link's tab must survive.
+    if (session && !hasComments && columnTab === "comments") setColumnTab("flows");
+  }, [session, hasComments, columnTab]);
 
   const flows = useFlows(session ? repoPath : "", rev, flowsTick);
   const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
@@ -818,6 +820,7 @@ export default function Page() {
     (id: string) => {
       setCommentId(id);
       setFocusedThreadId(id);
+      setColumnTab("comments");
       const thread = threads.find((t) => t.id === id) ?? null;
       // null means leave the change column alone — the two panes are separate
       // axes, and an unlinked comment has nothing to say about which change
