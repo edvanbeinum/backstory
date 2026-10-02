@@ -149,7 +149,7 @@ test("flows are traced at the head, then walked back to the base", async () => {
   const runner: Runner = async <T>(prompt: string) => {
     prompts.push(prompt);
     const answer = prompt.includes("as it ran at the base") ? BASE_ANSWER : HEAD_ANSWER;
-    return { output: structuredClone(answer) as T, costUsd: 0.5 };
+    return { output: structuredClone(answer) as T, costUsd: 0.5, model: "claude-test" };
   };
 
   const set = await generateFlows({ root: repo, base: BASE, head: HEAD, runner });
@@ -195,7 +195,7 @@ test("a new flow needs one run and has no before side", async () => {
     runs++;
     const answer = structuredClone(HEAD_ANSWER);
     answer.flows[0].isNew = true;
-    return { output: answer as T, costUsd: 0.3 };
+    return { output: answer as T, costUsd: 0.3, model: "claude-test" };
   };
   const set = await generateFlows({ root: repo, base: BASE, head: HEAD, runner });
   assert.equal(runs, 1);

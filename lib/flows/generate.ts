@@ -292,7 +292,7 @@ export async function generateFlows(opts: GenerateOptions): Promise<FlowSet> {
 
   phase("Tracing flows at the head");
   const head = await withSnapshot(ctx.root, ctx.head, async (dir) => {
-    const { output, costUsd } = await runner<HeadOutput>(
+    const { output, costUsd, model } = await runner<HeadOutput>(
       headPrompt({
         sha: ctx.head.slice(0, 7),
         subject: ctx.subject,
@@ -305,7 +305,7 @@ export async function generateFlows(opts: GenerateOptions): Promise<FlowSet> {
     const flows = dedupeIds(output.flows);
     const verified = [];
     for (const raw of flows) verified.push({ raw, after: await verifySteps(dir, raw.steps) });
-    return { flows: verified, hunks: output.hunks, costUsd };
+    return { flows: verified, hunks: output.hunks, costUsd, model };
   });
 
   let costUsd = head.costUsd;
@@ -354,6 +354,7 @@ export async function generateFlows(opts: GenerateOptions): Promise<FlowSet> {
     })),
     costUsd,
     durationMs: Date.now() - started,
+    model: head.model,
   };
 }
 

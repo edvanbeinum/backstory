@@ -72,6 +72,8 @@ export interface FlowSet {
   appFiles: string[];
   costUsd: number;
   durationMs: number;
+  /** The model that traced them, e.g. claude-opus-5-5 */
+  model?: string | null;
 }
 
 export type FlowsStatus =

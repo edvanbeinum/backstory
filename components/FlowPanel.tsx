@@ -515,12 +515,18 @@ function ReadyFlows({
   );
 }
 
+/** "claude-sonnet-5-5" → "Sonnet 5.5". */
+function modelName(id: string) {
+  const m = id.match(/^claude-([a-z]+)-(\d+)-(\d+)/);
+  return m ? `${m[1].charAt(0).toUpperCase()}${m[1].slice(1)} ${m[2]}.${m[3]}` : id;
+}
+
 function Regenerate({ set, onRegenerate }: { set: FlowSet; onRegenerate: () => void }) {
   return (
     <p className="flex items-center gap-2 px-0.5 text-[11px] text-[var(--fg-subtle)]">
       <span>
-        Traced by Claude Code in {Math.round(set.durationMs / 1000)} s · $
-        {set.costUsd.toFixed(2)}
+        Traced by Claude Code{set.model ? ` (${modelName(set.model)})` : ""} in{" "}
+        {Math.round(set.durationMs / 1000)} s · ${set.costUsd.toFixed(2)}
       </span>
       <span className="flex-1" />
       <button

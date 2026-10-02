@@ -9,7 +9,15 @@ import { run } from "../exec";
 export interface ClaudeResult<T> {
   output: T;
   costUsd: number;
+  /** The model that answered, as Claude Code reports it */
+  model: string | null;
 }
+
+/**
+ * Which model traces flows: DIFFER_FLOWS_MODEL, an alias ("sonnet",
+ * "opus") or a full model id. Unset, Claude Code's own default answers.
+ */
+export const flowsModel = () => process.env.DIFFER_FLOWS_MODEL || null;
 
 /** A stand-in for Claude in tests: same contract, recorded answers. */
 export type Runner = <T>(
@@ -51,6 +59,7 @@ export const claudeRunner: Runner = async <T>(
       "--strict-mcp-config",
       "--setting-sources",
       "local",
+      ...(flowsModel() ? ["--model", flowsModel()!] : []),
     ],
     { cwd, input: prompt, timeout: TIMEOUT_MS },
   );
@@ -62,12 +71,23 @@ export const claudeRunner: Runner = async <T>(
     result?: string;
     structured_output?: T;
     total_cost_usd?: number;
+    modelUsage?: Record<string, unknown>;
   };
   if (result.is_error || result.structured_output === undefined) {
     throw new Error(`Claude Code failed: ${result.result ?? "no structured output"}`);
   }
-  return { output: result.structured_output, costUsd: result.total_cost_usd ?? 0 };
+  return {
+    output: result.structured_output,
+    costUsd: result.total_cost_usd ?? 0,
+    model: mainModel(result.modelUsage),
+  };
 };
+
+/** A run can use more than one model; the one that cost the most did the work. */
+function mainModel(usage: Record<string, unknown> | undefined): string | null {
+  const cost = (u: unknown) => ((u as { costUSD?: number })?.costUSD ?? 0);
+  return Object.entries(usage ?? {}).sort((a, b) => cost(b[1]) - cost(a[1]))[0]?.[0] ?? null;
+}
 
 export async function claudeAvailable(): Promise<boolean> {
   try {

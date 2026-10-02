@@ -137,6 +137,7 @@ export function toSarif(set: FlowSet, repoUri: string): SarifLog {
           "differ.appFiles": set.appFiles,
           "differ.costUsd": set.costUsd,
           "differ.durationMs": set.durationMs,
+          "differ.model": set.model ?? null,
         },
       },
     ],
@@ -183,6 +184,7 @@ export function fromSarif(log: SarifLog): FlowSet {
     appFiles: (p["differ.appFiles"] as string[]) ?? [],
     costUsd: (p["differ.costUsd"] as number) ?? 0,
     durationMs: (p["differ.durationMs"] as number) ?? 0,
+    model: (p["differ.model"] as string | null) ?? null,
   };
 }
 
