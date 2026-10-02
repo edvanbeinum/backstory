@@ -15,9 +15,11 @@ export interface ClaudeResult<T> {
 
 /**
  * Which model traces flows: DIFFER_FLOWS_MODEL, an alias ("sonnet",
- * "opus") or a full model id. Unset, Claude Code's own default answers.
+ * "opus") or a full model id. Sonnet by default: compared with Opus on the
+ * same views it cost about a third, took under half the time and verified
+ * every step, tracing coarser flows that still told the same story.
  */
-export const flowsModel = () => process.env.DIFFER_FLOWS_MODEL || null;
+export const flowsModel = () => process.env.DIFFER_FLOWS_MODEL || "sonnet";
 
 /** A stand-in for Claude in tests: same contract, recorded answers. */
 export type Runner = <T>(
@@ -59,7 +61,8 @@ export const claudeRunner: Runner = async <T>(
       "--strict-mcp-config",
       "--setting-sources",
       "local",
-      ...(flowsModel() ? ["--model", flowsModel()!] : []),
+      "--model",
+      flowsModel(),
     ],
     { cwd, input: prompt, timeout: TIMEOUT_MS },
   );
