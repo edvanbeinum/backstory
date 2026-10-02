@@ -16,17 +16,9 @@ reply for you to paste back.
 
 Whether a comment is handled is your call and nobody else's — you tick it.
 
-## Read-only, on purpose
+## What differ keeps
 
-differ never writes to your repo or to GitHub:
-
-- **No git writes.** It never commits, amends, rebases, or pushes. You drive git
-  from your terminal exactly as you do now.
-- **No GitHub writes.** It never posts a comment, never resolves a thread. It
-  generates reply text and puts it on your clipboard; posting it is your call.
-
-What it does keep is its own: drafts, ticks and traced flows, under
-`~/.differ`.
+Its own state lives under `~/.differ`: drafts, ticks, and traced flows.
 
 ## Diagrams: the map, the data model and flows
 
