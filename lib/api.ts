@@ -22,3 +22,23 @@ export function errorResponse(err: unknown) {
     { status: 500 },
   );
 }
+
+/**
+ * Refuse a request another website's page sent. differ listens on a fixed
+ * local port, so any page the user visits can POST to it; a browser marks
+ * such a request with Sec-Fetch-Site and Origin. Requests without them (the
+ * CLI, curl) are the user's own.
+ */
+export function crossSite(request: Request): NextResponse | null {
+  const site = request.headers.get("sec-fetch-site");
+  const origin = request.headers.get("origin");
+  const host = request.headers.get("host");
+  const foreignOrigin = origin !== null && host !== null && new URL(origin).host !== host;
+  if ((site && site !== "same-origin" && site !== "none") || foreignOrigin) {
+    return NextResponse.json<ApiError>(
+      { error: "Requests from other sites aren't accepted.", kind: "internal" },
+      { status: 403 },
+    );
+  }
+  return null;
+}
