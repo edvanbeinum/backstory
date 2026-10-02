@@ -56,11 +56,13 @@ export const claudeRunner: Runner = async <T>(
       "WebFetch",
       "WebSearch",
       "--no-session-persistence",
-      // Skip the user's plugins, hooks and MCP servers: they cost tokens on
-      // every run (startup fell from $0.18 to $0.03) and can steer the answer.
+      // Load no settings at all. Not the user's (plugins and hooks cost
+      // tokens and can steer the answer), and above all not the reviewed
+      // commit's: the snapshot is its cwd, and a .claude/settings.local.json
+      // committed on a branch would otherwise run its hooks on this machine.
       "--strict-mcp-config",
       "--setting-sources",
-      "local",
+      "",
       "--model",
       flowsModel(),
     ],
