@@ -246,3 +246,17 @@ test("generated files are not app code", async () => {
   assert.equal(isAppCode(null, "archspec_todo.yml"), false);
   assert.equal(isAppCode(null, "app/models/user.rb"), true);
 });
+
+test("every hunk reaches the prompt, however big the ones before it", async () => {
+  const { hunkText } = await import("../lib/flows/hunks");
+  const big = { id: "H1", file: "big.ts", oldFile: "big.ts", oldStart: 0, oldLines: 0, newStart: 1, newLines: 3000, text: Array.from({ length: 3000 }, (_, i) => `+line ${i} of a very large new file`) };
+  const small = { id: "H2", file: "small.ts", oldFile: "small.ts", oldStart: 3, oldLines: 1, newStart: 3, newLines: 1, text: ["-a", "+b"] };
+  const text = hunkText([big, small], 8_000);
+  assert.match(text, /^H1  big\.ts/);
+  assert.match(text, /read the file for the rest/);
+  assert.match(text, /H2  small\.ts  old 3,1  new 3,1\n-a\n\+b/);
+  // Past the budget, a hunk is still named, with a pointer to the file.
+  const tight = hunkText([big, small], 1_000);
+  assert.match(tight, /H1  big\.ts.*\n\(content not shown here/);
+  assert.match(tight, /H2  small\.ts/);
+});

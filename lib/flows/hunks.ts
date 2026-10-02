@@ -115,17 +115,26 @@ export function isAddedLine(
   );
 }
 
+/** One hunk's content shown to Claude, at most: a huge new file is cut short. */
+const HUNK_MAX = 6_000;
+
+/**
+ * The hunks for a prompt. Every hunk is listed by id, path and range, so
+ * Claude can place each one; content is shown until the budget runs out,
+ * and after that a hunk is a header with a pointer to the file.
+ */
 export function hunkText(hunks: Hunk[], maxChars = 60_000): string {
-  let out = "";
-  for (const h of hunks) {
-    const block =
-      `${h.id}  ${h.file}  old ${h.oldStart},${h.oldLines}  new ${h.newStart},${h.newLines}\n` +
-      h.text.join("\n");
-    if (out.length + block.length > maxChars) {
-      out += `\n\n(${hunks.length - Number(h.id.slice(1)) + 1} more hunks not shown; read the files for them.)`;
-      break;
-    }
-    out += (out ? "\n\n" : "") + block;
-  }
-  return out;
+  let used = 0;
+  return hunks
+    .map((h) => {
+      const header = `${h.id}  ${h.file}  old ${h.oldStart},${h.oldLines}  new ${h.newStart},${h.newLines}`;
+      let body = h.text.join("\n");
+      if (body.length > HUNK_MAX) {
+        body = `${body.slice(0, HUNK_MAX)}\n(… ${h.text.length} lines in all; read the file for the rest)`;
+      }
+      if (used + body.length > maxChars) return `${header}\n(content not shown here: read the file at these lines)`;
+      used += body.length;
+      return `${header}\n${body}`;
+    })
+    .join("\n\n");
 }
