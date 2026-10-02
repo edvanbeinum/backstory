@@ -639,17 +639,11 @@ export default function Page() {
     if (!hasComments && columnTab === "comments") setColumnTab("flows");
   }, [hasComments, columnTab]);
 
-  const flows = useFlows(
-    session ? repoPath : "",
-    rev,
-    showColumn && columnTab === "flows",
-    flowsTick,
-  );
+  const flows = useFlows(session ? repoPath : "", rev, flowsTick);
   const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
-  const flowsLead =
-    rev !== WORKING_REV &&
-    flows.status?.status !== "unavailable" &&
-    !(flowSet && flowSet.flows.length === 0);
+  // Diagrams lead only where there are flows to lead with: an untraced
+  // view opens on the diff, with "Trace this change" in the column.
+  const flowsLead = rev !== WORKING_REV && flowSet !== null && flowSet.flows.length > 0;
   const layout = flowsLead ? (layoutOverride ?? layoutPref) : "code";
   const inlineCode =
     layout === "diagrams"

@@ -5,12 +5,13 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FlowsStatus } from "@/lib/flows/types";
 
 /**
- * The flows for the view on screen. Generation is on demand: it starts the
- * first time the Flows tab is open on a view with nothing cached, and costs
- * nothing until then. A finished run arrives as a "flows" watch event
- * (`tick`); while one runs, a slow poll keeps its phase current.
+ * The flows for the view on screen. Tracing costs money and a minute, so it
+ * starts only when asked ("Trace this change"); opening a commit to glance
+ * at it costs nothing. Cached flows load as soon as the view opens. A
+ * finished run arrives as a "flows" watch event (`tick`); while one runs, a
+ * slow poll keeps its phase current.
  */
-export function useFlows(repo: string, rev: string, active: boolean, tick: number) {
+export function useFlows(repo: string, rev: string, tick: number) {
   const [status, setStatus] = useState<FlowsStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const viewRef = useRef(`${repo}@${rev}`);
@@ -50,10 +51,6 @@ export function useFlows(repo: string, rev: string, active: boolean, tick: numbe
     void request("GET");
   }, [repo, rev, tick, request]);
 
-  useEffect(() => {
-    if (active && status?.status === "idle") void request("POST");
-  }, [active, status, request]);
-
   const running = status?.status === "running" || (status?.status === "ready" && status.tracing.length > 0);
   useEffect(() => {
     if (!running) return;
@@ -62,10 +59,11 @@ export function useFlows(repo: string, rev: string, active: boolean, tick: numbe
   }, [running, request]);
 
   const regenerate = useCallback(() => void request("POST", { regenerate: "1" }), [request]);
-  const retry = useCallback(() => void request("POST"), [request]);
+  const start = useCallback(() => void request("POST"), [request]);
+  const retry = start;
   const trace = useCallback((hunk: string) => void request("POST", { hunk }), [request]);
 
-  return { status, error, regenerate, retry, trace };
+  return { status, error, start, regenerate, retry, trace };
 }
 
 export type FlowsApi = ReturnType<typeof useFlows>;

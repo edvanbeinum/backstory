@@ -112,8 +112,26 @@ export function FlowPanel({
       </Notice>
     );
   }
-  if (status.status === "idle" || status.status === "running") {
-    return <Generating startedAt={status.status === "running" ? status.startedAt : null} phase={status.status === "running" ? status.phase : "Starting"} />;
+  if (status.status === "idle") {
+    return (
+      <div className="rounded-md border border-[var(--border)] bg-[var(--canvas)] px-4 py-6 text-center">
+        <button
+          type="button"
+          onClick={api.start}
+          className="inline-flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-1.5 text-[13px] font-medium hover:border-[var(--fg-subtle)]"
+        >
+          Trace this change
+        </button>
+        <p className="mx-auto mt-2 max-w-[56ch] text-[12px] text-[var(--fg-muted)]">
+          Claude Code reads the change and follows each user action it touches, drawing what the
+          code does as flows. It takes about a minute and usually costs $0.10–0.40 on your Claude
+          account; the result is kept, so this view won&apos;t ask again.
+        </p>
+      </div>
+    );
+  }
+  if (status.status === "running") {
+    return <Generating startedAt={status.startedAt} phase={status.phase} />;
   }
   if (status.status === "failed") {
     return (
