@@ -9,7 +9,6 @@ import { FlowCoverage } from "@/components/FlowCoverage";
 import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
 import type { ComponentInfo, DataField } from "@/components/FlowSequence";
 import { DataStrip } from "@/components/DataStrip";
-import { WorthALook } from "@/components/WorthALook";
 import { findings as designQuestions } from "@/lib/findings";
 import { MapStrip } from "@/components/MapStrip";
 import type { DataResponse } from "@/lib/data/types";
@@ -665,7 +664,7 @@ export default function Page() {
       : null;
   const pendingJump = layout === "code" ? jumpTo : null;
 
-  /** Notes worth a look, from the flows and the data model, and where each is pinned. */
+  /** Notes on the change's shape, pinned on the data cards and under flow titles. */
   const questions = useMemo(() => designQuestions(flowSet, dataModel), [flowSet, dataModel]);
   const entityNotes = useMemo(() => {
     const out = new Map<string, string[]>();
@@ -683,12 +682,6 @@ export default function Page() {
     }
     return out;
   }, [questions]);
-  const [focusStep, setFocusStep] = useState<string | null>(null);
-  const showStep = useCallback((flow: number, step: string) => {
-    setColumnTab("flows");
-    setFlowSel({ index: flow, mode: "diff" });
-    setFocusStep(step);
-  }, []);
 
   /** Fields the change touched, for chips on the flow steps that use them. */
   const dataFields = useMemo(
@@ -1388,7 +1381,6 @@ export default function Page() {
                         <>
                           <MapStrip map={map} onHover={setHoveredComponent} />
                           <DataStrip data={dataModel} notes={entityNotes} />
-                          <WorthALook findings={questions} onShowStep={showStep} />
                         </>
                       ) : null
                     }
@@ -1404,8 +1396,6 @@ export default function Page() {
                         jumpTo={pendingJump}
                         components={componentInfo}
                       dataFields={dataFields}
-                      focusStep={focusStep}
-                      onFocused={() => setFocusStep(null)}
                       flowNotes={flowNotes}
                         onJumped={() => setJumpTo(null)}
                         coverage={
@@ -1459,7 +1449,6 @@ export default function Page() {
                       <>
                           <MapStrip map={map} onHover={setHoveredComponent} />
                           <DataStrip data={dataModel} notes={entityNotes} />
-                          <WorthALook findings={questions} onShowStep={showStep} />
                         </>
                     ) : null
                   }
@@ -1475,8 +1464,6 @@ export default function Page() {
                       jumpTo={pendingJump}
                       components={componentInfo}
                       dataFields={dataFields}
-                      focusStep={focusStep}
-                      onFocused={() => setFocusStep(null)}
                       flowNotes={flowNotes}
                       onJumped={() => setJumpTo(null)}
                       coverage={

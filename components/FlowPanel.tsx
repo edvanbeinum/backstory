@@ -55,8 +55,6 @@ export function FlowPanel({
   onJumped,
   components,
   dataFields,
-  focusStep = null,
-  onFocused,
   flowNotes,
 }: {
   api: FlowsApi;
@@ -75,9 +73,6 @@ export function FlowPanel({
   onJumped?: () => void;
   components?: Map<string, ComponentInfo>;
   dataFields?: DataField[];
-  /** A step to bring forward, from a design question's evidence */
-  focusStep?: string | null;
-  onFocused?: () => void;
   /** "Worth a look" notes pinned on flows, by flow index */
   flowNotes?: Map<number, string[]>;
 }) {
@@ -147,8 +142,6 @@ export function FlowPanel({
       onJumped={onJumped}
       components={components}
       dataFields={dataFields}
-      focusStep={focusStep}
-      onFocused={onFocused}
       flowNotes={flowNotes}
     />
   );
@@ -169,8 +162,6 @@ function ReadyFlows({
   onJumped,
   components,
   dataFields,
-  focusStep,
-  onFocused,
   flowNotes,
 }: {
   set: FlowSet;
@@ -187,8 +178,6 @@ function ReadyFlows({
   onJumped?: () => void;
   components?: Map<string, ComponentInfo>;
   dataFields?: DataField[];
-  focusStep: string | null;
-  onFocused?: () => void;
   flowNotes?: Map<number, string[]>;
 }) {
   const flow = set.flows[selection.index] ?? null;
@@ -325,26 +314,6 @@ function ReadyFlows({
     }, 100);
     return () => clearInterval(poll);
   }, [jumpTo, code, rows, goTo, onJumped]);
-
-  // A design question pointed at a step: open it (flow-first) or bring its
-  // line into view (beside the diff).
-  useEffect(() => {
-    if (!focusStep) return;
-    const row = rows.find((r) => r.step.id === focusStep);
-    if (!row) return;
-    onFocused?.();
-    if (code) {
-      cursor.current = row.key;
-      setOpen(new Set([row.key]));
-      requestAnimationFrame(() =>
-        document
-          .querySelector(`.flow-row[data-row="${CSS.escape(row.key)}"]`)
-          ?.scrollIntoView({ block: "center" }),
-      );
-    } else {
-      goTo(row);
-    }
-  }, [focusStep, rows, code, goTo, onFocused]);
 
   useEffect(() => {
     navRef.current = (delta) => {

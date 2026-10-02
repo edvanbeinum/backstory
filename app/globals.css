@@ -1662,66 +1662,6 @@ tr.step-code-target td.diff-num {
   padding: 4px 10px 6px;
 }
 
-/* --- Worth a look ----------------------------------------------------- */
-
-/* Facts about the change's shape, pinned where they apply; this is their
-   quiet index. Attention-coloured, never alarming. */
-.look {
-  border: 1px solid var(--border-muted);
-  border-radius: 6px;
-  background: var(--canvas-subtle);
-}
-.look-line {
-  display: flex;
-  width: 100%;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  font-size: 12px;
-  color: var(--fg-muted);
-  text-align: left;
-}
-.look-label {
-  flex-shrink: 0;
-  font-weight: 600;
-  color: var(--fg);
-}
-.look-items {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.look-list {
-  display: grid;
-  gap: 8px;
-  padding: 2px 12px 10px 30px;
-}
-.look-title {
-  font-size: 12.5px;
-  font-weight: 500;
-}
-.look-evidence li {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
-  font-size: 11.5px;
-  color: var(--fg-muted);
-}
-.look-evidence button {
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--accent);
-  text-align: left;
-}
-.look-evidence button:hover {
-  text-decoration: underline;
-}
 /* A note pinned on a diagram: a data card, or under a flow's title. */
 .pinned-note {
   display: flex;
