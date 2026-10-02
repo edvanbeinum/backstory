@@ -7,8 +7,10 @@ import { CommentPane } from "@/components/CommentPane";
 import type { FileMarks } from "@/components/DiffFile";
 import { FlowCoverage } from "@/components/FlowCoverage";
 import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
-import type { ComponentInfo } from "@/components/FlowSequence";
+import type { ComponentInfo, DataField } from "@/components/FlowSequence";
+import { DataStrip } from "@/components/DataStrip";
 import { MapStrip } from "@/components/MapStrip";
+import type { DataResponse } from "@/lib/data/types";
 import type { MapResponse } from "@/lib/map";
 import { SideColumn, type ColumnTab } from "@/components/SideColumn";
 import { useFlows } from "@/components/useFlows";
@@ -133,6 +135,7 @@ export default function Page() {
   const [flowSel, setFlowSel] = useState<FlowSelection>({ index: 0, mode: "diff" });
   const flowNavRef = useRef<((delta: number) => void) | null>(null);
   const [map, setMap] = useState<MapResponse | null>(null);
+  const [dataModel, setDataModel] = useState<DataResponse | null>(null);
   /** The map component under the pointer: its files are outlined in the diff. */
   const [hoveredComponent, setHoveredComponent] = useState<string | null>(null);
   const revRef = useRef(rev);
@@ -544,14 +547,17 @@ export default function Page() {
   useEffect(() => {
     if (!repoPath || !haveSession || rev === WORKING_REV) {
       setMap(null);
+      setDataModel(null);
       return;
     }
     let cancelled = false;
-    getJson<MapResponse>(
-      `/api/map?repo=${encodeURIComponent(repoPath)}&rev=${encodeURIComponent(rev)}`,
-    )
+    const query = `repo=${encodeURIComponent(repoPath)}&rev=${encodeURIComponent(rev)}`;
+    getJson<MapResponse>(`/api/map?${query}`)
       .then((data) => !cancelled && setMap(data))
       .catch(() => !cancelled && setMap(null));
+    getJson<DataResponse>(`/api/data?${query}`)
+      .then((data) => !cancelled && setDataModel(data))
+      .catch(() => !cancelled && setDataModel(null));
     return () => {
       cancelled = true;
     };
@@ -656,6 +662,17 @@ export default function Page() {
         }
       : null;
   const pendingJump = layout === "code" ? jumpTo : null;
+
+  /** Fields the change touched, for chips on the flow steps that use them. */
+  const dataFields = useMemo(
+    () =>
+      (dataModel?.entities ?? []).flatMap((e) =>
+        e.fields
+          .filter((f) => f.state !== "same")
+          .map((f) => ({ entity: e.name, field: f.item.name, state: f.state as DataField["state"] })),
+      ),
+    [dataModel],
+  );
 
   /** What the map says of each component, for the flow's component boxes. */
   const componentInfo = useMemo(() => {
@@ -1341,7 +1358,10 @@ export default function Page() {
                     showComments={hasComments}
                     header={
                       rev !== WORKING_REV ? (
-                        <MapStrip map={map} onHover={setHoveredComponent} />
+                        <>
+                          <MapStrip map={map} onHover={setHoveredComponent} />
+                          <DataStrip data={dataModel} />
+                        </>
                       ) : null
                     }
                     flows={
@@ -1355,6 +1375,7 @@ export default function Page() {
                         code={inlineCode}
                         jumpTo={pendingJump}
                         components={componentInfo}
+                      dataFields={dataFields}
                         onJumped={() => setJumpTo(null)}
                         coverage={
                           flowSet && diff && diff.rev === rev ? (
@@ -1404,7 +1425,10 @@ export default function Page() {
                   showComments={hasComments}
                   header={
                     rev !== WORKING_REV ? (
-                      <MapStrip map={map} onHover={setHoveredComponent} />
+                      <>
+                          <MapStrip map={map} onHover={setHoveredComponent} />
+                          <DataStrip data={dataModel} />
+                        </>
                     ) : null
                   }
                   flows={
@@ -1418,6 +1442,7 @@ export default function Page() {
                       code={inlineCode}
                       jumpTo={pendingJump}
                       components={componentInfo}
+                      dataFields={dataFields}
                       onJumped={() => setJumpTo(null)}
                       coverage={
                         flowSet && diff && diff.rev === rev ? (

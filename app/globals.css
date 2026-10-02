@@ -1442,3 +1442,148 @@ tr.step-code-target td.diff-num {
   color: var(--accent);
   font-weight: 600;
 }
+
+/* --- The data model -------------------------------------------------- */
+
+.data-glyph {
+  display: flex;
+  width: 112px;
+  flex-shrink: 0;
+  justify-content: center;
+  color: var(--fg-subtle);
+}
+.data-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.data-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+  overflow: hidden;
+}
+.data-card.changed {
+  border: 1.5px solid var(--fg-muted);
+}
+.data-card.added {
+  border-color: var(--success);
+  box-shadow: inset 3px 0 0 var(--success);
+}
+.data-card.removed {
+  border: 1px dashed var(--danger);
+}
+.data-card.same {
+  background: var(--canvas-subtle);
+}
+.data-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-muted);
+}
+.data-card-head .name {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+.data-card.same .data-card-head {
+  border-bottom: 0;
+}
+.data-card.same .data-card-head .name {
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.data-note {
+  padding: 0 10px 8px;
+  font-size: 11px;
+  color: var(--fg-subtle);
+}
+.data-section {
+  padding: 4px 0;
+}
+.data-section + .data-section {
+  border-top: 1px solid var(--border-muted);
+}
+.data-label {
+  padding: 2px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.data-row {
+  display: flex;
+  gap: 6px;
+  padding: 1px 10px 1px 6px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.data-row .mark {
+  width: 10px;
+  flex-shrink: 0;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+}
+.data-row.added {
+  background: var(--diff-add-bg);
+}
+.data-row.added .mark {
+  color: var(--success);
+}
+.data-row.removed {
+  background: var(--diff-del-bg);
+  color: var(--fg-muted);
+}
+.data-row.removed .mark {
+  color: var(--danger);
+}
+.data-row.changed {
+  background: color-mix(in srgb, var(--attention) 12%, var(--canvas));
+}
+.data-row .mono {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+.data-row .type,
+.data-row .was {
+  color: var(--fg-muted);
+}
+.data-row .was {
+  font-style: italic;
+}
+.data-more {
+  padding: 2px 10px 2px 22px;
+  font-size: 11px;
+  color: var(--fg-subtle);
+}
+.data-more:hover {
+  color: var(--accent);
+}
+
+/* A flow step that uses a field the change touched. */
+.flow-badge.data {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 10.5px;
+}
+.flow-badge.data.added {
+  background: var(--diff-add-num-bg);
+  color: var(--success);
+}
+.flow-badge.data.removed {
+  background: var(--diff-del-num-bg);
+  color: var(--danger);
+}
+.flow-badge.data.changed {
+  background: color-mix(in srgb, var(--attention) 18%, var(--canvas));
+  color: var(--attention);
+}

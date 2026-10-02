@@ -19,6 +19,21 @@ const BOX_DESC_LINES = 6;
 /** The box's padding below the lane names. */
 const BOX_PAD = 16;
 const NONE_OPEN = new Set<string>();
+const NO_FIELDS: DataField[] = [];
+
+export interface DataField {
+  entity: string;
+  field: string;
+  state: "added" | "removed" | "changed";
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/** The changed fields a step's call names. */
+function fieldsIn(step: FlowRow["step"], fields: DataField[]) {
+  const text = `${step.label} ${step.symbol}`;
+  return fields.filter((f) => new RegExp(`\\b${escapeRe(f.field)}\\b`).test(text)).slice(0, 2);
+}
 
 /**
  * The sequence diagram: participants across the top, one call per row,
@@ -41,6 +56,7 @@ export function FlowSequence({
   open = NONE_OPEN,
   renderCode,
   components,
+  dataFields = NO_FIELDS,
 }: {
   rows: FlowRow[];
   lanes: FlowParticipant[];
@@ -55,6 +71,8 @@ export function FlowSequence({
   renderCode?: (row: FlowRow) => React.ReactNode;
   /** What the map says of each component: its description, and what the change did to it */
   components?: Map<string, ComponentInfo>;
+  /** Fields the change added, removed or changed, for chips on the steps that use them */
+  dataFields?: DataField[];
 }) {
   const id = useId().replace(/:/g, "");
   const measure = useRef<HTMLDivElement>(null);
@@ -293,6 +311,15 @@ export function FlowSequence({
                       )}
                       {row.step.repeat && <span className="flow-badge">× {row.step.repeat}</span>}
                       {row.again && <span className="flow-badge">{row.again}</span>}
+                      {fieldsIn(row.step, dataFields).map((f) => (
+                        <span
+                          key={f.field}
+                          className={`flow-badge data ${f.state}`}
+                          title={`This step uses ${f.entity}.${f.field}, which the change ${f.state === "added" ? "adds" : f.state === "removed" ? "removes" : "changes"}`}
+                        >
+                          {f.entity}.{f.field} {f.state === "added" ? "new" : f.state}
+                        </span>
+                      ))}
                       {!row.step.verified && (
                         <span
                           className="flow-badge warn"

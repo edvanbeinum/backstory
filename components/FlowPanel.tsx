@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { componentPath, groupLanes, summarise, type FlowMode, type FlowRow } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
-import { FlowSequence, type ComponentInfo } from "./FlowSequence";
+import { FlowSequence, type ComponentInfo, type DataField } from "./FlowSequence";
 import { StepCode } from "./StepCode";
 import { AlertIcon, ChevronRightIcon, SyncIcon } from "./icons";
 import { Spinner } from "./ui";
@@ -54,6 +54,7 @@ export function FlowPanel({
   jumpTo = null,
   onJumped,
   components,
+  dataFields,
 }: {
   api: FlowsApi;
   selection: FlowSelection;
@@ -70,6 +71,7 @@ export function FlowPanel({
   jumpTo?: string | null;
   onJumped?: () => void;
   components?: Map<string, ComponentInfo>;
+  dataFields?: DataField[];
 }) {
   const { status, error } = api;
 
@@ -136,6 +138,7 @@ export function FlowPanel({
       jumpTo={jumpTo}
       onJumped={onJumped}
       components={components}
+      dataFields={dataFields}
     />
   );
 }
@@ -154,6 +157,7 @@ function ReadyFlows({
   jumpTo,
   onJumped,
   components,
+  dataFields,
 }: {
   set: FlowSet;
   api: FlowsApi;
@@ -168,6 +172,7 @@ function ReadyFlows({
   jumpTo: string | null;
   onJumped?: () => void;
   components?: Map<string, ComponentInfo>;
+  dataFields?: DataField[];
 }) {
   const flow = set.flows[selection.index] ?? null;
   const summaries = useMemo(() => set.flows.map((f) => summarise(f, set.hunks)), [set]);
@@ -442,6 +447,7 @@ function ReadyFlows({
           onRowClick={code ? toggle : goTo}
           open={code ? open : undefined}
           components={components}
+          dataFields={dataFields}
           renderCode={
             code
               ? (row) => (
