@@ -9,6 +9,8 @@ import { FlowCoverage } from "@/components/FlowCoverage";
 import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
 import type { ComponentInfo, DataField } from "@/components/FlowSequence";
 import { DataStrip } from "@/components/DataStrip";
+import { QuestionsStrip } from "@/components/QuestionsStrip";
+import { findings as designQuestions } from "@/lib/findings";
 import { MapStrip } from "@/components/MapStrip";
 import type { DataResponse } from "@/lib/data/types";
 import type { MapResponse } from "@/lib/map";
@@ -662,6 +664,15 @@ export default function Page() {
         }
       : null;
   const pendingJump = layout === "code" ? jumpTo : null;
+
+  /** Design questions, from the flows and the data model. */
+  const questions = useMemo(() => designQuestions(flowSet, dataModel), [flowSet, dataModel]);
+  const [focusStep, setFocusStep] = useState<string | null>(null);
+  const showStep = useCallback((flow: number, step: string) => {
+    setColumnTab("flows");
+    setFlowSel({ index: flow, mode: "diff" });
+    setFocusStep(step);
+  }, []);
 
   /** Fields the change touched, for chips on the flow steps that use them. */
   const dataFields = useMemo(
@@ -1361,6 +1372,11 @@ export default function Page() {
                         <>
                           <MapStrip map={map} onHover={setHoveredComponent} />
                           <DataStrip data={dataModel} />
+                          <QuestionsStrip
+                            findings={questions}
+                            ready={flowSet !== null}
+                            onShowStep={showStep}
+                          />
                         </>
                       ) : null
                     }
@@ -1376,6 +1392,8 @@ export default function Page() {
                         jumpTo={pendingJump}
                         components={componentInfo}
                       dataFields={dataFields}
+                      focusStep={focusStep}
+                      onFocused={() => setFocusStep(null)}
                         onJumped={() => setJumpTo(null)}
                         coverage={
                           flowSet && diff && diff.rev === rev ? (
@@ -1428,6 +1446,11 @@ export default function Page() {
                       <>
                           <MapStrip map={map} onHover={setHoveredComponent} />
                           <DataStrip data={dataModel} />
+                          <QuestionsStrip
+                            findings={questions}
+                            ready={flowSet !== null}
+                            onShowStep={showStep}
+                          />
                         </>
                     ) : null
                   }
@@ -1443,6 +1466,8 @@ export default function Page() {
                       jumpTo={pendingJump}
                       components={componentInfo}
                       dataFields={dataFields}
+                      focusStep={focusStep}
+                      onFocused={() => setFocusStep(null)}
                       onJumped={() => setJumpTo(null)}
                       coverage={
                         flowSet && diff && diff.rev === rev ? (

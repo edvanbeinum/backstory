@@ -1661,3 +1661,65 @@ tr.step-code-target td.diff-num {
 .data-section.details .data-note {
   padding: 4px 10px 6px;
 }
+
+/* --- Design questions ------------------------------------------------- */
+
+.questions-glyph {
+  display: flex;
+  width: 112px;
+  flex-shrink: 0;
+  justify-content: center;
+}
+.questions-glyph span {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--attention);
+  border-radius: 50%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--attention);
+}
+.question {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--attention);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+.question-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+.question-why {
+  margin: 2px 0 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.question-evidence {
+  display: grid;
+  gap: 1px;
+}
+.question-evidence li {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 11.5px;
+  color: var(--fg-muted);
+}
+.question-evidence button {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--accent);
+  text-align: left;
+}
+.question-evidence button:hover {
+  text-decoration: underline;
+}
