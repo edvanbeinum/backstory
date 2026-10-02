@@ -1662,47 +1662,46 @@ tr.step-code-target td.diff-num {
   padding: 4px 10px 6px;
 }
 
-/* --- Design questions ------------------------------------------------- */
+/* --- Worth a look ----------------------------------------------------- */
 
-.questions-glyph {
-  display: flex;
-  width: 112px;
-  flex-shrink: 0;
-  justify-content: center;
-}
-.questions-glyph span {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  border: 1.5px solid var(--attention);
-  border-radius: 50%;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--attention);
-}
-.question {
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--attention);
+/* Facts about the change's shape, pinned where they apply; this is their
+   quiet index. Attention-coloured, never alarming. */
+.look {
+  border: 1px solid var(--border-muted);
   border-radius: 6px;
-  background: var(--canvas);
+  background: var(--canvas-subtle);
 }
-.question-title {
-  font-size: 13px;
-  font-weight: 600;
-}
-.question-why {
-  margin: 2px 0 6px;
+.look-line {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
   font-size: 12px;
   color: var(--fg-muted);
+  text-align: left;
 }
-.question-evidence {
+.look-label {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: var(--fg);
+}
+.look-items {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.look-list {
   display: grid;
-  gap: 1px;
+  gap: 8px;
+  padding: 2px 12px 10px 30px;
 }
-.question-evidence li {
+.look-title {
+  font-size: 12.5px;
+  font-weight: 500;
+}
+.look-evidence li {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -1712,7 +1711,7 @@ tr.step-code-target td.diff-num {
   font-size: 11.5px;
   color: var(--fg-muted);
 }
-.question-evidence button {
+.look-evidence button {
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1720,6 +1719,27 @@ tr.step-code-target td.diff-num {
   color: var(--accent);
   text-align: left;
 }
-.question-evidence button:hover {
+.look-evidence button:hover {
   text-decoration: underline;
+}
+/* A note pinned on a diagram: a data card, or under a flow's title. */
+.pinned-note {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--attention);
+}
+.pinned-note::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--attention);
+  transform: translateY(-1px);
+}
+.data-card .pinned-note {
+  padding: 0 10px 8px;
 }

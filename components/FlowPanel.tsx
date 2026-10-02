@@ -57,6 +57,7 @@ export function FlowPanel({
   dataFields,
   focusStep = null,
   onFocused,
+  flowNotes,
 }: {
   api: FlowsApi;
   selection: FlowSelection;
@@ -77,6 +78,8 @@ export function FlowPanel({
   /** A step to bring forward, from a design question's evidence */
   focusStep?: string | null;
   onFocused?: () => void;
+  /** "Worth a look" notes pinned on flows, by flow index */
+  flowNotes?: Map<number, string[]>;
 }) {
   const { status, error } = api;
 
@@ -146,6 +149,7 @@ export function FlowPanel({
       dataFields={dataFields}
       focusStep={focusStep}
       onFocused={onFocused}
+      flowNotes={flowNotes}
     />
   );
 }
@@ -167,6 +171,7 @@ function ReadyFlows({
   dataFields,
   focusStep,
   onFocused,
+  flowNotes,
 }: {
   set: FlowSet;
   api: FlowsApi;
@@ -184,6 +189,7 @@ function ReadyFlows({
   dataFields?: DataField[];
   focusStep: string | null;
   onFocused?: () => void;
+  flowNotes?: Map<number, string[]>;
 }) {
   const flow = set.flows[selection.index] ?? null;
   const summaries = useMemo(() => set.flows.map((f) => summarise(f, set.hunks)), [set]);
@@ -440,6 +446,11 @@ function ReadyFlows({
                 <>Same steps · {stepWord(summary.afterSteps)}</>
               )}
             </div>
+            {(flowNotes?.get(selection.index) ?? []).map((n) => (
+              <div key={n} className="pinned-note mt-1">
+                {n}
+              </div>
+            ))}
             {path.length > 0 && (
               <div className="flow-path" title="The map's components this flow passes through, in order">
                 {path.map((c, i) => (

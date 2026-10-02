@@ -37,7 +37,7 @@ const set = (flows: Flow[]): FlowSet => ({
 
 const kinds = (f: ReturnType<typeof findings>) => f.map((x) => x.kind);
 
-test("a core entity gaining a vendor's fields is asked about", () => {
+test("a core entity gaining a vendor's fields is noted, on that entity", () => {
   const data: DataResponse = {
     status: "ok",
     baseModel: true,
@@ -59,10 +59,11 @@ test("a core entity gaining a vendor's fields is asked about", () => {
   const flows = set([flow("Import", [step("Controller", "ZoomClient", "ZoomClient.new.recordings")])]);
   const found = findings(flows, data);
   assert.deepEqual(kinds(found), ["vendor-fields"]);
-  assert.equal(found[0].title, "Item (Catalog) gains 1 field named after Zoom");
+  assert.equal(found[0].title, "Item (Catalog) gains 1 Zoom field");
+  assert.deepEqual(found[0].on, { entity: "Item" });
 });
 
-test("raw HTTP beside a vendor client is asked about; HTTP inside the client isn't", () => {
+test("raw HTTP beside a vendor client is noted; HTTP inside the client isn't", () => {
   const picker = flow("Picker", [step("Controller", "ZoomClient", "ZoomClient.new.recordings")]);
   const leaky = flow("Job", [step("ImportJob", "Net::HTTP", "Net::HTTP.start")], ["Net::HTTP"]);
   assert.deepEqual(kinds(findings(set([picker, leaky]), null)), ["two-ways"]);
@@ -70,7 +71,7 @@ test("raw HTTP beside a vendor client is asked about; HTTP inside the client isn
   assert.deepEqual(kinds(findings(set([picker, owned]), null)), []);
 });
 
-test("two flows making the same calls from different code repeat each other; from the same code they don't", () => {
+test("two flows making the same calls from different code are noted; from the same code they aren't", () => {
   const calls = (from: string, sites: string[]) => [
     step(from, "ZoomClient", "ZoomClient.new(account).recordings", sites[0]),
     step(from, "Recording", "recording.selectable?", sites[1]),
@@ -80,23 +81,13 @@ test("two flows making the same calls from different code repeat each other; fro
     flow("Import", calls("PickerController", ["a.rb:1", "a.rb:2", "a.rb:3"])),
     flow("Retry", calls("RetryController", ["b.rb:1", "b.rb:2", "b.rb:3"])),
   ]);
-  assert.deepEqual(kinds(findings(copied, null)), ["repeated-flows"]);
+  const [note] = findings(copied, null);
+  assert.equal(note.kind, "repeated-flows");
+  assert.deepEqual(note.on, { flows: [0, 1] });
   // Two ways into one screen reach the same lines: shared, not copied.
   const shared = set([
     flow("From Exercise", calls("ProgressView", ["v.rb:1", "v.rb:2", "v.rb:3"])),
     flow("From History", calls("ProgressView", ["v.rb:1", "v.rb:2", "v.rb:3"])),
   ]);
   assert.deepEqual(kinds(findings(shared, null)), []);
-});
-
-test("a job with steps of its own is asked about; one that presses a button isn't", () => {
-  const busy = flow("Run", [
-    step("ImportJob", "ImportJob", "acquire_token"),
-    step("ImportJob", "ImportJob", "stream_to_tempfile"),
-    step("ImportJob", "ImportJob", "classify_response!"),
-    step("ImportJob", "Item", "item.update_columns"),
-  ]);
-  assert.deepEqual(kinds(findings(set([busy]), null)), ["busy-job"]);
-  const thin = flow("Run", [step("ImportJob", "Recording", "recording.download!")]);
-  assert.deepEqual(kinds(findings(set([thin]), null)), []);
 });

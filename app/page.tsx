@@ -9,7 +9,7 @@ import { FlowCoverage } from "@/components/FlowCoverage";
 import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
 import type { ComponentInfo, DataField } from "@/components/FlowSequence";
 import { DataStrip } from "@/components/DataStrip";
-import { QuestionsStrip } from "@/components/QuestionsStrip";
+import { WorthALook } from "@/components/WorthALook";
 import { findings as designQuestions } from "@/lib/findings";
 import { MapStrip } from "@/components/MapStrip";
 import type { DataResponse } from "@/lib/data/types";
@@ -665,8 +665,24 @@ export default function Page() {
       : null;
   const pendingJump = layout === "code" ? jumpTo : null;
 
-  /** Design questions, from the flows and the data model. */
+  /** Notes worth a look, from the flows and the data model, and where each is pinned. */
   const questions = useMemo(() => designQuestions(flowSet, dataModel), [flowSet, dataModel]);
+  const entityNotes = useMemo(() => {
+    const out = new Map<string, string[]>();
+    for (const q of questions) {
+      if (q.on.entity) out.set(q.on.entity, [...(out.get(q.on.entity) ?? []), q.short.replace(`${q.on.entity} gains `, "")]);
+    }
+    return out;
+  }, [questions]);
+  const flowNotes = useMemo(() => {
+    const out = new Map<number, string[]>();
+    for (const q of questions) {
+      for (const [i, text] of Object.entries(q.flowText ?? {})) {
+        out.set(Number(i), [...(out.get(Number(i)) ?? []), text]);
+      }
+    }
+    return out;
+  }, [questions]);
   const [focusStep, setFocusStep] = useState<string | null>(null);
   const showStep = useCallback((flow: number, step: string) => {
     setColumnTab("flows");
@@ -1371,12 +1387,8 @@ export default function Page() {
                       rev !== WORKING_REV ? (
                         <>
                           <MapStrip map={map} onHover={setHoveredComponent} />
-                          <DataStrip data={dataModel} />
-                          <QuestionsStrip
-                            findings={questions}
-                            ready={flowSet !== null}
-                            onShowStep={showStep}
-                          />
+                          <DataStrip data={dataModel} notes={entityNotes} />
+                          <WorthALook findings={questions} onShowStep={showStep} />
                         </>
                       ) : null
                     }
@@ -1394,6 +1406,7 @@ export default function Page() {
                       dataFields={dataFields}
                       focusStep={focusStep}
                       onFocused={() => setFocusStep(null)}
+                      flowNotes={flowNotes}
                         onJumped={() => setJumpTo(null)}
                         coverage={
                           flowSet && diff && diff.rev === rev ? (
@@ -1445,12 +1458,8 @@ export default function Page() {
                     rev !== WORKING_REV ? (
                       <>
                           <MapStrip map={map} onHover={setHoveredComponent} />
-                          <DataStrip data={dataModel} />
-                          <QuestionsStrip
-                            findings={questions}
-                            ready={flowSet !== null}
-                            onShowStep={showStep}
-                          />
+                          <DataStrip data={dataModel} notes={entityNotes} />
+                          <WorthALook findings={questions} onShowStep={showStep} />
                         </>
                     ) : null
                   }
@@ -1468,6 +1477,7 @@ export default function Page() {
                       dataFields={dataFields}
                       focusStep={focusStep}
                       onFocused={() => setFocusStep(null)}
+                      flowNotes={flowNotes}
                       onJumped={() => setJumpTo(null)}
                       coverage={
                         flowSet && diff && diff.rev === rev ? (

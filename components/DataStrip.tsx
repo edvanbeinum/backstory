@@ -88,7 +88,18 @@ function Row({ state, children, was }: { state: string; children: React.ReactNod
  * level 4: rules, the columns links live in, timestamps. Unchanged fields
  * aren't shown at all: they're the code's business, not the change's.
  */
-function EntityCard({ p, open, onToggle }: { p: Presented; open: boolean; onToggle: () => void }) {
+function EntityCard({
+  p,
+  open,
+  onToggle,
+  notes = [],
+}: {
+  p: Presented;
+  open: boolean;
+  onToggle: () => void;
+  /** "Worth a look" notes pinned on this entity */
+  notes?: string[];
+}) {
   const [details, setDetails] = useState(false);
   const e = p.entity;
   if (p.state === "same") {
@@ -114,6 +125,11 @@ function EntityCard({ p, open, onToggle }: { p: Presented; open: boolean; onTogg
         <span>{p.state === "added" ? p.summary.replace(/^New · /, "") || "New" : p.summary}</span>
         <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
       </button>
+      {notes.map((n) => (
+        <div key={n} className="pinned-note">
+          {n}
+        </div>
+      ))}
       {open && (
         <>
           {p.fields.length > 0 && (
@@ -199,7 +215,15 @@ function dataEdges(entities: EntityDiff[], changed: Set<string>): DataEdge[] {
   return out;
 }
 
-function DataGraph({ shown, width }: { shown: Presented[]; width: number }) {
+function DataGraph({
+  shown,
+  width,
+  notes,
+}: {
+  shown: Presented[];
+  width: number;
+  notes?: Map<string, string[]>;
+}) {
   const changedNames = useMemo(
     () => new Set(shown.filter((p) => p.state !== "same").map((p) => p.entity.name)),
     [shown],
@@ -325,6 +349,7 @@ function DataGraph({ shown, width }: { shown: Presented[]; width: number }) {
           <EntityCard
             p={n}
             open={open.has(n.id)}
+            notes={notes?.get(n.id)}
             onToggle={() =>
               setOpen((cur) => {
                 const next = new Set(cur);
@@ -340,7 +365,13 @@ function DataGraph({ shown, width }: { shown: Presented[]; width: number }) {
   );
 }
 
-export function DataStrip({ data }: { data: DataResponse | null }) {
+export function DataStrip({
+  data,
+  notes,
+}: {
+  data: DataResponse | null;
+  notes?: Map<string, string[]>;
+}) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
@@ -405,7 +436,7 @@ export function DataStrip({ data }: { data: DataResponse | null }) {
       {open && (
         <div className="map-overlay">
           <div className="map-card">
-            <DataGraph shown={shown} width={width} />
+            <DataGraph shown={shown} width={width} notes={notes} />
           </div>
           <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
             From {data.source === "rails" ? "db/schema.rb and the models" : "the Core Data model"}, at the base and

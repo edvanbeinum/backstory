@@ -1,12 +1,13 @@
 import { present } from "./data/present";
 import type { DataResponse } from "./data/types";
-import type { Flow, FlowSet, FlowStep } from "./flows/types";
+import type { FlowSet, FlowStep } from "./flows/types";
 
 /**
- * Design questions, raised mechanically from what differ already holds: the
- * view's flows and its data model change. Each is a heuristic, so each is
- * phrased as a question and carries the evidence it fired on. None needs
- * Claude: the opinion stays with the reader.
+ * Notes on the shape of a change, worked out from what differ already
+ * holds: the view's flows and its data model change. Each states a fact
+ * worth a look, with the evidence, and says where it belongs on the
+ * diagrams. They don't judge: whether a pattern is a problem is the
+ * reader's call, and the reviewer's.
  */
 
 export interface Evidence {
@@ -20,14 +21,16 @@ export interface Evidence {
 
 export interface Finding {
   id: string;
-  kind: "vendor-fields" | "two-ways" | "repeated-flows" | "busy-job";
-  /** A few words, for the strip */
+  kind: "vendor-fields" | "two-ways" | "repeated-flows";
+  /** A few words, for the strip and for the place it's pinned */
   short: string;
-  /** The question, in a line */
+  /** The fact, in a line */
   title: string;
-  /** Why it's worth asking */
-  why: string;
   evidence: Evidence[];
+  /** Where it's pinned: an entity in the data view, or flows */
+  on: { entity?: string; flows?: number[] };
+  /** For a pinned flow, what the note says there */
+  flowText?: Record<number, string>;
 }
 
 /** Lanes that are raw HTTP: calling one means speaking a protocol, not a domain. */
@@ -67,13 +70,14 @@ function vendorFields(data: DataResponse | null, names: string[]): Finding[] {
       const named = p.fields.filter((f) => f.state === "added" && f.item.name.toLowerCase().startsWith(prefix));
       if (named.length === 0) continue;
       const where = p.entity.component ? ` (${p.entity.component})` : "";
+      const fields = `${named.length} ${vendor} ${named.length === 1 ? "field" : "fields"}`;
       out.push({
         id: `vendor-fields:${p.entity.name}:${vendor}`,
         kind: "vendor-fields",
-        short: `${p.entity.name} takes ${vendor} fields`,
-        title: `${p.entity.name}${where} gains ${named.length} ${named.length === 1 ? "field" : "fields"} named after ${vendor}`,
-        why: `When a second source arrives, does ${p.entity.name} grow another set of fields? A ${vendor}-specific record linked to ${p.entity.name} would keep ${p.entity.name} the same.`,
+        short: `${p.entity.name} gains ${fields}`,
+        title: `${p.entity.name}${where} gains ${fields}`,
         evidence: named.map((f) => ({ entity: p.entity.name, text: `+ ${f.item.name}` })),
+        on: { entity: p.entity.name },
       });
     }
   }
@@ -99,13 +103,17 @@ function twoWays(set: FlowSet | null): Finding[] {
   });
   if (raw.length === 0) return [];
   const callers = [...new Set(raw.map((r) => r.text.split(" → ")[0]))];
+  const flows = [...new Set(raw.map((r) => r.flow!))];
   return [...clients].map(([vendor, client]) => ({
     id: `two-ways:${vendor}`,
     kind: "two-ways" as const,
-    short: `${vendor} reached two ways`,
-    title: `${vendor} is reached two ways: through ${client}, and directly over HTTP from ${callers.join(", ")}`,
-    why: `If ${vendor} changes how it authenticates or rate-limits, how many places need fixing? A client that owns every call to ${vendor} would be one.`,
+    short: `${vendor} called two ways`,
+    title: `${vendor} is called through ${client}, and directly over HTTP from ${callers.join(", ")}`,
     evidence: raw,
+    on: { flows },
+    flowText: Object.fromEntries(
+      flows.map((f) => [f, `Calls ${vendor} over HTTP directly; elsewhere ${client} does`]),
+    ),
   }));
 }
 
@@ -162,6 +170,7 @@ function repeatedFlows(set: FlowSet | null): Finding[] {
       const b = set.flows[j];
       // Where they part: the same call made with different words.
       const differ: Evidence[] = [];
+      const parts: string[] = [];
       for (const s of a.after) {
         const sig = signature(s, externals[i]);
         const twin = b.after.find(
@@ -172,53 +181,32 @@ function repeatedFlows(set: FlowSet | null): Finding[] {
             `${t.file}:${t.line}` !== `${s.file}:${s.line}`,
         );
         if (twin) {
+          parts.push(sig!.split(".").pop()!);
           differ.push({ flow: i, step: s.id, text: `${a.name}: ${s.label}` });
           differ.push({ flow: j, step: twin.id, text: `${b.name}: ${twin.label}` });
         }
       }
+      const at = parts.length
+        ? `; ${parts.length === n ? "all" : parts.length} of them ${parts.length === 1 ? "differs" : "differ"} in what's passed`
+        : "";
       out.push({
         id: `repeated:${a.id}:${b.id}`,
         kind: "repeated-flows",
-        short: "two flows repeat each other",
-        title: `"${a.name}" and "${b.name}" each make the same ${n} calls, from different code`,
-        why:
-          differ.length > 0
-            ? "Two copies of one sequence tend to drift apart, and these already differ. Could they share one path?"
-            : "Two copies of one sequence tend to drift apart. Could they share one path?",
+        short: `flows ${i + 1} and ${j + 1} share ${n} calls`,
+        title: `"${a.name}" and "${b.name}" make the same ${n} calls from different places${at}`,
         evidence: differ.length > 0 ? differ.slice(0, 6) : [{ flow: i, text: `${n} calls in common` }],
+        on: { flows: [i, j] },
+        flowText: {
+          [i]: `Makes ${n} of the same calls as flow ${j + 1}, from different code${at}`,
+          [j]: `Makes ${n} of the same calls as flow ${i + 1}, from different code${at}`,
+        },
       });
     }
   }
   return out;
 }
 
-const JOB = /(Job|Worker)$/;
-
-/** 4. A job doing the work itself rather than pressing a button on a model. */
-function busyJobs(set: FlowSet | null): Finding[] {
-  if (!set) return [];
-  const out: Finding[] = [];
-  set.flows.forEach((f: Flow, i) => {
-    const jobs = new Set(f.after.map((s) => s.from).filter((n) => JOB.test(n)));
-    for (const job of jobs) {
-      const own = f.after.filter((s) => s.from === job);
-      const self = own.filter((s) => s.to === job);
-      const others = new Set(own.filter((s) => s.to !== job).map((s) => s.to));
-      if (self.length < 3 && others.size < 4) continue;
-      out.push({
-        id: `busy-job:${job}:${f.id}`,
-        kind: "busy-job",
-        short: `${job} does the work itself`,
-        title: `${job} does the work itself: ${self.length} steps of its own, calling ${others.size} other types`,
-        why: "A job that only presses one button on a model can be tested without a queue, and the rule lives with the model it's about.",
-        evidence: own.slice(0, 6).map((s) => ({ flow: i, step: s.id, text: `${s.to === job ? "itself" : s.to}: ${s.label}` })),
-      });
-    }
-  });
-  return out;
-}
-
 export function findings(set: FlowSet | null, data: DataResponse | null, known: string[] = []): Finding[] {
   const names = vendors(set, data, known);
-  return [...vendorFields(data, names), ...twoWays(set), ...repeatedFlows(set), ...busyJobs(set)];
+  return [...vendorFields(data, names), ...twoWays(set), ...repeatedFlows(set)];
 }
