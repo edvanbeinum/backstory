@@ -31,7 +31,6 @@ export interface Presented {
     rules: Diffed<Constraint>[];
     linkFields: Diffed<Field>[];
     timestamps: Diffed<Field>[];
-    unchangedFields: Field[];
   };
 }
 
@@ -113,7 +112,6 @@ export function present(entities: EntityDiff[]): Presented[] {
         rules,
         linkFields: changed(linkFields),
         timestamps: changed(timestamps),
-        unchangedFields: own.filter((f) => f.state === "same").map((f) => f.item),
       },
     };
   });

@@ -21,10 +21,6 @@ import { ChevronDownIcon } from "./icons";
  * column is only a word in a step.
  */
 
-function count(n: number, word: string) {
-  return `${n} ${word}${n === 1 ? "" : "s"}`;
-}
-
 /** Level 1, the strip: which entities changed, in a phrase each. */
 function summary(shown: Presented[]) {
   const changed = shown.filter((p) => p.state !== "same");
@@ -89,7 +85,8 @@ function Row({ state, children, was }: { state: string; children: React.ReactNod
 /**
  * One entity. Level 2: its name and one line. Click for level 3, the field
  * changes and any relationship the arrows don't already say. "Details" is
- * level 4: rules, the columns links live in, timestamps, unchanged fields.
+ * level 4: rules, the columns links live in, timestamps. Unchanged fields
+ * aren't shown at all: they're the code's business, not the change's.
  */
 function EntityCard({ p, open, onToggle }: { p: Presented; open: boolean; onToggle: () => void }) {
   const [details, setDetails] = useState(false);
@@ -103,8 +100,7 @@ function EntityCard({ p, open, onToggle }: { p: Presented; open: boolean; onTogg
     );
   }
   const d = p.details;
-  const hasDetails =
-    d.rules.length + d.linkFields.length + d.timestamps.length + d.unchangedFields.length > 0;
+  const hasDetails = d.rules.length + d.linkFields.length + d.timestamps.length > 0;
   return (
     <div className={`data-card ${p.state} ${open ? "open" : ""}`} title={e.file ?? undefined}>
       <button type="button" className="data-card-head" onClick={onToggle} aria-expanded={open}>
@@ -155,12 +151,6 @@ function EntityCard({ p, open, onToggle }: { p: Presented; open: boolean; onTogg
                   <span className="mono">{f.item.name}</span> <span className="type">{fieldType(f.item)}</span>
                 </Row>
               ))}
-              {d.unchangedFields.length > 0 && (
-                <div className="data-note">
-                  {count(d.unchangedFields.length, "unchanged field")}:{" "}
-                  <span className="mono">{d.unchangedFields.map((f) => f.name).join(", ")}</span>
-                </div>
-              )}
             </div>
           )}
         </>
