@@ -3,6 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
+import { edgePath, layeredLayout, type Box } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
 
 /**
@@ -19,18 +20,8 @@ const MAX_FILES = 4;
 const COL_GAP = 18;
 const PAD = 14;
 
-interface Placed extends MapNode {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
+type Placed = MapNode & Box;
 
-/**
- * A fixed layered layout: each element's row is the longest chain of arrows
- * leading to it, so callers sit above what they call. Within a row, nodes
- * follow their callers' order.
- */
 /**
  * A box's height before it's measured: name, the description wrapped, and
  * one line per file named. The real height replaces it after the first paint.
@@ -50,73 +41,13 @@ function layout(
   width: number,
   heights: Map<string, number> = new Map(),
 ) {
-  const ids = nodes.map((n) => n.id);
-  const into = new Map<string, string[]>(ids.map((id) => [id, []]));
-  for (const e of edges) if (e.source !== e.destination) into.get(e.destination)?.push(e.source);
-
-  const rank = new Map<string, number>();
-  const visiting = new Set<string>();
-  const rankOf = (id: string): number => {
-    if (rank.has(id)) return rank.get(id)!;
-    if (visiting.has(id)) return 0; // a cycle: break it here
-    visiting.add(id);
-    const r = Math.max(-1, ...(into.get(id) ?? []).map(rankOf)) + 1;
-    visiting.delete(id);
-    rank.set(id, r);
-    return r;
-  };
-  for (const id of ids) rankOf(id);
-
-  const rows: MapNode[][] = [];
-  for (const n of nodes) (rows[rank.get(n.id)!] ??= []).push(n);
-  const packed = rows.filter(Boolean);
-
-  const placed = new Map<string, Placed>();
-  let y = PAD;
-  for (const row of packed) {
-    // Order by where the callers sit, so arrows cross less.
-    const pos = (n: MapNode) => {
-      const xs = (into.get(n.id) ?? []).map((s) => placed.get(s)).filter(Boolean) as Placed[];
-      return xs.length ? xs.reduce((a, p) => a + p.x + p.w / 2, 0) / xs.length : Infinity;
-    };
-    row.sort((a, b) => pos(a) - pos(b));
-    const perLine = Math.max(1, Math.min(row.length, Math.floor((width - 2 * PAD + COL_GAP) / (MIN_NODE_W + COL_GAP))));
-    for (let start = 0; start < row.length; start += perLine) {
-      const line = row.slice(start, start + perLine);
-      const w = Math.min(MAX_NODE_W, (width - 2 * PAD - (line.length - 1) * COL_GAP) / line.length);
-      const total = line.length * w + (line.length - 1) * COL_GAP;
-      let x = (width - total) / 2;
-      const hs = line.map((n) => heights.get(n.id) ?? estimateHeight(n, w));
-      line.forEach((n, i) => {
-        placed.set(n.id, { ...n, x, y, w, h: hs[i] });
-        x += w + COL_GAP;
-      });
-      y += Math.max(...hs) + ROW_GAP;
-    }
-  }
-  return { placed, height: y - ROW_GAP + PAD };
-}
-
-function edgePath(a: Placed, b: Placed, ai: number, an: number, bi: number, bn: number) {
-  const ax = a.x + (a.w * (ai + 1)) / (an + 1);
-  const bx = b.x + (b.w * (bi + 1)) / (bn + 1);
-  if (b.y > a.y + a.h / 2) {
-    const y1 = a.y + a.h;
-    const y2 = b.y;
-    const mid = (y1 + y2) / 2;
-    return { d: `M${ax} ${y1} C${ax} ${mid} ${bx} ${mid} ${bx} ${y2 - 1}`, lx: (ax + bx) / 2, ly: mid };
-  }
-  if (b.y + b.h < a.y + a.h / 2) {
-    const y1 = a.y;
-    const y2 = b.y + b.h;
-    const mid = (y1 + y2) / 2;
-    return { d: `M${ax} ${y1} C${ax} ${mid} ${bx} ${mid} ${bx} ${y2 + 1}`, lx: (ax + bx) / 2, ly: mid };
-  }
-  // Same row: loop underneath.
-  const y1 = a.y + a.h;
-  const y2 = b.y + b.h;
-  const dip = Math.max(y1, y2) + 28;
-  return { d: `M${ax} ${y1} C${ax} ${dip} ${bx} ${dip} ${bx} ${y2 + 1}`, lx: (ax + bx) / 2, ly: dip - 6 };
+  return layeredLayout(nodes, edges, width, (n, w) => heights.get(n.id) ?? estimateHeight(n, w), {
+    minW: MIN_NODE_W,
+    maxW: MAX_NODE_W,
+    rowGap: ROW_GAP,
+    colGap: COL_GAP,
+    pad: PAD,
+  });
 }
 
 function Squares({ add, del }: { add: number; del: number }) {

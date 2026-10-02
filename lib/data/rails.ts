@@ -128,6 +128,8 @@ function parseModel(file: string, text: string): ModelDecl | null {
       const polymorphic = /polymorphic:\s*true/.test(opts);
       const className = opts.match(/class_name:\s*"([^"]+)"/)?.[1];
       const through = opts.match(/through:\s*:(\w+)/)?.[1];
+      const as = opts.match(/\bas:\s*:(\w+)/)?.[1];
+      const foreignKey = opts.match(/foreign_key:\s*:?"?(\w+)"?/)?.[1];
       const source = opts.match(/source_type:\s*"([^"]+)"/)?.[1];
       const base = rel[1] === "belongs_to" || rel[1] === "has_one" ? rel[2] : singular(rel[2]);
       relationships.push({
@@ -135,7 +137,12 @@ function parseModel(file: string, text: string): ModelDecl | null {
         kind: KINDS[rel[1]],
         target: polymorphic ? null : (source ?? className ?? classify(base)),
         polymorphic,
+        ...(as ? { as } : {}),
         ...(through ? { through } : {}),
+        // A belongs-to lives in this entity's own columns.
+        ...(rel[1] === "belongs_to"
+          ? { fields: [...(polymorphic ? [`${rel[2]}_type`] : []), foreignKey ?? `${rel[2]}_id`] }
+          : {}),
       });
       continue;
     }
@@ -182,6 +189,19 @@ export function readRails(src: RailsSources): DataModel {
       relationships: model?.relationships ?? [],
       constraints,
     });
+  }
+  // "Any" in a polymorphic belongs-to means the entities that say they're
+  // one: `has_one :item, as: :source` on Zoom::Recording fills Item.source.
+  for (const entity of entities.values()) {
+    for (const rel of entity.relationships) {
+      if (!rel.polymorphic || rel.kind !== "belongs to") continue;
+      rel.candidates = [...entities.values()]
+        .filter((other) =>
+          other.relationships.some((r) => r.as === rel.name && r.target === entity.name),
+        )
+        .map((other) => other.name)
+        .sort();
+    }
   }
   return { source: "rails", entities };
 }

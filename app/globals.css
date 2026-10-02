@@ -1587,3 +1587,28 @@ tr.step-code-target td.diff-num {
   background: color-mix(in srgb, var(--attention) 18%, var(--canvas));
   color: var(--attention);
 }
+.data-row .via {
+  color: var(--fg-subtle);
+  font-size: 11px;
+}
+.data-placed {
+  position: absolute;
+  z-index: 1;
+}
+.map-edge.same.data {
+  stroke: var(--border);
+}
+.map-edge.same.data.hover {
+  stroke: var(--fg-subtle);
+}
+.data-edge-label {
+  z-index: 3;
+}
+.data-edge-label {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+.data-edge-label.added::before {
+  content: none;
+}

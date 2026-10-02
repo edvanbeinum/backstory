@@ -37,7 +37,11 @@ function diffBy<T>(
 const fieldSame = (a: Field, b: Field) =>
   a.type === b.type && a.required === b.required && (a.values ?? []).join() === (b.values ?? []).join();
 const relSame = (a: Relationship, b: Relationship) =>
-  a.kind === b.kind && a.target === b.target && a.polymorphic === b.polymorphic && a.through === b.through;
+  a.kind === b.kind &&
+  a.target === b.target &&
+  a.polymorphic === b.polymorphic &&
+  a.through === b.through &&
+  (a.candidates ?? []).join() === (b.candidates ?? []).join();
 const constraintKey = (c: Constraint) => `${c.kind}:${c.fields.join(",")}:${c.target ?? ""}`;
 
 function diffEntity(name: string, before: Entity | undefined, after: Entity | undefined): EntityDiff {

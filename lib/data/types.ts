@@ -21,8 +21,17 @@ export interface Relationship {
   /** The entity it points at; null when polymorphic (any of several) */
   target: string | null;
   polymorphic: boolean;
+  /**
+   * For a polymorphic belongs-to, the entities that declare themselves one
+   * of its kinds (`has_one :item, as: :source`): what "any" means today.
+   */
+  candidates?: string[];
+  /** For a has-one or has-many, the polymorphic relationship it fills (`as: :source`) */
+  as?: string;
   /** For a has-many through another relationship */
   through?: string;
+  /** The entity's own columns that hold this link, e.g. source_type, source_id */
+  fields?: string[];
 }
 
 export interface Constraint {

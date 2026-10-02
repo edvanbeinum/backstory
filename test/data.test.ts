@@ -76,7 +76,40 @@ test("a polymorphic relationship has no single target", () => {
     models: new Map([["app/models/item.rb", item(`  belongs_to :source, polymorphic: true, optional: true`)]]),
   });
   const source = model.entities.get("Item")!.relationships.find((r) => r.name === "source");
-  assert.deepEqual(source, { name: "source", kind: "belongs to", target: null, polymorphic: true });
+  assert.deepEqual(source, {
+    name: "source",
+    kind: "belongs to",
+    target: null,
+    polymorphic: true,
+    fields: ["source_type", "source_id"],
+    candidates: [],
+  });
+});
+
+test("a polymorphic relationship's kinds are the models that declare themselves one", () => {
+  const recordingSchema = `
+ActiveRecord::Schema[8.1].define(version: 1) do
+  create_table "items", force: :cascade do |t|
+    t.uuid "source_id"
+    t.string "source_type"
+  end
+  create_table "zoom_recordings", force: :cascade do |t|
+    t.string "meeting_uuid", null: false
+  end
+end
+`;
+  const model = readRails({
+    schema: recordingSchema,
+    models: new Map([
+      ["app/models/item.rb", `class Item < ApplicationRecord\n  belongs_to :source, polymorphic: true\nend\n`],
+      [
+        "app/models/zoom/recording.rb",
+        `module Zoom\n  class Recording < ApplicationRecord\n    has_one :item, as: :source\n  end\nend\n`,
+      ],
+    ]),
+  });
+  assert.deepEqual(model.entities.get("Item")!.relationships[0].candidates, ["Zoom::Recording"]);
+  assert.equal(model.entities.get("Zoom::Recording")!.relationships[0].as, "source");
 });
 
 test("the diff names what changed on each entity, with neighbours after", () => {
