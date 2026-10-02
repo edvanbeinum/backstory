@@ -33,8 +33,11 @@ export interface Finding {
   flowText?: Record<number, string>;
 }
 
-/** Lanes that are raw HTTP: calling one means speaking a protocol, not a domain. */
-const HTTP = /^(Net::HTTP|HTTParty|Faraday|RestClient|Excon|URLSession|fetch|axios|requests|http\.Client|OkHttp)/i;
+/**
+ * Lanes that are raw HTTP: calling one means speaking a protocol, not a
+ * domain. Names vary by tracer ("Net::HTTP", "NetHTTP"), so match loosely.
+ */
+const HTTP = /^(Net(::)?HTTP|HTTParty|Faraday|RestClient|Excon|URLSession|fetch|axios|requests|http\.Client|OkHttp)/i;
 
 /** "ZoomClient" → "Zoom"; "ConnectedAccount::ZoomProvider" → "Zoom". */
 function vendorOf(lane: string): string | null {
