@@ -155,3 +155,68 @@ test("Core Data: entities, attributes, relationships and uniqueness", () => {
   assert.deepEqual(m.constraints, [{ kind: "unique", fields: ["id"] }]);
   assert.equal(model.entities.get("Exercise")!.relationships[0].kind, "belongs to");
 });
+
+test("present: a link is said once, and bookkeeping waits for details", async () => {
+  const { present } = await import("../lib/data/present");
+  const before = readRails({
+    schema: `
+ActiveRecord::Schema[8.1].define(version: 1) do
+  create_table "items", force: :cascade do |t|
+    t.string "title"
+  end
+  create_table "spaces", force: :cascade do |t|
+    t.string "name"
+  end
+end
+`,
+    models: new Map([
+      ["app/models/item.rb", `class Item < ApplicationRecord\nend\n`],
+      ["app/models/space.rb", `class Space < ApplicationRecord\nend\n`],
+    ]),
+  });
+  const after = readRails({
+    schema: `
+ActiveRecord::Schema[8.1].define(version: 1) do
+  create_table "items", force: :cascade do |t|
+    t.string "title"
+    t.uuid "source_id"
+    t.string "source_type"
+    t.index ["source_type", "source_id"], name: "x", unique: true
+  end
+  create_table "spaces", force: :cascade do |t|
+    t.string "name"
+  end
+  create_table "zoom_recordings", force: :cascade do |t|
+    t.string "meeting_uuid", null: false
+    t.uuid "space_id", null: false
+    t.datetime "created_at", null: false
+  end
+  add_foreign_key "zoom_recordings", "spaces"
+end
+`,
+    models: new Map([
+      ["app/models/item.rb", `class Item < ApplicationRecord\n  belongs_to :source, polymorphic: true\nend\n`],
+      ["app/models/space.rb", `class Space < ApplicationRecord\n  has_many :zoom_recordings, class_name: "Zoom::Recording"\nend\n`],
+      [
+        "app/models/zoom/recording.rb",
+        `module Zoom\n  class Recording < ApplicationRecord\n    belongs_to :space\n    has_one :item, as: :source\n  end\nend\n`,
+      ],
+    ]),
+  });
+  const shown = present(diffModels(before, after));
+  const by = (n: string) => shown.find((p) => p.entity.name === n)!;
+
+  // The new entity: its one real field; the link and the timestamp wait.
+  assert.equal(by("Zoom::Recording").summary, "New · 1 field");
+  assert.deepEqual(by("Zoom::Recording").fields.map((f) => f.item.name), ["meeting_uuid"]);
+  assert.deepEqual(by("Zoom::Recording").details.timestamps.map((f) => f.item.name), ["created_at"]);
+  // Its foreign key is the arrow to Space again; its has-one fills Item's link.
+  assert.deepEqual(by("Zoom::Recording").details.rules, []);
+  assert.deepEqual(by("Zoom::Recording").relationships, []);
+  // Item: one relationship; its two columns and its rule are details.
+  assert.equal(by("Item").summary, "+1 relationship");
+  assert.deepEqual(by("Item").fields, []);
+  assert.equal(by("Item").details.linkFields.length, 2);
+  // Space only gained the far end of Zoom::Recording's link.
+  assert.equal(by("Space").state, "same");
+});

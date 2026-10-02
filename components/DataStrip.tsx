@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { present, type Presented } from "@/lib/data/present";
 import type {
   Constraint,
   DataResponse,
@@ -20,70 +21,40 @@ import { ChevronDownIcon } from "./icons";
  * column is only a word in a step.
  */
 
-const changes = <T,>(list: Diffed<T>[]) => list.filter((d) => d.state !== "same");
-
 function count(n: number, word: string) {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
-/**
- * Columns that only hold a link (source_type, source_id) belong to their
- * relationship, not the field list: a polymorphic link is one change, not
- * two new fields and a relationship.
- */
-export function linkFields(e: EntityDiff): Set<string> {
-  return new Set(e.relationships.flatMap((r) => r.item.fields ?? []));
-}
-
-/** "Item +3 fields, +1 rule": what happened to one entity, in a phrase. */
-function entityPhrase(e: EntityDiff) {
-  const parts: string[] = [];
-  const tally = (list: Diffed<unknown>[], word: string) => {
-    const added = list.filter((d) => d.state === "added").length;
-    const removed = list.filter((d) => d.state === "removed").length;
-    const changed = list.filter((d) => d.state === "changed").length;
-    const bits = [added && `+${added}`, removed && `−${removed}`, changed && `~${changed}`].filter(Boolean);
-    if (bits.length) parts.push(`${bits.join(" ")} ${word}${added + removed + changed === 1 ? "" : "s"}`);
-  };
-  const links = linkFields(e);
-  tally(
-    e.fields.filter((f) => !links.has(f.item.name)),
-    "field",
-  );
-  tally(e.relationships, "relationship");
-  tally(e.constraints, "rule");
-  return parts.join(", ");
-}
-
-function summary(data: DataResponse) {
-  const changed = data.entities.filter((e) => e.state !== "same");
+/** Level 1, the strip: which entities changed, in a phrase each. */
+function summary(shown: Presented[]) {
+  const changed = shown.filter((p) => p.state !== "same");
   if (changed.length === 0) return <>no data model change</>;
-  const added = changed.filter((e) => e.state === "added");
-  const removed = changed.filter((e) => e.state === "removed");
-  const edited = changed.filter((e) => e.state === "changed");
+  const added = changed.filter((p) => p.state === "added");
+  const removed = changed.filter((p) => p.state === "removed");
+  const edited = changed.filter((p) => p.state === "changed");
   const parts: React.ReactNode[] = [];
   if (added.length) {
     parts.push(
       <span className="text-[var(--success)]">
-        {added.map((e) => e.name).join(", ")} {added.length === 1 ? "is" : "are"} new
+        {added.map((p) => p.entity.name).join(", ")} {added.length === 1 ? "is" : "are"} new
       </span>,
     );
   }
-  for (const e of edited) {
+  for (const p of edited) {
     parts.push(
       <>
-        <b>{e.name}</b> {entityPhrase(e)}
+        <b>{p.entity.name}</b> {p.summary}
       </>,
     );
   }
   if (removed.length) {
-    parts.push(<span className="text-[var(--danger)]">{removed.map((e) => e.name).join(", ")} removed</span>);
+    parts.push(<span className="text-[var(--danger)]">{removed.map((p) => p.entity.name).join(", ")} removed</span>);
   }
-  if (!added.length) parts.push(<>no new entities</>);
-  return parts.map((p, i) => (
+  if (!added.length && !removed.length) parts.push(<>no new entities</>);
+  return parts.map((part, i) => (
     <span key={i}>
       {i > 0 && " · "}
-      {p}
+      {part}
     </span>
   ));
 }
@@ -94,8 +65,7 @@ function relText(r: Relationship) {
   const target = r.polymorphic
     ? `${r.candidates?.length ? r.candidates.join(" or ") : "anything"} (polymorphic)`
     : (r.target ?? "?");
-  const as = r.as ? `, as its ${r.as}` : "";
-  return `${r.name}: ${r.kind} ${target}${as}${r.through ? ` through ${r.through}` : ""}`;
+  return `${r.name}: ${r.kind} ${target}${r.through ? ` through ${r.through}` : ""}`;
 }
 
 function ruleText(c: Constraint) {
@@ -116,67 +86,81 @@ function Row({ state, children, was }: { state: string; children: React.ReactNod
   );
 }
 
-export function EntityCard({ e }: { e: EntityDiff }) {
-  const [all, setAll] = useState(false);
-  const links = linkFields(e);
-  const own = e.fields.filter((f) => !links.has(f.item.name));
-  const fields = all ? own : changes(own);
-  const unchangedFields = own.length - changes(own).length;
-  const neighbour = e.state === "same";
-  return (
-    <div className={`data-card ${e.state}`} title={e.file ?? undefined}>
-      <div className="data-card-head">
+/**
+ * One entity. Level 2: its name and one line. Click for level 3, the field
+ * changes and any relationship the arrows don't already say. "Details" is
+ * level 4: rules, the columns links live in, timestamps, unchanged fields.
+ */
+function EntityCard({ p, open, onToggle }: { p: Presented; open: boolean; onToggle: () => void }) {
+  const [details, setDetails] = useState(false);
+  const e = p.entity;
+  if (p.state === "same") {
+    return (
+      <div className="data-card same compact" title={e.file ?? undefined}>
         <span className="name">{e.name}</span>
-        {e.state === "added" && <span className="map-tag new">New</span>}
-        {e.state === "removed" && <span className="map-tag removed">Removed</span>}
-        <span className="flex-1" />
         {e.component && <span className="file-owner">{e.component}</span>}
       </div>
-      {neighbour ? (
-        <div className="data-note">
-          Unchanged · {count(e.fields.length, "field")}
-          {e.relationships.length > 0 && ` · ${count(e.relationships.length, "relationship")}`}
-        </div>
-      ) : (
+    );
+  }
+  const d = p.details;
+  const hasDetails =
+    d.rules.length + d.linkFields.length + d.timestamps.length + d.unchangedFields.length > 0;
+  return (
+    <div className={`data-card ${p.state} ${open ? "open" : ""}`} title={e.file ?? undefined}>
+      <button type="button" className="data-card-head" onClick={onToggle} aria-expanded={open}>
+        <span className="name">{e.name}</span>
+        {p.state === "added" && <span className="map-tag new">New</span>}
+        {p.state === "removed" && <span className="map-tag removed">Removed</span>}
+        <span className="flex-1" />
+        {e.component && <span className="file-owner">{e.component}</span>}
+      </button>
+      <button type="button" className="data-card-line" onClick={onToggle}>
+        <span>{p.state === "added" ? p.summary.replace(/^New · /, "") || "New" : p.summary}</span>
+        <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
+      </button>
+      {open && (
         <>
-          {(fields.length > 0 || unchangedFields > 0) && (
+          {p.fields.length > 0 && (
             <div className="data-section">
-              {fields.map((d) => (
-                <Row key={d.item.name} state={d.state} was={d.before ? fieldType(d.before) : undefined}>
-                  <span className="mono">{d.item.name}</span> <span className="type">{fieldType(d.item)}</span>
+              {p.fields.map((f) => (
+                <Row key={f.item.name} state={f.state} was={f.before ? fieldType(f.before) : undefined}>
+                  <span className="mono">{f.item.name}</span> <span className="type">{fieldType(f.item)}</span>
                 </Row>
               ))}
-              {unchangedFields > 0 && (
-                <button type="button" className="data-more" onClick={() => setAll((v) => !v)}>
-                  {all ? "Hide unchanged fields" : `+ ${count(unchangedFields, "unchanged field")}`}
-                </button>
+            </div>
+          )}
+          {p.relationships.length > 0 && (
+            <div className="data-section">
+              {p.relationships.map((r) => (
+                <Row key={r.item.name} state={r.state} was={r.before ? relText(r.before) : undefined}>
+                  {relText(r.item)}
+                </Row>
+              ))}
+            </div>
+          )}
+          {hasDetails && (
+            <button type="button" className="data-more" onClick={() => setDetails((v) => !v)}>
+              {details ? "Hide details" : "Details: rules, link columns, timestamps"}
+            </button>
+          )}
+          {details && (
+            <div className="data-section details">
+              {d.rules.map((r, i) => (
+                <Row key={`r${i}`} state={r.state}>
+                  <span className="mono">{ruleText(r.item)}</span>
+                </Row>
+              ))}
+              {[...d.linkFields, ...d.timestamps].map((f) => (
+                <Row key={f.item.name} state={f.state}>
+                  <span className="mono">{f.item.name}</span> <span className="type">{fieldType(f.item)}</span>
+                </Row>
+              ))}
+              {d.unchangedFields.length > 0 && (
+                <div className="data-note">
+                  {count(d.unchangedFields.length, "unchanged field")}:{" "}
+                  <span className="mono">{d.unchangedFields.map((f) => f.name).join(", ")}</span>
+                </div>
               )}
-            </div>
-          )}
-          {changes(e.relationships).length > 0 && (
-            <div className="data-section">
-              <div className="data-label">Relationships</div>
-              {changes(e.relationships).map((d) => (
-                <Row key={d.item.name} state={d.state} was={d.before ? relText(d.before) : undefined}>
-                  {relText(d.item)}
-                  {d.item.fields && d.item.fields.length > 0 && (
-                    <span className="via">
-                      {" "}
-                      via <span className="mono">{d.item.fields.join(", ")}</span>
-                    </span>
-                  )}
-                </Row>
-              ))}
-            </div>
-          )}
-          {changes(e.constraints).length > 0 && (
-            <div className="data-section">
-              <div className="data-label">Rules</div>
-              {changes(e.constraints).map((d, i) => (
-                <Row key={i} state={d.state}>
-                  <span className="mono">{ruleText(d.item)}</span>
-                </Row>
-              ))}
             </div>
           )}
         </>
@@ -199,10 +183,8 @@ interface DataEdge {
  * it), and many-to-many. A has-many is the other end of a belongs-to, so
  * drawing both would be one link twice.
  */
-function dataEdges(entities: EntityDiff[]): DataEdge[] {
+function dataEdges(entities: EntityDiff[], changed: Set<string>): DataEdge[] {
   const shown = new Set(entities.map((e) => e.name));
-  // Links between two unchanged neighbours aren't this change's story.
-  const changed = new Set(entities.filter((e) => e.state !== "same").map((e) => e.name));
   const out: DataEdge[] = [];
   for (const e of entities) {
     for (const d of e.relationships) {
@@ -211,7 +193,9 @@ function dataEdges(entities: EntityDiff[]): DataEdge[] {
       const targets = r.polymorphic ? (r.candidates ?? []) : r.target ? [r.target] : [];
       for (const t of targets) {
         if (!shown.has(t) || t === e.name) continue;
-        if (d.state === "same" && !changed.has(e.name) && !changed.has(t)) continue;
+        // An unchanged link is drawn only between two changed entities: the
+        // rest is context that the cards' grey neighbours don't need.
+        if (d.state === "same" && !(changed.has(e.name) && changed.has(t))) continue;
         out.push({
           key: `${e.name}.${r.name}→${t}`,
           source: e.name,
@@ -225,17 +209,31 @@ function dataEdges(entities: EntityDiff[]): DataEdge[] {
   return out;
 }
 
-function DataGraph({ entities, width }: { entities: EntityDiff[]; width: number }) {
-  const nodes = useMemo(() => entities.map((e) => ({ ...e, id: e.name })), [entities]);
-  const edges = useMemo(() => dataEdges(entities), [entities]);
+function DataGraph({ shown, width }: { shown: Presented[]; width: number }) {
+  const changedNames = useMemo(
+    () => new Set(shown.filter((p) => p.state !== "same").map((p) => p.entity.name)),
+    [shown],
+  );
+  const edges = useMemo(
+    () => dataEdges(shown.map((p) => p.entity), changedNames),
+    [shown, changedNames],
+  );
+  // Changed entities, and only the neighbours a changed one links to.
+  const nodes = useMemo(() => {
+    const linked = new Set(edges.flatMap((e) => [e.source, e.destination]));
+    return shown
+      .filter((p) => p.state !== "same" || linked.has(p.entity.name))
+      .map((p) => ({ ...p, id: p.entity.name }));
+  }, [shown, edges]);
+  const [open, setOpen] = useState<Set<string>>(new Set());
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const [hover, setHover] = useState<string | null>(null);
   const cards = useRef(new Map<string, HTMLDivElement>());
   const { placed, height } = useMemo(
     () =>
-      layeredLayout(nodes, edges, width, (n, w) => heights.get(n.id) ?? estimateCard(n, w), {
-        minW: 250,
-        maxW: 320,
+      layeredLayout(nodes, edges, width, (n) => heights.get(n.id) ?? (n.state === "same" ? 36 : 64), {
+        minW: 220,
+        maxW: 300,
         rowGap: 64,
         colGap: 22,
         pad: 12,
@@ -243,16 +241,25 @@ function DataGraph({ entities, width }: { entities: EntityDiff[]; width: number 
     [nodes, edges, width, heights],
   );
 
-  // Cards size to what they hold; lay out again with their real heights.
-  useLayoutEffect(() => {
-    const next = new Map<string, number>();
-    let changed = false;
-    for (const [id, el] of cards.current) {
-      next.set(id, el.offsetHeight);
-      if (Math.abs((heights.get(id) ?? -1) - el.offsetHeight) > 1) changed = true;
-    }
-    if (changed) setHeights(next);
-  }, [placed, heights]);
+  // Cards size to what they hold, and grow when opened: lay out again
+  // whenever any card's height changes.
+  const measure = useCallback(() => {
+    setHeights((current) => {
+      const next = new Map<string, number>();
+      let changed = false;
+      for (const [id, el] of cards.current) {
+        next.set(id, el.offsetHeight);
+        if (Math.abs((current.get(id) ?? -1) - el.offsetHeight) > 1) changed = true;
+      }
+      return changed ? next : current;
+    });
+  }, []);
+  useLayoutEffect(measure, [placed, measure]);
+  useEffect(() => {
+    const observer = new ResizeObserver(measure);
+    for (const el of cards.current.values()) observer.observe(el);
+    return () => observer.disconnect();
+  }, [nodes, measure]);
 
   const ends = useMemo(() => {
     const out = new Map<string, string[]>();
@@ -325,18 +332,22 @@ function DataGraph({ entities, width }: { entities: EntityDiff[]; width: number 
           className="data-placed"
           style={{ left: n.x, top: n.y, width: n.w }}
         >
-          <EntityCard e={n} />
+          <EntityCard
+            p={n}
+            open={open.has(n.id)}
+            onToggle={() =>
+              setOpen((cur) => {
+                const next = new Set(cur);
+                if (next.has(n.id)) next.delete(n.id);
+                else next.add(n.id);
+                return next;
+              })
+            }
+          />
         </div>
       ))}
     </div>
   );
-}
-
-/** A card's height before it's measured: its header, and a line per change shown. */
-function estimateCard(e: EntityDiff, _w: number) {
-  if (e.state === "same") return 56;
-  const lines = [...e.fields, ...e.relationships, ...e.constraints].filter((d) => d.state !== "same").length;
-  return 40 + lines * 22 + 30;
 }
 
 export function DataStrip({ data }: { data: DataResponse | null }) {
@@ -366,8 +377,9 @@ export function DataStrip({ data }: { data: DataResponse | null }) {
     };
   }, [open]);
 
+  const shown = useMemo(() => present(data?.entities ?? []), [data]);
   if (!data) return null;
-  const changed = data.entities.filter((e) => e.state !== "same");
+  const changed = shown.filter((p) => p.state !== "same");
   if (data.status === "none" || changed.length === 0) {
     return (
       <div className="map-strip quiet">
@@ -394,7 +406,7 @@ export function DataStrip({ data }: { data: DataResponse | null }) {
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[14px] font-semibold">Data</div>
-        <div className="truncate text-[12px] text-[var(--fg-muted)]">{summary(data)}</div>
+        <div className="truncate text-[12px] text-[var(--fg-muted)]">{summary(shown)}</div>
       </div>
       <button type="button" className="map-btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
         {open ? "Hide data" : "Show data"}
@@ -403,12 +415,12 @@ export function DataStrip({ data }: { data: DataResponse | null }) {
       {open && (
         <div className="map-overlay">
           <div className="map-card">
-            <DataGraph entities={data.entities} width={width} />
+            <DataGraph shown={shown} width={width} />
           </div>
           <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
             From {data.source === "rails" ? "db/schema.rb and the models" : "the Core Data model"}, at the base and
-            the head. Arrows point from the entity holding a link to the one it links to; unchanged
-            entities shown are the ones the changed entities relate to.
+            the head. Click an entity for its fields. Arrows point from the entity holding a link to
+            the one it links to; grey boxes are unchanged entities a changed one links to.
           </p>
         </div>
       )}

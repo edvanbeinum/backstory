@@ -1612,3 +1612,52 @@ tr.step-code-target td.diff-num {
 .data-edge-label.added::before {
   content: none;
 }
+
+/* The data view's levels: a card is a name and one line until opened. */
+.data-card-head {
+  width: 100%;
+  text-align: left;
+}
+.data-card .data-card-head {
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+.data-card-line {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  text-align: left;
+}
+.data-card-line > span {
+  flex: 1;
+}
+.data-card.added .data-card-line {
+  color: var(--success);
+}
+.data-card.open .data-card-line {
+  border-bottom: 1px solid var(--border-muted);
+}
+.data-card.compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+}
+.data-card.compact .name {
+  flex: 1;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.data-section.details {
+  background: var(--canvas-subtle);
+}
+.data-section.details .data-note {
+  padding: 4px 10px 6px;
+}
