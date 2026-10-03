@@ -257,3 +257,35 @@ test("model files with non-ASCII text read whole, and so do the ones after them"
     rmSync(repo, { recursive: true, force: true });
   }
 });
+
+test("Rails inflections, quoting and enums as real apps write them", () => {
+  assert.equal(tableFor("Person"), "people");
+  assert.equal(tableFor("Status"), "statuses");
+  const model = readRails({
+    schema: `
+ActiveRecord::Schema[8.1].define(version: 1) do
+  create_table "purchases", force: :cascade do |t|
+    t.integer "role"
+  end
+  create_table "people", force: :cascade do |t|
+    t.string "name"
+  end
+  create_table "access_grants", force: :cascade do |t|
+    t.uuid "purchase_id"
+  end
+  add_foreign_key "access_grants", "purchases"
+end
+`,
+    models: new Map([
+      ["app/models/purchase.rb", `class Purchase < ApplicationRecord\n  belongs_to :buyer, class_name: 'Person'\n  enum :role, [:creator, :member]\nend\n`],
+      ["app/models/person.rb", `class Person < ApplicationRecord\n  has_many :purchases, foreign_key: :buyer_id\nend\n`],
+      ["app/models/access_grant.rb", `class AccessGrant < ApplicationRecord\n  belongs_to :purchase\nend\n`],
+    ]),
+  });
+  assert.ok(model.entities.has("Person"), "people is Person's table");
+  assert.equal(model.entities.get("Person")!.relationships[0].target, "Purchase");
+  assert.equal(model.entities.get("Purchase")!.relationships[0].target, "Person");
+  assert.deepEqual(model.entities.get("Purchase")!.fields[0].values, ["creator", "member"]);
+  const fk = model.entities.get("AccessGrant")!.constraints.find((c) => c.kind === "foreign key");
+  assert.deepEqual(fk, { kind: "foreign key", fields: ["purchase_id"], target: "Purchase" });
+});

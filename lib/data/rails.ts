@@ -21,7 +21,33 @@ export function tableFor(className: string): string {
   return pluralise(snake);
 }
 
-function pluralise(word: string): string {
+/** Plurals Rails's inflector knows that suffix rules get wrong. */
+const IRREGULAR: Record<string, string> = {
+  person: "people",
+  child: "children",
+  man: "men",
+  woman: "women",
+  status: "statuses",
+  alias: "aliases",
+  address: "addresses",
+  datum: "data",
+  medium: "media",
+  analysis: "analyses",
+};
+const SINGULAR = Object.fromEntries(Object.entries(IRREGULAR).map(([one, many]) => [many, one]));
+
+/** Inflect the last word of a snake_case name: "access_grant" → "access_grants". */
+function lastWord(word: string, fn: (w: string) => string) {
+  const at = word.lastIndexOf("_");
+  return at === -1 ? fn(word) : word.slice(0, at + 1) + fn(word.slice(at + 1));
+}
+
+function pluralise(name: string): string {
+  return lastWord(name, pluralWord);
+}
+
+function pluralWord(word: string): string {
+  if (IRREGULAR[word]) return IRREGULAR[word];
   if (/[^aeiou]y$/.test(word)) return word.slice(0, -1) + "ies";
   if (/(s|x|z|ch|sh)$/.test(word)) return word + "es";
   return word + "s";
@@ -95,12 +121,26 @@ function classify(name: string) {
     .join("");
 }
 
-function singular(word: string) {
+function singular(name: string) {
+  return lastWord(name, singularWord);
+}
+
+/**
+ * "purchases" → "purchase", "boxes" → "box", "categories" → "category".
+ * Only -sses, -xes, -zes, -ches and -shes lose "es": "purchases" is a
+ * purchase plus "s", not a "purchas".
+ */
+function singularWord(word: string) {
+  if (SINGULAR[word]) return SINGULAR[word];
   if (word.endsWith("ies")) return word.slice(0, -3) + "y";
-  if (/(ses|xes|ches|shes)$/.test(word)) return word.slice(0, -2);
-  if (word.endsWith("s")) return word.slice(0, -1);
+  if (/(sses|xes|zes|ches|shes)$/.test(word)) return word.slice(0, -2);
+  if (word.endsWith("s") && !word.endsWith("ss")) return word.slice(0, -1);
   return word;
 }
+
+/** An option's string value, in either quote style: class_name: 'User'. */
+const quoted = (opts: string, key: string) =>
+  opts.match(new RegExp(`${key}:\\s*["']([^"']+)["']`))?.[1];
 
 function parseModel(file: string, text: string): ModelDecl | null {
   // The file's record class: `class Zoom::Recording < ApplicationRecord`, or
@@ -118,7 +158,7 @@ function parseModel(file: string, text: string): ModelDecl | null {
   }
   if (!name) return null;
 
-  const table = text.match(/self\.table_name\s*=\s*"([^"]+)"/)?.[1] ?? tableFor(name);
+  const table = text.match(/self\.table_name\s*=\s*["']([^"']+)["']/)?.[1] ?? tableFor(name);
   const relationships: Relationship[] = [];
   const enums = new Map<string, string[]>();
   for (const line of text.split("\n")) {
@@ -126,11 +166,15 @@ function parseModel(file: string, text: string): ModelDecl | null {
     if (rel) {
       const opts = rel[3];
       const polymorphic = /polymorphic:\s*true/.test(opts);
-      const className = opts.match(/class_name:\s*"([^"]+)"/)?.[1];
+      const className = quoted(opts, "class_name");
       const through = opts.match(/through:\s*:(\w+)/)?.[1];
       const as = opts.match(/\bas:\s*:(\w+)/)?.[1];
       const foreignKey = opts.match(/foreign_key:\s*:?"?(\w+)"?/)?.[1];
-      const source = opts.match(/source_type:\s*"([^"]+)"/)?.[1];
+      // A through association can name the association it follows (source:)
+      // and, when that's polymorphic, the type it lands on (source_type:).
+      const sourceType = quoted(opts, "source_type");
+      const sourceName = opts.match(/\bsource:\s*:(\w+)/)?.[1];
+      const source = sourceType ?? (sourceName ? classify(singular(sourceName)) : undefined);
       const base = rel[1] === "belongs_to" || rel[1] === "has_one" ? rel[2] : singular(rel[2]);
       relationships.push({
         name: rel[2],
@@ -146,12 +190,14 @@ function parseModel(file: string, text: string): ModelDecl | null {
       });
       continue;
     }
-    const en = line.match(/^\s*enum\s+:?(\w+):?,?\s*\{([^}]*)\}/);
+    // enum :status, {a: 0, b: 1} · enum status: {a: 0} · enum :role, [:a, :b]
+    const en = line.match(/^\s*enum\s+:?(\w+):?,?\s*([{[])([^}\]]*)[}\]]/);
     if (en) {
-      enums.set(
-        en[1],
-        [...en[2].matchAll(/(\w+):/g)].map((m) => m[1]),
-      );
+      const values =
+        en[2] === "{"
+          ? [...en[3].matchAll(/["']?(\w+)["']?\s*:/g)].map((m) => m[1])
+          : [...en[3].matchAll(/:(\w+)|["'](\w+)["']/g)].map((m) => m[1] ?? m[2]);
+      enums.set(en[1], values);
     }
   }
   return { name, file, table, relationships, enums };
