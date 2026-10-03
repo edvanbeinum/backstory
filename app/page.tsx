@@ -628,7 +628,7 @@ export default function Page() {
   }, [repoPath, rev]);
   const chooseLayout = useCallback((next: "diagrams" | "code") => {
     setLayoutPref(next);
-    setLayoutOverride(null);
+    setLayoutOverride(next);
     try {
       window.localStorage.setItem(LAYOUT_KEY, next);
     } catch {
@@ -647,8 +647,20 @@ export default function Page() {
   const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
   // Diagrams lead only where there are flows to lead with: an untraced
   // view opens on the diff, with "Trace this change" in the column.
-  const flowsLead = rev !== WORKING_REV && flowSet !== null && flowSet.flows.length > 0;
-  const layout = flowsLead ? (layoutOverride ?? layoutPref) : "code";
+  const hasFlows = rev !== WORKING_REV && flowSet !== null && flowSet.flows.length > 0;
+  // Decided once per view, when its flows have loaded. Status is null for a
+  // moment on every move and "running" through a regenerate; deciding then
+  // would flash the diff and remount it. A trace landing later doesn't flip
+  // the view either, so a note being typed survives; the switch appears.
+  const viewKey = `${repoPath}@${rev}`;
+  const [lead, setLead] = useState<{ view: string; lead: boolean } | null>(null);
+  const settled = flows.status !== null && flows.status.status !== "running";
+  useEffect(() => {
+    if (settled && lead?.view !== viewKey) setLead({ view: viewKey, lead: hasFlows });
+  }, [settled, lead, viewKey, hasFlows]);
+  const flowsLead = lead?.lead ?? false;
+  const layout = layoutOverride ?? (flowsLead ? layoutPref : "code");
+  const canChooseLayout = flowsLead || hasFlows;
   const inlineCode =
     layout === "diagrams"
       ? {
@@ -1388,7 +1400,7 @@ export default function Page() {
                     fileComponents={map?.fileComponents ?? null}
                     hoveredComponent={hoveredComponent}
                     layout={layout}
-                    onLayout={flowsLead ? chooseLayout : null}
+                    onLayout={canChooseLayout ? chooseLayout : null}
                   />
                 <SideColumn
                     full
@@ -1551,7 +1563,7 @@ export default function Page() {
                   fileComponents={map?.fileComponents ?? null}
                   hoveredComponent={hoveredComponent}
                   layout={layout}
-                  onLayout={flowsLead ? chooseLayout : null}
+                  onLayout={canChooseLayout ? chooseLayout : null}
                 />
               </div>
             </div>

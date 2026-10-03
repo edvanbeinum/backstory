@@ -12,7 +12,9 @@ import type { FlowsStatus } from "@/lib/flows/types";
  * slow poll keeps its phase current.
  */
 export function useFlows(repo: string, rev: string, tick: number | string) {
-  const [status, setStatus] = useState<FlowsStatus | null>(null);
+  // Kept with the view it answers, so a render just after a move never
+  // shows the last view's status as this one's.
+  const [answer, setAnswer] = useState<{ view: string; status: FlowsStatus } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const viewRef = useRef(`${repo}@${rev}`);
   viewRef.current = `${repo}@${rev}`;
@@ -39,7 +41,7 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
         }
         const status = data as FlowsStatus;
         setError(null);
-        setStatus(status);
+        setAnswer({ view, status });
         return status;
       } catch (err) {
         if (!stale()) setError(err instanceof Error ? err.message : String(err));
@@ -51,7 +53,7 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
 
   // A new view starts blank rather than showing the last one's flows.
   useEffect(() => {
-    setStatus(null);
+    setAnswer(null);
     setError(null);
   }, [repo, rev]);
 
@@ -60,6 +62,7 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
     void request("GET");
   }, [repo, rev, tick, request]);
 
+  const status = answer?.view === `${repo}@${rev}` ? answer.status : null;
   const running = status?.status === "running" || (status?.status === "ready" && status.tracing.length > 0);
   useEffect(() => {
     if (!running) return;
