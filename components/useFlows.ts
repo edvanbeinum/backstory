@@ -11,7 +11,7 @@ import type { FlowsStatus } from "@/lib/flows/types";
  * finished run arrives as a "flows" watch event (`tick`); while one runs, a
  * slow poll keeps its phase current.
  */
-export function useFlows(repo: string, rev: string, tick: number) {
+export function useFlows(repo: string, rev: string, tick: number | string) {
   const [status, setStatus] = useState<FlowsStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
   const viewRef = useRef(`${repo}@${rev}`);

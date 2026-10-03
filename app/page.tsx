@@ -641,7 +641,9 @@ export default function Page() {
     if (session && !hasComments && columnTab === "comments") setColumnTab("flows");
   }, [session, hasComments, columnTab]);
 
-  const flows = useFlows(session ? repoPath : "", rev, flowsTick);
+  // "All changes" follows HEAD: when the diff is fetched again, so are its
+  // flows, or the last head's flows would sit on the new head's lines.
+  const flows = useFlows(session ? repoPath : "", rev, `${flowsTick}:${workingDiffKey}`);
   const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
   // Diagrams lead only where there are flows to lead with: an untraced
   // view opens on the diff, with "Trace this change" in the column.
