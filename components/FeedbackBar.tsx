@@ -135,6 +135,7 @@ export function FeedbackBar({
   };
 
   const copyForAgent = async () => {
+    setSending(true);
     setSendError(null);
     try {
       const message = await buildMessage();
@@ -149,6 +150,8 @@ export function FeedbackBar({
       }
     } catch (err) {
       setSendError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setSending(false);
     }
   };
 
@@ -237,7 +240,7 @@ export function FeedbackBar({
             <Button
               size="sm"
               variant="default"
-              disabled={copied}
+              disabled={copied || sending}
               onClick={() => void copyForAgent()}
               title="Copy the notes as one markdown message to paste into an agent session. They move into a sent round."
             >
@@ -435,10 +438,17 @@ function queueTarget(lastSeen: OutboxApi["lastSeen"]): string {
     : "Queued for the next session to stop here";
 }
 
-/** How a round left, if differ recorded it — rounds from before it did aren't. */
+/**
+ * How a round left, if differ recorded it — rounds from before it did aren't.
+ * Matched on time as well as notes: a record whose notes were already sent by
+ * another one never got its own round.
+ */
 function sentAs(round: RoundGroup, sent: OutboxRound[]): OutboxRound | null {
   const ids = new Set(round.notes.map((n) => n.id));
-  return sent.find((r) => r.noteIds.some((id) => ids.has(id))) ?? null;
+  return (
+    sent.find((r) => r.queuedAt === round.sentAt && r.noteIds.some((id) => ids.has(id))) ??
+    null
+  );
 }
 
 const shortSession = (session: string) => session.slice(0, 8);
