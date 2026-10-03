@@ -220,3 +220,40 @@ end
   // Space only gained the far end of Zoom::Recording's link.
   assert.equal(by("Space").state, "same");
 });
+
+test("model files with non-ASCII text read whole, and so do the ones after them", async () => {
+  const { buildData } = await import("../lib/data/build");
+  const { execFileSync } = await import("node:child_process");
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+  const os = await import("node:os");
+  const path = await import("node:path");
+  const repo = mkdtempSync(path.join(os.tmpdir(), "differ-unicode-"));
+  const git = (...a: string[]) => execFileSync("git", ["-C", repo, ...a], { encoding: "utf8" }).trim();
+  const write = (f: string, t: string) => {
+    mkdirSync(path.dirname(path.join(repo, f)), { recursive: true });
+    writeFileSync(path.join(repo, f), t);
+  };
+  try {
+    git("init", "-q");
+    git("config", "user.email", "t@example.com");
+    git("config", "user.name", "T");
+    write("db/schema.rb", `ActiveRecord::Schema[8.1].define(version: 1) do\n  create_table "items", force: :cascade do |t|\n    t.string "title"\n  end\n  create_table "posts", force: :cascade do |t|\n    t.string "title"\n  end\nend\n`);
+    // An em-dash-heavy comment, as real code has, before a later model.
+    write("app/models/item.rb", `# ${"— ".repeat(60)}\nclass Item < ApplicationRecord\nend\n`);
+    write("app/models/post.rb", `class Post < ApplicationRecord\n  belongs_to :item\nend\n`);
+    git("add", ".");
+    git("commit", "-qm", "base");
+    const base = git("rev-parse", "HEAD");
+    write("app/models/post.rb", `class Post < ApplicationRecord\n  belongs_to :item\n  has_many :comments\nend\n`);
+    git("commit", "-qam", "head");
+    const data = await buildData(repo, base, git("rev-parse", "HEAD"));
+    const post = data.entities.find((e) => e.name === "Post")!;
+    assert.deepEqual(
+      post.relationships.filter((r) => r.state !== "same").map((r) => [r.state, r.item.name]),
+      [["added", "comments"]],
+    );
+    assert.equal(data.entities.find((e) => e.name === "Item")?.state ?? "same", "same");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
+});

@@ -1,28 +1,25 @@
-import { gitTry, run } from "../exec";
+import { gitTry } from "../exec";
 import { readModelAt, showFile } from "../model";
 import { readCoreData } from "./coredata";
 import { diffModels } from "./diff";
 import { readRails } from "./rails";
 import type { DataModel, DataResponse } from "./types";
 
-/** Every model file at a commit, read in one `git cat-file --batch`. */
+/**
+ * Every model file at a commit. Read one by one, a few at a time: git's
+ * batch output gives sizes in bytes, and slicing decoded text by them
+ * goes wrong at the first non-ASCII character.
+ */
 async function readFiles(root: string, rev: string, paths: string[]): Promise<Map<string, string>> {
   const out = new Map<string, string>();
-  if (paths.length === 0) return out;
-  const { stdout } = await run("git", ["cat-file", "--batch"], {
-    cwd: root,
-    input: paths.map((p) => `${rev}:${p}`).join("\n") + "\n",
-    maxBuffer: 128 * 1024 * 1024,
-  });
-  let at = 0;
-  for (const path of paths) {
-    const header = stdout.slice(at, stdout.indexOf("\n", at));
-    at += header.length + 1;
-    const size = Number(header.split(" ")[2]);
-    if (Number.isNaN(size)) continue; // "missing"
-    out.set(path, stdout.slice(at, at + size));
-    at += size + 1;
-  }
+  const queue = [...paths];
+  const worker = async () => {
+    for (let path = queue.shift(); path !== undefined; path = queue.shift()) {
+      const text = await showFile(root, rev, path);
+      if (text !== null) out.set(path, text);
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, worker));
   return out;
 }
 
