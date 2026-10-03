@@ -383,7 +383,8 @@ export function MapStrip({
     const observer = new ResizeObserver(([entry]) => setWidth(Math.max(320, entry.contentRect.width - 22)));
     observer.observe(el);
     return () => observer.disconnect();
-  }, []);
+    // Again once the map arrives: before it does, the strip isn't rendered.
+  }, [map]);
 
   if (!map) return null;
   if (map.status === "none" || map.nodes.length === 0) {
