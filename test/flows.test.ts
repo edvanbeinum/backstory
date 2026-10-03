@@ -6,7 +6,7 @@ import path from "node:path";
 import { after, test } from "node:test";
 
 import type { Runner } from "../lib/flows/claude";
-import { generateFlows } from "../lib/flows/generate";
+import { generateFlows, traceHunk } from "../lib/flows/generate";
 import {
   isAddedLine,
   mapNewToOld,
@@ -200,6 +200,26 @@ test("a new flow needs one run and has no before side", async () => {
   const set = await generateFlows({ root: repo, base: BASE, head: HEAD, runner });
   assert.equal(runs, 1);
   assert.equal(set.flows[0].before, null);
+});
+
+test("a hunk traced later is found by where it is, though the ids have moved", async () => {
+  const newFlow: Runner = async <T>() => {
+    const answer = structuredClone(HEAD_ANSWER);
+    answer.flows[0].isNew = true;
+    return { output: answer as T, costUsd: 0.3, model: "claude-test" };
+  };
+  const set = await generateFlows({ root: repo, base: BASE, head: HEAD, runner: newFlow });
+  // Traced when another file counted as app code: Loader's hunk was H2.
+  const loader = { ...set.hunks[0], id: "H2", flows: [] };
+  const traced = { ...set, flows: [], hunks: [{ ...loader, id: "H1", file: "app/assets/site.css" }, loader] };
+  const prompts: string[] = [];
+  const runner: Runner = async <T>(prompt: string) => {
+    prompts.push(prompt);
+    return newFlow<T>(prompt, {}, repo);
+  };
+  const after = await traceHunk({ root: repo, base: BASE, head: HEAD, runner, set: traced, hunkId: "H2" });
+  assert.match(prompts[0], /src\/Loader\.ts/);
+  assert.deepEqual(after.hunks.map((h) => [h.id, h.flows]), [["H1", []], ["H2", ["load"]]]);
 });
 
 test("a change with no app code makes no runs", async () => {

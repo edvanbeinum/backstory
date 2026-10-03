@@ -375,7 +375,20 @@ export async function traceHunk(
   const started = Date.now();
   const runner = opts.runner ?? claudeRunner;
   const ctx = await prepare(opts.root, opts.base, opts.head);
-  const hunk = ctx.hunks.find((h) => h.id === opts.hunkId);
+  // Ids are positions among the app-code hunks, and which hunks are app
+  // code follows the model, which may have changed since the set was
+  // traced: find the cached hunk again by where it is, not by its id.
+  const cached = opts.set.hunks.find((h) => h.id === opts.hunkId);
+  const hunk =
+    cached &&
+    ctx.hunks.find(
+      (h) =>
+        h.file === cached.file &&
+        h.oldStart === cached.oldStart &&
+        h.oldLines === cached.oldLines &&
+        h.newStart === cached.newStart &&
+        h.newLines === cached.newLines,
+    );
   if (!hunk) throw new Error(`No hunk ${opts.hunkId} in this change.`);
 
   const head = await withSnapshot(ctx.root, ctx.head, async (dir) => {
