@@ -1,0 +1,86 @@
+/**
+ * A repo's data model in one shape, whatever wrote it down: Rails's
+ * schema.rb and models, a Core Data model, and later others. The data view
+ * draws and compares this, never the source format.
+ */
+
+export interface Field {
+  name: string;
+  /** The stack's own type name, e.g. "string", "integer 64" */
+  type: string;
+  required: boolean;
+  /** An enum's values, in order */
+  values?: string[];
+}
+
+export type RelationshipKind = "belongs to" | "has many" | "has one" | "many to many";
+
+export interface Relationship {
+  name: string;
+  kind: RelationshipKind;
+  /** The entity it points at; null when polymorphic (any of several) */
+  target: string | null;
+  polymorphic: boolean;
+  /**
+   * For a polymorphic belongs-to, the entities that declare themselves one
+   * of its kinds (`has_one :item, as: :source`): what "any" means today.
+   */
+  candidates?: string[];
+  /** For a has-one or has-many, the polymorphic relationship it fills (`as: :source`) */
+  as?: string;
+  /** For a has-many through another relationship */
+  through?: string;
+  /** The entity's own columns that hold this link, e.g. source_type, source_id */
+  fields?: string[];
+}
+
+export interface Constraint {
+  kind: "unique" | "foreign key";
+  fields: string[];
+  /** For a foreign key, the entity it points at */
+  target?: string;
+}
+
+export interface Entity {
+  name: string;
+  /** Where it's declared, for its component and for opening its code */
+  file: string | null;
+  fields: Field[];
+  relationships: Relationship[];
+  constraints: Constraint[];
+}
+
+export interface DataModel {
+  /** Which reader produced it */
+  source: "rails" | "core data";
+  entities: Map<string, Entity>;
+}
+
+export type ChangeState = "added" | "removed" | "changed" | "same";
+
+export interface Diffed<T> {
+  state: ChangeState;
+  item: T;
+  /** For a changed item, what it was */
+  before?: T;
+}
+
+export interface EntityDiff {
+  name: string;
+  state: ChangeState;
+  file: string | null;
+  /** The C4 component its file belongs to, when the repo has a model */
+  component: string | null;
+  fields: Diffed<Field>[];
+  relationships: Diffed<Relationship>[];
+  constraints: Diffed<Constraint>[];
+}
+
+export interface DataResponse {
+  status: "ok" | "none";
+  source?: DataModel["source"];
+  /** False when the base has no data model: everything reads as added */
+  baseModel: boolean;
+  /** Entities the change touched, then their unchanged neighbours */
+  entities: EntityDiff[];
+}

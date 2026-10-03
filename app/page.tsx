@@ -4,6 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChangePane, openingChangeFor } from "@/components/ChangePane";
 import { CommentPane } from "@/components/CommentPane";
+import type { FileMarks } from "@/components/DiffFile";
+import { FlowCoverage } from "@/components/FlowCoverage";
+import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
+import type { ComponentInfo, DataField } from "@/components/FlowSequence";
+import { DataStrip } from "@/components/DataStrip";
+import { findings as designQuestions } from "@/lib/findings";
+import { jumpToFile, MapStrip } from "@/components/MapStrip";
+import type { DataResponse } from "@/lib/data/types";
+import type { MapResponse } from "@/lib/map";
+import { SideColumn, type ColumnTab } from "@/components/SideColumn";
+import { useFlows } from "@/components/useFlows";
+import { flowRows, type FlowRow } from "@/lib/flows/rows";
 import { AlertIcon, FileDiffIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
@@ -56,6 +68,9 @@ const WORKING_COMMIT: CommitSummary = {
   url: null,
   isMerge: false,
 };
+
+/** This viewer's layout: "diagrams" (the default) or "code". */
+const LAYOUT_KEY = "differ.layout";
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
@@ -115,6 +130,15 @@ export default function Page() {
   const [workingTick, setWorkingTick] = useState(0);
   /** Bumped when an agent starts or stops waiting for a review. */
   const [reviewTick, setReviewTick] = useState(0);
+  /** Bumped when a flow run finishes. */
+  const [flowsTick, setFlowsTick] = useState(0);
+  const [columnTab, setColumnTab] = useState<ColumnTab>("flows");
+  const [flowSel, setFlowSel] = useState<FlowSelection>({ index: 0, mode: "diff" });
+  const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
+  const [map, setMap] = useState<MapResponse | null>(null);
+  const [dataModel, setDataModel] = useState<DataResponse | null>(null);
+  /** The map component under the pointer: its files are outlined in the diff. */
+  const [hoveredComponent, setHoveredComponent] = useState<string | null>(null);
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
   const refRef = useRef(ref);
@@ -160,7 +184,10 @@ export default function Page() {
     setRepoPath(path);
     setRef(fromUrl.ref ?? null);
     if (fromUrl.rev) setRev(fromUrl.rev);
-    if (fromUrl.comment) setCommentId(fromUrl.comment);
+    if (fromUrl.comment) {
+      setCommentId(fromUrl.comment);
+      setColumnTab("comments");
+    }
     if (fromUrl.repo) window.localStorage.setItem(STORAGE_KEY, fromUrl.repo);
     setRecents(loadRecents());
     setReady(true);
@@ -455,8 +482,9 @@ export default function Page() {
       if (kinds.length === 0) return;
 
       if (kinds.includes("review")) setReviewTick((t) => t + 1);
-      // A review request alone changes nothing on disk.
-      if (kinds.every((kind) => kind === "review")) return;
+      if (kinds.includes("flows")) setFlowsTick((t) => t + 1);
+      // A review request or a finished flow run changes nothing on disk.
+      if (kinds.every((kind) => kind === "review" || kind === "flows")) return;
 
       setWorkingTick((t) => t + 1);
       void loadSession(repoPath, {
@@ -515,6 +543,27 @@ export default function Page() {
     };
   }, [repoPath, rev, haveSession, workingDiffKey]);
 
+  // The map follows the diff: a commit's never changes; the branch's moves
+  // with HEAD.
+  useEffect(() => {
+    if (!repoPath || !haveSession || rev === WORKING_REV) {
+      setMap(null);
+      setDataModel(null);
+      return;
+    }
+    let cancelled = false;
+    const query = `repo=${encodeURIComponent(repoPath)}&rev=${encodeURIComponent(rev)}`;
+    getJson<MapResponse>(`/api/map?${query}`)
+      .then((data) => !cancelled && setMap(data))
+      .catch(() => !cancelled && setMap(null));
+    getJson<DataResponse>(`/api/data?${query}`)
+      .then((data) => !cancelled && setDataModel(data))
+      .catch(() => !cancelled && setDataModel(null));
+    return () => {
+      cancelled = true;
+    };
+  }, [repoPath, rev, haveSession, workingDiffKey]);
+
   const commitForRev = useMemo((): CommitSummary | null => {
     if (rev === WORKING_REV) return WORKING_COMMIT;
     if (rev === BRANCH_REV) {
@@ -551,6 +600,192 @@ export default function Page() {
    * where the comment columns are dead weight.
    */
   const hasComments = threads.length > 0;
+
+  /**
+   * The diagram column shows for any commit or the whole branch, where there
+   * are flows to trace, and wherever there are comments to work through.
+   */
+  const showColumn = hasComments || rev !== WORKING_REV;
+
+  /**
+   * Diagrams or code. The flows lead wherever there are any: uncommitted
+   * work, and a change with no flows, stay on the diff. The choice is this
+   * viewer's own; "Show in diff" from a step switches for this view only.
+   */
+  const [layoutPref, setLayoutPref] = useState<"diagrams" | "code">("diagrams");
+  const [layoutOverride, setLayoutOverride] = useState<"diagrams" | "code" | null>(null);
+  const [jumpTo, setJumpTo] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(LAYOUT_KEY) === "code") setLayoutPref("code");
+    } catch {
+      // Storage blocked: lead with the diagrams.
+    }
+  }, []);
+  useEffect(() => {
+    setLayoutOverride(null);
+    setJumpTo(null);
+  }, [repoPath, rev]);
+  const chooseLayout = useCallback((next: "diagrams" | "code") => {
+    setLayoutPref(next);
+    setLayoutOverride(next);
+    try {
+      window.localStorage.setItem(LAYOUT_KEY, next);
+    } catch {
+      // As above.
+    }
+  }, []);
+  useEffect(() => {
+    // Only once the session says there are none: before it loads, a
+    // ?comment= link's tab must survive.
+    if (session && !hasComments && columnTab === "comments") setColumnTab("flows");
+  }, [session, hasComments, columnTab]);
+
+  // "All changes" follows HEAD: when the diff is fetched again, so are its
+  // flows, or the last head's flows would sit on the new head's lines.
+  const flows = useFlows(session ? repoPath : "", rev, `${flowsTick}:${workingDiffKey}`);
+  const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
+  // Diagrams lead only where there are flows to lead with: an untraced
+  // view opens on the diff, with "Trace this change" in the column.
+  const hasFlows = rev !== WORKING_REV && flowSet !== null && flowSet.flows.length > 0;
+  // Decided once per view, when its flows have loaded. Status is null for a
+  // moment on every move and "running" through a regenerate; deciding then
+  // would flash the diff and remount it. A trace landing later doesn't flip
+  // the view either, so a note being typed survives; the switch appears.
+  const viewKey = `${repoPath}@${rev}`;
+  const [lead, setLead] = useState<{ view: string; lead: boolean } | null>(null);
+  const settled = flows.status !== null && flows.status.status !== "running";
+  useEffect(() => {
+    if (settled && lead?.view !== viewKey) setLead({ view: viewKey, lead: hasFlows });
+  }, [settled, lead, viewKey, hasFlows]);
+  const flowsLead = lead?.lead ?? false;
+  const layout = layoutOverride ?? (flowsLead ? layoutPref : "code");
+  const canChooseLayout = flowsLead || hasFlows;
+  const inlineCode =
+    layout === "diagrams"
+      ? {
+          repo: repoPath,
+          rev,
+          onShowInDiff: (row: FlowRow) => {
+            setLayoutOverride("code");
+            setJumpTo(row.key);
+          },
+        }
+      : null;
+  const pendingJump = layout === "code" ? jumpTo : null;
+
+  // A file picked on the map: in Diagrams there's no diff to show it in,
+  // so switch to Code for this view, then bring the file up once it renders.
+  const [pendingFile, setPendingFile] = useState<string | null>(null);
+  const openFile = useCallback(
+    (path: string) => {
+      if (layout === "diagrams") setLayoutOverride("code");
+      setPendingFile(path);
+    },
+    [layout],
+  );
+  useEffect(() => {
+    if (!pendingFile || layout !== "code") return;
+    let tries = 0;
+    const poll = setInterval(() => {
+      if (jumpToFile(pendingFile) || ++tries > 40) {
+        clearInterval(poll);
+        setPendingFile(null);
+      }
+    }, 100);
+    return () => clearInterval(poll);
+  }, [pendingFile, layout]);
+
+  /** Notes on the change's shape, pinned on the data cards and under flow titles. */
+  const questions = useMemo(() => designQuestions(flowSet, dataModel), [flowSet, dataModel]);
+  const entityNotes = useMemo(() => {
+    const out = new Map<string, string[]>();
+    for (const q of questions) {
+      if (q.on.entity) out.set(q.on.entity, [...(out.get(q.on.entity) ?? []), q.short.replace(`${q.on.entity} gains `, "")]);
+    }
+    return out;
+  }, [questions]);
+  const flowNotes = useMemo(() => {
+    const out = new Map<number, string[]>();
+    for (const q of questions) {
+      for (const [i, text] of Object.entries(q.flowText ?? {})) {
+        out.set(Number(i), [...(out.get(Number(i)) ?? []), text]);
+      }
+    }
+    return out;
+  }, [questions]);
+
+  /** Fields the change touched, for chips on the flow steps that use them. */
+  const dataFields = useMemo(
+    () =>
+      (dataModel?.entities ?? []).flatMap((e) =>
+        e.fields
+          .filter((f) => f.state !== "same")
+          .map((f) => ({ entity: e.name, field: f.item.name, state: f.state as DataField["state"] })),
+      ),
+    [dataModel],
+  );
+
+  /** What the map says of each component, for the flow's component boxes. */
+  const componentInfo = useMemo(() => {
+    const info = new Map<string, ComponentInfo>();
+    for (const [name, description] of Object.entries(map?.descriptions ?? {})) {
+      info.set(name, { description, state: "neighbour" });
+    }
+    for (const n of map?.nodes ?? []) {
+      if (n.state !== "neighbour") info.set(n.name, { description: n.description, state: n.state });
+    }
+    return info;
+  }, [map]);
+
+  // Each view starts on its first flow, as a diff.
+  useEffect(() => {
+    setFlowSel({ index: 0, mode: "diff" });
+  }, [repoPath, rev]);
+
+  // A regenerate can return fewer flows than the one selected.
+  useEffect(() => {
+    if (flowSet && flowSel.index >= flowSet.flows.length) setFlowSel({ index: 0, mode: "diff" });
+  }, [flowSet, flowSel.index]);
+
+  const selectedFlow = flowSet?.flows[flowSel.index] ?? null;
+  const flowMode =
+    selectedFlow?.before === null && flowSel.mode === "before" ? "diff" : flowSel.mode;
+  const rows = useMemo(
+    () => (selectedFlow && flowSet ? flowRows(selectedFlow, flowMode, flowSet.hunks) : []),
+    [selectedFlow, flowMode, flowSet],
+  );
+
+  /** The selected flow's steps, by the diff line each sits on. */
+  const flowMarks = useMemo(() => {
+    if (!showColumn || columnTab !== "flows" || rows.length === 0) return null;
+    const marks = new Map<string, FileMarks>();
+    for (const row of rows) {
+      const entry = marks.get(row.step.file) ?? { old: new Map(), new: new Map() };
+      const side = entry[row.side];
+      const number = row.kind === "del" ? row.was : (row.now ?? row.was);
+      side.set(row.step.line, [
+        ...(side.get(row.step.line) ?? []),
+        {
+          key: row.key,
+          chip: row.kind === "del" ? `was step ${number}` : `step ${number}`,
+          was: row.kind === "del",
+        },
+      ]);
+      marks.set(row.step.file, entry);
+    }
+    return marks;
+  }, [rows, showColumn, columnTab]);
+
+  const filesInDiff = useMemo(
+    () =>
+      new Set(
+        (diff?.files ?? []).flatMap((f) =>
+          [f.newPath, f.oldPath].filter((p): p is string => Boolean(p)),
+        ),
+      ),
+    [diff],
+  );
 
   /** Thread ids whose file is touched by the diff currently on screen. */
   const anchoredIds = useMemo(() => {
@@ -626,6 +861,7 @@ export default function Page() {
     (id: string) => {
       setCommentId(id);
       setFocusedThreadId(id);
+      setColumnTab("comments");
       const thread = threads.find((t) => t.id === id) ?? null;
       // null means leave the change column alone — the two panes are separate
       // axes, and an unlinked comment has nothing to say about which change
@@ -929,6 +1165,17 @@ export default function Page() {
       }
       if (!session) return;
 
+      // With the Flows tab open, j/k walk the flow's steps instead.
+      if (
+        showColumn &&
+        columnTab === "flows" &&
+        event.key !== "x" &&
+        flowNavRef.current?.(event.key === "j" ? 1 : -1)
+      ) {
+        event.preventDefault();
+        return;
+      }
+
       // `x` ticks in place and deliberately does not advance: auto-advancing
       // steals the moment you just earned and makes a mis-tick awkward to
       // undo. `j` is right there.
@@ -972,7 +1219,7 @@ export default function Page() {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session, rev, threads, commentId, toggleDone, selectComment]);
+  }, [session, rev, threads, commentId, toggleDone, selectComment, showColumn, columnTab]);
 
   return (
     <div className="min-h-screen">
@@ -1124,34 +1371,170 @@ export default function Page() {
               </p>
             )}
 
-            {/* Two columns, two independent selections: the comment you're
-                working on stays put on the left while you browse changes on
-                the right. Stacks below xl, where side-by-side would squeeze
-                the diff too hard. */}
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start">
-              {hasComments && (
-              <div
-                className="thin-scroll min-w-0 xl:sticky xl:w-[440px] xl:shrink-0 xl:overflow-y-auto"
-                style={{
-                  top: "calc(var(--header-height, 0px) + 1rem)",
-                  maxHeight: "calc(100vh - var(--header-height, 0px) - 2rem)",
-                }}
-              >
-                <CommentPane
-                  threads={threads}
-                  thread={selectedThread}
-                  index={commentIndex}
-                  onStep={stepComment}
-                  repo={session.repo}
-                  pr={session.github.pr}
-                  commit={commitForRev}
-                  branch={session.repo.branch}
-                  commitCandidates={pinCandidates}
-                  onToggleDone={toggleDone}
-                  onLinkCommit={linkCommit}
-                  onDraftChange={saveDraft}
-                />
+            {layout === "diagrams" ? (
+              // Flow-first: the change, then where it landed and what it does.
+              // The diff is a click away, from any step.
+              <div className="mx-auto w-full max-w-[1280px] space-y-4">
+                <ChangePane
+                    session={session}
+                    rev={rev}
+                    onRevChange={(next) => {
+                      // Remember anything that isn't in the offered list, so a
+                      // pasted sha survives the next refresh.
+                      if (
+                        !session.commits.some((c) => c.sha === next) &&
+                        !session.history.some((c) => c.sha === next)
+                      ) {
+                        pickedRevs.current = [
+                          ...new Set([...pickedRevs.current, next]),
+                        ];
+                      }
+                      setRev(next);
+                    }}
+                    commit={commitForRev}
+                    diff={diff}
+                    loading={diffLoading}
+                    error={diffError}
+                    threads={threads}
+                    thread={selectedThread}
+                    focusedThreadId={focusedThreadId}
+                    pushed={revIsPushed}
+                    reviewTick={reviewTick}
+                    flowMarks={flowMarks}
+                    fileComponents={map?.fileComponents ?? null}
+                    hoveredComponent={hoveredComponent}
+                    layout={layout}
+                    onLayout={canChooseLayout ? chooseLayout : null}
+                  />
+                <SideColumn
+                    full
+                    tab={columnTab}
+                    onTab={setColumnTab}
+                    flowCount={flowSet ? flowSet.flows.length : null}
+                    commentCount={threads.length}
+                    showComments={hasComments}
+                    header={
+                      rev !== WORKING_REV ? (
+                        <>
+                          <MapStrip map={map} onHover={setHoveredComponent} onOpenFile={openFile} />
+                          <DataStrip data={dataModel} notes={entityNotes} />
+                        </>
+                      ) : null
+                    }
+                    flows={
+                      <FlowPanel
+                        api={flows}
+                        selection={{ ...flowSel, mode: flowMode }}
+                        onSelect={setFlowSel}
+                        rows={rows}
+                        filesInDiff={filesInDiff}
+                        navRef={flowNavRef}
+                        code={inlineCode}
+                        jumpTo={pendingJump}
+                        components={componentInfo}
+                      dataFields={dataFields}
+                      flowNotes={flowNotes}
+                        onJumped={() => setJumpTo(null)}
+                        coverage={
+                          flowSet && diff && diff.rev === rev ? (
+                            <FlowCoverage
+                              set={flowSet}
+                              files={diff.files}
+                              tracing={
+                                flows.status?.status === "ready" ? flows.status.tracing : []
+                              }
+                              onTrace={flows.trace}
+                              inline={inlineCode && { repo: repoPath, rev }}
+                            />
+                          ) : null
+                        }
+                      />
+                    }
+                    comments={
+                      <CommentPane
+                        threads={threads}
+                        thread={selectedThread}
+                        index={commentIndex}
+                        onStep={stepComment}
+                        repo={session.repo}
+                        pr={session.github.pr}
+                        commit={commitForRev}
+                        branch={session.repo.branch}
+                        commitCandidates={pinCandidates}
+                        onToggleDone={toggleDone}
+                        onLinkCommit={linkCommit}
+                        onDraftChange={saveDraft}
+                      />
+                    }
+                  />
               </div>
+            ) : (
+            /* Two columns, two independent selections: the flow or comment
+                you're working on stays put on the left while you browse
+                changes on the right. Stacks below xl, where side-by-side would
+                squeeze the diff too hard. */
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-0">
+              {showColumn && (
+                <SideColumn
+                  tab={columnTab}
+                  onTab={setColumnTab}
+                  flowCount={flowSet ? flowSet.flows.length : null}
+                  commentCount={threads.length}
+                  showComments={hasComments}
+                  header={
+                    rev !== WORKING_REV ? (
+                      <>
+                          <MapStrip map={map} onHover={setHoveredComponent} onOpenFile={openFile} />
+                          <DataStrip data={dataModel} notes={entityNotes} />
+                        </>
+                    ) : null
+                  }
+                  flows={
+                    <FlowPanel
+                      api={flows}
+                      selection={{ ...flowSel, mode: flowMode }}
+                      onSelect={setFlowSel}
+                      rows={rows}
+                      filesInDiff={filesInDiff}
+                      navRef={flowNavRef}
+                      code={inlineCode}
+                      jumpTo={pendingJump}
+                      components={componentInfo}
+                      dataFields={dataFields}
+                      flowNotes={flowNotes}
+                      onJumped={() => setJumpTo(null)}
+                      coverage={
+                        flowSet && diff && diff.rev === rev ? (
+                          <FlowCoverage
+                            set={flowSet}
+                            files={diff.files}
+                            tracing={
+                              flows.status?.status === "ready" ? flows.status.tracing : []
+                            }
+                            onTrace={flows.trace}
+                            inline={inlineCode && { repo: repoPath, rev }}
+                          />
+                        ) : null
+                      }
+                    />
+                  }
+                  comments={
+                    <CommentPane
+                      threads={threads}
+                      thread={selectedThread}
+                      index={commentIndex}
+                      onStep={stepComment}
+                      repo={session.repo}
+                      pr={session.github.pr}
+                      commit={commitForRev}
+                      branch={session.repo.branch}
+                      commitCandidates={pinCandidates}
+                      onToggleDone={toggleDone}
+                      onLinkCommit={linkCommit}
+                      onDraftChange={saveDraft}
+                    />
+                  }
+                />
               )}
 
               <div className="min-w-0 flex-1">
@@ -1180,9 +1563,15 @@ export default function Page() {
                   focusedThreadId={focusedThreadId}
                   pushed={revIsPushed}
                   reviewTick={reviewTick}
+                  flowMarks={flowMarks}
+                  fileComponents={map?.fileComponents ?? null}
+                  hoveredComponent={hoveredComponent}
+                  layout={layout}
+                  onLayout={canChooseLayout ? chooseLayout : null}
                 />
               </div>
             </div>
+            )}
             </div>
           </main>
         </div>

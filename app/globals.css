@@ -35,6 +35,13 @@
 
   --overlay-shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
 
+  /* For the flow and map views: Primer's emphasis green (diffstat squares),
+     the UnderlineNav's active tab, and an empty diffstat square. */
+  --success-emphasis: #1f883d;
+  --tab-active: #fd8c73;
+  --square-empty: #d1d9e0;
+  --lifeline: #c4ccd5;
+
   color-scheme: light;
 }
 
@@ -67,6 +74,11 @@
 
     --overlay-shadow: 0 8px 24px rgba(1, 4, 9, 0.8);
 
+    --success-emphasis: #238636;
+    --tab-active: #f78166;
+    --square-empty: #3d444d;
+    --lifeline: #4b535d;
+
     color-scheme: dark;
   }
 }
@@ -96,6 +108,11 @@
   --diff-hunk-fg: #9198a1;
 
   --overlay-shadow: 0 8px 24px rgba(1, 4, 9, 0.8);
+
+  --success-emphasis: #238636;
+  --tab-active: #f78166;
+  --square-empty: #3d444d;
+  --lifeline: #4b535d;
 
   color-scheme: dark;
 }
@@ -547,4 +564,1124 @@ tr.note-row td {
   .tick-strike {
     text-decoration: line-through;
   }
+}
+
+/* --- Flows ------------------------------------------------------------- */
+
+/*
+ * A sequence diagram on a row grid, drawn to read like the diff beside it:
+ * a gutter of step numbers (was, now), a +/− marker, and one call per row.
+ * Lanes, lifelines and arrows are one SVG laid over the rows.
+ */
+
+.flow-tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px 10px;
+  font-size: 14px;
+  color: var(--fg);
+}
+.flow-tab svg {
+  color: var(--fg-muted);
+}
+.flow-tab[aria-selected="true"] {
+  font-weight: 600;
+}
+.flow-tab[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  border-radius: 6px;
+  background: var(--tab-active);
+}
+.counter {
+  display: inline-block;
+  min-width: 20px;
+  padding: 0 6px;
+  border-radius: 2em;
+  background: color-mix(in srgb, var(--fg-muted) 18%, transparent);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 18px;
+  text-align: center;
+  color: var(--fg);
+}
+
+.flow-pick {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--fg-muted);
+}
+.flow-pick:hover {
+  color: var(--fg);
+}
+.flow-pick[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-subtle);
+}
+.flow-pick.changed::after {
+  content: "";
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--attention);
+  box-shadow: 0 0 0 2px var(--canvas);
+}
+
+.seg {
+  display: inline-flex;
+  flex-shrink: 0;
+  padding: 2px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--fg-muted) 12%, transparent);
+}
+.seg button {
+  padding: 2px 10px;
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.seg button[aria-pressed="true"] {
+  background: var(--canvas);
+  color: var(--fg);
+  box-shadow: 0 0 0 1px var(--border);
+}
+.seg button:disabled {
+  opacity: 0.4;
+}
+
+.flow-seq {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+.flow-grid {
+  display: grid;
+  grid-template-columns: 28px 28px 20px 1fr;
+}
+.flow-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--canvas-subtle);
+}
+.flow-head .oh {
+  align-self: center;
+  padding-right: 6px;
+  text-align: right;
+  font-size: 10px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.flow-lanes {
+  position: relative;
+  height: 36px;
+}
+.flow-who {
+  position: absolute;
+  top: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 2em;
+  background: var(--canvas);
+  font-size: 12px;
+  font-weight: 600;
+}
+.flow-who {
+  border-color: var(--fg-subtle);
+  font-size: 12.5px;
+  box-shadow: 0 1px 0 rgba(31, 35, 40, 0.04);
+}
+.flow-who.external {
+  font-weight: 500;
+  color: var(--fg-muted);
+  border-style: dashed;
+}
+
+.flow-rows {
+  position: relative;
+}
+.flow-svg {
+  position: absolute;
+  left: 76px;
+  top: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+/* Lifelines: firm enough to follow from a type's name down to its calls. */
+.flow-svg .lifeline {
+  stroke: var(--lifeline);
+  stroke-width: 1.5;
+}
+.flow-lifeline {
+  position: absolute;
+  z-index: 1;
+  width: 1.5px;
+  margin-left: -0.75px;
+  background: var(--lifeline);
+}
+.flow-svg path {
+  fill: none;
+  stroke-width: 2;
+  transition: stroke 160ms ease, stroke-width 160ms ease;
+}
+.flow-svg path.k-ctx {
+  stroke: var(--fg);
+}
+.flow-svg path.k-add {
+  stroke: var(--success);
+}
+.flow-svg path.k-del {
+  stroke: var(--danger);
+  stroke-dasharray: 4 3;
+}
+.flow-svg path.unverified {
+  stroke: var(--fg-subtle);
+  stroke-dasharray: 2 3;
+}
+.flow-svg path.inview {
+  stroke: var(--accent);
+  stroke-width: 2.6;
+}
+
+.flow-row {
+  height: 40px;
+  cursor: pointer;
+  transition: background-color 160ms ease;
+}
+.flow-row .n {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-end;
+  padding: 5px 6px 0 0;
+  color: var(--fg-subtle);
+}
+.flow-row .m {
+  display: flex;
+  justify-content: center;
+  padding-top: 5px;
+  font-weight: 600;
+}
+.flow-row .n,
+.flow-row .m,
+.flow-row .lab {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 12px;
+  line-height: 18px;
+}
+.flow-row .l {
+  position: relative;
+}
+.flow-row.k-add .m::before {
+  content: "+";
+  color: var(--success);
+}
+.flow-row.k-del .m::before {
+  content: "−";
+  color: var(--danger);
+}
+.flow-row.k-del .lab {
+  color: var(--fg-muted);
+}
+.flow-row:hover .l,
+.flow-row:hover .m,
+.flow-row:hover .n {
+  background: color-mix(in srgb, var(--accent-subtle) 55%, transparent);
+}
+.flow-row.inview .n {
+  color: var(--accent);
+  font-weight: 600;
+}
+.flow-row.inview .n:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.flow-row.inview .l,
+.flow-row.inview .m {
+  background: color-mix(in srgb, var(--accent-subtle) 70%, transparent);
+}
+.flow-row .lab {
+  position: absolute;
+  z-index: 2;
+  top: 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  color: var(--fg);
+}
+/* The call sits on the canvas colour, so lifelines and arrows pass behind
+   it rather than through its text. */
+.flow-row .lab .call {
+  padding: 0 6px;
+  border-radius: 4px;
+  background: var(--canvas);
+}
+.flow-row .lab .ret {
+  color: var(--fg-muted);
+}
+.flow-row .lab .flow-badge {
+  flex-shrink: 0;
+}
+.flow-badge {
+  padding: 0 6px;
+  border-radius: 2em;
+  background: color-mix(in srgb, var(--fg-muted) 16%, transparent);
+  color: var(--fg-muted);
+  font-family:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica,
+    Arial, sans-serif;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+}
+.flow-badge.warn {
+  background: none;
+  border: 1px dashed var(--attention);
+  color: var(--attention);
+}
+
+.flow-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-muted);
+  background: var(--canvas-subtle);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.flow-here {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+}
+.flow-here i {
+  width: 3px;
+  height: 14px;
+  flex-shrink: 0;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
+/* The diff's side of the sync: a chip on each anchored line, and the line
+   nearest the reading line lit. */
+.flow-chip {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 0 6px;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
+  border-radius: 2em;
+  color: var(--accent);
+  font:
+    600 10px/16px -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  font-style: normal;
+  vertical-align: 1px;
+  white-space: nowrap;
+  /* Copying code shouldn't copy "step 3" with it. */
+  user-select: none;
+}
+.flow-chip.was {
+  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+  color: var(--danger);
+}
+tr.flow-inview td {
+  background: color-mix(in srgb, var(--accent-subtle) 80%, var(--canvas)) !important;
+}
+tr.line-add.flow-inview td {
+  background: color-mix(in srgb, var(--accent-subtle) 80%, var(--diff-add-bg)) !important;
+}
+tr.line-del.flow-inview td {
+  background: color-mix(in srgb, var(--accent-subtle) 70%, var(--diff-del-bg)) !important;
+}
+tr.flow-inview td.diff-num {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.col-resizer {
+  width: 16px;
+  align-self: stretch;
+  flex-shrink: 0;
+  display: flex;
+  justify-content: center;
+  cursor: col-resize;
+  touch-action: none;
+}
+.col-resizer::before {
+  content: "";
+  width: 1px;
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+.col-resizer:hover::before,
+.col-resizer[data-dragging="true"]::before {
+  background: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flow-row,
+  .flow-svg path {
+    transition: none;
+  }
+}
+
+/* --- The map ----------------------------------------------------------- */
+
+.map-strip {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+.map-strip.quiet {
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--canvas-subtle);
+}
+.map-thumb {
+  flex-shrink: 0;
+  border-radius: 4px;
+  background-image: radial-gradient(circle, var(--border-muted) 1px, transparent 1.2px);
+  background-size: 8px 8px;
+}
+.map-btn {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas-subtle);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+}
+.map-btn:hover {
+  border-color: var(--fg-subtle);
+}
+.map-overlay {
+  position: absolute;
+  left: -1px;
+  right: -1px;
+  top: calc(100% + 6px);
+  z-index: 30;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--canvas);
+  box-shadow: var(--overlay-shadow);
+}
+.map-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.map-canvas {
+  position: relative;
+  background-image: radial-gradient(circle, var(--border-muted) 1px, transparent 1.2px);
+  background-size: 16px 16px;
+  background-position: 8px 8px;
+}
+.map-edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.map-edge {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 1.25;
+  pointer-events: none;
+}
+.map-edge.hover {
+  stroke: var(--fg-subtle);
+}
+.map-edge.added {
+  stroke: var(--success);
+  stroke-width: 1.75;
+}
+.map-edge.changed {
+  stroke: var(--attention);
+  stroke-width: 1.75;
+}
+.map-edge.removed {
+  stroke: var(--danger);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+.map-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 10;
+  cursor: default;
+}
+.map-label {
+  position: absolute;
+  z-index: 2;
+  max-width: 150px;
+  transform: translate(-50%, -50%);
+  padding: 0 4px;
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--canvas) 88%, transparent);
+  font-size: 11px;
+  line-height: 14px;
+  text-align: center;
+  color: var(--fg-muted);
+  pointer-events: none;
+}
+.map-label.added {
+  color: var(--success);
+}
+.map-label.added::before {
+  content: "+ ";
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  opacity: 0.8;
+}
+.map-label.changed span {
+  color: var(--attention);
+}
+.map-label.changed s,
+.map-label.removed {
+  color: var(--danger);
+}
+.map-label.removed {
+  text-decoration: line-through;
+}
+.map-node {
+  position: absolute;
+  z-index: 1;
+  padding: 8px 11px 7px;
+  border: 1px solid var(--fg-subtle);
+  border-radius: 6px;
+  background: var(--canvas);
+  transition:
+    box-shadow 120ms ease,
+    border-color 120ms ease;
+}
+.map-node h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 18px;
+}
+.map-node p {
+  margin: 1px 0 0;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--fg-muted);
+}
+.map-node.jumps {
+  cursor: pointer;
+}
+.map-files {
+  margin: 6px 0 0;
+  padding: 2px 0 0;
+  border-top: 1px solid var(--border-muted);
+}
+.map-files button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 1px 0;
+  font-size: 12px;
+  line-height: 16px;
+  text-align: left;
+}
+.map-files .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 11.5px;
+  color: var(--accent);
+}
+.map-files button:hover .name {
+  text-decoration: underline;
+}
+.map-files .new,
+.map-files .gone {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.map-files .new {
+  color: var(--success);
+}
+.map-files .gone {
+  color: var(--danger);
+}
+.map-files .stat {
+  margin-left: auto;
+  flex-shrink: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+}
+.map-files .more {
+  color: var(--fg-muted);
+}
+.map-node .foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 7px;
+  font-size: 11px;
+  line-height: 14px;
+  color: var(--fg-muted);
+}
+.map-node.touched {
+  border: 1.5px solid var(--fg-muted);
+  padding: 7.5px 10.5px 6.5px;
+}
+.map-node.added {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--diff-add-bg) 70%, var(--canvas));
+  box-shadow: inset 3px 0 0 var(--success);
+}
+.map-node.removed {
+  border: 1px dashed var(--danger);
+  background: color-mix(in srgb, var(--diff-del-bg) 70%, var(--canvas));
+}
+.map-node.neighbour {
+  border-color: var(--border);
+  background: var(--canvas-subtle);
+}
+.map-node.neighbour h4 {
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.map-node.neighbour p {
+  color: var(--fg-subtle);
+}
+.map-node:not(.neighbour):hover {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.map-tag {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border: 1px solid currentColor;
+  border-radius: 2em;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 1;
+}
+.map-tag.new {
+  color: var(--success);
+}
+.map-tag.removed {
+  color: var(--danger);
+}
+.map-squares {
+  display: inline-flex;
+  gap: 2px;
+}
+.map-squares i {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--square-empty);
+}
+.map-squares i.g {
+  background: var(--success-emphasis);
+}
+.map-squares i.r {
+  background: var(--danger);
+}
+.map-foot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-top: 1px solid var(--border-muted);
+  background: var(--canvas-subtle);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.map-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 2em;
+  background: var(--canvas);
+  font-size: 12px;
+}
+.map-chip b {
+  color: var(--fg);
+  font-weight: 600;
+}
+.map-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 10px 2px 0;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.map-key > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.map-key .box {
+  width: 18px;
+  height: 12px;
+  border-radius: 3px;
+  border: 1px solid var(--fg-subtle);
+  background: var(--canvas);
+}
+.map-key .box.touched {
+  border: 1.5px solid var(--fg-muted);
+}
+.map-key .box.added {
+  border-color: var(--success);
+  background: var(--diff-add-bg);
+  box-shadow: inset 2px 0 0 var(--success);
+}
+.map-key .box.removed {
+  border: 1px dashed var(--danger);
+  background: var(--diff-del-bg);
+}
+.map-key .box.neighbour {
+  border-color: var(--border);
+  background: var(--canvas-subtle);
+}
+
+/* A file's component, on its header; outlined while its box is hovered. */
+.file-owner {
+  flex-shrink: 0;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 2em;
+  background: var(--canvas);
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--fg-muted);
+}
+section.file-linked {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
+}
+section.file-linked .file-owner {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* Components on a flow: a band over each component's lanes, a line where
+   one component's lanes end, and the path through them under the title. */
+/* Component boxes are context, so they stay quiet: the types inside
+   them, and their calls, are what's read. */
+.flow-comp {
+  position: absolute;
+  top: 6px;
+  bottom: 8px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-muted);
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--canvas-subtle) 60%, var(--canvas));
+}
+.flow-comp h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 16px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.flow-comp p {
+  display: -webkit-box;
+  margin: 1px 0 0;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 6;
+  font-size: 11px;
+  line-height: 16px;
+  color: var(--fg-subtle);
+}
+/* Touched by the change: the name darkens a step, nothing louder. */
+.flow-comp.touched h4 {
+  color: var(--fg);
+}
+.flow-comp.added {
+  border-color: color-mix(in srgb, var(--success) 40%, var(--border-muted));
+  background: color-mix(in srgb, var(--diff-add-bg) 45%, var(--canvas));
+}
+.flow-comp.added h4 {
+  color: var(--fg);
+}
+.flow-comp.plain {
+  border: 1px dashed var(--border-muted);
+  background: transparent;
+}
+.flow-comp.plain h4 {
+  font-style: italic;
+  color: var(--fg-subtle);
+}
+.flow-who {
+  z-index: 1;
+}
+.flow-path {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.flow-path .name {
+  padding: 0 7px;
+  border: 1px solid var(--border);
+  border-radius: 2em;
+  background: var(--canvas);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg);
+}
+.flow-path .arrow {
+  padding: 0 4px;
+  color: var(--fg-subtle);
+}
+
+/* A flow step's code, opened under its row in the flow-first layout. */
+.step-code {
+  position: relative;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  margin: 0 8px 0 76px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+  box-shadow: 0 1px 3px rgba(31, 35, 40, 0.08);
+  overflow: hidden;
+  cursor: default;
+}
+.step-code-slot {
+  position: sticky;
+  left: 0;
+  z-index: 3;
+}
+.step-code-head {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border-muted);
+  background: var(--canvas-subtle);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.step-code-head .hint {
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--fg-subtle);
+}
+.step-code-body {
+  flex: 1;
+  overflow: auto;
+}
+.step-code-body .diff-table {
+  line-height: 18px;
+}
+tr.step-code-target td {
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 35%, transparent),
+    inset 0 -1px 0 color-mix(in srgb, var(--accent) 35%, transparent);
+}
+tr.step-code-target td.diff-num {
+  box-shadow: inset 3px 0 0 var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* --- The data model -------------------------------------------------- */
+
+.data-glyph {
+  display: flex;
+  width: 112px;
+  flex-shrink: 0;
+  justify-content: center;
+  color: var(--fg-subtle);
+}
+.data-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+.data-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+  overflow: hidden;
+}
+.data-card.changed {
+  border: 1.5px solid var(--fg-muted);
+}
+.data-card.added {
+  border-color: var(--success);
+  box-shadow: inset 3px 0 0 var(--success);
+}
+.data-card.removed {
+  border: 1px dashed var(--danger);
+}
+.data-card.same {
+  background: var(--canvas-subtle);
+}
+.data-card-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-muted);
+}
+.data-card-head .name {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 13px;
+  font-weight: 600;
+}
+.data-card.same .data-card-head {
+  border-bottom: 0;
+}
+.data-card.same .data-card-head .name {
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.data-note {
+  padding: 0 10px 8px;
+  font-size: 11px;
+  color: var(--fg-subtle);
+}
+.data-section {
+  padding: 4px 0;
+}
+.data-section + .data-section {
+  border-top: 1px solid var(--border-muted);
+}
+.data-label {
+  padding: 2px 10px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--fg-subtle);
+}
+.data-row {
+  display: flex;
+  gap: 6px;
+  padding: 1px 10px 1px 6px;
+  font-size: 12px;
+  line-height: 18px;
+}
+.data-row .mark {
+  width: 10px;
+  flex-shrink: 0;
+  text-align: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-weight: 600;
+}
+.data-row.added {
+  background: var(--diff-add-bg);
+}
+.data-row.added .mark {
+  color: var(--success);
+}
+.data-row.removed {
+  background: var(--diff-del-bg);
+  color: var(--fg-muted);
+}
+.data-row.removed .mark {
+  color: var(--danger);
+}
+.data-row.changed {
+  background: color-mix(in srgb, var(--attention) 12%, var(--canvas));
+}
+.data-row .mono {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+.data-row .type,
+.data-row .was {
+  color: var(--fg-muted);
+}
+.data-row .was {
+  font-style: italic;
+}
+.data-more {
+  padding: 2px 10px 2px 22px;
+  font-size: 11px;
+  color: var(--fg-subtle);
+}
+.data-more:hover {
+  color: var(--accent);
+}
+
+/* A flow step that uses a field the change touched. */
+.flow-badge.data {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 10.5px;
+}
+.flow-badge.data.added {
+  background: var(--diff-add-num-bg);
+  color: var(--success);
+}
+.flow-badge.data.removed {
+  background: var(--diff-del-num-bg);
+  color: var(--danger);
+}
+.flow-badge.data.changed {
+  background: color-mix(in srgb, var(--attention) 18%, var(--canvas));
+  color: var(--attention);
+}
+.data-row .via {
+  color: var(--fg-subtle);
+  font-size: 11px;
+}
+.data-placed {
+  position: absolute;
+  z-index: 1;
+}
+.map-edge.same.data {
+  stroke: var(--border);
+}
+.map-edge.same.data.hover {
+  stroke: var(--fg-subtle);
+}
+.data-edge-label {
+  z-index: 3;
+}
+.data-edge-label {
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+.data-edge-label.added::before {
+  content: none;
+}
+
+/* The data view's levels: a card is a name and one line until opened. */
+.data-card-head {
+  width: 100%;
+  text-align: left;
+}
+.data-card .data-card-head {
+  border-bottom: 0;
+  padding-bottom: 2px;
+}
+.data-card-line {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 8px;
+  font-size: 12px;
+  color: var(--fg-muted);
+  text-align: left;
+}
+.data-card-line > span {
+  flex: 1;
+}
+.data-card.added .data-card-line {
+  color: var(--success);
+}
+.data-card.open .data-card-line {
+  border-bottom: 1px solid var(--border-muted);
+}
+.data-card.compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+}
+.data-card.compact .name {
+  flex: 1;
+  font-family:
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.data-section.details {
+  background: var(--canvas-subtle);
+}
+.data-section.details .data-note {
+  padding: 4px 10px 6px;
+}
+
+/* A note pinned on a diagram: a data card, or under a flow's title. */
+.pinned-note {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 16px;
+  color: var(--attention);
+}
+.pinned-note::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--attention);
+  transform: translateY(-1px);
+}
+.data-card .pinned-note {
+  padding: 0 10px 8px;
 }
