@@ -73,10 +73,14 @@ export async function attachComponents(root: string, set: FlowSet): Promise<Flow
   if (!read) return set;
   const { model } = read;
 
+  // Keyed on everything the answer depends on: the lanes (a traced hunk
+  // adds new ones) and each element's name and globs (the model can change).
+  const lanes = [...new Set(set.flows.flatMap((f) => f.participants.map((p) => p.name)))].sort();
   const signature = createHash("sha1")
     .update(LOOKUP_VERSION)
     .update(set.head)
-    .update(JSON.stringify([...model.elements.values()].map((e) => [e.id, e.globs])))
+    .update(JSON.stringify(lanes))
+    .update(JSON.stringify([...model.elements.values()].map((e) => [e.id, e.name, e.globs])))
     .digest("hex");
   let components = cache.get(signature);
   if (!components) {
