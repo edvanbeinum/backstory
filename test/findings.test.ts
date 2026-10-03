@@ -65,10 +65,29 @@ test("a core entity gaining a vendor's fields is noted, on that entity", () => {
 
 test("raw HTTP beside a vendor client is noted; HTTP inside the client isn't", () => {
   const picker = flow("Picker", [step("Controller", "ZoomClient", "ZoomClient.new.recordings")]);
-  const leaky = flow("Job", [step("ImportJob", "Net::HTTP", "Net::HTTP.start")], ["Net::HTTP"]);
+  const leaky = flow("Job", [step("ImportZoomRecordingJob", "Net::HTTP", "Net::HTTP.start")], ["Net::HTTP"]);
   assert.deepEqual(kinds(findings(set([picker, leaky]), null)), ["two-ways"]);
   const owned = flow("Job", [step("ZoomClient", "Net::HTTP", "http.request")], ["Net::HTTP"]);
   assert.deepEqual(kinds(findings(set([picker, owned]), null)), []);
+});
+
+test("raw HTTP is credited only to the vendor it names", () => {
+  const clients = flow("Pay", [
+    step("Controller", "ZoomClient", "ZoomClient.new.recordings"),
+    step("Controller", "StripeClient", "StripeClient.charge"),
+  ]);
+  const slack = flow("Notify", [step("NotifyJob", "Net::HTTP", "Net::HTTP.post(webhook_url)")], ["Net::HTTP"]);
+  assert.deepEqual(kinds(findings(set([clients, slack]), null)), []);
+  const zoom = flow("Import", [step("ImportZoomRecordingJob", "NetHTTP", "http.request")], ["NetHTTP"]);
+  const found = findings(set([clients, slack, zoom]), null);
+  assert.deepEqual(found.map((f) => f.id), ["two-ways:Zoom"]);
+  assert.equal(found[0].evidence.length, 1);
+});
+
+test("a lane only starting like an HTTP library isn't raw HTTP", () => {
+  const picker = flow("Picker", [step("Controller", "ZoomClient", "ZoomClient.new.recordings")]);
+  const named = flow("Zoom", [step("ZoomWebhook", "RequestsController", "zoom requests"), step("ZoomWebhook", "Fetcher", "zoom fetch")]);
+  assert.deepEqual(kinds(findings(set([picker, named]), null)), []);
 });
 
 test("two flows making the same calls from different code are noted; from the same code they aren't", () => {

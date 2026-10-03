@@ -35,9 +35,10 @@ export interface Finding {
 
 /**
  * Lanes that are raw HTTP: calling one means speaking a protocol, not a
- * domain. Names vary by tracer ("Net::HTTP", "NetHTTP"), so match loosely.
+ * domain. Names vary by tracer ("Net::HTTP", "NetHTTP", "Faraday::Connection"),
+ * but the library's name must end there: "RequestsController" isn't HTTP.
  */
-const HTTP = /^(Net(::)?HTTP|HTTParty|Faraday|RestClient|Excon|URLSession|fetch|axios|requests|http\.Client|OkHttp)/i;
+const HTTP = /^(Net(::)?HTTP|HTTParty|Faraday|RestClient|Excon|URLSession|fetch|axios|requests|http\.Client|OkHttp)(?![a-z0-9])/i;
 
 /** "ZoomClient" → "Zoom"; "ConnectedAccount::ZoomProvider" → "Zoom". */
 function vendorOf(lane: string): string | null {
@@ -87,29 +88,41 @@ function vendorFields(data: DataResponse | null, names: string[]): Finding[] {
   return out;
 }
 
-/** 2. An outside system reached two ways: through its client, and over raw HTTP. */
+/**
+ * 2. An outside system reached two ways: through its client, and over raw
+ * HTTP. A raw call counts toward a vendor only when it names the vendor (its
+ * caller, label or file): a Slack webhook says nothing about Zoom.
+ */
 function twoWays(set: FlowSet | null): Finding[] {
   if (!set) return [];
+  // Clients at the head only: one the change removed isn't "elsewhere".
   const clients = new Map<string, string>();
-  for (const f of set.flows) for (const p of f.participants) {
-    const v = vendorOf(p.name);
-    if (v && /Client$/.test(p.name)) clients.set(v, p.name);
+  for (const f of set.flows) for (const s of f.after) for (const lane of [s.from, s.to]) {
+    const v = vendorOf(lane);
+    if (v && /Client$/.test(lane)) clients.set(v, lane);
   }
-  if (clients.size === 0) return [];
-  const raw: Evidence[] = [];
-  set.flows.forEach((f, i) => {
-    for (const s of f.after) {
-      if (HTTP.test(s.to) && !vendorOf(s.from)?.length) {
+  const out: Finding[] = [];
+  for (const [vendor, client] of clients) {
+    const named = vendor.toLowerCase();
+    const raw: Evidence[] = [];
+    set.flows.forEach((f, i) => {
+      for (const s of f.after) {
+        if (!HTTP.test(s.to) || vendorOf(s.from)) continue;
+        if (!`${s.from} ${s.label} ${s.file}`.toLowerCase().includes(named)) continue;
         raw.push({ flow: i, step: s.id, text: `${s.from} → ${s.to}: ${s.label}` });
       }
-    }
-  });
-  if (raw.length === 0) return [];
+    });
+    if (raw.length > 0) out.push(twoWaysNote(vendor, client, raw));
+  }
+  return out;
+}
+
+function twoWaysNote(vendor: string, client: string, raw: Evidence[]): Finding {
   const callers = [...new Set(raw.map((r) => r.text.split(" → ")[0]))];
   const flows = [...new Set(raw.map((r) => r.flow!))];
-  return [...clients].map(([vendor, client]) => ({
+  return {
     id: `two-ways:${vendor}`,
-    kind: "two-ways" as const,
+    kind: "two-ways",
     short: `${vendor} called two ways`,
     title: `${vendor} is called through ${client}, and directly over HTTP from ${callers.join(", ")}`,
     evidence: raw,
@@ -117,7 +130,7 @@ function twoWays(set: FlowSet | null): Finding[] {
     flowText: Object.fromEntries(
       flows.map((f) => [f, `Calls ${vendor} over HTTP directly; elsewhere ${client} does`]),
     ),
-  }));
+  };
 }
 
 /**
