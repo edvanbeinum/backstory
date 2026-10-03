@@ -261,3 +261,17 @@ test("every hunk reaches the prompt, however big the ones before it", async () =
   assert.match(tight, /H2  small\.ts/);
 });
 
+
+test("the hunk list stays near its budget, headers included", async () => {
+  const { hunkText } = await import("../lib/flows/hunks");
+  const many = Array.from({ length: 600 }, (_, i) => ({
+    id: `H${i + 1}`, file: `app/models/model_${i}.rb`, oldFile: `app/models/model_${i}.rb`,
+    oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, text: ["-a", "+b"],
+  }));
+  const text = hunkText(many, 20_000);
+  // Headers past the budget still count; the list stops at its cap.
+  assert.ok(text.length < 20_000 + 400 * 120, `got ${text.length}`);
+  assert.match(text, /H400  /);
+  assert.doesNotMatch(text, /H401  /);
+  assert.match(text, /200 more hunks not listed/);
+});
