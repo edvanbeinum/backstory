@@ -16,15 +16,21 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
   const [error, setError] = useState<string | null>(null);
   const viewRef = useRef(`${repo}@${rev}`);
   viewRef.current = `${repo}@${rev}`;
+  /** Only the newest request's answer counts: an older one can land later. */
+  const latest = useRef(0);
 
   const request = useCallback(
     async (method: "GET" | "POST", extra: Record<string, string> = {}) => {
       const view = `${repo}@${rev}`;
+      const mine = ++latest.current;
+      const stale = () => mine !== latest.current || viewRef.current !== view;
       const params = new URLSearchParams({ repo, rev, ...extra });
       try {
         const response = await fetch(`/api/flows?${params}`, { method, cache: "no-store" });
         const data = (await response.json()) as FlowsStatus | { error: string };
-        if (viewRef.current !== view) return null;
+        // "All changes" refetches as HEAD moves; a slower earlier answer
+        // would put the old head's flows back beside the new diff.
+        if (stale()) return null;
         // A failed request is an HTTP error; a failed trace is a 200 whose
         // status says so, and must reach the panel as one.
         if (!response.ok) {
@@ -36,7 +42,7 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
         setStatus(status);
         return status;
       } catch (err) {
-        if (viewRef.current === view) setError(err instanceof Error ? err.message : String(err));
+        if (!stale()) setError(err instanceof Error ? err.message : String(err));
         return null;
       }
     },
