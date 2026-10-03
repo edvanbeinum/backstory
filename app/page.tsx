@@ -134,7 +134,7 @@ export default function Page() {
   const [flowsTick, setFlowsTick] = useState(0);
   const [columnTab, setColumnTab] = useState<ColumnTab>("flows");
   const [flowSel, setFlowSel] = useState<FlowSelection>({ index: 0, mode: "diff" });
-  const flowNavRef = useRef<((delta: number) => void) | null>(null);
+  const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
   const [map, setMap] = useState<MapResponse | null>(null);
   const [dataModel, setDataModel] = useState<DataResponse | null>(null);
   /** The map component under the pointer: its files are outlined in the diff. */
@@ -743,6 +743,11 @@ export default function Page() {
     setFlowSel({ index: 0, mode: "diff" });
   }, [repoPath, rev]);
 
+  // A regenerate can return fewer flows than the one selected.
+  useEffect(() => {
+    if (flowSet && flowSel.index >= flowSet.flows.length) setFlowSel({ index: 0, mode: "diff" });
+  }, [flowSet, flowSel.index]);
+
   const selectedFlow = flowSet?.flows[flowSel.index] ?? null;
   const flowMode =
     selectedFlow?.before === null && flowSel.mode === "before" ? "diff" : flowSel.mode;
@@ -1165,10 +1170,9 @@ export default function Page() {
         showColumn &&
         columnTab === "flows" &&
         event.key !== "x" &&
-        flowNavRef.current
+        flowNavRef.current?.(event.key === "j" ? 1 : -1)
       ) {
         event.preventDefault();
-        flowNavRef.current(event.key === "j" ? 1 : -1);
         return;
       }
 

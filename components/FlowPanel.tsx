@@ -64,8 +64,8 @@ export function FlowPanel({
   rows: FlowRow[];
   /** Paths the diff on screen shows, old and new */
   filesInDiff: Set<string>;
-  /** j/k move through steps while the Flows tab is open */
-  navRef: React.MutableRefObject<((delta: number) => void) | null>;
+  /** j/k move through steps while the Flows tab is open; false when there are none, so they move commits */
+  navRef: React.MutableRefObject<((delta: number) => boolean) | null>;
   coverage: React.ReactNode;
   code?: InlineCode | null;
   /** A step to bring into view once the diff has rendered */
@@ -188,7 +188,8 @@ function ReadyFlows({
   onSelect: (next: FlowSelection) => void;
   rows: FlowRow[];
   filesInDiff: Set<string>;
-  navRef: React.MutableRefObject<((delta: number) => void) | null>;
+  /** Walks the flow's steps; false when there are none, so j/k move commits */
+  navRef: React.MutableRefObject<((delta: number) => boolean) | null>;
   coverage: React.ReactNode;
   traceError?: string;
   code: InlineCode | null;
@@ -335,18 +336,17 @@ function ReadyFlows({
 
   useEffect(() => {
     navRef.current = (delta) => {
-      if (rows.length === 0) return;
-      if (code) {
-        const at = rows.findIndex((r) => r.key === cursor.current);
-        const next = rows[Math.min(rows.length - 1, Math.max(0, at === -1 ? 0 : at + delta))];
-        if (!next) return;
-        cursor.current = next.key;
-        setOpen(new Set([next.key]));
-        return;
-      }
-      const at = rows.findIndex((r) => activeKeys.has(r.key));
+      if (rows.length === 0) return false;
+      // Walk from the last step j/k reached, not the one the scroll lit: a
+      // step outside the diff never lights, and a changed line's − and +
+      // light together, so the lit row alone can leave j stuck.
+      let at = rows.findIndex((r) => r.key === cursor.current);
+      if (at === -1 && !code) at = rows.findIndex((r) => activeKeys.has(r.key));
       const next = rows[Math.min(rows.length - 1, Math.max(0, at === -1 ? 0 : at + delta))];
-      if (next) goTo(next);
+      cursor.current = next.key;
+      if (code) setOpen(new Set([next.key]));
+      else goTo(next);
+      return true;
     };
     return () => {
       navRef.current = null;
