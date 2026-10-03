@@ -36,7 +36,9 @@ export const claudeRunner: Runner = async <T>(
   schema: object,
   cwd: string,
 ) => {
-  const { stdout } = await run(
+  // On failure Claude Code still prints its JSON, with the reason in
+  // `result`; read it rather than a "Command failed" carrying the schema.
+  const { stdout, stderr } = await run(
     "claude",
     [
       "-p",
@@ -66,11 +68,13 @@ export const claudeRunner: Runner = async <T>(
       "--model",
       flowsModel(),
     ],
-    { cwd, input: prompt, timeout: TIMEOUT_MS },
+    { cwd, input: prompt, timeout: TIMEOUT_MS, allowExitCodes: [1] },
   );
 
   const start = stdout.indexOf("{");
-  if (start === -1) throw new Error("Claude Code returned no JSON.");
+  if (start === -1) {
+    throw new Error(`Claude Code returned no JSON${stderr.trim() ? `: ${stderr.trim().slice(0, 500)}` : "."}`);
+  }
   const result = JSON.parse(stdout.slice(start)) as {
     is_error?: boolean;
     result?: string;
