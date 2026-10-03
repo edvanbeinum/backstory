@@ -289,3 +289,13 @@ end
   const fk = model.entities.get("AccessGrant")!.constraints.find((c) => c.kind === "foreign key");
   assert.deepEqual(fk, { kind: "foreign key", fields: ["purchase_id"], target: "Purchase" });
 });
+
+test("an explicit class_name wins over a target guessed from source:", () => {
+  const model = readRails({
+    schema: `ActiveRecord::Schema[8.1].define(version: 1) do\n  create_table "spaces", force: :cascade do |t|\n  end\nend\n`,
+    models: new Map([
+      ["app/models/space.rb", `class Space < ApplicationRecord\n  has_many :members, through: :memberships, source: :owner, class_name: "User"\nend\n`],
+    ]),
+  });
+  assert.equal(model.entities.get("Space")!.relationships[0].target, "User");
+});

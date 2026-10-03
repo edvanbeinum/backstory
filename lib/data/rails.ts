@@ -174,7 +174,9 @@ function parseModel(file: string, text: string): ModelDecl | null {
       // and, when that's polymorphic, the type it lands on (source_type:).
       const sourceType = quoted(opts, "source_type");
       const sourceName = opts.match(/\bsource:\s*:(\w+)/)?.[1];
-      const source = sourceType ?? (sourceName ? classify(singular(sourceName)) : undefined);
+      // What the code says outranks what's guessed from a name: class_name
+      // beats an inferred source: target.
+      const source = sourceType ?? className ?? (sourceName ? classify(singular(sourceName)) : undefined);
       const base = rel[1] === "belongs_to" || rel[1] === "has_one" ? rel[2] : singular(rel[2]);
       relationships.push({
         name: rel[2],
