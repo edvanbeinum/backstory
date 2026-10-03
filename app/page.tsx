@@ -10,7 +10,7 @@ import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
 import type { ComponentInfo, DataField } from "@/components/FlowSequence";
 import { DataStrip } from "@/components/DataStrip";
 import { findings as designQuestions } from "@/lib/findings";
-import { MapStrip } from "@/components/MapStrip";
+import { jumpToFile, MapStrip } from "@/components/MapStrip";
 import type { DataResponse } from "@/lib/data/types";
 import type { MapResponse } from "@/lib/map";
 import { SideColumn, type ColumnTab } from "@/components/SideColumn";
@@ -661,6 +661,28 @@ export default function Page() {
         }
       : null;
   const pendingJump = layout === "code" ? jumpTo : null;
+
+  // A file picked on the map: in Diagrams there's no diff to show it in,
+  // so switch to Code for this view, then bring the file up once it renders.
+  const [pendingFile, setPendingFile] = useState<string | null>(null);
+  const openFile = useCallback(
+    (path: string) => {
+      if (layout === "diagrams") setLayoutOverride("code");
+      setPendingFile(path);
+    },
+    [layout],
+  );
+  useEffect(() => {
+    if (!pendingFile || layout !== "code") return;
+    let tries = 0;
+    const poll = setInterval(() => {
+      if (jumpToFile(pendingFile) || ++tries > 40) {
+        clearInterval(poll);
+        setPendingFile(null);
+      }
+    }, 100);
+    return () => clearInterval(poll);
+  }, [pendingFile, layout]);
 
   /** Notes on the change's shape, pinned on the data cards and under flow titles. */
   const questions = useMemo(() => designQuestions(flowSet, dataModel), [flowSet, dataModel]);
@@ -1378,7 +1400,7 @@ export default function Page() {
                     header={
                       rev !== WORKING_REV ? (
                         <>
-                          <MapStrip map={map} onHover={setHoveredComponent} />
+                          <MapStrip map={map} onHover={setHoveredComponent} onOpenFile={openFile} />
                           <DataStrip data={dataModel} notes={entityNotes} />
                         </>
                       ) : null
@@ -1446,7 +1468,7 @@ export default function Page() {
                   header={
                     rev !== WORKING_REV ? (
                       <>
-                          <MapStrip map={map} onHover={setHoveredComponent} />
+                          <MapStrip map={map} onHover={setHoveredComponent} onOpenFile={openFile} />
                           <DataStrip data={dataModel} notes={entityNotes} />
                         </>
                     ) : null

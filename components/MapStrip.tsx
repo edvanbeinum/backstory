@@ -64,13 +64,14 @@ function Squares({ add, del }: { add: number; del: number }) {
 }
 
 /** Scroll the diff to a file and flash its header. */
-function jumpToFile(path: string) {
+export function jumpToFile(path: string): boolean {
   const section = document.getElementById(`file-${encodeURIComponent(path)}`);
-  if (!section) return;
+  if (!section) return false;
   section.scrollIntoView({ block: "start" });
   section.classList.remove("flash");
   void section.offsetWidth;
   section.classList.add("flash");
+  return true;
 }
 
 const fileName = (path: string) => path.split("/").pop() ?? path;
@@ -351,9 +352,12 @@ function summary(map: MapResponse) {
 export function MapStrip({
   map,
   onHover,
+  onOpenFile,
 }: {
   map: MapResponse | null;
   onHover: (component: string | null) => void;
+  /** Bring a file into view; the page knows whether there's a diff to show it in */
+  onOpenFile: (path: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -444,8 +448,7 @@ export function MapStrip({
               onJump={(path) => {
                 setOpen(false);
                 onHover(null);
-                // After the overlay is gone, so the jump lands where you can see it.
-                requestAnimationFrame(() => jumpToFile(path));
+                onOpenFile(path);
               }}
             />
             <div className="map-foot">
