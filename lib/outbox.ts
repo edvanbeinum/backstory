@@ -31,6 +31,11 @@ export const MAX_MESSAGE = 200_000;
 
 /** Delivered rounds are only kept to label their round in the window. */
 const KEEP_DELIVERED_MS = 30 * 24 * 60 * 60 * 1000;
+/**
+ * How long a taken round waits for its hook to say the agent has it before
+ * it can be taken again. Longer than a hook can run: differ's exits by 5s.
+ */
+export const CLAIM_MS = 30_000;
 /** Sessions remembered per checkout; only the latest is ever aimed at. */
 const KEEP_SESSIONS = 10;
 
@@ -50,6 +55,11 @@ export interface OutboxRound {
   deliveredAt: number | null;
   /** A session id, CLIPBOARD or DIFFER_REVIEW. */
   deliveredTo: string | null;
+  /**
+   * Handed to a Stop hook that hasn't yet confirmed printing it. Delivered
+   * only on that confirmation, so a hook that gave up waiting doesn't lose it.
+   */
+  claim: { session: string; until: number } | null;
 }
 
 export interface OutboxState {
@@ -65,7 +75,14 @@ export const isSessionId = (value: unknown): value is string =>
 
 const isTime = (value: unknown) => value === null || typeof value === "number";
 
-function isRound(value: unknown): value is Omit<OutboxRound, "id" | "root"> {
+const isClaim = (value: unknown) =>
+  value === undefined ||
+  value === null ||
+  (isObject(value) && isSessionId(value.session) && typeof value.until === "number");
+
+function isRound(
+  value: unknown,
+): value is Omit<OutboxRound, "id" | "root" | "claim"> & { claim?: OutboxRound["claim"] } {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const r = value as Record<string, unknown>;
   return (
@@ -76,7 +93,8 @@ function isRound(value: unknown): value is Omit<OutboxRound, "id" | "root"> {
     typeof r.queuedAt === "number" &&
     (r.forSession === null || isSessionId(r.forSession)) &&
     isTime(r.deliveredAt) &&
-    (r.deliveredTo === null || typeof r.deliveredTo === "string")
+    (r.deliveredTo === null || typeof r.deliveredTo === "string") &&
+    isClaim(r.claim)
   );
 }
 
@@ -116,6 +134,7 @@ function parse(root: string, entries: Record<string, Stored>): ForRoot {
         forSession: value.forSession,
         deliveredAt: value.deliveredAt,
         deliveredTo: value.deliveredTo,
+        claim: value.claim ?? null,
       });
     }
   }
@@ -228,6 +247,7 @@ export function queueRound(root: string, round: NewRound): Promise<OutboxRound> 
       forSession: delivered ? null : (lastSeen(forRoot.seen)?.session ?? null),
       deliveredAt: delivered ? Date.now() : null,
       deliveredTo: round.deliveredTo ?? null,
+      claim: null,
     };
     forRoot.rounds.set(entry.id, entry);
     return { result: entry, changed: true };
@@ -236,8 +256,9 @@ export function queueRound(root: string, round: NewRound): Promise<OutboxRound> 
 
 /**
  * A session finished a turn here: note it, and hand it every undelivered round
- * aimed at it or at nobody, marking them delivered — one write, under the
- * lock, so two sessions stopping at once can't both collect a round.
+ * aimed at it or at nobody, claiming them for it — one write, under the lock,
+ * so two sessions stopping at once can't both collect a round. They're
+ * delivered once the hook confirms with `ack`.
  */
 export function take(root: string, session: string): Promise<OutboxRound[]> {
   if (!isSessionId(session)) throw new Error("Invalid session id");
@@ -254,12 +275,37 @@ export function take(root: string, session: string): Promise<OutboxRound[]> {
     for (const round of forRoot.rounds.values()) {
       if (round.deliveredAt !== null) continue;
       if (round.forSession !== null && round.forSession !== session) continue;
-      round.deliveredAt = now;
-      round.deliveredTo = session;
+      if (claimed(round, now) && round.claim?.session !== session) continue;
+      round.claim = { session, until: now + CLAIM_MS };
       taken.push(round);
     }
     taken.sort((a, b) => a.queuedAt - b.queuedAt);
     return { result: taken, changed: true };
+  });
+}
+
+const claimed = (round: OutboxRound, now = Date.now()) =>
+  round.claim !== null && round.claim.until > now;
+
+/**
+ * The hook printed what it took: those rounds are delivered. Only rounds this
+ * session still holds; returns how many.
+ */
+export function ack(root: string, session: string, ids: string[]): Promise<number> {
+  if (!isSessionId(session)) throw new Error("Invalid session id");
+
+  return change(root, (forRoot) => {
+    const now = Date.now();
+    let count = 0;
+    for (const id of ids) {
+      const round = forRoot.rounds.get(id);
+      if (!round || round.deliveredAt !== null || round.claim?.session !== session) continue;
+      round.deliveredAt = now;
+      round.deliveredTo = session;
+      round.claim = null;
+      count++;
+    }
+    return { result: count, changed: count > 0 };
   });
 }
 
@@ -282,13 +328,46 @@ export function retarget(
 
 /**
  * Withdraw a waiting round. Returns it, so the caller can put its notes back
- * to drafts; null if it's gone or an agent already has it.
+ * to drafts; null if it's gone or an agent has it, or may be reading it now.
  */
 export function cancel(root: string, id: string): Promise<OutboxRound | null> {
   return change(root, (forRoot) => {
     const round = forRoot.rounds.get(id);
-    if (!round || round.deliveredAt !== null) return { result: null, changed: false };
+    if (!round || round.deliveredAt !== null || claimed(round)) {
+      return { result: null, changed: false };
+    }
     forRoot.rounds.delete(id);
+    return { result: round, changed: true };
+  });
+}
+
+/**
+ * Undo a write whose partner failed: drop a round just filed, or put back
+ * one just withdrawn, exactly as it was.
+ */
+export function revert(
+  root: string,
+  id: string,
+  round: OutboxRound | null,
+): Promise<void> {
+  return change(root, (forRoot) => {
+    if (round) forRoot.rounds.set(id, round);
+    else forRoot.rounds.delete(id);
+    return { result: undefined, changed: true };
+  });
+}
+
+/**
+ * The agent a round was filed for as answered had gone by the time it was
+ * answered: queue it instead, aimed as Send would have.
+ */
+export function requeue(root: string, id: string): Promise<OutboxRound | null> {
+  return change(root, (forRoot) => {
+    const round = forRoot.rounds.get(id);
+    if (!round) return { result: null, changed: false };
+    round.deliveredAt = null;
+    round.deliveredTo = null;
+    round.forSession = lastSeen(forRoot.seen)?.session ?? null;
     return { result: round, changed: true };
   });
 }

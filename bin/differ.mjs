@@ -32,10 +32,8 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { readStdin, stopHook } from "./hook.mjs";
+import { DEFAULT_PORT, hookPort, readStdin, recordPort, stopHook } from "./hook.mjs";
 import * as launchd from "./launchd.mjs";
-
-const DEFAULT_PORT = 4460;
 
 // First, before anything that could start, restart or wait on a server: the
 // hook runs on every turn of every session and must only ever ask.
@@ -43,9 +41,7 @@ if (process.argv[2] === "hook") {
   // A backstop for anything that hangs past the take's own timeout.
   setTimeout(() => process.exit(0), 5000);
   if (process.argv[3] === "stop") {
-    const port = Number(process.env.DIFFER_PORT) || DEFAULT_PORT;
-    const out = await stopHook(await readStdin(), { base: `http://127.0.0.1:${port}` });
-    if (out) process.stdout.write(out + "\n");
+    await stopHook(await readStdin(), { base: `http://127.0.0.1:${hookPort()}` });
   }
   process.exit(0);
 }
@@ -202,6 +198,7 @@ async function handOff() {
     console.error(`differ: ${body?.error ?? "not a git repository"}`);
     return null;
   }
+  recordPort(args.port);
   if (args.open) openWindow(`${base}/`);
   return body.repo;
 }
@@ -339,6 +336,7 @@ if (args.command === "install") {
     console.error(`differ: server didn't come up on :${args.port} — see ${serverLog}`);
     process.exit(1);
   }
+  recordPort(args.port);
   console.log(`differ: login agent installed — serving ${base} (log: ${serverLog})`);
   process.exit(0);
 }
@@ -418,6 +416,7 @@ if (args.review) {
   await review();
 }
 
+recordPort(args.port);
 const child = spawn("node", [server], {
   env,
   stdio: ["ignore", "inherit", "inherit"],

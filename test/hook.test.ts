@@ -3,7 +3,11 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { test } from "node:test";
 
-import { stopHook } from "../bin/hook.mjs";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+
+import { DEFAULT_PORT, hookPort, recordPort, stopHook } from "../bin/hook.mjs";
 
 const INPUT = JSON.stringify({
   session_id: "abc-123",
@@ -30,18 +34,58 @@ async function differ(
 
 test("queued notes block the stop and become the agent's instructions", async () => {
   const seen: string[] = [];
-  const { base, server } = await differ(200, { message: "## a.ts:3\nfix it\n" }, seen);
+  const printed: string[] = [];
+  const { base, server } = await differ(
+    200,
+    { message: "## a.ts:3\nfix it\n", ids: ["r1"] },
+    seen,
+  );
   try {
-    const out = JSON.parse(await stopHook(INPUT, { base }));
-    assert.deepEqual(out, { decision: "block", reason: "## a.ts:3\nfix it\n" });
+    const out = await stopHook(INPUT, { base, print: (o: string) => printed.push(o) });
+    assert.deepEqual(JSON.parse(out), { decision: "block", reason: "## a.ts:3\nfix it\n" });
+    assert.deepEqual(printed, [out]);
     const url = new URL(seen[0].split(" ")[1], base);
     assert.equal(seen[0].split(" ")[0], "POST");
     assert.equal(url.searchParams.get("cwd"), "/repos/app");
     assert.equal(url.searchParams.get("session"), "abc-123");
     assert.ok(url.searchParams.has("take"));
+    // Then it says it printed them, which is what marks them delivered.
+    assert.ok(new URL(seen[1].split(" ")[1], base).searchParams.has("ack"));
   } finally {
     server.close();
   }
+});
+
+test("the notes are printed even when the confirmation fails", async () => {
+  let calls = 0;
+  const server = createServer((req, res) => {
+    calls++;
+    res.writeHead(calls === 1 ? 200 : 500, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(calls === 1 ? { message: "fix it", ids: ["r1"] } : {}));
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  const printed: string[] = [];
+  try {
+    await stopHook(INPUT, {
+      base: `http://127.0.0.1:${port}`,
+      print: (o: string) => printed.push(o),
+    });
+    assert.equal(printed.length, 1);
+  } finally {
+    server.close();
+  }
+});
+
+test("the hook finds the port differ was last started on", () => {
+  const env: Record<string, string> = {
+    DIFFER_HOME: mkdtempSync(path.join(tmpdir(), "differ-hook-")),
+  };
+  assert.equal(hookPort(env), DEFAULT_PORT);
+  recordPort(4555, env);
+  assert.equal(hookPort(env), 4555);
+  // The agent's own DIFFER_PORT still wins.
+  assert.equal(hookPort({ ...env, DIFFER_PORT: "4600" }), 4600);
 });
 
 test("nothing queued prints nothing", async () => {
