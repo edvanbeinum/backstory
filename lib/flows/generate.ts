@@ -89,11 +89,18 @@ async function prepare(root: string, base: string | null, head: string): Promise
 /** The commit's files in a temp dir. Nothing in the repo is touched. */
 async function snapshot(root: string, rev: string): Promise<string> {
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), `differ-flows-${rev.slice(0, 7)}-`));
-  await run("sh", ["-c", 'git archive "$1" | tar -x -C "$2"', "sh", rev, dir], {
-    cwd: root,
-    timeout: 120_000,
-  });
-  return dir;
+  try {
+    // pipefail: a failed archive (a blobless clone, say) would otherwise
+    // leave an empty folder, traced and cached as a change with no flows.
+    await run("bash", ["-o", "pipefail", "-c", 'git archive "$1" | tar -x -C "$2"', "bash", rev, dir], {
+      cwd: root,
+      timeout: 120_000,
+    });
+    return dir;
+  } catch (err) {
+    await fs.rm(dir, { recursive: true, force: true });
+    throw err;
+  }
 }
 
 async function withSnapshot<T>(root: string, rev: string, fn: (dir: string) => Promise<T>) {
