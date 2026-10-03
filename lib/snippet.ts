@@ -34,9 +34,13 @@ export async function snippet(opts: {
   const { root, base, head, path, side, line } = opts;
   const context = opts.context ?? 6;
 
+  const from = base ?? EMPTY_TREE;
+  // A renamed file needs both its names in the pathspec, or git reads it
+  // as one file deleted and another added, every line changed.
+  const names = [path, ...(await renamePartner(root, from, head, path))];
   const { stdout } = await git(
     root,
-    ["diff", "-U1000000", "-M", "--no-color", "--no-ext-diff", base ?? EMPTY_TREE, head, "--", path],
+    ["diff", "-U1000000", "-M", "--no-color", "--no-ext-diff", "--no-textconv", from, head, "--", ...names],
     { maxBuffer: 64 * 1024 * 1024 },
   );
   let lines: DiffLine[] | null = parseUnifiedDiff(stdout)[0]?.hunks[0]?.lines ?? null;
@@ -77,4 +81,17 @@ export async function snippet(opts: {
   };
   await highlightFiles([file]);
   return { path, target: at - start, file, changed };
+}
+
+/** The file's other name, if this view renamed it to or from `path`. */
+async function renamePartner(root: string, from: string, head: string, path: string): Promise<string[]> {
+  const { stdout } = await git(root, ["diff", "--name-status", "-M", "-z", "--diff-filter=R", from, head]);
+  const parts = stdout.split("\0");
+  // -z: "R087", old path, new path, repeated.
+  for (let i = 0; i + 2 < parts.length; i += 3) {
+    const [oldPath, newPath] = [parts[i + 1], parts[i + 2]];
+    if (newPath === path) return [oldPath];
+    if (oldPath === path) return [newPath];
+  }
+  return [];
 }
