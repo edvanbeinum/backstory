@@ -526,7 +526,9 @@ function ReadyFlows({
         />
       )}
 
-      {traceError && <Notice tone="danger">Tracing that flow failed: {traceError}</Notice>}
+      {traceError && (
+        <Notice tone="danger">The last trace failed, so these are the flows from before it: {traceError}</Notice>
+      )}
       {!code && coverage}
       <Regenerate set={set} onRegenerate={api.regenerate} />
     </section>

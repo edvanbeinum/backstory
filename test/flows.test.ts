@@ -260,3 +260,4 @@ test("every hunk reaches the prompt, however big the ones before it", async () =
   assert.match(tight, /H1  big\.ts.*\n\(content not shown here/);
   assert.match(tight, /H2  small\.ts/);
 });
+
