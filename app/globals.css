@@ -907,6 +907,8 @@ tr.note-row td {
   font-style: normal;
   vertical-align: 1px;
   white-space: nowrap;
+  /* Copying code shouldn't copy "step 3" with it. */
+  user-select: none;
 }
 .flow-chip.was {
   border-color: color-mix(in srgb, var(--danger) 45%, transparent);
