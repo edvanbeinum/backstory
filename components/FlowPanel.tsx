@@ -82,7 +82,7 @@ export function FlowPanel({
     return (
       <Notice tone="danger">
         Couldn&apos;t load flows: {error}{" "}
-        <button type="button" className="text-[var(--accent)]" onClick={api.retry}>
+        <button type="button" className="text-[var(--accent)]" onClick={api.reload}>
           Try again
         </button>
       </Notice>
@@ -106,7 +106,7 @@ export function FlowPanel({
         Flows need Claude Code: differ runs <code className="mono">claude -p</code> with your
         login, and couldn&apos;t find <code className="mono">claude</code> on its PATH. The rest of
         differ works without it.{" "}
-        <button type="button" className="text-[var(--accent)]" onClick={api.retry}>
+        <button type="button" className="text-[var(--accent)]" onClick={api.reload}>
           Look again
         </button>
       </Notice>

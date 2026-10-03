@@ -25,13 +25,16 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
         const response = await fetch(`/api/flows?${params}`, { method, cache: "no-store" });
         const data = (await response.json()) as FlowsStatus | { error: string };
         if (viewRef.current !== view) return null;
-        if ("error" in data) {
-          setError(data.error);
+        // A failed request is an HTTP error; a failed trace is a 200 whose
+        // status says so, and must reach the panel as one.
+        if (!response.ok) {
+          setError((data as { error: string }).error);
           return null;
         }
+        const status = data as FlowsStatus;
         setError(null);
-        setStatus(data);
-        return data;
+        setStatus(status);
+        return status;
       } catch (err) {
         if (viewRef.current === view) setError(err instanceof Error ? err.message : String(err));
         return null;
@@ -60,10 +63,13 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
 
   const regenerate = useCallback(() => void request("POST", { regenerate: "1" }), [request]);
   const start = useCallback(() => void request("POST"), [request]);
+  /** After a failed trace: trace again, which is a paid run the user asked for. */
   const retry = start;
+  /** After a failed load: only load again. Never a trace. */
+  const reload = useCallback(() => void request("GET"), [request]);
   const trace = useCallback((hunk: string) => void request("POST", { hunk }), [request]);
 
-  return { status, error, start, regenerate, retry, trace };
+  return { status, error, start, regenerate, retry, reload, trace };
 }
 
 export type FlowsApi = ReturnType<typeof useFlows>;
