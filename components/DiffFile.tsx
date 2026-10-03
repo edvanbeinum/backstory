@@ -24,6 +24,20 @@ import { NoteCard, NoteComposer } from "./NoteCard";
 import { Badge, copyToClipboard, CopyButton, Spinner } from "./ui";
 import type { NotesApi } from "./useNotes";
 
+/** A flow step anchored on a line: its row key, and the chip to show. */
+export interface FlowMark {
+  key: string;
+  chip: string;
+  was: boolean;
+}
+
+export interface FileMarks {
+  old: Map<number, FlowMark[]>;
+  new: Map<number, FlowMark[]>;
+}
+
+const NO_MARKS: FlowMark[] = [];
+
 /** The line a note is being written on. */
 interface NoteTarget {
   side: "old" | "new";
@@ -49,6 +63,9 @@ export function DiffFile({
   notes = null,
   noteRev = null,
   fileNotes = [],
+  marks = null,
+  component = null,
+  linked = false,
 }: {
   file: DiffFileType;
   threads: ReviewThread[];
@@ -62,6 +79,12 @@ export function DiffFile({
   noteRev?: string | null;
   /** This file's notes, on this change */
   fileNotes?: Note[];
+  /** Flow steps anchored in this file */
+  marks?: FileMarks | null;
+  /** The C4 component this file belongs to */
+  component?: string | null;
+  /** Its component is hovered on the map */
+  linked?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
@@ -175,6 +198,21 @@ export function DiffFile({
     target?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [showWhole, whole, wholeLoading]);
 
+  // A flow step outside the hunks on screen asks for its line: open the whole
+  // file. The flow view scrolls to the line once its anchor renders.
+  useEffect(() => {
+    const onReveal = (event: Event) => {
+      const { path } = (event as CustomEvent<{ path: string }>).detail;
+      if (path !== file.newPath && path !== file.oldPath) return;
+      setCollapsed(false);
+      if (!canViewWhole) return;
+      setShowWhole(true);
+      if (!whole && !wholeLoading) void loadWhole();
+    };
+    window.addEventListener("differ:reveal", onReveal);
+    return () => window.removeEventListener("differ:reveal", onReveal);
+  }, [file.newPath, file.oldPath, canViewWhole, whole, wholeLoading, loadWhole]);
+
   // A different commit means a different file revision; drop the cached view.
   useEffect(() => {
     setWhole(null);
@@ -189,7 +227,7 @@ export function DiffFile({
       // header's containing scrollport, and since the section itself never
       // scrolls, the filename would never actually stick. Corners are
       // rounded per-edge instead.
-      className="rounded-md border border-[var(--border)] bg-[var(--canvas)]"
+      className={`rounded-md border border-[var(--border)] bg-[var(--canvas)] ${linked ? "file-linked" : ""}`}
       // Jump targets must clear the sticky app bar, or FileNav's scroll
       // lands the section header underneath it.
       style={{ scrollMarginTop: "calc(var(--header-height, 0px) + 8px)" }}
@@ -229,6 +267,8 @@ export function DiffFile({
           variant="invisible"
           className="!px-1"
         />
+
+        {component && <span className="file-owner">{component}</span>}
 
         <span className={`text-[11px] ${STATUS_TONE[file.status] ?? ""}`}>
           {file.status}
@@ -312,6 +352,7 @@ export function DiffFile({
                         drafting={drafting}
                         onDraft={setDrafting}
                         onSaveNew={saveNew}
+                        marks={marks}
                       />
                     ))}
                   </tbody>
@@ -394,6 +435,7 @@ function HunkRows({
   drafting,
   onDraft,
   onSaveNew,
+  marks,
 }: {
   hunk: DiffFileType["hunks"][number];
   hunkIndex: number;
@@ -413,6 +455,7 @@ function HunkRows({
   drafting: NoteTarget | null;
   onDraft: (target: NoteTarget | null) => void;
   onSaveNew: (target: NoteTarget, body: string) => void;
+  marks: FileMarks | null | undefined;
 }) {
   // Clicking a line number copies the editor-style "path:line" reference —
   // the thing you paste into a terminal, an editor, or a review reply. The
@@ -469,6 +512,19 @@ function HunkRows({
           drafting?.side === target.side &&
           drafting.line === target.line;
 
+        // A removed step sits on its old line; every other step on its new
+        // one. An unchanged line has both, so look on both sides.
+        const lineMarks = marks
+          ? [
+              ...(line.type !== "add" && line.oldNo != null
+                ? (marks.old.get(line.oldNo) ?? NO_MARKS)
+                : NO_MARKS),
+              ...(line.type !== "del" && line.newNo != null
+                ? (marks.new.get(line.newNo) ?? NO_MARKS)
+                : NO_MARKS),
+            ]
+          : NO_MARKS;
+
         return (
           <Fragment key={index}>
             <tr
@@ -483,6 +539,11 @@ function HunkRows({
                   ? "line-anchored"
                   : ""
               }`}
+              data-old-line={line.oldNo ?? undefined}
+              data-new-line={line.newNo ?? undefined}
+              data-flow-steps={
+                lineMarks.length > 0 ? lineMarks.map((m) => m.key).join(" ") : undefined
+              }
             >
               {numCell(line.oldNo, "old")}
               {numCell(line.newNo, "new")}
@@ -502,10 +563,21 @@ function HunkRows({
                   </button>
                 )}
               </td>
-              <td
-                className="diff-code"
-                dangerouslySetInnerHTML={{ __html: line.html ?? "" }}
-              />
+              {lineMarks.length > 0 ? (
+                <td className="diff-code">
+                  <span dangerouslySetInnerHTML={{ __html: line.html ?? "" }} />
+                  {lineMarks.map((m) => (
+                    <em key={m.key} className={`flow-chip ${m.was ? "was" : ""}`}>
+                      {m.chip}
+                    </em>
+                  ))}
+                </td>
+              ) : (
+                <td
+                  className="diff-code"
+                  dangerouslySetInnerHTML={{ __html: line.html ?? "" }}
+                />
+              )}
             </tr>
 
             {notes && (lineNotes.length > 0 || isDrafting) && (

@@ -10,6 +10,7 @@ import type {
   SessionResponse,
 } from "@/lib/types";
 import { CommitHeader } from "./CommitHeader";
+import type { FileMarks } from "./DiffFile";
 import { DiffView } from "./DiffView";
 import { CommitPicker } from "./CommitPicker";
 import { FeedbackBar } from "./FeedbackBar";
@@ -124,6 +125,11 @@ export function ChangePane({
   focusedThreadId,
   pushed,
   reviewTick,
+  flowMarks = null,
+  fileComponents = null,
+  hoveredComponent = null,
+  layout = "code",
+  onLayout,
 }: {
   session: SessionResponse;
   rev: string;
@@ -139,6 +145,15 @@ export function ChangePane({
   pushed: boolean;
   /** Moves when an agent starts or stops waiting, or a round is queued or collected */
   reviewTick: number;
+  /** The selected flow's steps, anchored on the diff's lines */
+  flowMarks?: Map<string, FileMarks> | null;
+  /** Each file's C4 component, from the map */
+  fileComponents?: Record<string, string> | null;
+  hoveredComponent?: string | null;
+  /** "diagrams" hides the diff: the flows lead, the code is opened from them */
+  layout?: "diagrams" | "code";
+  /** Offered only where there are flows to lead with */
+  onLayout?: ((layout: "diagrams" | "code") => void) | null;
 }) {
   const notes = useNotes(session.repo.root);
   const review = useReview(session.repo.root, reviewTick);
@@ -218,6 +233,25 @@ export function ChangePane({
               align="left"
             />
           )}
+          {onLayout && (
+            <span className="seg ml-auto" role="group" aria-label="Layout">
+              {(["diagrams", "code"] as const).map((l) => (
+                <button
+                  key={l}
+                  type="button"
+                  aria-pressed={layout === l}
+                  onClick={() => onLayout(l)}
+                  title={
+                    l === "diagrams"
+                      ? "Lead with the map and the flows; open code from a step"
+                      : "The flow beside the full diff"
+                  }
+                >
+                  {l === "diagrams" ? "Diagrams" : "Code"}
+                </button>
+              ))}
+            </span>
+          )}
       </div>
 
       {landing.length > 0 && (
@@ -241,6 +275,7 @@ export function ChangePane({
         pushed={pushed}
       />
 
+      {layout === "code" && (
       <DiffView
         diff={diff}
         loading={loading}
@@ -252,10 +287,15 @@ export function ChangePane({
         focusedThreadId={focusedThreadId}
         notes={noteRev ? notes : null}
         noteRev={noteRev}
+        marks={flowMarks}
+        fileComponents={fileComponents}
+        hoveredComponent={hoveredComponent}
       />
+      )}
 
       {/* Pinned to the bottom of the window while the diff scrolls, so a
           general note or Send is always a click away. */}
+      {/* In either layout: an agent waiting on review must never be invisible. */}
       {(noteRev || notes.notes.length > 0 || review.waiting || review.error) && (
         <div className="sticky bottom-4 z-20">
           <FeedbackBar

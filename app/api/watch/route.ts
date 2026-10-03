@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api";
 import { gitLine } from "@/lib/exec";
 import { resolveRepo } from "@/lib/git";
+import { onFlowsChange } from "@/lib/flows/store";
 import { onOutboxChange } from "@/lib/outbox";
 import { onReviewChange } from "@/lib/review";
 import type { ApiError } from "@/lib/types";
@@ -28,9 +29,10 @@ export const dynamic = "force-dynamic";
  *
  * Events carry a coarse kind so the client can decide how hard to refresh:
  * "remote" (refs/remotes moved — bypass the GitHub cache), "git" (local git
- * state), "worktree" (file edits), and two that aren't the filesystem at all:
- * "review", an agent starting or stopping waiting for your notes on this
- * checkout, and "outbox", a sent round queued, collected or withdrawn.
+ * state), "worktree" (file edits), and three that aren't the filesystem at
+ * all: "review", an agent starting or stopping waiting for your notes on this
+ * checkout; "outbox", a sent round queued, collected or withdrawn; and
+ * "flows", a flow run finished.
  */
 
 const DEBOUNCE_MS = 400;
@@ -166,6 +168,9 @@ export async function GET(request: Request) {
       const stopOutbox = onOutboxChange((changedRoot) => {
         if (changedRoot === root) send({ kinds: ["outbox"] });
       });
+      const stopFlows = onFlowsChange((changedRoot) => {
+        if (changedRoot === root) send({ kinds: ["flows"] });
+      });
 
       // Keep intermediaries from reaping the idle connection.
       const heartbeat = setInterval(() => {
@@ -182,6 +187,7 @@ export async function GET(request: Request) {
         closed = true;
         stopReviews();
         stopOutbox();
+        stopFlows();
         clearInterval(heartbeat);
         if (debounce) clearTimeout(debounce);
         for (const w of watchers) w.close();

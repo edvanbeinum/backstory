@@ -16,14 +16,41 @@ reply for you to paste back.
 
 Whether a comment is handled is your call and nobody else's — you tick it.
 
-## Read-only, on purpose
+## What differ keeps
 
-differ never writes anything:
+Its own state lives under `~/.differ`: drafts, ticks, and traced flows.
 
-- **No git writes.** It never commits, amends, rebases, or pushes. You drive git
-  from your terminal exactly as you do now.
-- **No GitHub writes.** It never posts a comment, never resolves a thread. It
-  generates reply text and puts it on your clipboard; posting it is your call.
+## Diagrams: the map, the data model and flows
+
+Beside the diff, or in place of it, differ draws what a change did to the
+system, so you can see where it landed before reading its lines:
+
+- **The map** is a C4 component view of the repo, with the components the
+  change touched, added or removed. It reads `architecture/workspace.json`
+  (a [Structurizr](https://docs.structurizr.com) export) from the repo, at the
+  change's base and head. A repo that doesn't commit one can keep a model at
+  `~/.differ/models/<repo>/workspace.json`; it shows where a change landed, but
+  not what it added or removed.
+- **The data model** shows the entities the change touched: new fields,
+  relationships and rules. It reads `db/schema.rb` and the models (Rails) or
+  the `.xcdatamodeld` (Core Data). Nothing is run.
+- **Flows** are sequence diagrams of what the code does for each user action
+  the change touches, before and after, beside the code they come from.
+
+Flows are traced by **Claude Code**, through your own `claude` login: differ
+runs `claude -p` over a copy of the commit, with read-only tools. That means:
+
+- **Your code is read by Claude** the same way it is when you use Claude Code
+  in that repo. Think about that before tracing a repo you couldn't use Claude
+  Code on.
+- **It costs.** Tracing a change takes about a minute and usually $0.10–0.40
+  on your Claude account. It only happens when you press "Trace this change",
+  and the result is kept in `~/.differ/flows/`, so a view is traced once.
+- **The model** is Sonnet unless you set `DIFFER_FLOWS_MODEL` (`opus`, or a
+  full model id). Every step Claude cites is checked against its line; the
+  ones that don't hold are shown dashed, as unverified.
+
+Without Claude Code installed, differ works as before, with no flows.
 
 ## Running it
 
