@@ -299,3 +299,34 @@ test("an explicit class_name wins over a target guessed from source:", () => {
   });
   assert.equal(model.entities.get("Space")!.relationships[0].target, "User");
 });
+
+test("present: tightening a link that stays is a change, not plumbing", async () => {
+  const { present } = await import("../lib/data/present");
+  const schema = (spaceId: string, fk: string) => `
+ActiveRecord::Schema[8.1].define(version: 1) do
+  create_table "items", force: :cascade do |t|
+    t.string "title"
+    ${spaceId}
+  end
+  create_table "spaces", force: :cascade do |t|
+    t.string "name"
+  end
+  ${fk}
+end
+`;
+  const models = new Map([
+    ["app/models/item.rb", `class Item < ApplicationRecord\n  belongs_to :space\nend\n`],
+    ["app/models/space.rb", `class Space < ApplicationRecord\n  has_many :items\nend\n`],
+  ]);
+  const before = readRails({ schema: schema(`t.bigint "space_id"`, ""), models });
+  const notNull = readRails({ schema: schema(`t.bigint "space_id", null: false`, ""), models });
+  const withFk = readRails({ schema: schema(`t.bigint "space_id"`, `add_foreign_key "items", "spaces"`), models });
+
+  const tightened = present(diffModels(before, notNull)).find((p) => p.entity.name === "Item")!;
+  assert.equal(tightened.state, "changed");
+  assert.deepEqual(tightened.fields.map((f) => f.item.name), ["space_id"]);
+
+  const constrained = present(diffModels(before, withFk)).find((p) => p.entity.name === "Item")!;
+  assert.equal(constrained.state, "changed");
+  assert.equal(constrained.summary, "+1 rule");
+});

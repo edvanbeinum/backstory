@@ -6,8 +6,9 @@ import type { Constraint, Diffed, EntityDiff, Field, Relationship } from "./type
  *
  * - a link is said once, by its arrow: the foreign-key rule behind a
  *   belongs-to, and the has-many at its other end, are the same link again;
- * - timestamps are bookkeeping, and the columns a link lives in are its
- *   plumbing: both wait for "details";
+ * - timestamps are bookkeeping, and the columns and foreign key of a new
+ *   or removed link are its plumbing: both wait for "details". On a link
+ *   that stays, a change to them (a NOT NULL, a foreign key) is news;
  * - an entity whose only change is the far end of someone else's new link
  *   hasn't changed in any way a reader needs told.
  */
@@ -65,8 +66,10 @@ export function present(entities: EntityDiff[]): Presented[] {
     const linkNames = new Set(entity.relationships.flatMap((d) => d.item.fields ?? []));
     const fieldsOf = (pred: (f: Diffed<Field>) => boolean) => entity.fields.filter(pred);
     const timestamps = fieldsOf((f) => TIMESTAMPS.has(f.item.name));
-    const linkFields = fieldsOf((f) => linkNames.has(f.item.name));
-    const own = fieldsOf((f) => !TIMESTAMPS.has(f.item.name) && !linkNames.has(f.item.name));
+    // Only a new or removed link's columns are plumbing it already says.
+    const newLinks = new Set(changed(entity.relationships).flatMap((d) => d.item.fields ?? []));
+    const linkFields = fieldsOf((f) => linkNames.has(f.item.name) && newLinks.has(f.item.name));
+    const own = fieldsOf((f) => !TIMESTAMPS.has(f.item.name) && !linkFields.includes(f));
 
     const arrows = changed(entity.relationships).filter((d) => isArrow(d.item));
     // A has-many or has-one is the far end of another entity's belongs-to.
@@ -74,7 +77,9 @@ export function present(entities: EntityDiff[]): Presented[] {
       (d) => !isArrow(d.item) && !(d.item.target && pointsAt(d.item.target, entity.name)) && !d.item.as,
     );
     const belongsFields = new Set(
-      entity.relationships.filter((d) => d.item.kind === "belongs to").flatMap((d) => d.item.fields ?? []),
+      changed(entity.relationships)
+        .filter((d) => d.item.kind === "belongs to")
+        .flatMap((d) => d.item.fields ?? []),
     );
     const rules = changed(entity.constraints).filter(
       (d) => !(d.item.kind === "foreign key" && d.item.fields.every((f) => belongsFields.has(f))),
