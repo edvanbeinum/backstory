@@ -129,11 +129,9 @@ export async function startFlows(
   const key = jobKey(await repoDir(view.root), view);
   if (registry.jobs.has(key)) return flowsStatus(view);
   // Regenerating replaces the cached flows only when the new run succeeds:
-  // a failure keeps what was paid for. A hunk still being traced would
-  // write the old set back over the new one, so wait for it.
-  if (opts.regenerate) {
-    if ((registry.tracing.get(key)?.size ?? 0) > 0) return flowsStatus(view);
-  } else if (await readCache(key)) return flowsStatus(view);
+  // a failure keeps what was paid for. Runs share one queue, so a hunk
+  // trace already queued finishes first and this run's result replaces it.
+  if (!opts.regenerate && (await readCache(key))) return flowsStatus(view);
 
   const job: Job = { startedAt: Date.now(), phase: "Waiting for another run" };
   registry.jobs.set(key, job);
