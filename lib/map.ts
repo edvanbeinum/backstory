@@ -46,8 +46,8 @@ export interface MapResponse {
   status: "ok" | "none";
   /** False when the base has no model: nothing reads as added or removed */
   baseModel: boolean;
-  /** The committed JSON wasn't re-exported after the DSL changed */
-  stale: boolean;
+  /** Why the head's model file couldn't be read, when it couldn't */
+  error: string | null;
   /** The model is kept on this machine, not in the repo: no structural diff */
   local: boolean;
   nodes: MapNode[];
@@ -132,7 +132,7 @@ export async function buildMap(
   const empty: MapResponse = {
     status: "none",
     baseModel: false,
-    stale: false,
+    error: null,
     local: false,
     nodes: [],
     edges: [],
@@ -143,11 +143,14 @@ export async function buildMap(
     descriptions: {},
   };
   if (!headRead) return empty;
+  if (!headRead.model) return { ...empty, error: headRead.error };
   const model = headRead.model;
   // A local model is the same for every commit; comparing it with itself
   // would claim "no structural change" when nothing was checked.
   const baseRead =
     base && !headRead.local ? await readModelAt(root, base) : null;
+  // A base model that fails to read counts as none, so nothing reads as
+  // added or removed.
   const baseModel = baseRead && !baseRead.local ? baseRead.model : null;
 
   // Files: each to its one leaf element. A deleted file maps by the base
@@ -303,7 +306,7 @@ export async function buildMap(
   return {
     status: "ok",
     baseModel: baseModel !== null,
-    stale: headRead.stale,
+    error: null,
     local: headRead.local,
     nodes,
     edges: [...edges.values()].filter(

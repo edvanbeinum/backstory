@@ -496,6 +496,23 @@ function summary(map: MapResponse) {
   return parts;
 }
 
+/** The reader's messages quote the DSL in backticks. */
+function Ticked({ text }: { text: string }) {
+  return (
+    <span>
+      {text.split("`").map((part, i) =>
+        i % 2 ? (
+          <code key={i} className="mono">
+            {part}
+          </code>
+        ) : (
+          part
+        ),
+      )}
+    </span>
+  );
+}
+
 export function MapStrip({
   map,
   onHover,
@@ -540,11 +557,18 @@ export function MapStrip({
     return (
       <div className="map-strip quiet">
         <span className="text-[13px] font-semibold">Map</span>
-        <span className="text-[12px] text-[var(--fg-muted)]">
-          {map.status === "none"
-            ? "· no architecture/workspace.json in this repo, and no local model"
-            : "· this change touches no mapped component"}
-        </span>
+        {map.error ? (
+          <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
+            <AlertIcon size={11} /> Couldn&apos;t read the model:{" "}
+            <Ticked text={map.error} />
+          </span>
+        ) : (
+          <span className="text-[12px] text-[var(--fg-muted)]">
+            {map.status === "none"
+              ? "· no architecture/workspace.dsl or .json in this repo, and no local model"
+              : "· this change touches no mapped component"}
+          </span>
+        )}
       </div>
     );
   }
@@ -563,12 +587,6 @@ export function MapStrip({
             </span>
           ))}
         </div>
-        {map.stale && (
-          <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[var(--attention)]">
-            <AlertIcon size={11} /> Model JSON is stale: the DSL changed without
-            a re-export, so this map may be out of date.
-          </div>
-        )}
         {(map.unmapped.length > 0 || map.ambiguous.length > 0) && (
           <div
             className="text-[11px] text-[var(--fg-subtle)]"

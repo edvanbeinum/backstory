@@ -4,14 +4,14 @@ import path from "node:path";
 
 import picomatch from "picomatch";
 
-import { readDsl } from "./dsl";
+import { DslError, readDsl } from "./dsl";
 import { gitLine, gitTry } from "./exec";
 
 /**
- * The repo's C4 model: `architecture/workspace.json`, exported by Structurizr
- * from the committed `workspace.dsl`. differ only reads it. Elements are keyed
- * by their DSL identifier (`ios.progress`), which survives elements being
- * added, unlike Structurizr's numeric ids.
+ * The repo's C4 model: `architecture/workspace.dsl`, read directly, or a
+ * Structurizr JSON export where there's no DSL. differ only reads it.
+ * Elements are keyed by their DSL identifier (`ios.progress`), which survives
+ * elements being added, unlike Structurizr's numeric ids.
  */
 
 export const MODEL_JSON = "architecture/workspace.json";
@@ -45,8 +45,6 @@ export interface Model {
   match: (path: string) => string[];
   isTest: (path: string) => boolean;
   isIgnored: (path: string) => boolean;
-  /** The DSL embedded in the JSON at export, for the stale check */
-  embeddedDsl: string | null;
 }
 
 /** A model as either reader finds it, before differ builds its matchers. */
@@ -211,20 +209,11 @@ export function buildModel(ws: Workspace): Model {
       splitGlobs(ws.properties["code.ignore"]),
       () => DEFAULT_IGNORE,
     ),
-    embeddedDsl: null,
   };
 }
 
-export function parseModel(json: string): Model {
-  const raw = JSON.parse(json) as RawWorkspace;
-  const embedded = raw.properties?.["structurizr.dsl"];
-  return {
-    ...buildModel(fromJson(raw)),
-    embeddedDsl: embedded
-      ? Buffer.from(embedded, "base64").toString("utf8")
-      : null,
-  };
-}
+export const parseModel = (json: string): Model =>
+  buildModel(fromJson(JSON.parse(json) as RawWorkspace));
 
 export const parseDsl = (text: string): Model => buildModel(readDsl(text));
 
@@ -241,7 +230,7 @@ export async function showFile(
 
 /**
  * A model kept on this machine for a repo that doesn't commit one:
- * `~/.differ/models/<repo>/workspace.json`, named after the main checkout's
+ * `~/.differ/models/<repo>/workspace.dsl` (or `.json`), named after the main checkout's
  * folder so every worktree finds it. One model for every commit, so it can
  * say where a change landed but not what it added or removed.
  */
@@ -256,46 +245,49 @@ export async function localModelDir(root: string): Promise<string> {
   return path.join(home, "models", path.basename(path.dirname(common)));
 }
 
-async function readLocalModel(root: string) {
-  const dir = await localModelDir(root);
-  const json = await fs
-    .readFile(path.join(dir, "workspace.json"), "utf8")
-    .catch(() => null);
-  if (!json) return null;
-  const dsl = await fs
-    .readFile(path.join(dir, "workspace.dsl"), "utf8")
-    .catch(() => null);
-  return { json, dsl };
+export interface ModelRead {
+  /** Null when the file is there but couldn't be read: see `error` */
+  model: Model | null;
+  local: boolean;
+  error: string | null;
 }
 
+function read(text: string, format: "dsl" | "json", local: boolean): ModelRead {
+  try {
+    const model = format === "dsl" ? parseDsl(text) : parseModel(text);
+    return { model, local, error: null };
+  } catch (e) {
+    const error =
+      e instanceof DslError
+        ? e.message
+        : format === "json"
+          ? "workspace.json isn't valid JSON"
+          : String(e);
+    return { model: null, local, error };
+  }
+}
+
+/**
+ * The first model file found is the model: the DSL, then the JSON, at the
+ * rev, then on this machine. A DSL that fails doesn't fall back to a JSON
+ * beside it, which is a leftover export once the DSL is read directly.
+ */
 export async function readModelAt(
   root: string,
   rev: string,
-): Promise<{ model: Model; stale: boolean; local: boolean } | null> {
-  let json = await showFile(root, rev, MODEL_JSON);
-  let dsl: string | null = null;
-  let local = false;
-  if (json) {
-    dsl = await showFile(root, rev, MODEL_DSL);
-  } else {
-    const found = await readLocalModel(root);
-    if (!found) return null;
-    ({ json, dsl } = found);
-    local = true;
+): Promise<ModelRead | null> {
+  const dsl = await showFile(root, rev, MODEL_DSL);
+  if (dsl !== null) return read(dsl, "dsl", false);
+  const json = await showFile(root, rev, MODEL_JSON);
+  if (json !== null) return read(json, "json", false);
+  const dir = await localModelDir(root);
+  for (const format of ["dsl", "json"] as const) {
+    const text = await fs
+      .readFile(path.join(dir, `workspace.${format}`), "utf8")
+      .catch(() => null);
+    if (text !== null) return read(text, format, true);
   }
-  let model: Model;
-  try {
-    model = parseModel(json);
-  } catch {
-    return null;
-  }
-  // The JSON carries the DSL it was exported from. If the DSL has moved on,
-  // someone edited the model and didn't re-export.
-  const stale =
-    dsl !== null &&
-    model.embeddedDsl !== null &&
-    dsl.trim() !== model.embeddedDsl.trim();
-  return { model, stale, local };
+  return null;
 }
 
 /**
