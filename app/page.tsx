@@ -635,10 +635,6 @@ export default function Page() {
       // Storage blocked: lead with the diagrams.
     }
   }, []);
-  useEffect(() => {
-    setLayoutOverride(null);
-    setJumpTo(null);
-  }, [repoPath, rev]);
   const chooseLayout = useCallback((next: "diagrams" | "code") => {
     setLayoutPref(next);
     setLayoutOverride(next);
@@ -648,12 +644,10 @@ export default function Page() {
       // As above.
     }
   }, []);
-  useEffect(() => {
-    // Only once the session says there are none: before it loads, a
-    // ?comment= link's tab must survive.
-    if (session && !hasComments && columnTab === "comments")
-      setColumnTab("flows");
-  }, [session, hasComments, columnTab]);
+  // Only once the session says there are none: before it loads, a
+  // ?comment= link's tab must survive.
+  if (session && !hasComments && columnTab === "comments")
+    setColumnTab("flows");
 
   // "All changes" follows HEAD: when the diff is fetched again, so are its
   // flows, or the last head's flows would sit on the new head's lines.
@@ -667,19 +661,26 @@ export default function Page() {
   // view opens on the diff, with "Trace this change" in the column.
   const hasFlows =
     rev !== WORKING_REV && flowSet !== null && flowSet.flows.length > 0;
+  const viewKey = `${repoPath}@${rev}`;
+  // Reset while rendering, not in an effect, so a new view never paints
+  // with the last one's selection.
+  const [shownView, setShownView] = useState(viewKey);
+  if (shownView !== viewKey) {
+    setShownView(viewKey);
+    setLayoutOverride(null);
+    setJumpTo(null);
+    setFlowSel({ index: 0, mode: "diff" });
+  }
   // Decided once per view, when its flows have loaded. Status is null for a
   // moment on every move and "running" through a regenerate; deciding then
   // would flash the diff and remount it. A trace landing later doesn't flip
   // the view either, so a note being typed survives; the switch appears.
-  const viewKey = `${repoPath}@${rev}`;
   const [lead, setLead] = useState<{ view: string; lead: boolean } | null>(
     null,
   );
   const settled = flows.status !== null && flows.status.status !== "running";
-  useEffect(() => {
-    if (settled && lead?.view !== viewKey)
-      setLead({ view: viewKey, lead: hasFlows });
-  }, [settled, lead, viewKey, hasFlows]);
+  if (settled && lead?.view !== viewKey)
+    setLead({ view: viewKey, lead: hasFlows });
   const flowsLead = lead?.lead ?? false;
   const layout = layoutOverride ?? (flowsLead ? layoutPref : "code");
   const canChooseLayout = flowsLead || hasFlows;
@@ -772,16 +773,9 @@ export default function Page() {
     return info;
   }, [map]);
 
-  // Each view starts on its first flow, as a diff.
-  useEffect(() => {
-    setFlowSel({ index: 0, mode: "diff" });
-  }, [repoPath, rev]);
-
   // A regenerate can return fewer flows than the one selected.
-  useEffect(() => {
-    if (flowSet && flowSel.index >= flowSet.flows.length)
-      setFlowSel({ index: 0, mode: "diff" });
-  }, [flowSet, flowSel.index]);
+  if (flowSet && flowSel.index >= flowSet.flows.length)
+    setFlowSel({ index: 0, mode: "diff" });
 
   const selectedFlow = flowSet?.flows[flowSel.index] ?? null;
   const flowMode =
