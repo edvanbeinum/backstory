@@ -10,7 +10,12 @@
     "build": "next build",
     "postbuild": "cp -R public .next/standalone/public && mkdir -p .next/standalone/.next && cp -R .next/static .next/standalone/.next/static",
     "start": "next start -H 127.0.0.1",
-    "test": "tsx --test \"test/*.test.ts\""
+    "test": "tsx --test \"test/*.test.ts\"",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "tsc --noEmit",
+    "check": "npm run typecheck && npm run lint && npm run format:check && npm test"
   },
   "dependencies": {
     "next": "16.2.12",
@@ -27,6 +32,11 @@
     "@types/picomatch": "^4.0.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "16.2.12",
+    "eslint-config-prettier": "^10.1.8",
+    "globals": "16.4.0",
+    "prettier": "^3.9.9",
     "tailwindcss": "^4",
     "tsx": "^4.23.1",
     "typescript": "^5"

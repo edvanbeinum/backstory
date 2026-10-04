@@ -9,3 +9,5 @@ This version has breaking changes — APIs, conventions, and file structure may 
 Rules a tool can't check. Each one names where it came from.
 
 - Comment only a non-obvious _why_ (a constraint, a trap, a past bug). No step labels or restatements of the next line. When editing near narrating comments, drop them rather than reword them. _(Ed, differ review, 2026-09-28.)_
+
+Formatting and lint rules live in `eslint.config.mjs` and Prettier, not here.
