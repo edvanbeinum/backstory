@@ -17,8 +17,8 @@ const scripts: Record<string, string> = JSON.parse(
 ).scripts;
 
 /**
- * Git with none of Ed's config, and no GIT_* left over from a hook that is
- * running these tests, so it only ever sees the temp directory it's given.
+ * Strip the user's git config and any GIT_* a pre-push hook exported, so git
+ * sees only the temp directory it's given.
  */
 function gitEnv(dir: string) {
   const env = { ...process.env };
@@ -50,7 +50,8 @@ test("npm install points git at the repo's hooks, and pre-push runs the check", 
     rmSync(repo, { recursive: true, force: true });
   }
 
-  // The mode git records is what every clone, worktree and CI checkout gets.
+  // Check git's recorded mode, not the disk: it's what every clone, worktree
+  // and CI checkout gets.
   const entry = execFileSync(
     "git",
     ["-C", ROOT, "ls-files", "-s", "--", ".githooks/pre-push"],
