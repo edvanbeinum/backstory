@@ -343,10 +343,15 @@ function ReadyFlows({
   // Flow-first: a step opens its code beneath it, rather than scrolling a diff.
   const [open, setOpen] = useState<Set<string>>(new Set());
   const cursor = useRef<string | null>(null);
-  useEffect(() => {
+  const flowKey = `${selection.index}:${selection.mode}`;
+  const [shownFlow, setShownFlow] = useState(flowKey);
+  if (shownFlow !== flowKey) {
+    setShownFlow(flowKey);
     setOpen(new Set());
+  }
+  useEffect(() => {
     cursor.current = null;
-  }, [selection.index, selection.mode]);
+  }, [flowKey]);
   const toggle = useCallback((row: FlowRow) => {
     cursor.current = row.key;
     setOpen((current) => {
