@@ -192,6 +192,7 @@ export function relativeTime(iso: string): string {
  */
 export function RelativeTime({ iso }: { iso: string }) {
   const [text, setText] = useState("");
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- server and client would disagree on the time
   useEffect(() => setText(relativeTime(iso)), [iso]);
   return (
     <time dateTime={iso} title={new Date(iso).toLocaleString()}>

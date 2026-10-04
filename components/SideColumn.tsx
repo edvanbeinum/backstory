@@ -75,6 +75,7 @@ export function SideColumn({
   useEffect(() => {
     try {
       const stored = Number(window.localStorage.getItem(WIDTH_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
       if (stored >= MIN_WIDTH && stored <= MAX_WIDTH) setWidth(stored);
     } catch {
       // Storage blocked: the default width will do.

@@ -63,6 +63,7 @@ export function RepoBrowser({
     const start = currentRepo
       ? currentRepo.slice(0, currentRepo.lastIndexOf("/")) || null
       : null;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches when its key changes
     void load(start);
   }, [currentRepo, load]);
 

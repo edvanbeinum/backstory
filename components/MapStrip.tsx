@@ -116,6 +116,7 @@ function MapCanvas({
       next.set(id, h);
       if (Math.abs((heights.get(id) ?? -1) - h) > 1) changed = true;
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- lays out again from measured heights, before paint
     if (changed) setHeights(next);
   }, [placed, heights]);
   const [hoverEdge, setHoverEdge] = useState<string | null>(null);

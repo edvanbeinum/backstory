@@ -186,6 +186,7 @@ export default function Page() {
     const fromUrl = readUrlState();
     const path = fromUrl.repo ?? "";
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL is only readable after mount
     setRepoPath(path);
     setRef(fromUrl.ref ?? null);
     if (fromUrl.rev) setRev(fromUrl.rev);
@@ -205,6 +206,7 @@ export default function Page() {
   const sessionBranch = session?.repo.branch;
   useEffect(() => {
     if (!sessionRoot) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- recents live in localStorage, kept in step with the session
     setRecents((current) => {
       const next = touchList(
         current,
@@ -234,6 +236,7 @@ export default function Page() {
         ? stored.filter((v): v is string => typeof v === "string")
         : [];
       const seeds = loadRecents().map((r) => r.path);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
       setInboxRoots([...new Set([...known, ...seeds])]);
     } catch {
       setInboxRoots(loadRecents().map((r) => r.path));
@@ -267,6 +270,7 @@ export default function Page() {
   }, []);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- inbox roots live in localStorage, kept in step with the session
     if (sessionRoot) rememberRoot(sessionRoot);
   }, [sessionRoot, rememberRoot]);
 
@@ -411,6 +415,7 @@ export default function Page() {
 
   useEffect(() => {
     if (!ready) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches when its key changes
     void loadSession(repoPath);
     // `ref` matters as much as the path: two branches of one stack are
     // reviewed from the same worktree, so switching between them changes
@@ -529,6 +534,7 @@ export default function Page() {
     let cancelled = false;
     // Watcher-driven refetches of the working diff keep the old content on
     // screen until the new one arrives; only a rev switch shows the loader.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- shows the loader, then fetches the new rev
     setDiffLoading(true);
     setDiffError(null);
 
@@ -557,6 +563,7 @@ export default function Page() {
   // with HEAD.
   useEffect(() => {
     if (!repoPath || !haveSession || rev === WORKING_REV) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the map where there is none, else fetches it
       setMap(null);
       setDataModel(null);
       return;
@@ -630,6 +637,7 @@ export default function Page() {
   useEffect(() => {
     try {
       if (window.localStorage.getItem(LAYOUT_KEY) === "code")
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
         setLayoutPref("code");
     } catch {
       // Storage blocked: lead with the diagrams.

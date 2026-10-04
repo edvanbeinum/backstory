@@ -58,6 +58,7 @@ export function useNotes(root: string): NotesApi {
     setNotes([]);
   }
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches when its key changes
     void load();
   }, [load]);
 

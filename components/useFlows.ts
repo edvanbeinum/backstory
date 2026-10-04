@@ -70,6 +70,7 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
 
   useEffect(() => {
     if (!repo) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches when its key changes
     void request("GET");
   }, [repo, rev, tick, request]);
 
