@@ -49,7 +49,11 @@ export function RepoBar({
   const headerRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => setDraft(repoPath), [repoPath]);
+  const [shownRepoPath, setShownRepoPath] = useState(repoPath);
+  if (shownRepoPath !== repoPath) {
+    setShownRepoPath(repoPath);
+    setDraft(repoPath);
+  }
 
   // Publish the header's real height so the commit rail and the sticky file
   // headers can sit directly beneath it. This bar wraps to two or three rows
