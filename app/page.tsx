@@ -781,8 +781,10 @@ export default function Page() {
     return info;
   }, [map]);
 
-  // A regenerate can return fewer flows than the one selected.
-  if (flowSet && flowSel.index >= flowSet.flows.length)
+  // A regenerate can return fewer flows than the one selected. Index 0 is
+  // left alone: with no flows it is still "out of range", and resetting it
+  // on every render would loop.
+  if (flowSet && flowSel.index > 0 && flowSel.index >= flowSet.flows.length)
     setFlowSel({ index: 0, mode: "diff" });
 
   const selectedFlow = flowSet?.flows[flowSel.index] ?? null;
