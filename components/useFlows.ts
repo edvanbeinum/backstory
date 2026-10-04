@@ -20,7 +20,6 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const viewRef = useRef(`${repo}@${rev}`);
-  viewRef.current = `${repo}@${rev}`;
   /** Only the newest request's answer counts: an older one can land later. */
   const latest = useRef(0);
 
@@ -60,6 +59,7 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
 
   // A new view starts blank rather than showing the last one's flows.
   useEffect(() => {
+    viewRef.current = `${repo}@${rev}`;
     setAnswer(null);
     setError(null);
   }, [repo, rev]);
