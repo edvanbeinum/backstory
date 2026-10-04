@@ -154,6 +154,7 @@ test("a base with no model adds nothing", async () => {
 test("a repo with no model uses one kept locally, without a structural diff", async () => {
   const plain = mkdtempSync(path.join(os.tmpdir(), "differ-local-model-"));
   const home = mkdtempSync(path.join(os.tmpdir(), "differ-home-"));
+  const previousHome = process.env.DIFFER_HOME;
   const git = (...args: string[]) =>
     execFileSync("git", ["-C", plain, ...args], { encoding: "utf8" }).trim();
   try {
@@ -185,7 +186,9 @@ test("a repo with no model uses one kept locally, without a structural diff", as
     assert.equal(map.stale, false);
     assert.equal(map.fileComponents["src/a/one.ts"], "Alpha");
   } finally {
-    delete process.env.DIFFER_HOME;
+    // Restore npm test's throwaway DIFFER_HOME so later tests can use it.
+    if (previousHome === undefined) delete process.env.DIFFER_HOME;
+    else process.env.DIFFER_HOME = previousHome;
     rmSync(plain, { recursive: true, force: true });
     rmSync(home, { recursive: true, force: true });
   }
