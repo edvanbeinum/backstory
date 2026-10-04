@@ -385,6 +385,8 @@ origin/main`), so the commit list is never a mystery.
 
 ## Layout
 
+The building blocks, with their code and what to read before changing each, are in `architecture/primitives.yaml`.
+
 | Path                | What's in it                                               |
 | ------------------- | ---------------------------------------------------------- |
 | `app/api/inbox`     | every worktree of every known repo, with its PR and counts |
