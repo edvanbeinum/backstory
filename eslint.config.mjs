@@ -33,6 +33,10 @@ export default defineConfig([
           destructuredArrayIgnorePattern: "^_",
         },
       ],
+      // Its 29 hits here are deliberate: resetting state when the view
+      // changes, reading localStorage after mount to match the server render,
+      // and fetching on a key change. Rewriting them would move effect timing.
+      "react-hooks/set-state-in-effect": "off",
     },
   },
   prettier,
