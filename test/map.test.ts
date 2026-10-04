@@ -186,7 +186,7 @@ test("a repo with no model uses one kept locally, without a structural diff", as
     assert.equal(map.stale, false);
     assert.equal(map.fileComponents["src/a/one.ts"], "Alpha");
   } finally {
-    // npm test's own throwaway DIFFER_HOME must outlive this test.
+    // Restore npm test's throwaway DIFFER_HOME so later tests can use it.
     if (previousHome === undefined) delete process.env.DIFFER_HOME;
     else process.env.DIFFER_HOME = previousHome;
     rmSync(plain, { recursive: true, force: true });
