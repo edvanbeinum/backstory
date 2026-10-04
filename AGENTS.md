@@ -16,5 +16,5 @@ Formatting and lint rules live in `eslint.config.mjs` and Prettier, not here. Ru
 
 # Before you plan
 
-- Read `architecture/primitives.yaml` before planning, and use its terms for names.
-- When you add or rename a block or a term, update `architecture/primitives.yaml` in the same change.
+- Read `architecture/language.yaml` before planning, and use its terms for names.
+- When you add or rename a block or a term, update `architecture/language.yaml` in the same change.

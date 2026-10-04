@@ -385,7 +385,7 @@ origin/main`), so the commit list is never a mystery.
 
 ## Layout
 
-The building blocks, with their code and what to read before changing each, are in `architecture/primitives.yaml`.
+The building blocks, with their code and what to read before changing each, are in `architecture/language.yaml`.
 
 | Path                | What's in it                                               |
 | ------------------- | ---------------------------------------------------------- |

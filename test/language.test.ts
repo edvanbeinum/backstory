@@ -6,7 +6,7 @@ import { test } from "node:test";
 // Read as text, not parsed: nothing else in differ needs a YAML dependency,
 // and these checks only rely on a few line shapes.
 const root = path.join(__dirname, "..");
-const FILE = "architecture/primitives.yaml";
+const FILE = "architecture/language.yaml";
 const text = readFileSync(path.join(root, FILE), "utf8");
 
 function section(key: string): string[] {
@@ -35,7 +35,7 @@ function field(entry: string[], name: string): string | undefined {
   }
 }
 
-test("the primitives file has terms, blocks and invariants, and AGENTS.md points at it", () => {
+test("the language file has terms, blocks and invariants, and AGENTS.md points at it", () => {
   for (const key of ["terms", "blocks", "invariants"]) {
     assert.ok(entries(key).length > 0, `${key} is empty`);
   }
