@@ -232,7 +232,9 @@ export async function updateResponses(
               done: patch.done,
               // Only stamp on the transition, so re-ticking doesn't reset it.
               doneAt: patch.done
-                ? (before.done ? before.doneAt : Date.now())
+                ? before.done
+                  ? before.doneAt
+                  : Date.now()
                 : null,
             }
           : {}),
@@ -248,9 +250,7 @@ export async function updateResponses(
           : [...next.commits, patch.addCommit];
       }
       if (patch.removeCommit) {
-        next.commits = next.commits.filter(
-          (c) => c.sha !== patch.removeCommit,
-        );
+        next.commits = next.commits.filter((c) => c.sha !== patch.removeCommit);
       }
 
       if (isEmpty(next)) delete forPr[id];

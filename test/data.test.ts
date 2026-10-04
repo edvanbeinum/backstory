@@ -37,16 +37,29 @@ end
 
 test("Rails: fields from schema.rb, relationships and enums from the models", () => {
   const model = readRails({
-    schema: schema(`    t.integer "zoom_import_status"\n    t.index ["space_id", "zoom_meeting_uuid"], name: "x", unique: true`),
+    schema: schema(
+      `    t.integer "zoom_import_status"\n    t.index ["space_id", "zoom_meeting_uuid"], name: "x", unique: true`,
+    ),
     models: new Map([
-      ["app/models/item.rb", item(`  enum :zoom_import_status, {import_pending: 0, import_complete: 1}`)],
+      [
+        "app/models/item.rb",
+        item(
+          `  enum :zoom_import_status, {import_pending: 0, import_complete: 1}`,
+        ),
+      ],
       ["app/models/space.rb", space],
     ]),
   });
   const it = model.entities.get("Item")!;
   assert.equal(it.file, "app/models/item.rb");
-  assert.deepEqual(it.fields.find((f) => f.name === "title"), { name: "title", type: "string", required: true });
-  assert.deepEqual(it.fields.find((f) => f.name === "zoom_import_status")?.values, ["import_pending", "import_complete"]);
+  assert.deepEqual(
+    it.fields.find((f) => f.name === "title"),
+    { name: "title", type: "string", required: true },
+  );
+  assert.deepEqual(
+    it.fields.find((f) => f.name === "zoom_import_status")?.values,
+    ["import_pending", "import_complete"],
+  );
   assert.deepEqual(
     it.relationships.map((r) => [r.name, r.kind, r.target]),
     [
@@ -73,9 +86,16 @@ test("table names follow Rails's conventions", () => {
 test("a polymorphic relationship has no single target", () => {
   const model = readRails({
     schema: schema(`    t.uuid "source_id"\n    t.string "source_type"`),
-    models: new Map([["app/models/item.rb", item(`  belongs_to :source, polymorphic: true, optional: true`)]]),
+    models: new Map([
+      [
+        "app/models/item.rb",
+        item(`  belongs_to :source, polymorphic: true, optional: true`),
+      ],
+    ]),
   });
-  const source = model.entities.get("Item")!.relationships.find((r) => r.name === "source");
+  const source = model.entities
+    .get("Item")!
+    .relationships.find((r) => r.name === "source");
   assert.deepEqual(source, {
     name: "source",
     kind: "belongs to",
@@ -101,30 +121,52 @@ end
   const model = readRails({
     schema: recordingSchema,
     models: new Map([
-      ["app/models/item.rb", `class Item < ApplicationRecord\n  belongs_to :source, polymorphic: true\nend\n`],
+      [
+        "app/models/item.rb",
+        `class Item < ApplicationRecord\n  belongs_to :source, polymorphic: true\nend\n`,
+      ],
       [
         "app/models/zoom/recording.rb",
         `module Zoom\n  class Recording < ApplicationRecord\n    has_one :item, as: :source\n  end\nend\n`,
       ],
     ]),
   });
-  assert.deepEqual(model.entities.get("Item")!.relationships[0].candidates, ["Zoom::Recording"]);
-  assert.equal(model.entities.get("Zoom::Recording")!.relationships[0].as, "source");
+  assert.deepEqual(model.entities.get("Item")!.relationships[0].candidates, [
+    "Zoom::Recording",
+  ]);
+  assert.equal(
+    model.entities.get("Zoom::Recording")!.relationships[0].as,
+    "source",
+  );
 });
 
 test("the diff names what changed on each entity, with neighbours after", () => {
-  const before = readRails({ schema: schema(""), models: new Map([["app/models/item.rb", item("")], ["app/models/space.rb", space]]) });
+  const before = readRails({
+    schema: schema(""),
+    models: new Map([
+      ["app/models/item.rb", item("")],
+      ["app/models/space.rb", space],
+    ]),
+  });
   const after = readRails({
     schema: schema(`    t.string "zoom_meeting_uuid"`),
-    models: new Map([["app/models/item.rb", item("")], ["app/models/space.rb", space]]),
+    models: new Map([
+      ["app/models/item.rb", item("")],
+      ["app/models/space.rb", space],
+    ]),
   });
   const diff = diffModels(before, after);
-  assert.deepEqual(diff.map((e) => [e.name, e.state]), [
-    ["Item", "changed"],
-    ["Space", "same"],
-  ]);
   assert.deepEqual(
-    diff[0].fields.filter((f) => f.state !== "same").map((f) => [f.state, f.item.name]),
+    diff.map((e) => [e.name, e.state]),
+    [
+      ["Item", "changed"],
+      ["Space", "same"],
+    ],
+  );
+  assert.deepEqual(
+    diff[0].fields
+      .filter((f) => f.state !== "same")
+      .map((f) => [f.state, f.item.name]),
     [["added", "zoom_meeting_uuid"]],
   );
   // No base model: nothing can be said to have changed.
@@ -151,9 +193,17 @@ test("Core Data: entities, attributes, relationships and uniqueness", () => {
     { name: "name", type: "string", required: false },
     { name: "id", type: "uuid", required: true },
   ]);
-  assert.deepEqual(m.relationships[0], { name: "exercises", kind: "has many", target: "Exercise", polymorphic: false });
+  assert.deepEqual(m.relationships[0], {
+    name: "exercises",
+    kind: "has many",
+    target: "Exercise",
+    polymorphic: false,
+  });
   assert.deepEqual(m.constraints, [{ kind: "unique", fields: ["id"] }]);
-  assert.equal(model.entities.get("Exercise")!.relationships[0].kind, "belongs to");
+  assert.equal(
+    model.entities.get("Exercise")!.relationships[0].kind,
+    "belongs to",
+  );
 });
 
 test("present: a link is said once, and bookkeeping waits for details", async () => {
@@ -195,8 +245,14 @@ ActiveRecord::Schema[8.1].define(version: 1) do
 end
 `,
     models: new Map([
-      ["app/models/item.rb", `class Item < ApplicationRecord\n  belongs_to :source, polymorphic: true\nend\n`],
-      ["app/models/space.rb", `class Space < ApplicationRecord\n  has_many :zoom_recordings, class_name: "Zoom::Recording"\nend\n`],
+      [
+        "app/models/item.rb",
+        `class Item < ApplicationRecord\n  belongs_to :source, polymorphic: true\nend\n`,
+      ],
+      [
+        "app/models/space.rb",
+        `class Space < ApplicationRecord\n  has_many :zoom_recordings, class_name: "Zoom::Recording"\nend\n`,
+      ],
       [
         "app/models/zoom/recording.rb",
         `module Zoom\n  class Recording < ApplicationRecord\n    belongs_to :space\n    has_one :item, as: :source\n  end\nend\n`,
@@ -208,8 +264,14 @@ end
 
   // The new entity: its one real field; the link and the timestamp wait.
   assert.equal(by("Zoom::Recording").summary, "New · 1 field");
-  assert.deepEqual(by("Zoom::Recording").fields.map((f) => f.item.name), ["meeting_uuid"]);
-  assert.deepEqual(by("Zoom::Recording").details.timestamps.map((f) => f.item.name), ["created_at"]);
+  assert.deepEqual(
+    by("Zoom::Recording").fields.map((f) => f.item.name),
+    ["meeting_uuid"],
+  );
+  assert.deepEqual(
+    by("Zoom::Recording").details.timestamps.map((f) => f.item.name),
+    ["created_at"],
+  );
   // Its foreign key is the arrow to Space again; its has-one fills Item's link.
   assert.deepEqual(by("Zoom::Recording").details.rules, []);
   assert.deepEqual(by("Zoom::Recording").relationships, []);
@@ -224,11 +286,13 @@ end
 test("model files with non-ASCII text read whole, and so do the ones after them", async () => {
   const { buildData } = await import("../lib/data/build");
   const { execFileSync } = await import("node:child_process");
-  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } = await import("node:fs");
+  const { mkdtempSync, mkdirSync, writeFileSync, rmSync } =
+    await import("node:fs");
   const os = await import("node:os");
   const path = await import("node:path");
   const repo = mkdtempSync(path.join(os.tmpdir(), "differ-unicode-"));
-  const git = (...a: string[]) => execFileSync("git", ["-C", repo, ...a], { encoding: "utf8" }).trim();
+  const git = (...a: string[]) =>
+    execFileSync("git", ["-C", repo, ...a], { encoding: "utf8" }).trim();
   const write = (f: string, t: string) => {
     mkdirSync(path.dirname(path.join(repo, f)), { recursive: true });
     writeFileSync(path.join(repo, f), t);
@@ -237,22 +301,39 @@ test("model files with non-ASCII text read whole, and so do the ones after them"
     git("init", "-q");
     git("config", "user.email", "t@example.com");
     git("config", "user.name", "T");
-    write("db/schema.rb", `ActiveRecord::Schema[8.1].define(version: 1) do\n  create_table "items", force: :cascade do |t|\n    t.string "title"\n  end\n  create_table "posts", force: :cascade do |t|\n    t.string "title"\n  end\nend\n`);
+    write(
+      "db/schema.rb",
+      `ActiveRecord::Schema[8.1].define(version: 1) do\n  create_table "items", force: :cascade do |t|\n    t.string "title"\n  end\n  create_table "posts", force: :cascade do |t|\n    t.string "title"\n  end\nend\n`,
+    );
     // An em-dash-heavy comment, as real code has, before a later model.
-    write("app/models/item.rb", `# ${"— ".repeat(60)}\nclass Item < ApplicationRecord\nend\n`);
-    write("app/models/post.rb", `class Post < ApplicationRecord\n  belongs_to :item\nend\n`);
+    write(
+      "app/models/item.rb",
+      `# ${"— ".repeat(60)}\nclass Item < ApplicationRecord\nend\n`,
+    );
+    write(
+      "app/models/post.rb",
+      `class Post < ApplicationRecord\n  belongs_to :item\nend\n`,
+    );
     git("add", ".");
     git("commit", "-qm", "base");
     const base = git("rev-parse", "HEAD");
-    write("app/models/post.rb", `class Post < ApplicationRecord\n  belongs_to :item\n  has_many :comments\nend\n`);
+    write(
+      "app/models/post.rb",
+      `class Post < ApplicationRecord\n  belongs_to :item\n  has_many :comments\nend\n`,
+    );
     git("commit", "-qam", "head");
     const data = await buildData(repo, base, git("rev-parse", "HEAD"));
     const post = data.entities.find((e) => e.name === "Post")!;
     assert.deepEqual(
-      post.relationships.filter((r) => r.state !== "same").map((r) => [r.state, r.item.name]),
+      post.relationships
+        .filter((r) => r.state !== "same")
+        .map((r) => [r.state, r.item.name]),
       [["added", "comments"]],
     );
-    assert.equal(data.entities.find((e) => e.name === "Item")?.state ?? "same", "same");
+    assert.equal(
+      data.entities.find((e) => e.name === "Item")?.state ?? "same",
+      "same",
+    );
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
@@ -277,24 +358,51 @@ ActiveRecord::Schema[8.1].define(version: 1) do
 end
 `,
     models: new Map([
-      ["app/models/purchase.rb", `class Purchase < ApplicationRecord\n  belongs_to :buyer, class_name: 'Person'\n  enum :role, [:creator, :member]\nend\n`],
-      ["app/models/person.rb", `class Person < ApplicationRecord\n  has_many :purchases, foreign_key: :buyer_id\nend\n`],
-      ["app/models/access_grant.rb", `class AccessGrant < ApplicationRecord\n  belongs_to :purchase\nend\n`],
+      [
+        "app/models/purchase.rb",
+        `class Purchase < ApplicationRecord\n  belongs_to :buyer, class_name: 'Person'\n  enum :role, [:creator, :member]\nend\n`,
+      ],
+      [
+        "app/models/person.rb",
+        `class Person < ApplicationRecord\n  has_many :purchases, foreign_key: :buyer_id\nend\n`,
+      ],
+      [
+        "app/models/access_grant.rb",
+        `class AccessGrant < ApplicationRecord\n  belongs_to :purchase\nend\n`,
+      ],
     ]),
   });
   assert.ok(model.entities.has("Person"), "people is Person's table");
-  assert.equal(model.entities.get("Person")!.relationships[0].target, "Purchase");
-  assert.equal(model.entities.get("Purchase")!.relationships[0].target, "Person");
-  assert.deepEqual(model.entities.get("Purchase")!.fields[0].values, ["creator", "member"]);
-  const fk = model.entities.get("AccessGrant")!.constraints.find((c) => c.kind === "foreign key");
-  assert.deepEqual(fk, { kind: "foreign key", fields: ["purchase_id"], target: "Purchase" });
+  assert.equal(
+    model.entities.get("Person")!.relationships[0].target,
+    "Purchase",
+  );
+  assert.equal(
+    model.entities.get("Purchase")!.relationships[0].target,
+    "Person",
+  );
+  assert.deepEqual(model.entities.get("Purchase")!.fields[0].values, [
+    "creator",
+    "member",
+  ]);
+  const fk = model.entities
+    .get("AccessGrant")!
+    .constraints.find((c) => c.kind === "foreign key");
+  assert.deepEqual(fk, {
+    kind: "foreign key",
+    fields: ["purchase_id"],
+    target: "Purchase",
+  });
 });
 
 test("an explicit class_name wins over a target guessed from source:", () => {
   const model = readRails({
     schema: `ActiveRecord::Schema[8.1].define(version: 1) do\n  create_table "spaces", force: :cascade do |t|\n  end\nend\n`,
     models: new Map([
-      ["app/models/space.rb", `class Space < ApplicationRecord\n  has_many :members, through: :memberships, source: :owner, class_name: "User"\nend\n`],
+      [
+        "app/models/space.rb",
+        `class Space < ApplicationRecord\n  has_many :members, through: :memberships, source: :owner, class_name: "User"\nend\n`,
+      ],
     ]),
   });
   assert.equal(model.entities.get("Space")!.relationships[0].target, "User");
@@ -315,18 +423,40 @@ ActiveRecord::Schema[8.1].define(version: 1) do
 end
 `;
   const models = new Map([
-    ["app/models/item.rb", `class Item < ApplicationRecord\n  belongs_to :space\nend\n`],
-    ["app/models/space.rb", `class Space < ApplicationRecord\n  has_many :items\nend\n`],
+    [
+      "app/models/item.rb",
+      `class Item < ApplicationRecord\n  belongs_to :space\nend\n`,
+    ],
+    [
+      "app/models/space.rb",
+      `class Space < ApplicationRecord\n  has_many :items\nend\n`,
+    ],
   ]);
-  const before = readRails({ schema: schema(`t.bigint "space_id"`, ""), models });
-  const notNull = readRails({ schema: schema(`t.bigint "space_id", null: false`, ""), models });
-  const withFk = readRails({ schema: schema(`t.bigint "space_id"`, `add_foreign_key "items", "spaces"`), models });
+  const before = readRails({
+    schema: schema(`t.bigint "space_id"`, ""),
+    models,
+  });
+  const notNull = readRails({
+    schema: schema(`t.bigint "space_id", null: false`, ""),
+    models,
+  });
+  const withFk = readRails({
+    schema: schema(`t.bigint "space_id"`, `add_foreign_key "items", "spaces"`),
+    models,
+  });
 
-  const tightened = present(diffModels(before, notNull)).find((p) => p.entity.name === "Item")!;
+  const tightened = present(diffModels(before, notNull)).find(
+    (p) => p.entity.name === "Item",
+  )!;
   assert.equal(tightened.state, "changed");
-  assert.deepEqual(tightened.fields.map((f) => f.item.name), ["space_id"]);
+  assert.deepEqual(
+    tightened.fields.map((f) => f.item.name),
+    ["space_id"],
+  );
 
-  const constrained = present(diffModels(before, withFk)).find((p) => p.entity.name === "Item")!;
+  const constrained = present(diffModels(before, withFk)).find(
+    (p) => p.entity.name === "Item",
+  )!;
   assert.equal(constrained.state, "changed");
   assert.equal(constrained.summary, "+1 rule");
 });

@@ -1,10 +1,20 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { componentPath, flowRows, groupLanes, shortLabels, summarise } from "../lib/flows/rows";
+import {
+  componentPath,
+  flowRows,
+  groupLanes,
+  shortLabels,
+  summarise,
+} from "../lib/flows/rows";
 import type { Flow, FlowHunk, FlowStep } from "../lib/flows/types";
 
-const step = (id: string, line: number, extra: Partial<FlowStep> = {}): FlowStep => ({
+const step = (
+  id: string,
+  line: number,
+  extra: Partial<FlowStep> = {},
+): FlowStep => ({
   id,
   from: "A",
   to: "B",
@@ -19,7 +29,15 @@ const step = (id: string, line: number, extra: Partial<FlowStep> = {}): FlowStep
 });
 
 const hunks: FlowHunk[] = [
-  { id: "H1", file: "a.ts", oldStart: 3, oldLines: 2, newStart: 3, newLines: 1, flows: [] },
+  {
+    id: "H1",
+    file: "a.ts",
+    oldStart: 3,
+    oldLines: 2,
+    newStart: 3,
+    newLines: 1,
+    flows: [],
+  },
 ];
 
 const flow = (before: FlowStep[] | null, after: FlowStep[]): Flow => ({
@@ -33,7 +51,9 @@ const flow = (before: FlowStep[] | null, after: FlowStep[]): Flow => ({
 });
 
 const shape = (f: Flow) =>
-  flowRows(f, "diff", hunks).map((r) => `${r.kind} ${r.was ?? "-"} ${r.now ?? "-"} ${r.step.id}`);
+  flowRows(f, "diff", hunks).map(
+    (r) => `${r.kind} ${r.was ?? "-"} ${r.now ?? "-"} ${r.step.id}`,
+  );
 
 test("a changed flow reads like a line diff", () => {
   const f = flow(
@@ -57,7 +77,10 @@ test("a changed flow reads like a line diff", () => {
 });
 
 test("the same call with new words is a removal and an addition", () => {
-  const f = flow([step("load", 1, { label: "fetch one" })], [step("load", 1, { label: "fetch all" })]);
+  const f = flow(
+    [step("load", 1, { label: "fetch one" })],
+    [step("load", 1, { label: "fetch all" })],
+  );
   assert.deepEqual(shape(f), ["del 1 - load", "add - 1 load"]);
 });
 
@@ -88,21 +111,35 @@ test("sameAs reads as the range of steps it re-runs", () => {
 test("lanes drop a shared prefix unless that makes two lanes one name", () => {
   const lane = (name: string) => ({ name, label: name });
   const labels = shortLabels(
-    ["MovementProgressView", "MovementProgressViewModel", "MovementProgressRepository", "NSManagedObjectContext", "ExerciseView"].map(lane),
+    [
+      "MovementProgressView",
+      "MovementProgressViewModel",
+      "MovementProgressRepository",
+      "NSManagedObjectContext",
+      "ExerciseView",
+    ].map(lane),
   );
-  assert.deepEqual([...labels.values()], [
-    "View",
-    "ViewModel",
-    "Repository",
-    "NSManagedObjectContext",
-    "ExerciseView",
-  ]);
+  assert.deepEqual(
+    [...labels.values()],
+    [
+      "View",
+      "ViewModel",
+      "Repository",
+      "NSManagedObjectContext",
+      "ExerciseView",
+    ],
+  );
 });
 
 test("a short name that two lanes would share stays long", () => {
   const lane = (name: string) => ({ name, label: name });
-  const labels = shortLabels(["HistoryView", "HistoryModel", "ExerciseView", "ExerciseModel"].map(lane));
-  assert.deepEqual([...labels.values()], ["HistoryView", "HistoryModel", "ExerciseView", "ExerciseModel"]);
+  const labels = shortLabels(
+    ["HistoryView", "HistoryModel", "ExerciseView", "ExerciseModel"].map(lane),
+  );
+  assert.deepEqual(
+    [...labels.values()],
+    ["HistoryView", "HistoryModel", "ExerciseView", "ExerciseModel"],
+  );
 });
 
 test("coverage counts the diff's own hunks, on a flow or not", async () => {
@@ -113,14 +150,35 @@ test("coverage counts the diff's own hunks, on a flow or not", async () => {
     generatedAt: 0,
     flows: [],
     hunks: [
-      { id: "H1", file: "a.ts", oldStart: 3, oldLines: 1, newStart: 3, newLines: 1, flows: ["f"] },
-      { id: "H2", file: "a.ts", oldStart: 40, oldLines: 0, newStart: 41, newLines: 1, flows: [], reason: "a comment" },
+      {
+        id: "H1",
+        file: "a.ts",
+        oldStart: 3,
+        oldLines: 1,
+        newStart: 3,
+        newLines: 1,
+        flows: ["f"],
+      },
+      {
+        id: "H2",
+        file: "a.ts",
+        oldStart: 40,
+        oldLines: 0,
+        newStart: 41,
+        newLines: 1,
+        flows: [],
+        reason: "a comment",
+      },
     ],
     appFiles: ["a.ts"],
     costUsd: 0,
     durationMs: 0,
   };
-  const line = (type: "add" | "del" | "context", oldNo: number | null, newNo: number | null) => ({
+  const line = (
+    type: "add" | "del" | "context",
+    oldNo: number | null,
+    newNo: number | null,
+  ) => ({
     type,
     oldNo,
     newNo,
@@ -137,11 +195,42 @@ test("coverage counts the diff's own hunks, on a flow or not", async () => {
       deletions: 1,
       lang: null,
       hunks: [
-        { header: "", oldStart: 1, oldLines: 5, newStart: 1, newLines: 5, lines: [line("context", 2, 2), line("del", 3, null), line("add", null, 3), line("context", 4, 4)] },
-        { header: "", oldStart: 38, oldLines: 4, newStart: 39, newLines: 5, lines: [line("context", 40, 40), line("add", null, 41), line("context", 41, 42)] },
+        {
+          header: "",
+          oldStart: 1,
+          oldLines: 5,
+          newStart: 1,
+          newLines: 5,
+          lines: [
+            line("context", 2, 2),
+            line("del", 3, null),
+            line("add", null, 3),
+            line("context", 4, 4),
+          ],
+        },
+        {
+          header: "",
+          oldStart: 38,
+          oldLines: 4,
+          newStart: 39,
+          newLines: 5,
+          lines: [
+            line("context", 40, 40),
+            line("add", null, 41),
+            line("context", 41, 42),
+          ],
+        },
       ],
     },
-    { ...{ oldPath: "t.test.ts", newPath: "t.test.ts", path: "t.test.ts" }, status: "added" as const, isBinary: false, additions: 1, deletions: 0, lang: null, hunks: [] },
+    {
+      ...{ oldPath: "t.test.ts", newPath: "t.test.ts", path: "t.test.ts" },
+      status: "added" as const,
+      isBinary: false,
+      additions: 1,
+      deletions: 0,
+      lang: null,
+      hunks: [],
+    },
   ];
   const result = coverage(set, files);
   assert.deepEqual(
@@ -154,7 +243,8 @@ test("coverage counts the diff's own hunks, on a flow or not", async () => {
 });
 
 test("lanes group by component, in the order the flow reaches them", () => {
-  const call = (id: string, from: string, to: string) => step(id, 1, { from, to });
+  const call = (id: string, from: string, to: string) =>
+    step(id, 1, { from, to });
   const f: Flow = {
     ...flow(null, [
       call("route", "Router", "Controller"),
@@ -164,10 +254,25 @@ test("lanes group by component, in the order the flow reaches them", () => {
     ]),
     participants: [
       { name: "Router", label: "Router", external: true },
-      { name: "Controller", label: "Controller", external: false, component: "Native API" },
+      {
+        name: "Controller",
+        label: "Controller",
+        external: false,
+        component: "Native API",
+      },
       { name: "Scope", label: "Scope", external: false, component: "Access" },
-      { name: "Library", label: "Library", external: false, component: "Native API" },
-      { name: "Listing", label: "Listing", external: false, component: "Catalog" },
+      {
+        name: "Library",
+        label: "Library",
+        external: false,
+        component: "Native API",
+      },
+      {
+        name: "Listing",
+        label: "Listing",
+        external: false,
+        component: "Catalog",
+      },
     ],
   };
   const rows = flowRows(f, "after", hunks);

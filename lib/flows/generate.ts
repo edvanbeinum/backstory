@@ -5,12 +5,7 @@ import path from "node:path";
 import { git, gitLine, run } from "../exec";
 import { isAppCode, readModelAt, type Model } from "../model";
 import { claudeRunner, type Runner } from "./claude";
-import {
-  hunkText,
-  mapNewToOld,
-  parseZeroContext,
-  type Hunk,
-} from "./hunks";
+import { hunkText, mapNewToOld, parseZeroContext, type Hunk } from "./hunks";
 import {
   basePrompt,
   baseSchema,
@@ -64,20 +59,34 @@ interface Context {
   appFiles: string[];
 }
 
-async function prepare(root: string, base: string | null, head: string): Promise<Context> {
+async function prepare(
+  root: string,
+  base: string | null,
+  head: string,
+): Promise<Context> {
   const subject =
-    (await gitLine(root, ["log", "-1", "--format=%s", head])) ?? head.slice(0, 7);
+    (await gitLine(root, ["log", "-1", "--format=%s", head])) ??
+    head.slice(0, 7);
   const model = (await readModelAt(root, head))?.model ?? null;
   const { stdout } = await git(
     root,
-    ["diff", "-U0", "-M", "--no-color", "--no-ext-diff", base ?? EMPTY_TREE, head],
+    [
+      "diff",
+      "-U0",
+      "-M",
+      "--no-color",
+      "--no-ext-diff",
+      base ?? EMPTY_TREE,
+      head,
+    ],
     { maxBuffer: 256 * 1024 * 1024, timeout: 60_000 },
   );
   const renames = new Map<string, string>();
   let from: string | null = null;
   for (const line of stdout.split("\n")) {
     if (line.startsWith("rename from ")) from = line.slice(12);
-    else if (line.startsWith("rename to ") && from) renames.set(line.slice(10), from);
+    else if (line.startsWith("rename to ") && from)
+      renames.set(line.slice(10), from);
   }
   const hunks = parseZeroContext(stdout)
     .filter((h) => isAppCode(model, h.file))
@@ -88,14 +97,28 @@ async function prepare(root: string, base: string | null, head: string): Promise
 
 /** The commit's files in a temp dir. Nothing in the repo is touched. */
 async function snapshot(root: string, rev: string): Promise<string> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), `differ-flows-${rev.slice(0, 7)}-`));
+  const dir = await fs.mkdtemp(
+    path.join(os.tmpdir(), `differ-flows-${rev.slice(0, 7)}-`),
+  );
   try {
     // pipefail: a failed archive (a blobless clone, say) would otherwise
     // leave an empty folder, traced and cached as a change with no flows.
-    await run("bash", ["-o", "pipefail", "-c", 'git archive "$1" | tar -x -C "$2"', "bash", rev, dir], {
-      cwd: root,
-      timeout: 120_000,
-    });
+    await run(
+      "bash",
+      [
+        "-o",
+        "pipefail",
+        "-c",
+        'git archive "$1" | tar -x -C "$2"',
+        "bash",
+        rev,
+        dir,
+      ],
+      {
+        cwd: root,
+        timeout: 120_000,
+      },
+    );
     return dir;
   } catch (err) {
     await fs.rm(dir, { recursive: true, force: true });
@@ -103,7 +126,11 @@ async function snapshot(root: string, rev: string): Promise<string> {
   }
 }
 
-async function withSnapshot<T>(root: string, rev: string, fn: (dir: string) => Promise<T>) {
+async function withSnapshot<T>(
+  root: string,
+  rev: string,
+  fn: (dir: string) => Promise<T>,
+) {
   const dir = await snapshot(root, rev);
   try {
     return await fn(dir);
@@ -122,7 +149,9 @@ function lineReader(dir: string): LineReader {
       const resolved = path.resolve(dir, file);
       // Claude names the file; it must stay inside the snapshot.
       const inside = resolved.startsWith(dir + path.sep);
-      const text = inside ? await fs.readFile(resolved, "utf8").catch(() => null) : null;
+      const text = inside
+        ? await fs.readFile(resolved, "utf8").catch(() => null)
+        : null;
       cache.set(file, text === null ? null : text.split("\n"));
     }
     return cache.get(file)?.[line - 1] ?? null;
@@ -140,14 +169,20 @@ const squash = (text: string) => text.replace(/\s+/g, "");
  * Does the symbol start on this line? On the line itself, or, ignoring
  * whitespace, running on over the next few lines.
  */
-async function startsOn(read: LineReader, file: string, line: number, symbol: string) {
+async function startsOn(
+  read: LineReader,
+  file: string,
+  line: number,
+  symbol: string,
+) {
   const first = await read(file, line);
   if (first === null || symbol.length === 0) return false;
   if (first.includes(symbol)) return true;
   const want = squash(symbol);
   const head = squash(first);
   let joined = head;
-  for (let k = 1; k < SPAN; k++) joined += squash((await read(file, line + k)) ?? "");
+  for (let k = 1; k < SPAN; k++)
+    joined += squash((await read(file, line + k)) ?? "");
   const at = joined.indexOf(want);
   return at !== -1 && at < head.length;
 }
@@ -165,7 +200,8 @@ export async function locate(
 ): Promise<number | null> {
   for (let d = 0; d <= near; d++) {
     for (const candidate of d === 0 ? [line] : [line - d, line + d]) {
-      if (candidate >= 1 && (await startsOn(read, file, candidate, symbol))) return candidate;
+      if (candidate >= 1 && (await startsOn(read, file, candidate, symbol)))
+        return candidate;
     }
   }
   return null;
@@ -182,7 +218,8 @@ async function verifySteps(dir: string, steps: RawStep[]): Promise<FlowStep[]> {
   return out;
 }
 
-const normalisePath = (file: string) => file.replace(/^\.\//, "").replace(/^\/+/, "");
+const normalisePath = (file: string) =>
+  file.replace(/^\.\//, "").replace(/^\/+/, "");
 
 /** Ids Claude repeats across flows or steps are made unique, never merged. */
 function dedupeIds(flows: RawFlow[]): RawFlow[] {
@@ -216,12 +253,19 @@ function participantsFor(
 ): FlowParticipant[] {
   const byName = new Map<string, FlowParticipant>();
   for (const list of raw) {
-    for (const p of list) if (!byName.has(p.name)) byName.set(p.name, { ...p, component: null });
+    for (const p of list)
+      if (!byName.has(p.name)) byName.set(p.name, { ...p, component: null });
   }
   // A step can name a participant Claude forgot to declare.
   for (const s of steps) {
     for (const name of [s.from, s.to]) {
-      if (!byName.has(name)) byName.set(name, { name, label: name, external: false, component: null });
+      if (!byName.has(name))
+        byName.set(name, {
+          name,
+          label: name,
+          external: false,
+          component: null,
+        });
     }
   }
   return [...byName.values()];
@@ -231,7 +275,10 @@ async function traceBefore(
   ctx: Context,
   runner: Runner,
   flows: { raw: RawFlow; after: FlowStep[] }[],
-): Promise<{ before: Map<string, { raw: RawFlow; steps: FlowStep[] }>; costUsd: number }> {
+): Promise<{
+  before: Map<string, { raw: RawFlow; steps: FlowStep[] }>;
+  costUsd: number;
+}> {
   const base = ctx.base!;
   return withSnapshot(ctx.root, base, async (dir) => {
     const read = lineReader(dir);
@@ -241,7 +288,8 @@ async function traceBefore(
       for (const s of after) {
         const at = baseLineOf(ctx, s.file, s.line);
         // A carried step's line is proven by the mapping, so no searching nearby.
-        const carried = at !== null && (await startsOn(read, at.file, at.line, s.symbol));
+        const carried =
+          at !== null && (await startsOn(read, at.file, at.line, s.symbol));
         const { verified: _verified, ...rest } = s;
         steps.push(
           carried
@@ -252,7 +300,9 @@ async function traceBefore(
       marked.push({ ...raw, steps });
     }
     const carried = new Map(
-      marked.flatMap((f) => f.steps.filter((s) => s.status === "carried").map((s) => [s.id, s])),
+      marked.flatMap((f) =>
+        f.steps.filter((s) => s.status === "carried").map((s) => [s.id, s]),
+      ),
     );
 
     const { output, costUsd } = await runner<BaseOutput>(
@@ -295,7 +345,8 @@ export async function generateFlows(opts: GenerateOptions): Promise<FlowSet> {
     costUsd: 0,
     durationMs: 0,
   };
-  if (ctx.hunks.length === 0) return { ...empty, durationMs: Date.now() - started };
+  if (ctx.hunks.length === 0)
+    return { ...empty, durationMs: Date.now() - started };
 
   phase("Tracing flows at the head");
   const head = await withSnapshot(ctx.root, ctx.head, async (dir) => {
@@ -311,7 +362,8 @@ export async function generateFlows(opts: GenerateOptions): Promise<FlowSet> {
     );
     const flows = dedupeIds(output.flows);
     const verified = [];
-    for (const raw of flows) verified.push({ raw, after: await verifySteps(dir, raw.steps) });
+    for (const raw of flows)
+      verified.push({ raw, after: await verifySteps(dir, raw.steps) });
     return { flows: verified, hunks: output.hunks, costUsd, model };
   });
 
@@ -356,8 +408,12 @@ export async function generateFlows(opts: GenerateOptions): Promise<FlowSet> {
       oldLines: h.oldLines,
       newStart: h.newStart,
       newLines: h.newLines,
-      flows: (assigned.get(h.id)?.flows ?? []).filter((id) => flows.some((f) => f.id === id)),
-      ...(assigned.get(h.id)?.reason ? { reason: assigned.get(h.id)?.reason } : {}),
+      flows: (assigned.get(h.id)?.flows ?? []).filter((id) =>
+        flows.some((f) => f.id === id),
+      ),
+      ...(assigned.get(h.id)?.reason
+        ? { reason: assigned.get(h.id)?.reason }
+        : {}),
     })),
     costUsd,
     durationMs: Date.now() - started,
@@ -409,7 +465,8 @@ export async function traceHunk(
       return { ...f, id };
     });
     const verified = [];
-    for (const raw of flows) verified.push({ raw, after: await verifySteps(dir, raw.steps) });
+    for (const raw of flows)
+      verified.push({ raw, after: await verifySteps(dir, raw.steps) });
     return { flows: verified, costUsd };
   });
 
@@ -429,7 +486,11 @@ export async function traceHunk(
     name: found.raw.name,
     trigger: found.raw.trigger,
     isNew,
-    participants: participantsFor(ctx, [found.raw.participants, prior?.raw.participants ?? []], steps),
+    participants: participantsFor(
+      ctx,
+      [found.raw.participants, prior?.raw.participants ?? []],
+      steps,
+    ),
     before: isNew ? null : (prior?.steps ?? []),
     after: found.after,
   };

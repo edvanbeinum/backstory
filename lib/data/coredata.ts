@@ -1,4 +1,10 @@
-import type { Constraint, DataModel, Entity, Field, Relationship } from "./types";
+import type {
+  Constraint,
+  DataModel,
+  Entity,
+  Field,
+  Relationship,
+} from "./types";
 
 /**
  * A Core Data model: the current version's `contents` XML inside an
@@ -16,24 +22,30 @@ export function readCoreData(xml: string, file: string): DataModel {
     if (!name) continue;
     const body = block.slice(0, block.indexOf("</entity>"));
 
-    const fields: Field[] = [...body.matchAll(/<attribute\b[^>]*>/g)].map(([tag]) => ({
-      name: attr(tag, "name") ?? "?",
-      type: (attr(tag, "attributeType") ?? "?").toLowerCase(),
-      required: attr(tag, "optional") !== "YES",
-    }));
-    const relationships: Relationship[] = [...body.matchAll(/<relationship\b[^>]*>/g)].map(
+    const fields: Field[] = [...body.matchAll(/<attribute\b[^>]*>/g)].map(
       ([tag]) => ({
         name: attr(tag, "name") ?? "?",
-        kind: attr(tag, "toMany") === "YES" ? "has many" : "belongs to",
-        target: attr(tag, "destinationEntity"),
-        polymorphic: false,
+        type: (attr(tag, "attributeType") ?? "?").toLowerCase(),
+        required: attr(tag, "optional") !== "YES",
       }),
     );
+    const relationships: Relationship[] = [
+      ...body.matchAll(/<relationship\b[^>]*>/g),
+    ].map(([tag]) => ({
+      name: attr(tag, "name") ?? "?",
+      kind: attr(tag, "toMany") === "YES" ? "has many" : "belongs to",
+      target: attr(tag, "destinationEntity"),
+      polymorphic: false,
+    }));
     const constraints: Constraint[] = [
-      ...body.matchAll(/<uniquenessConstraint>([\s\S]*?)<\/uniquenessConstraint>/g),
+      ...body.matchAll(
+        /<uniquenessConstraint>([\s\S]*?)<\/uniquenessConstraint>/g,
+      ),
     ].map(([, inner]) => ({
       kind: "unique" as const,
-      fields: [...inner.matchAll(/<constraint value="([^"]+)"/g)].map((m) => m[1]),
+      fields: [...inner.matchAll(/<constraint value="([^"]+)"/g)].map(
+        (m) => m[1],
+      ),
     }));
     entities.set(name, { name, file, fields, relationships, constraints });
   }

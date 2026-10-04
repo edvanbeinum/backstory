@@ -26,10 +26,7 @@ export function touchList(
   return [{ ...entry, at: now }, ...rest].slice(0, MAX);
 }
 
-export function removeFromList(
-  list: RecentRepo[],
-  path: string,
-): RecentRepo[] {
+export function removeFromList(list: RecentRepo[], path: string): RecentRepo[] {
   return list.filter((r) => r.path !== path);
 }
 

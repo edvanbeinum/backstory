@@ -145,8 +145,7 @@ export function RepoBar({
               >
                 {recents.map((recent) => {
                   const name =
-                    recent.path.split("/").filter(Boolean).pop() ??
-                    recent.path;
+                    recent.path.split("/").filter(Boolean).pop() ?? recent.path;
                   const isCurrent = session?.repo.root === recent.path;
                   return (
                     <li key={recent.path} className="flex items-stretch">

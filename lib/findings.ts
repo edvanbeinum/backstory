@@ -38,17 +38,24 @@ export interface Finding {
  * domain. Names vary by tracer ("Net::HTTP", "NetHTTP", "Faraday::Connection"),
  * but the library's name must end there: "RequestsController" isn't HTTP.
  */
-const HTTP = /^(Net(::)?HTTP|HTTParty|Faraday|RestClient|Excon|URLSession|fetch|axios|requests|http\.Client|OkHttp)(?![a-z0-9])/i;
+const HTTP =
+  /^(Net(::)?HTTP|HTTParty|Faraday|RestClient|Excon|URLSession|fetch|axios|requests|http\.Client|OkHttp)(?![a-z0-9])/i;
 
 /** "ZoomClient" → "Zoom"; "ConnectedAccount::ZoomProvider" → "Zoom". */
 function vendorOf(lane: string): string | null {
   const last = lane.split("::").pop() ?? lane;
-  const m = last.match(/^([A-Z][a-z0-9]+)(Client|Provider|Gateway|Api|API|Adapter|Service)$/);
+  const m = last.match(
+    /^([A-Z][a-z0-9]+)(Client|Provider|Gateway|Api|API|Adapter|Service)$/,
+  );
   return m ? m[1] : null;
 }
 
 /** Outside systems the change talks to, from its lanes and its new namespaces. */
-export function vendors(set: FlowSet | null, data: DataResponse | null, known: string[] = []): string[] {
+export function vendors(
+  set: FlowSet | null,
+  data: DataResponse | null,
+  known: string[] = [],
+): string[] {
   const out = new Set<string>(known);
   for (const f of set?.flows ?? []) {
     for (const p of f.participants) {
@@ -57,12 +64,14 @@ export function vendors(set: FlowSet | null, data: DataResponse | null, known: s
     }
   }
   for (const e of data?.entities ?? []) {
-    if (e.state === "added" && e.name.includes("::")) out.add(e.name.split("::")[0]);
+    if (e.state === "added" && e.name.includes("::"))
+      out.add(e.name.split("::")[0]);
   }
   return [...out];
 }
 
-const snake = (s: string) => s.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
+const snake = (s: string) =>
+  s.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toLowerCase();
 
 /** 1. A core entity takes an outside system's vocabulary. */
 function vendorFields(data: DataResponse | null, names: string[]): Finding[] {
@@ -71,7 +80,10 @@ function vendorFields(data: DataResponse | null, names: string[]): Finding[] {
     if (p.state !== "changed") continue;
     for (const vendor of names) {
       const prefix = `${snake(vendor)}_`;
-      const named = p.fields.filter((f) => f.state === "added" && f.item.name.toLowerCase().startsWith(prefix));
+      const named = p.fields.filter(
+        (f) =>
+          f.state === "added" && f.item.name.toLowerCase().startsWith(prefix),
+      );
       if (named.length === 0) continue;
       const where = p.entity.component ? ` (${p.entity.component})` : "";
       const fields = `${named.length} ${vendor} ${named.length === 1 ? "field" : "fields"}`;
@@ -80,7 +92,10 @@ function vendorFields(data: DataResponse | null, names: string[]): Finding[] {
         kind: "vendor-fields",
         short: `${p.entity.name} gains ${fields}`,
         title: `${p.entity.name}${where} gains ${fields}`,
-        evidence: named.map((f) => ({ entity: p.entity.name, text: `+ ${f.item.name}` })),
+        evidence: named.map((f) => ({
+          entity: p.entity.name,
+          text: `+ ${f.item.name}`,
+        })),
         on: { entity: p.entity.name },
       });
     }
@@ -97,10 +112,12 @@ function twoWays(set: FlowSet | null): Finding[] {
   if (!set) return [];
   // Clients at the head only: one the change removed isn't "elsewhere".
   const clients = new Map<string, string>();
-  for (const f of set.flows) for (const s of f.after) for (const lane of [s.from, s.to]) {
-    const v = vendorOf(lane);
-    if (v && /Client$/.test(lane)) clients.set(v, lane);
-  }
+  for (const f of set.flows)
+    for (const s of f.after)
+      for (const lane of [s.from, s.to]) {
+        const v = vendorOf(lane);
+        if (v && /Client$/.test(lane)) clients.set(v, lane);
+      }
   const out: Finding[] = [];
   for (const [vendor, client] of clients) {
     const named = vendor.toLowerCase();
@@ -108,8 +125,13 @@ function twoWays(set: FlowSet | null): Finding[] {
     set.flows.forEach((f, i) => {
       for (const s of f.after) {
         if (!HTTP.test(s.to) || vendorOf(s.from)) continue;
-        if (!`${s.from} ${s.label} ${s.file}`.toLowerCase().includes(named)) continue;
-        raw.push({ flow: i, step: s.id, text: `${s.from} → ${s.to}: ${s.label}` });
+        if (!`${s.from} ${s.label} ${s.file}`.toLowerCase().includes(named))
+          continue;
+        raw.push({
+          flow: i,
+          step: s.id,
+          text: `${s.from} → ${s.to}: ${s.label}`,
+        });
       }
     });
     if (raw.length > 0) out.push(twoWaysNote(vendor, client, raw));
@@ -128,7 +150,10 @@ function twoWaysNote(vendor: string, client: string, raw: Evidence[]): Finding {
     evidence: raw,
     on: { flows },
     flowText: Object.fromEntries(
-      flows.map((f) => [f, `Calls ${vendor} over HTTP directly; elsewhere ${client} does`]),
+      flows.map((f) => [
+        f,
+        `Calls ${vendor} over HTTP directly; elsewhere ${client} does`,
+      ]),
     ),
   };
 }
@@ -140,7 +165,8 @@ function twoWaysNote(vendor: string, client: string, raw: Evidence[]): Finding {
  */
 function signature(s: FlowStep, external: Set<string>): string | null {
   if (s.from === s.to || external.has(s.to)) return null;
-  const method = s.label.replace(/^[^.(]*\.(?=\w)/, "").match(/^[\w!?]+/)?.[0] ?? s.label;
+  const method =
+    s.label.replace(/^[^.(]*\.(?=\w)/, "").match(/^[\w!?]+/)?.[0] ?? s.label;
   return `${s.to}.${method}`;
 }
 
@@ -157,10 +183,14 @@ interface Call {
  */
 function copied(a: Call[], b: Call[]): number {
   const same = (x: Call, y: Call) => x.sig === y.sig && x.site !== y.site;
-  const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  const dp = Array.from({ length: a.length + 1 }, () =>
+    new Array<number>(b.length + 1).fill(0),
+  );
   for (let i = a.length - 1; i >= 0; i--) {
     for (let j = b.length - 1; j >= 0; j--) {
-      dp[i][j] = same(a[i], b[j]) ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      dp[i][j] = same(a[i], b[j])
+        ? dp[i + 1][j + 1] + 1
+        : Math.max(dp[i + 1][j], dp[i][j + 1]);
     }
   }
   return dp[0][0];
@@ -170,7 +200,9 @@ function copied(a: Call[], b: Call[]): number {
 function repeatedFlows(set: FlowSet | null): Finding[] {
   if (!set) return [];
   const out: Finding[] = [];
-  const externals = set.flows.map((f) => new Set(f.participants.filter((p) => p.external).map((p) => p.name)));
+  const externals = set.flows.map(
+    (f) => new Set(f.participants.filter((p) => p.external).map((p) => p.name)),
+  );
   const calls: Call[][] = set.flows.map((f, i) =>
     f.after.flatMap((s) => {
       const sig = signature(s, externals[i]);
@@ -199,7 +231,11 @@ function repeatedFlows(set: FlowSet | null): Finding[] {
         if (twin) {
           parts.push(sig!.split(".").pop()!);
           differ.push({ flow: i, step: s.id, text: `${a.name}: ${s.label}` });
-          differ.push({ flow: j, step: twin.id, text: `${b.name}: ${twin.label}` });
+          differ.push({
+            flow: j,
+            step: twin.id,
+            text: `${b.name}: ${twin.label}`,
+          });
         }
       }
       const at = parts.length
@@ -210,7 +246,10 @@ function repeatedFlows(set: FlowSet | null): Finding[] {
         kind: "repeated-flows",
         short: `flows ${i + 1} and ${j + 1} share ${n} calls`,
         title: `"${a.name}" and "${b.name}" make the same ${n} calls from different places${at}`,
-        evidence: differ.length > 0 ? differ.slice(0, 6) : [{ flow: i, text: `${n} calls in common` }],
+        evidence:
+          differ.length > 0
+            ? differ.slice(0, 6)
+            : [{ flow: i, text: `${n} calls in common` }],
         on: { flows: [i, j] },
         flowText: {
           [i]: `Makes ${n} of the same calls as flow ${j + 1}, from different code${at}`,
@@ -222,7 +261,11 @@ function repeatedFlows(set: FlowSet | null): Finding[] {
   return out;
 }
 
-export function findings(set: FlowSet | null, data: DataResponse | null, known: string[] = []): Finding[] {
+export function findings(
+  set: FlowSet | null,
+  data: DataResponse | null,
+  known: string[] = [],
+): Finding[] {
   const names = vendors(set, data, known);
   return [...vendorFields(data, names), ...twoWays(set), ...repeatedFlows(set)];
 }

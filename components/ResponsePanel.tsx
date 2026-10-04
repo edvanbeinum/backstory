@@ -39,11 +39,7 @@ export function ResponsePanel({
   commit: CommitSummary | null;
   commitCandidates?: CommitSummary[];
   onToggleDone: (threadId: string, done: boolean) => void;
-  onLinkCommit: (
-    threadId: string,
-    sha: string | null,
-    unlink?: string,
-  ) => void;
+  onLinkCommit: (threadId: string, sha: string | null, unlink?: string) => void;
   onDraftChange?: (threadId: string, text: string | null) => void;
 }) {
   const { response } = thread;
@@ -68,7 +64,9 @@ export function ResponsePanel({
           pr={pr}
           commit={commit}
           threadUrl={threadUrl}
-          linkedShas={response.commits.filter((c) => !c.missing).map((c) => c.sha)}
+          linkedShas={response.commits
+            .filter((c) => !c.missing)
+            .map((c) => c.sha)}
           draft={response.reply}
           onDraftChange={
             onDraftChange ? (text) => onDraftChange(thread.id, text) : undefined
@@ -84,8 +82,6 @@ export function ResponsePanel({
     </div>
   );
 }
-
-
 
 function CommitLink({
   thread,

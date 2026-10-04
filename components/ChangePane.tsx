@@ -17,12 +17,7 @@ import { FeedbackBar } from "./FeedbackBar";
 import { useNotes } from "./useNotes";
 import { useOutbox } from "./useOutbox";
 import { useReview } from "./useReview";
-import {
-  CommentIcon,
-  FileDiffIcon,
-  GitCommitIcon,
-  PencilIcon,
-} from "./icons";
+import { CommentIcon, FileDiffIcon, GitCommitIcon, PencilIcon } from "./icons";
 
 export interface ChangeOption {
   rev: string;
@@ -101,9 +96,7 @@ export function changesFor(
  * on screen. differ has no idea which change answers an unhandled comment,
  * and behaving as though it might is worse than doing nothing.
  */
-export function openingChangeFor(
-  thread: ReviewThread | null,
-): string | null {
+export function openingChangeFor(thread: ReviewThread | null): string | null {
   return thread?.response.commits.find((c) => !c.missing)?.sha ?? null;
 }
 
@@ -170,10 +163,7 @@ export function ChangePane({
     return /^[0-9a-f]{40}$/.test(rev) ? rev : null;
   }, [diff, rev, commit]);
 
-  const options = useMemo(
-    () => changesFor(thread, session),
-    [thread, session],
-  );
+  const options = useMemo(() => changesFor(thread, session), [thread, session]);
 
   /**
    * Any commit on the branch, so the diff column isn't limited to the three
@@ -199,59 +189,59 @@ export function ChangePane({
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-1.5">
         <span className="text-[11px] text-[var(--fg-muted)]">Showing</span>
-          {options.map((option) => (
-            <button
-              key={option.rev}
-              type="button"
-              title={option.hint}
-              onClick={() => onRevChange(option.rev)}
-              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-[3px] text-[11px] font-medium transition-colors ${
-                rev === option.rev
-                  ? "border-[var(--accent)] bg-[var(--accent-subtle)] text-[var(--accent)]"
-                  : "border-[var(--border)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
-              }`}
-            >
-              {option.icon}
-              {option.label}
-            </button>
-          ))}
-          {/* A commit picked from the dropdown isn't one of the offered
+        {options.map((option) => (
+          <button
+            key={option.rev}
+            type="button"
+            title={option.hint}
+            onClick={() => onRevChange(option.rev)}
+            className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-[3px] text-[11px] font-medium transition-colors ${
+              rev === option.rev
+                ? "border-[var(--accent)] bg-[var(--accent-subtle)] text-[var(--accent)]"
+                : "border-[var(--border)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
+            }`}
+          >
+            {option.icon}
+            {option.label}
+          </button>
+        ))}
+        {/* A commit picked from the dropdown isn't one of the offered
               options, but still needs to read as the current selection. */}
-          {!options.some((o) => o.rev === rev) && commit && (
-            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--accent)] bg-[var(--accent-subtle)] px-2.5 py-[3px] text-[11px] font-medium text-[var(--accent)]">
-              <GitCommitIcon size={12} />
-              {commit.shortSha}
-            </span>
-          )}
+        {!options.some((o) => o.rev === rev) && commit && (
+          <span className="inline-flex items-center gap-1 rounded-full border border-[var(--accent)] bg-[var(--accent-subtle)] px-2.5 py-[3px] text-[11px] font-medium text-[var(--accent)]">
+            <GitCommitIcon size={12} />
+            {commit.shortSha}
+          </span>
+        )}
 
-          {commitCandidates.length > 0 && (
-            <CommitPicker
-              label="A commit…"
-              candidates={commitCandidates}
-              selected={rev}
-              onPick={onRevChange}
-              align="left"
-            />
-          )}
-          {onLayout && (
-            <span className="seg ml-auto" role="group" aria-label="Layout">
-              {(["diagrams", "code"] as const).map((l) => (
-                <button
-                  key={l}
-                  type="button"
-                  aria-pressed={layout === l}
-                  onClick={() => onLayout(l)}
-                  title={
-                    l === "diagrams"
-                      ? "Lead with the map and the flows; open code from a step"
-                      : "The flow beside the full diff"
-                  }
-                >
-                  {l === "diagrams" ? "Diagrams" : "Code"}
-                </button>
-              ))}
-            </span>
-          )}
+        {commitCandidates.length > 0 && (
+          <CommitPicker
+            label="A commit…"
+            candidates={commitCandidates}
+            selected={rev}
+            onPick={onRevChange}
+            align="left"
+          />
+        )}
+        {onLayout && (
+          <span className="seg ml-auto" role="group" aria-label="Layout">
+            {(["diagrams", "code"] as const).map((l) => (
+              <button
+                key={l}
+                type="button"
+                aria-pressed={layout === l}
+                onClick={() => onLayout(l)}
+                title={
+                  l === "diagrams"
+                    ? "Lead with the map and the flows; open code from a step"
+                    : "The flow beside the full diff"
+                }
+              >
+                {l === "diagrams" ? "Diagrams" : "Code"}
+              </button>
+            ))}
+          </span>
+        )}
       </div>
 
       {landing.length > 0 && (
@@ -276,27 +266,30 @@ export function ChangePane({
       />
 
       {layout === "code" && (
-      <DiffView
-        diff={diff}
-        loading={loading}
-        error={error}
-        threads={threads}
-        repo={session.repo}
-        pr={session.github.pr}
-        commit={commit}
-        focusedThreadId={focusedThreadId}
-        notes={noteRev ? notes : null}
-        noteRev={noteRev}
-        marks={flowMarks}
-        fileComponents={fileComponents}
-        hoveredComponent={hoveredComponent}
-      />
+        <DiffView
+          diff={diff}
+          loading={loading}
+          error={error}
+          threads={threads}
+          repo={session.repo}
+          pr={session.github.pr}
+          commit={commit}
+          focusedThreadId={focusedThreadId}
+          notes={noteRev ? notes : null}
+          noteRev={noteRev}
+          marks={flowMarks}
+          fileComponents={fileComponents}
+          hoveredComponent={hoveredComponent}
+        />
       )}
 
       {/* Pinned to the bottom of the window while the diff scrolls, so a
           general note or Send is always a click away. */}
       {/* In either layout: an agent waiting on review must never be invisible. */}
-      {(noteRev || notes.notes.length > 0 || review.waiting || review.error) && (
+      {(noteRev ||
+        notes.notes.length > 0 ||
+        review.waiting ||
+        review.error) && (
         <div className="sticky bottom-4 z-20">
           <FeedbackBar
             notes={notes}

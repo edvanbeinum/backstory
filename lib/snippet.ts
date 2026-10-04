@@ -40,21 +40,44 @@ export async function snippet(opts: {
   const names = [path, ...(await renamePartner(root, from, head, path))];
   const { stdout } = await git(
     root,
-    ["diff", "-U1000000", "-M", "--no-color", "--no-ext-diff", "--no-textconv", from, head, "--", ...names],
+    [
+      "diff",
+      "-U1000000",
+      "-M",
+      "--no-color",
+      "--no-ext-diff",
+      "--no-textconv",
+      from,
+      head,
+      "--",
+      ...names,
+    ],
     { maxBuffer: 64 * 1024 * 1024 },
   );
-  let lines: DiffLine[] | null = parseUnifiedDiff(stdout)[0]?.hunks[0]?.lines ?? null;
+  let lines: DiffLine[] | null =
+    parseUnifiedDiff(stdout)[0]?.hunks[0]?.lines ?? null;
   const changed = lines !== null;
   if (!lines) {
-    const text = await showFile(root, side === "old" ? (base ?? head) : head, path);
+    const text = await showFile(
+      root,
+      side === "old" ? (base ?? head) : head,
+      path,
+    );
     if (text === null) return null;
     lines = text
       .replace(/\n$/, "")
       .split("\n")
-      .map((content, i) => ({ type: "context", oldNo: i + 1, newNo: i + 1, content }));
+      .map((content, i) => ({
+        type: "context",
+        oldNo: i + 1,
+        newNo: i + 1,
+        content,
+      }));
   }
 
-  const at = lines.findIndex((l) => (side === "old" ? l.oldNo : l.newNo) === line);
+  const at = lines.findIndex(
+    (l) => (side === "old" ? l.oldNo : l.newNo) === line,
+  );
   if (at === -1) return null;
   const start = Math.max(0, at - context);
   const window = lines.slice(start, at + context + 1);
@@ -84,8 +107,21 @@ export async function snippet(opts: {
 }
 
 /** The file's other name, if this view renamed it to or from `path`. */
-async function renamePartner(root: string, from: string, head: string, path: string): Promise<string[]> {
-  const { stdout } = await git(root, ["diff", "--name-status", "-M", "-z", "--diff-filter=R", from, head]);
+async function renamePartner(
+  root: string,
+  from: string,
+  head: string,
+  path: string,
+): Promise<string[]> {
+  const { stdout } = await git(root, [
+    "diff",
+    "--name-status",
+    "-M",
+    "-z",
+    "--diff-filter=R",
+    from,
+    head,
+  ]);
   const parts = stdout.split("\0");
   // -z: "R087", old path, new path, repeated.
   for (let i = 0; i + 2 < parts.length; i += 3) {

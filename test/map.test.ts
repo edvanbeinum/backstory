@@ -25,7 +25,11 @@ interface Comp {
 }
 
 /** A Structurizr export, cut down to what differ reads. */
-function workspace(comps: Comp[], rels: [string, string, string][], dsl: string) {
+function workspace(
+  comps: Comp[],
+  rels: [string, string, string][],
+  dsl: string,
+) {
   const byKey = new Map(comps.map((c) => [c.key, c.id]));
   return JSON.stringify({
     properties: {
@@ -75,7 +79,10 @@ sh("init", "-q");
 sh("config", "user.email", "t@example.com");
 sh("config", "user.name", "Test");
 write("architecture/workspace.dsl", "v1");
-write("architecture/workspace.json", workspace([a, b], [["a", "b", "Calls"]], "v1"));
+write(
+  "architecture/workspace.json",
+  workspace([a, b], [["a", "b", "Calls"]], "v1"),
+);
 write("src/a/one.ts", "1\n");
 write("src/b/two.ts", "2\n");
 sh("add", ".");
@@ -85,7 +92,14 @@ const BASE = sh("rev-parse", "HEAD");
 write("architecture/workspace.dsl", "v2");
 write(
   "architecture/workspace.json",
-  workspace([a, b, c], [["a", "b", "Asks"], ["b", "c", "Stores in"]], "v2"),
+  workspace(
+    [a, b, c],
+    [
+      ["a", "b", "Asks"],
+      ["b", "c", "Stores in"],
+    ],
+    "v2",
+  ),
 );
 write("src/a/one.ts", "1\nmore\n");
 write("src/b/.hidden", "dotfile\n");
@@ -104,9 +118,15 @@ test("the map compares models by identifier and arrows by their ends", async () 
   assert.equal(map.stale, false);
 
   const state = Object.fromEntries(map.nodes.map((n) => [n.name, n.state]));
-  assert.deepEqual(state, { Alpha: "touched", Beta: "touched", Gamma: "added" });
+  assert.deepEqual(state, {
+    Alpha: "touched",
+    Beta: "touched",
+    Gamma: "added",
+  });
 
-  const edges = Object.fromEntries(map.edges.map((e) => [e.key, [e.state, e.before ?? null]]));
+  const edges = Object.fromEntries(
+    map.edges.map((e) => [e.key, [e.state, e.before ?? null]]),
+  );
   assert.deepEqual(edges, {
     "app.web.a → app.web.b": ["changed", "Calls"],
     "app.web.b → app.web.c": ["added", null],
@@ -151,7 +171,10 @@ test("a repo with no model uses one kept locally, without a structural diff", as
 
     const dir = path.join(home, "models", path.basename(plain));
     mkdirSync(dir, { recursive: true });
-    writeFileSync(path.join(dir, "workspace.json"), workspace([a, b], [["a", "b", "Calls"]], "v1"));
+    writeFileSync(
+      path.join(dir, "workspace.json"),
+      workspace([a, b], [["a", "b", "Calls"]], "v1"),
+    );
     writeFileSync(path.join(dir, "workspace.dsl"), "v1");
 
     process.env.DIFFER_HOME = home;
@@ -170,7 +193,9 @@ test("a repo with no model uses one kept locally, without a structural diff", as
 
 test("a model that lists no tests or ignores keeps the built-in ones", async () => {
   const { parseModel } = await import("../lib/model");
-  const model = parseModel(JSON.stringify({ properties: {}, model: { softwareSystems: [] } }));
+  const model = parseModel(
+    JSON.stringify({ properties: {}, model: { softwareSystems: [] } }),
+  );
   assert.equal(model.isTest("test/models/item_test.rb"), true);
   assert.equal(model.isIgnored("package-lock.json"), true);
   assert.equal(model.isTest("app/models/item.rb"), false);

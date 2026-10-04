@@ -87,7 +87,10 @@ function DiffHunkPreview({ hunk }: { hunk: string }) {
             }
 
             return (
-              <tr key={index} className={type === "context" ? "" : `line-${type}`}>
+              <tr
+                key={index}
+                className={type === "context" ? "" : `line-${type}`}
+              >
                 <td className="diff-marker">
                   {type === "add" ? "+" : type === "del" ? "-" : " "}
                 </td>
@@ -144,9 +147,7 @@ export function ReviewThreadCard({
     <div
       id={`thread-${thread.id}`}
       className={`overflow-hidden rounded-md border bg-[var(--canvas)] ${
-        highlighted
-          ? "border-[var(--attention)]"
-          : "border-[var(--border)]"
+        highlighted ? "border-[var(--attention)]" : "border-[var(--border)]"
       }`}
     >
       <button

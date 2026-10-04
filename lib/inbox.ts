@@ -167,7 +167,10 @@ interface GqlInboxPr {
   baseRefName: string;
   isCrossRepository: boolean;
   headRepositoryOwner: { login: string } | null;
-  reviewThreads: { totalCount: number; nodes: Array<{ id: string; isResolved: boolean }> };
+  reviewThreads: {
+    totalCount: number;
+    nodes: Array<{ id: string; isResolved: boolean }>;
+  };
   reviews: { nodes: Array<{ id: string; body: string }> };
 }
 
@@ -368,7 +371,9 @@ async function buildRepo(
     worktree: (typeof worktrees)[number] | null,
   ): InboxRow => {
     const fact = branch ? facts.get(branch) : undefined;
-    const chosen = branch ? pickPullRequest(prs.get(branch) ?? [], owner) : null;
+    const chosen = branch
+      ? pickPullRequest(prs.get(branch) ?? [], owner)
+      : null;
 
     let pr: InboxPr | null = null;
     let progress: Progress | null = null;
@@ -463,9 +468,7 @@ function nest(rows: InboxRow[]): InboxRow[] {
   // targeting the default branch would indent under the trunk's own row,
   // which adds a level of nesting that says nothing.
   const byBranch = new Map(
-    rows
-      .filter((r) => r.branch && r.pr)
-      .map((r) => [r.branch as string, r]),
+    rows.filter((r) => r.branch && r.pr).map((r) => [r.branch as string, r]),
   );
   const children = new Map<string, InboxRow[]>();
   const roots: InboxRow[] = [];

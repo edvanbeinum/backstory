@@ -142,7 +142,9 @@ export function CommitPicker({
                     choose(candidate.sha);
                   }}
                   className={`flex w-full items-baseline gap-2 px-2 py-1 text-left hover:bg-[var(--canvas-subtle)] ${
-                    candidate.sha === selected ? "bg-[var(--accent-subtle)]" : ""
+                    candidate.sha === selected
+                      ? "bg-[var(--accent-subtle)]"
+                      : ""
                   }`}
                 >
                   <span className="mono shrink-0 text-[11px] text-[var(--fg-muted)]">

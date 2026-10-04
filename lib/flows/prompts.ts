@@ -25,7 +25,17 @@ const STEP_SCHEMA = {
     sameAs: { type: "string" },
     nesting: { type: "integer" },
   },
-  required: ["id", "from", "to", "file", "line", "caller", "label", "symbol", "nesting"],
+  required: [
+    "id",
+    "from",
+    "to",
+    "file",
+    "line",
+    "caller",
+    "label",
+    "symbol",
+    "nesting",
+  ],
 };
 
 const flowSchema = (maxSteps: number) => ({

@@ -22,11 +22,7 @@ export interface DiffHunk {
 }
 
 export type FileStatus =
-  | "added"
-  | "deleted"
-  | "modified"
-  | "renamed"
-  | "copied";
+  "added" | "deleted" | "modified" | "renamed" | "copied";
 
 export interface DiffFile {
   oldPath: string | null;
@@ -67,11 +63,7 @@ export interface CommitSummary {
  * upstream, and some branches have neither an upstream nor an origin ref.
  */
 export type BaseReason =
-  | "upstream"
-  | "origin-branch"
-  | "default-branch"
-  | "local-default"
-  | "root";
+  "upstream" | "origin-branch" | "default-branch" | "local-default" | "root";
 
 export interface BaseInfo {
   /** The ref or sha we diff against */

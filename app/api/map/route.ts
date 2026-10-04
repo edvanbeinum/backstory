@@ -24,9 +24,12 @@ export async function GET(request: Request) {
     const repo = await resolveRepo(repoPath);
     const range = await viewRange(repo, rev);
     if (!range) return NextResponse.json({ status: "none" });
-    return NextResponse.json(await buildMap(repo.root, range.base, range.head), {
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      await buildMap(repo.root, range.base, range.head),
+      {
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   } catch (err) {
     return errorResponse(err);
   }

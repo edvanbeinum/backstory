@@ -16,7 +16,8 @@ import { gitLine, gitTry } from "./exec";
 export const MODEL_JSON = "architecture/workspace.json";
 export const MODEL_DSL = "architecture/workspace.dsl";
 
-export type ElementType = "person" | "softwareSystem" | "container" | "component";
+export type ElementType =
+  "person" | "softwareSystem" | "container" | "component";
 
 export interface ModelElement {
   id: string;
@@ -80,8 +81,10 @@ const splitGlobs = (value: string | undefined) =>
 const matcher = (globs: string[]) =>
   globs.length > 0 ? picomatch(globs, { dot: true }) : () => false;
 
-const orDefault = (globs: string[], fallback: () => (path: string) => boolean) =>
-  globs.length > 0 ? matcher(globs) : (path: string) => fallback()(path);
+const orDefault = (
+  globs: string[],
+  fallback: () => (path: string) => boolean,
+) => (globs.length > 0 ? matcher(globs) : (path: string) => fallback()(path));
 
 export function parseModel(json: string): Model {
   const raw = JSON.parse(json) as RawWorkspace;
@@ -105,10 +108,14 @@ export function parseModel(json: string): Model {
     for (const c of el.components ?? []) visit(c, "component", id);
   };
   for (const p of raw.model?.people ?? []) visit(p, "person", null);
-  for (const s of raw.model?.softwareSystems ?? []) visit(s, "softwareSystem", null);
+  for (const s of raw.model?.softwareSystems ?? [])
+    visit(s, "softwareSystem", null);
 
   // Several arrows between one pair read as one, labelled with all of them.
-  const grouped = new Map<string, { rel: ModelRelationship; labels: string[] }>();
+  const grouped = new Map<
+    string,
+    { rel: ModelRelationship; labels: string[] }
+  >();
   for (const r of rawRels) {
     if (r.linkedRelationshipId) continue;
     const source = byNumericId.get(r.sourceId);
@@ -138,9 +145,17 @@ export function parseModel(json: string): Model {
     match: (path) => leaves.filter((l) => l.test(path)).map((l) => l.id),
     // A model that doesn't say which files are tests or ignored keeps the
     // built-in patterns, rather than counting every test as app code.
-    isTest: orDefault(splitGlobs(raw.properties?.["code.tests"]), () => DEFAULT_TESTS),
-    isIgnored: orDefault(splitGlobs(raw.properties?.["code.ignore"]), () => DEFAULT_IGNORE),
-    embeddedDsl: embedded ? Buffer.from(embedded, "base64").toString("utf8") : null,
+    isTest: orDefault(
+      splitGlobs(raw.properties?.["code.tests"]),
+      () => DEFAULT_TESTS,
+    ),
+    isIgnored: orDefault(
+      splitGlobs(raw.properties?.["code.ignore"]),
+      () => DEFAULT_IGNORE,
+    ),
+    embeddedDsl: embedded
+      ? Buffer.from(embedded, "base64").toString("utf8")
+      : null,
   };
 }
 
@@ -150,7 +165,9 @@ export async function showFile(
   rev: string,
   path: string,
 ): Promise<string | null> {
-  return gitTry(root, ["show", `${rev}:${path}`], { maxBuffer: 32 * 1024 * 1024 });
+  return gitTry(root, ["show", `${rev}:${path}`], {
+    maxBuffer: 32 * 1024 * 1024,
+  });
 }
 
 /**
@@ -161,17 +178,24 @@ export async function showFile(
  */
 export async function localModelDir(root: string): Promise<string> {
   const common =
-    (await gitLine(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"])) ??
-    path.join(root, ".git");
+    (await gitLine(root, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+    ])) ?? path.join(root, ".git");
   const home = process.env.DIFFER_HOME || path.join(homedir(), ".differ");
   return path.join(home, "models", path.basename(path.dirname(common)));
 }
 
 async function readLocalModel(root: string) {
   const dir = await localModelDir(root);
-  const json = await fs.readFile(path.join(dir, "workspace.json"), "utf8").catch(() => null);
+  const json = await fs
+    .readFile(path.join(dir, "workspace.json"), "utf8")
+    .catch(() => null);
   if (!json) return null;
-  const dsl = await fs.readFile(path.join(dir, "workspace.dsl"), "utf8").catch(() => null);
+  const dsl = await fs
+    .readFile(path.join(dir, "workspace.dsl"), "utf8")
+    .catch(() => null);
   return { json, dsl };
 }
 

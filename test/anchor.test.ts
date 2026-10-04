@@ -113,10 +113,7 @@ test("a thread with no line information at all is still surfaced", () => {
 
 test("two threads on the same line both anchor", () => {
   const [file] = parseUnifiedDiff(PATCH);
-  const { byNewLine } = anchorThreads(file, [
-    thread("a", 34),
-    thread("b", 34),
-  ]);
+  const { byNewLine } = anchorThreads(file, [thread("a", 34), thread("b", 34)]);
 
   assert.deepEqual(
     byNewLine.get(34)?.map((t) => t.id),

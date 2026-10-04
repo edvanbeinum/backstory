@@ -1,6 +1,13 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { anchorThreads } from "@/lib/anchor";
 import { anchorNotes, draftNote } from "@/lib/feedback";
@@ -192,9 +199,7 @@ export function DiffFile({
   // the actual change somewhere far below. Put the first change back on screen.
   useEffect(() => {
     if (!showWhole || !whole || wholeLoading) return;
-    const target = bodyRef.current?.querySelector(
-      "tr.line-add, tr.line-del",
-    );
+    const target = bodyRef.current?.querySelector("tr.line-add, tr.line-del");
     target?.scrollIntoView({ block: "center", behavior: "smooth" });
   }, [showWhole, whole, wholeLoading]);
 
@@ -211,7 +216,14 @@ export function DiffFile({
     };
     window.addEventListener("differ:reveal", onReveal);
     return () => window.removeEventListener("differ:reveal", onReveal);
-  }, [file.newPath, file.oldPath, canViewWhole, whole, wholeLoading, loadWhole]);
+  }, [
+    file.newPath,
+    file.oldPath,
+    canViewWhole,
+    whole,
+    wholeLoading,
+    loadWhole,
+  ]);
 
   // A different commit means a different file revision; drop the cached view.
   useEffect(() => {
@@ -377,8 +389,8 @@ export function DiffFile({
 
           {shown.truncated && !showWhole && (
             <p className="border-t border-[var(--border-muted)] px-3 py-2 text-[12px] text-[var(--attention)]">
-              This file is too large to render in full — showing the first
-              chunk only.
+              This file is too large to render in full — showing the first chunk
+              only.
             </p>
           )}
 
@@ -397,7 +409,11 @@ export function DiffFile({
                     <>
                       {note.side === "old" ? "Removed line" : "Line"}{" "}
                       {note.line} isn&apos;t in the diff as shown — it may have
-                      changed since {note.sentAt !== null ? "you sent this" : "you wrote this"}.
+                      changed since{" "}
+                      {note.sentAt !== null
+                        ? "you sent this"
+                        : "you wrote this"}
+                      .
                       {note.quote !== null && (
                         <code className="mono mt-1 block truncate text-[var(--fg)]">
                           {note.quote}
@@ -409,7 +425,6 @@ export function DiffFile({
               ))}
             </div>
           )}
-
         </>
       )}
     </section>
@@ -542,7 +557,9 @@ function HunkRows({
               data-old-line={line.oldNo ?? undefined}
               data-new-line={line.newNo ?? undefined}
               data-flow-steps={
-                lineMarks.length > 0 ? lineMarks.map((m) => m.key).join(" ") : undefined
+                lineMarks.length > 0
+                  ? lineMarks.map((m) => m.key).join(" ")
+                  : undefined
               }
             >
               {numCell(line.oldNo, "old")}
@@ -567,7 +584,10 @@ function HunkRows({
                 <td className="diff-code">
                   <span dangerouslySetInnerHTML={{ __html: line.html ?? "" }} />
                   {lineMarks.map((m) => (
-                    <em key={m.key} className={`flow-chip ${m.was ? "was" : ""}`}>
+                    <em
+                      key={m.key}
+                      className={`flow-chip ${m.was ? "was" : ""}`}
+                    >
                       {m.chip}
                     </em>
                   ))}

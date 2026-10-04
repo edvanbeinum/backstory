@@ -78,11 +78,15 @@ const isTime = (value: unknown) => value === null || typeof value === "number";
 const isClaim = (value: unknown) =>
   value === undefined ||
   value === null ||
-  (isObject(value) && isSessionId(value.session) && typeof value.until === "number");
+  (isObject(value) &&
+    isSessionId(value.session) &&
+    typeof value.until === "number");
 
 function isRound(
   value: unknown,
-): value is Omit<OutboxRound, "id" | "root" | "claim"> & { claim?: OutboxRound["claim"] } {
+): value is Omit<OutboxRound, "id" | "root" | "claim"> & {
+  claim?: OutboxRound["claim"];
+} {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
   const r = value as Record<string, unknown>;
   return (
@@ -161,7 +165,9 @@ function lastSeen(seen: Record<string, number>): OutboxState["lastSeen"] {
 
 function state(forRoot: ForRoot): OutboxState {
   return {
-    rounds: [...forRoot.rounds.values()].sort((a, b) => b.queuedAt - a.queuedAt),
+    rounds: [...forRoot.rounds.values()].sort(
+      (a, b) => b.queuedAt - a.queuedAt,
+    ),
     lastSeen: lastSeen(forRoot.seen),
     seen: forRoot.seen,
   };
@@ -182,7 +188,8 @@ export async function getOutbox(root: string): Promise<OutboxState> {
  * watch stream's listener.
  */
 const g = globalThis as { __differOutbox?: EventEmitter };
-const events: EventEmitter = (g.__differOutbox ??= new EventEmitter().setMaxListeners(0));
+const events: EventEmitter = (g.__differOutbox ??=
+  new EventEmitter().setMaxListeners(0));
 
 /** Be told when a checkout's rounds change: queued, taken, re-aimed, withdrawn. */
 export function onOutboxChange(listener: (root: string) => void): () => void {
@@ -205,7 +212,10 @@ async function change<T>(
     if (changed) {
       const now = Date.now();
       for (const [id, round] of forRoot.rounds) {
-        if (round.deliveredAt !== null && now - round.deliveredAt > KEEP_DELIVERED_MS) {
+        if (
+          round.deliveredAt !== null &&
+          now - round.deliveredAt > KEEP_DELIVERED_MS
+        ) {
           forRoot.rounds.delete(id);
         }
       }
@@ -232,9 +242,14 @@ export interface NewRound {
  * File a sent round. Undelivered, it's aimed at the session last seen
  * stopping here — or at nobody, when none has been.
  */
-export function queueRound(root: string, round: NewRound): Promise<OutboxRound> {
-  if (!round.noteIds.every((id) => KEY.test(id))) throw new Error("Invalid note id");
-  if (round.message.length > MAX_MESSAGE) throw new Error("Invalid message: too long");
+export function queueRound(
+  root: string,
+  round: NewRound,
+): Promise<OutboxRound> {
+  if (!round.noteIds.every((id) => KEY.test(id)))
+    throw new Error("Invalid note id");
+  if (round.message.length > MAX_MESSAGE)
+    throw new Error("Invalid message: too long");
 
   return change(root, (forRoot) => {
     const delivered = round.deliveredTo !== undefined;
@@ -291,7 +306,11 @@ const claimed = (round: OutboxRound, now = Date.now()) =>
  * The hook printed what it took: those rounds are delivered. Only rounds this
  * session still holds; returns how many.
  */
-export function ack(root: string, session: string, ids: string[]): Promise<number> {
+export function ack(
+  root: string,
+  session: string,
+  ids: string[],
+): Promise<number> {
   if (!isSessionId(session)) throw new Error("Invalid session id");
 
   return change(root, (forRoot) => {
@@ -299,7 +318,12 @@ export function ack(root: string, session: string, ids: string[]): Promise<numbe
     let count = 0;
     for (const id of ids) {
       const round = forRoot.rounds.get(id);
-      if (!round || round.deliveredAt !== null || round.claim?.session !== session) continue;
+      if (
+        !round ||
+        round.deliveredAt !== null ||
+        round.claim?.session !== session
+      )
+        continue;
       round.deliveredAt = now;
       round.deliveredTo = session;
       round.claim = null;
@@ -320,7 +344,8 @@ export function retarget(
   }
   return change(root, (forRoot) => {
     const round = forRoot.rounds.get(id);
-    if (!round || round.deliveredAt !== null) return { result: null, changed: false };
+    if (!round || round.deliveredAt !== null)
+      return { result: null, changed: false };
     round.forSession = forSession;
     return { result: round, changed: true };
   });
@@ -378,12 +403,14 @@ export function requeue(root: string, id: string): Promise<OutboxRound | null> {
  * never have been told about differ.
  */
 export function formatTaken(rounds: OutboxRound[]): string {
-  return [
-    "I reviewed your work in differ and sent these notes while you were busy. " +
-      "Address every note, then summarise what you changed for each. " +
-      "Find a line by its quoted text if the number has drifted. " +
-      "For a note on a commit, tell me how you mean to fix it (a fixup, a new " +
-      "commit on top, …) and wait for me to agree before rewriting history.",
-    ...rounds.map((r) => r.message.trimEnd()),
-  ].join("\n\n---\n\n") + "\n";
+  return (
+    [
+      "I reviewed your work in differ and sent these notes while you were busy. " +
+        "Address every note, then summarise what you changed for each. " +
+        "Find a line by its quoted text if the number has drifted. " +
+        "For a note on a commit, tell me how you mean to fix it (a fixup, a new " +
+        "commit on top, …) and wait for me to agree before rewriting history.",
+      ...rounds.map((r) => r.message.trimEnd()),
+    ].join("\n\n---\n\n") + "\n"
+  );
 }

@@ -28,11 +28,19 @@ type Placed = MapNode & Box;
  */
 function estimateHeight(n: MapNode, w: number) {
   const inner = w - 24;
-  const descLines = n.description ? Math.ceil((n.description.length * 6.4) / inner) : 0;
-  const nameLines = Math.ceil((n.name.length * 7.6 + (n.state === "added" || n.state === "removed" ? 60 : 0)) / inner);
+  const descLines = n.description
+    ? Math.ceil((n.description.length * 6.4) / inner)
+    : 0;
+  const nameLines = Math.ceil(
+    (n.name.length * 7.6 +
+      (n.state === "added" || n.state === "removed" ? 60 : 0)) /
+      inner,
+  );
   const files = Math.min(n.files.length, MAX_FILES + 1);
   const foot = n.state === "touched" || n.state === "added" ? 24 : 0;
-  return 16 + nameLines * 18 + descLines * 16 + (files ? 8 + files * 18 : 0) + foot;
+  return (
+    16 + nameLines * 18 + descLines * 16 + (files ? 8 + files * 18 : 0) + foot
+  );
 }
 
 function layout(
@@ -41,13 +49,19 @@ function layout(
   width: number,
   heights: Map<string, number> = new Map(),
 ) {
-  return layeredLayout(nodes, edges, width, (n, w) => heights.get(n.id) ?? estimateHeight(n, w), {
-    minW: MIN_NODE_W,
-    maxW: MAX_NODE_W,
-    rowGap: ROW_GAP,
-    colGap: COL_GAP,
-    pad: PAD,
-  });
+  return layeredLayout(
+    nodes,
+    edges,
+    width,
+    (n, w) => heights.get(n.id) ?? estimateHeight(n, w),
+    {
+      minW: MIN_NODE_W,
+      maxW: MAX_NODE_W,
+      rowGap: ROW_GAP,
+      colGap: COL_GAP,
+      pad: PAD,
+    },
+  );
 }
 
 function Squares({ add, del }: { add: number; del: number }) {
@@ -113,7 +127,9 @@ function MapCanvas({
     const out = new Map<string, string[]>();
     const inn = new Map<string, string[]>();
     const sorted = [...map.edges].sort(
-      (a, b) => (placed.get(a.destination)?.x ?? 0) - (placed.get(b.destination)?.x ?? 0),
+      (a, b) =>
+        (placed.get(a.destination)?.x ?? 0) -
+        (placed.get(b.destination)?.x ?? 0),
     );
     for (const e of sorted) {
       out.set(e.source, [...(out.get(e.source) ?? []), e.key]);
@@ -124,7 +140,12 @@ function MapCanvas({
 
   return (
     <div className="map-canvas" style={{ height }}>
-      <svg className="map-edges" width={width} height={height} aria-hidden="false">
+      <svg
+        className="map-edges"
+        width={width}
+        height={height}
+        aria-hidden="false"
+      >
         <defs>
           {[
             ["quiet", "var(--fg-subtle)"],
@@ -132,7 +153,16 @@ function MapCanvas({
             ["del", "var(--danger)"],
             ["chg", "var(--attention)"],
           ].map(([k, fill]) => (
-            <marker key={k} id={`map-${k}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <marker
+              key={k}
+              id={`map-${k}`}
+              viewBox="0 0 10 10"
+              refX="9"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto-start-reverse"
+            >
               <path d="M0 1 9 5 0 9z" style={{ fill }} />
             </marker>
           ))}
@@ -143,12 +173,34 @@ function MapCanvas({
           if (!a || !b || a === b) return null;
           const outs = ends.out.get(e.source) ?? [];
           const ins = ends.inn.get(e.destination) ?? [];
-          const { d } = edgePath(a, b, outs.indexOf(e.key), outs.length, ins.indexOf(e.key), ins.length);
-          const kind = e.state === "added" ? "add" : e.state === "removed" ? "del" : e.state === "changed" ? "chg" : "quiet";
+          const { d } = edgePath(
+            a,
+            b,
+            outs.indexOf(e.key),
+            outs.length,
+            ins.indexOf(e.key),
+            ins.length,
+          );
+          const kind =
+            e.state === "added"
+              ? "add"
+              : e.state === "removed"
+                ? "del"
+                : e.state === "changed"
+                  ? "chg"
+                  : "quiet";
           return (
-            <g key={e.key} onMouseEnter={() => setHoverEdge(e.key)} onMouseLeave={() => setHoverEdge(null)}>
+            <g
+              key={e.key}
+              onMouseEnter={() => setHoverEdge(e.key)}
+              onMouseLeave={() => setHoverEdge(null)}
+            >
               <path d={d} className="map-hit" />
-              <path d={d} className={`map-edge ${e.state} ${hoverEdge === e.key ? "hover" : ""}`} markerEnd={`url(#map-${kind})`} />
+              <path
+                d={d}
+                className={`map-edge ${e.state} ${hoverEdge === e.key ? "hover" : ""}`}
+                markerEnd={`url(#map-${kind})`}
+              />
               <title>{`${a.name} → ${b.name}: ${e.description}${e.before ? ` (was: ${e.before})` : ""}`}</title>
             </g>
           );
@@ -162,9 +214,20 @@ function MapCanvas({
         if (e.state === "same" && hoverEdge !== e.key) return null;
         const outs = ends.out.get(e.source) ?? [];
         const ins = ends.inn.get(e.destination) ?? [];
-        const { lx, ly } = edgePath(a, b, outs.indexOf(e.key), outs.length, ins.indexOf(e.key), ins.length);
+        const { lx, ly } = edgePath(
+          a,
+          b,
+          outs.indexOf(e.key),
+          outs.length,
+          ins.indexOf(e.key),
+          ins.length,
+        );
         return (
-          <div key={e.key} className={`map-label ${e.state}`} style={{ left: lx, top: ly }}>
+          <div
+            key={e.key}
+            className={`map-label ${e.state}`}
+            style={{ left: lx, top: ly }}
+          >
             {e.state === "changed" ? (
               <>
                 <s>{e.before}</s> <span>{e.description}</span>
@@ -178,7 +241,10 @@ function MapCanvas({
 
       {[...placed.values()].map((n) => {
         // "+1 more" takes a line anyway: name the file instead.
-        const shown = n.fileStats.slice(0, n.fileStats.length === MAX_FILES + 1 ? MAX_FILES + 1 : MAX_FILES);
+        const shown = n.fileStats.slice(
+          0,
+          n.fileStats.length === MAX_FILES + 1 ? MAX_FILES + 1 : MAX_FILES,
+        );
         const more = n.fileStats.length - shown.length;
         return (
           <div
@@ -189,14 +255,18 @@ function MapCanvas({
             }}
             className={`map-node ${n.state} ${n.files.length ? "jumps" : ""}`}
             style={{ left: n.x, top: n.y, width: n.w }}
-            onMouseEnter={() => onHover(n.state === "neighbour" ? null : n.name)}
+            onMouseEnter={() =>
+              onHover(n.state === "neighbour" ? null : n.name)
+            }
             onMouseLeave={() => onHover(null)}
             onClick={() => n.files[0] && onJump(n.files[0])}
           >
             <h4>
               <span>{n.name}</span>
               {n.state === "added" && <span className="map-tag new">New</span>}
-              {n.state === "removed" && <span className="map-tag removed">Removed</span>}
+              {n.state === "removed" && (
+                <span className="map-tag removed">Removed</span>
+              )}
             </h4>
             {n.description && <p>{n.description}</p>}
             {shown.length > 0 && (
@@ -213,10 +283,19 @@ function MapCanvas({
                     >
                       <span className="name">{fileName(f.path)}</span>
                       {f.status === "A" && <span className="new">new</span>}
-                      {f.status === "D" && <span className="gone">deleted</span>}
+                      {f.status === "D" && (
+                        <span className="gone">deleted</span>
+                      )}
                       <span className="stat">
-                        <span className="text-[var(--success)]">+{f.additions}</span>
-                        {f.deletions > 0 && <span className="text-[var(--danger)]"> −{f.deletions}</span>}
+                        <span className="text-[var(--success)]">
+                          +{f.additions}
+                        </span>
+                        {f.deletions > 0 && (
+                          <span className="text-[var(--danger)]">
+                            {" "}
+                            −{f.deletions}
+                          </span>
+                        )}
                       </span>
                     </button>
                   </li>
@@ -241,12 +320,19 @@ function MapCanvas({
               <div className="foot">
                 <span className="mono">
                   <span className="text-[var(--success)]">+{n.additions}</span>
-                  {n.deletions > 0 && <span className="text-[var(--danger)]"> −{n.deletions}</span>}
+                  {n.deletions > 0 && (
+                    <span className="text-[var(--danger)]">
+                      {" "}
+                      −{n.deletions}
+                    </span>
+                  )}
                 </span>
                 <Squares add={n.additions} del={n.deletions} />
                 <span>
                   {n.files.length} {n.files.length === 1 ? "file" : "files"}
-                  {n.newFiles > 0 && n.newFiles < n.files.length && `, ${n.newFiles} new`}
+                  {n.newFiles > 0 &&
+                    n.newFiles < n.files.length &&
+                    `, ${n.newFiles} new`}
                 </span>
               </div>
             )}
@@ -261,12 +347,21 @@ function MapCanvas({
 function Thumb({ map }: { map: MapResponse }) {
   const W = 112;
   const H = 56;
-  const { placed, height } = useMemo(() => layout(map.nodes, map.edges, 600), [map]);
+  const { placed, height } = useMemo(
+    () => layout(map.nodes, map.edges, 600),
+    [map],
+  );
   const scale = Math.min(W / 600, H / height);
   const ox = (W - 600 * scale) / 2;
   const oy = (H - height * scale) / 2;
   return (
-    <svg className="map-thumb" width={W} height={H} viewBox={`0 0 ${W} ${H}`} aria-hidden="true">
+    <svg
+      className="map-thumb"
+      width={W}
+      height={H}
+      viewBox={`0 0 ${W} ${H}`}
+      aria-hidden="true"
+    >
       {map.edges
         .filter((e) => e.state !== "same")
         .map((e) => {
@@ -281,7 +376,14 @@ function Thumb({ map }: { map: MapResponse }) {
               x2={ox + (b.x + b.w / 2) * scale}
               y2={oy + b.y * scale}
               strokeWidth="1.2"
-              style={{ stroke: e.state === "removed" ? "var(--danger)" : e.state === "changed" ? "var(--attention)" : "var(--success)" }}
+              style={{
+                stroke:
+                  e.state === "removed"
+                    ? "var(--danger)"
+                    : e.state === "changed"
+                      ? "var(--attention)"
+                      : "var(--success)",
+              }}
             />
           );
         })}
@@ -296,8 +398,22 @@ function Thumb({ map }: { map: MapResponse }) {
           strokeWidth="1.2"
           strokeDasharray={n.state === "removed" ? "2 2" : undefined}
           style={{
-            fill: n.state === "added" ? "var(--diff-add-num-bg)" : n.state === "removed" ? "var(--diff-del-bg)" : n.state === "neighbour" ? "var(--canvas-subtle)" : "var(--canvas)",
-            stroke: n.state === "added" ? "var(--success)" : n.state === "removed" ? "var(--danger)" : n.state === "neighbour" ? "var(--border)" : "var(--fg-muted)",
+            fill:
+              n.state === "added"
+                ? "var(--diff-add-num-bg)"
+                : n.state === "removed"
+                  ? "var(--diff-del-bg)"
+                  : n.state === "neighbour"
+                    ? "var(--canvas-subtle)"
+                    : "var(--canvas)",
+            stroke:
+              n.state === "added"
+                ? "var(--success)"
+                : n.state === "removed"
+                  ? "var(--danger)"
+                  : n.state === "neighbour"
+                    ? "var(--border)"
+                    : "var(--fg-muted)",
           }}
         />
       ))}
@@ -307,7 +423,9 @@ function Thumb({ map }: { map: MapResponse }) {
 
 const names = (list: MapNode[]) => {
   const n = list.map((x) => x.name);
-  return n.length <= 3 ? n.join(", ") : `${n.slice(0, 3).join(", ")} +${n.length - 3}`;
+  return n.length <= 3
+    ? n.join(", ")
+    : `${n.slice(0, 3).join(", ")} +${n.length - 3}`;
 };
 
 function summary(map: MapResponse) {
@@ -319,7 +437,13 @@ function summary(map: MapResponse) {
     removed: map.edges.filter((e) => e.state === "removed").length,
     changed: map.edges.filter((e) => e.state === "changed").length,
   };
-  const structural = added.length + removed.length + arrows.added + arrows.removed + arrows.changed > 0;
+  const structural =
+    added.length +
+      removed.length +
+      arrows.added +
+      arrows.removed +
+      arrows.changed >
+    0;
   const parts: React.ReactNode[] = [];
   if (!structural) {
     parts.push(
@@ -340,12 +464,36 @@ function summary(map: MapResponse) {
       <b>{changed.length}</b> changed
     </>,
   );
-  if (added.length) parts.push(<span className="text-[var(--success)]">{names(added)} {added.length === 1 ? "is" : "are"} new</span>);
-  if (removed.length) parts.push(<span className="text-[var(--danger)]">{names(removed)} removed</span>);
-  const plural = (n: number, w: string) => `${n} ${w} ${n === 1 ? "arrow" : "arrows"}`;
-  if (arrows.added) parts.push(<span className="text-[var(--success)]">{plural(arrows.added, "new")}</span>);
-  if (arrows.changed) parts.push(<span className="text-[var(--attention)]">{plural(arrows.changed, "relabelled")}</span>);
-  if (arrows.removed) parts.push(<span className="text-[var(--danger)]">{plural(arrows.removed, "removed")}</span>);
+  if (added.length)
+    parts.push(
+      <span className="text-[var(--success)]">
+        {names(added)} {added.length === 1 ? "is" : "are"} new
+      </span>,
+    );
+  if (removed.length)
+    parts.push(
+      <span className="text-[var(--danger)]">{names(removed)} removed</span>,
+    );
+  const plural = (n: number, w: string) =>
+    `${n} ${w} ${n === 1 ? "arrow" : "arrows"}`;
+  if (arrows.added)
+    parts.push(
+      <span className="text-[var(--success)]">
+        {plural(arrows.added, "new")}
+      </span>,
+    );
+  if (arrows.changed)
+    parts.push(
+      <span className="text-[var(--attention)]">
+        {plural(arrows.changed, "relabelled")}
+      </span>,
+    );
+  if (arrows.removed)
+    parts.push(
+      <span className="text-[var(--danger)]">
+        {plural(arrows.removed, "removed")}
+      </span>,
+    );
   return parts;
 }
 
@@ -380,7 +528,9 @@ export function MapStrip({
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(320, entry.contentRect.width - 22)));
+    const observer = new ResizeObserver(([entry]) =>
+      setWidth(Math.max(320, entry.contentRect.width - 22)),
+    );
     observer.observe(el);
     return () => observer.disconnect();
     // Again once the map arrives: before it does, the strip isn't rendered.
@@ -416,14 +566,17 @@ export function MapStrip({
         </div>
         {map.stale && (
           <div className="mt-0.5 flex items-center gap-1 text-[11px] text-[var(--attention)]">
-            <AlertIcon size={11} /> Model JSON is stale: the DSL changed without a re-export, so this
-            map may be out of date.
+            <AlertIcon size={11} /> Model JSON is stale: the DSL changed without
+            a re-export, so this map may be out of date.
           </div>
         )}
         {(map.unmapped.length > 0 || map.ambiguous.length > 0) && (
           <div
             className="text-[11px] text-[var(--fg-subtle)]"
-            title={[...map.unmapped, ...map.ambiguous.map((a) => `${a.file} ← ${a.ids.join(", ")}`)].join("\n")}
+            title={[
+              ...map.unmapped,
+              ...map.ambiguous.map((a) => `${a.file} ← ${a.ids.join(", ")}`),
+            ].join("\n")}
           >
             {map.unmapped.length > 0 &&
               (map.local
@@ -434,7 +587,12 @@ export function MapStrip({
           </div>
         )}
       </div>
-      <button type="button" className="map-btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+      <button
+        type="button"
+        className="map-btn"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
         {open ? "Hide map" : "Show map"}
         <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
       </button>
@@ -455,7 +613,8 @@ export function MapStrip({
             <div className="map-foot">
               {map.hidden > 0 && (
                 <span className="map-chip">
-                  <b>+{map.hidden}</b> unchanged {map.hidden === 1 ? "component" : "components"}
+                  <b>+{map.hidden}</b> unchanged{" "}
+                  {map.hidden === 1 ? "component" : "components"}
                 </span>
               )}
               <span className="flex-1" />
@@ -463,13 +622,31 @@ export function MapStrip({
             </div>
           </div>
           <div className="map-key">
-            <span><i className="box touched" />Touched</span>
-            <span><i className="box added" />New</span>
-            <span><i className="box removed" />Removed</span>
-            <span><i className="box neighbour" />Unchanged</span>
-            <span><span className="text-[var(--success)]">—</span> new arrow</span>
-            <span><span className="text-[var(--attention)]">—</span> relabelled</span>
-            <span><span className="text-[var(--danger)]">- -</span> removed arrow</span>
+            <span>
+              <i className="box touched" />
+              Touched
+            </span>
+            <span>
+              <i className="box added" />
+              New
+            </span>
+            <span>
+              <i className="box removed" />
+              Removed
+            </span>
+            <span>
+              <i className="box neighbour" />
+              Unchanged
+            </span>
+            <span>
+              <span className="text-[var(--success)]">—</span> new arrow
+            </span>
+            <span>
+              <span className="text-[var(--attention)]">—</span> relabelled
+            </span>
+            <span>
+              <span className="text-[var(--danger)]">- -</span> removed arrow
+            </span>
           </div>
         </div>
       )}

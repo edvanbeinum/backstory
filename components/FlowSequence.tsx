@@ -2,7 +2,12 @@
 
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { shortLabels, type FlowMode, type FlowRow, type LaneGroup } from "@/lib/flows/rows";
+import {
+  shortLabels,
+  type FlowMode,
+  type FlowRow,
+  type LaneGroup,
+} from "@/lib/flows/rows";
 import type { FlowParticipant } from "@/lib/flows/types";
 import { STEP_CODE_H } from "./StepCode";
 
@@ -32,7 +37,9 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 /** The changed fields a step's call names. */
 function fieldsIn(step: FlowRow["step"], fields: DataField[]) {
   const text = `${step.label} ${step.symbol}`;
-  return fields.filter((f) => new RegExp(`\\b${escapeRe(f.field)}\\b`).test(text)).slice(0, 2);
+  return fields
+    .filter((f) => new RegExp(`\\b${escapeRe(f.field)}\\b`).test(text))
+    .slice(0, 2);
 }
 
 /**
@@ -81,7 +88,9 @@ export function FlowSequence({
   useEffect(() => {
     const el = measure.current;
     if (!el) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width));
+    const observer = new ResizeObserver(([entry]) =>
+      setWidth(entry.contentRect.width),
+    );
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
@@ -92,7 +101,10 @@ export function FlowSequence({
 
   // Lanes share the width; a component group gets at least the room its
   // name needs, so the name is never cut. Wider than the column scrolls.
-  const laneW = Math.max(MIN_LANE, (width - GUTTER) / Math.max(lanes.length, 1));
+  const laneW = Math.max(
+    MIN_LANE,
+    (width - GUTTER) / Math.max(lanes.length, 1),
+  );
   const spans: { g: LaneGroup; left: number; width: number }[] = [];
   const centre = new Map<string, number>();
   const laneWidth = new Map<string, number>();
@@ -102,7 +114,9 @@ export function FlowSequence({
     // Wide enough for the component's name and for its widest lane name.
     const widestLane = Math.max(
       0,
-      ...lanes.slice(g.start, g.end + 1).map((l) => (labels.get(l.name) ?? l.label).length * 7.2 + 34),
+      ...lanes
+        .slice(g.start, g.end + 1)
+        .map((l) => (labels.get(l.name) ?? l.label).length * 7.2 + 34),
     );
     const w = Math.max(n * laneW, bandName(g).length * 7.6 + 32, widestLane);
     spans.push({ g, left: cursor, width: w });
@@ -127,17 +141,22 @@ export function FlowSequence({
         ? "Framework and library types"
         : "Code the map doesn't place";
     const lines = description
-      ? Math.min(BOX_DESC_LINES, Math.ceil((description.length * 6.5) / Math.max(40, w - 30)))
+      ? Math.min(
+          BOX_DESC_LINES,
+          Math.ceil((description.length * 6.5) / Math.max(40, w - 30)),
+        )
       : 0;
     return { ...span, state, description, lines };
   });
-  const BAND_H = BOX_NAME_H + Math.max(0, ...boxes.map((b) => b.lines)) * 16 + 6;
+  const BAND_H =
+    BOX_NAME_H + Math.max(0, ...boxes.map((b) => b.lines)) * 16 + 6;
   const inner = GUTTER + area;
   const narrowest = Math.min(...[...laneWidth.values(), laneW]);
   const stagger = lanes.length > 1 && narrowest < STAGGER_BELOW;
   const headH = (stagger ? 58 : 36) + BAND_H + BOX_PAD;
   const x = (name: string) => centre.get(name) ?? laneW / 2;
-  const chipWidth = (name: string) => (stagger ? 2 : 1) * (laneWidth.get(name) ?? laneW) - 12;
+  const chipWidth = (name: string) =>
+    (stagger ? 2 : 1) * (laneWidth.get(name) ?? laneW) - 12;
   // An open row's code sits under it at a fixed height, so every row below
   // moves down by the same amount and the arrows keep to their rows.
   const tops: number[] = [];
@@ -151,7 +170,11 @@ export function FlowSequence({
   const marker = (kind: string) => `url(#${id}-${kind})`;
   // A name chip is centred on its lane, but kept inside the lanes' area.
   const chipLeft = (p: FlowParticipant) => {
-    const half = Math.min(chipWidth(p.name), (labels.get(p.name) ?? p.label).length * 7 + 18) / 2;
+    const half =
+      Math.min(
+        chipWidth(p.name),
+        (labels.get(p.name) ?? p.label).length * 7 + 18,
+      ) / 2;
     return Math.min(Math.max(x(p.name), half), area - half);
   };
 
@@ -176,7 +199,9 @@ export function FlowSequence({
                   >
                     <h4>
                       <span className="truncate">{bandName(g)}</span>
-                      {state === "added" && <span className="map-tag new">New</span>}
+                      {state === "added" && (
+                        <span className="map-tag new">New</span>
+                      )}
                     </h4>
                     {description && <p>{description}</p>}
                   </div>
@@ -202,7 +227,11 @@ export function FlowSequence({
                     top: BAND_H + (stagger && i % 2 === 1 ? 31 : 6),
                     maxWidth: chipWidth(p.name),
                   }}
-                  title={[p.name, p.component && `in ${p.component}`, p.external && "external"]
+                  title={[
+                    p.name,
+                    p.component && `in ${p.component}`,
+                    p.external && "external",
+                  ]
                     .filter(Boolean)
                     .join(" · ")}
                 >
@@ -248,11 +277,23 @@ export function FlowSequence({
                   markerHeight="4.5"
                   orient="auto-start-reverse"
                 >
-                  <path d="M1 1 9 5 1 9" fill="none" strokeWidth="1.5" style={{ stroke: "var(--danger)" }} />
+                  <path
+                    d="M1 1 9 5 1 9"
+                    fill="none"
+                    strokeWidth="1.5"
+                    style={{ stroke: "var(--danger)" }}
+                  />
                 </marker>
               </defs>
               {lanes.map((p) => (
-                <line key={p.name} className="lifeline" x1={x(p.name)} x2={x(p.name)} y1={0} y2={height} />
+                <line
+                  key={p.name}
+                  className="lifeline"
+                  x1={x(p.name)}
+                  x2={x(p.name)}
+                  y1={0}
+                  y2={height}
+                />
               ))}
               {rows.map((row, i) => {
                 const from = x(row.step.from);
@@ -284,7 +325,10 @@ export function FlowSequence({
               // A label that won't fit to the right of its arrow ends at the
               // card's edge instead, reading back over the lanes to its left.
               const start = from === to ? from + 28 : Math.min(from, to) + 8;
-              const text = [row.step.label, row.step.returns ? `→ ${row.step.returns}` : ""].join(" ");
+              const text = [
+                row.step.label,
+                row.step.returns ? `→ ${row.step.returns}` : "",
+              ].join(" ");
               const fits = start + text.length * 7.3 + 8 <= area;
               const place = fits
                 ? { left: start, maxWidth: `calc(100% - ${start + 8}px)` }
@@ -293,50 +337,64 @@ export function FlowSequence({
               const second = mode === "diff" ? row.now : null;
               return (
                 <Fragment key={row.key}>
-                <div
-                  role="button"
-                  tabIndex={-1}
-                  className={`flow-grid flow-row k-${row.kind} ${activeKeys.has(row.key) ? "inview" : ""}`}
-                  onClick={() => onRowClick(row)}
-                  title={`${row.step.caller} · ${row.step.file}:${row.step.line}`}
-                >
-                  <span className="n">{first ?? ""}</span>
-                  <span className="n">{second ?? ""}</span>
-                  <span className="m" />
-                  <span className="l">
-                    <span className="lab" style={place}>
-                      <span className="call min-w-0 truncate">{row.step.label}</span>
-                      {row.step.returns && (
-                        <span className="ret min-w-0 shrink-[2] truncate">→ {row.step.returns}</span>
-                      )}
-                      {row.step.repeat && <span className="flow-badge">× {row.step.repeat}</span>}
-                      {row.again && <span className="flow-badge">{row.again}</span>}
-                      {fieldsIn(row.step, dataFields).map((f) => (
-                        <span
-                          key={f.field}
-                          className={`flow-badge data ${f.state}`}
-                          title={`This step uses ${f.entity}.${f.field}, which the change ${f.state === "added" ? "adds" : f.state === "removed" ? "removes" : "changes"}`}
-                        >
-                          {f.entity}.{f.field} {f.state === "added" ? "new" : f.state}
+                  <div
+                    role="button"
+                    tabIndex={-1}
+                    className={`flow-grid flow-row k-${row.kind} ${activeKeys.has(row.key) ? "inview" : ""}`}
+                    onClick={() => onRowClick(row)}
+                    title={`${row.step.caller} · ${row.step.file}:${row.step.line}`}
+                  >
+                    <span className="n">{first ?? ""}</span>
+                    <span className="n">{second ?? ""}</span>
+                    <span className="m" />
+                    <span className="l">
+                      <span className="lab" style={place}>
+                        <span className="call min-w-0 truncate">
+                          {row.step.label}
                         </span>
-                      ))}
-                      {!row.step.verified && (
-                        <span
-                          className="flow-badge warn"
-                          title={`"${row.step.symbol}" isn't on ${row.step.file}:${row.step.line}`}
-                        >
-                          unverified
-                        </span>
-                      )}
+                        {row.step.returns && (
+                          <span className="ret min-w-0 shrink-[2] truncate">
+                            → {row.step.returns}
+                          </span>
+                        )}
+                        {row.step.repeat && (
+                          <span className="flow-badge">
+                            × {row.step.repeat}
+                          </span>
+                        )}
+                        {row.again && (
+                          <span className="flow-badge">{row.again}</span>
+                        )}
+                        {fieldsIn(row.step, dataFields).map((f) => (
+                          <span
+                            key={f.field}
+                            className={`flow-badge data ${f.state}`}
+                            title={`This step uses ${f.entity}.${f.field}, which the change ${f.state === "added" ? "adds" : f.state === "removed" ? "removes" : "changes"}`}
+                          >
+                            {f.entity}.{f.field}{" "}
+                            {f.state === "added" ? "new" : f.state}
+                          </span>
+                        ))}
+                        {!row.step.verified && (
+                          <span
+                            className="flow-badge warn"
+                            title={`"${row.step.symbol}" isn't on ${row.step.file}:${row.step.line}`}
+                          >
+                            unverified
+                          </span>
+                        )}
+                      </span>
                     </span>
-                  </span>
-                </div>
-                {open.has(row.key) && (
-                  // Pinned to the visible part of a card that scrolls sideways.
-                  <div className="step-code-slot" style={{ width: width || undefined }}>
-                    {renderCode?.(row)}
                   </div>
-                )}
+                  {open.has(row.key) && (
+                    // Pinned to the visible part of a card that scrolls sideways.
+                    <div
+                      className="step-code-slot"
+                      style={{ width: width || undefined }}
+                    >
+                      {renderCode?.(row)}
+                    </div>
+                  )}
                 </Fragment>
               );
             })}

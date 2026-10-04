@@ -62,13 +62,20 @@ function home(): string {
 /** Worktrees of one repo share their flows: the key is the common git dir. */
 async function repoDir(root: string): Promise<string> {
   const common =
-    (await gitLine(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"])) ?? root;
-  const name = path.basename(path.dirname(common)).replace(/[^A-Za-z0-9._-]/g, "_");
+    (await gitLine(root, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+    ])) ?? root;
+  const name = path
+    .basename(path.dirname(common))
+    .replace(/[^A-Za-z0-9._-]/g, "_");
   const hash = createHash("sha1").update(common).digest("hex").slice(0, 8);
   return path.join(home(), "flows", `${name}-${hash}`);
 }
 
-const fileName = (view: View) => `${view.base ?? "root"}..${view.head}.sarif.json`;
+const fileName = (view: View) =>
+  `${view.base ?? "root"}..${view.head}.sarif.json`;
 const jobKey = (dir: string, view: View) => path.join(dir, fileName(view));
 
 async function readCache(file: string): Promise<FlowSet | null> {
@@ -81,7 +88,11 @@ async function readCache(file: string): Promise<FlowSet | null> {
 
 async function writeCache(file: string, set: FlowSet, root: string) {
   await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, JSON.stringify(toSarif(set, `file://${root}`), null, 1), "utf8");
+  await fs.writeFile(
+    file,
+    JSON.stringify(toSarif(set, `file://${root}`), null, 1),
+    "utf8",
+  );
 }
 
 export function onFlowsChange(listener: (root: string) => void): () => void {
@@ -92,7 +103,8 @@ export function onFlowsChange(listener: (root: string) => void): () => void {
 export async function flowsStatus(view: View): Promise<FlowsStatus> {
   const key = jobKey(await repoDir(view.root), view);
   const job = registry.jobs.get(key);
-  if (job) return { status: "running", startedAt: job.startedAt, phase: job.phase };
+  if (job)
+    return { status: "running", startedAt: job.startedAt, phase: job.phase };
   const cached = await readCache(key);
   if (cached) {
     return {
@@ -147,7 +159,10 @@ export async function startFlows(
       });
       await writeCache(key, set, view.root);
     } catch (err) {
-      registry.failures.set(key, err instanceof Error ? err.message : String(err));
+      registry.failures.set(
+        key,
+        err instanceof Error ? err.message : String(err),
+      );
     } finally {
       registry.jobs.delete(key);
       registry.events.emit("change", view.root);
@@ -157,8 +172,12 @@ export async function startFlows(
 }
 
 /** "Trace a flow from here": one more flow for a hunk on none. */
-export async function startTrace(view: View, hunkId: string): Promise<FlowsStatus> {
-  if (!(await haveClaude())) return { status: "unavailable", reason: "no-claude" };
+export async function startTrace(
+  view: View,
+  hunkId: string,
+): Promise<FlowsStatus> {
+  if (!(await haveClaude()))
+    return { status: "unavailable", reason: "no-claude" };
   const key = jobKey(await repoDir(view.root), view);
   const tracing = registry.tracing.get(key) ?? new Set<string>();
   if (tracing.has(hunkId)) return flowsStatus(view);
@@ -179,7 +198,10 @@ export async function startTrace(view: View, hunkId: string): Promise<FlowsStatu
       });
       await writeCache(key, next, view.root);
     } catch (err) {
-      registry.failures.set(key, err instanceof Error ? err.message : String(err));
+      registry.failures.set(
+        key,
+        err instanceof Error ? err.message : String(err),
+      );
     } finally {
       tracing.delete(hunkId);
       registry.events.emit("change", view.root);

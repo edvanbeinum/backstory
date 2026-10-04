@@ -9,7 +9,13 @@
  * a different port — so re-running `differ` is always the fix.
  */
 import { execFile } from "node:child_process";
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -133,7 +139,11 @@ export async function ensureAgent(spec) {
   // launchd reads a plist only when it's bootstrapped, so a changed one has
   // to be booted out and back in. RunAtLoad starts the server.
   await launchctl(["bootout", target()]);
-  const boot = await launchctl(["bootstrap", `gui/${process.getuid()}`, plistPath()]);
+  const boot = await launchctl([
+    "bootstrap",
+    `gui/${process.getuid()}`,
+    plistPath(),
+  ]);
   if (!boot.ok) throw new Error(`launchctl bootstrap failed: ${boot.out}`);
   if (current === null) return "installed";
   return current === plist ? "started" : "updated";

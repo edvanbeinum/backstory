@@ -7,7 +7,13 @@ import globals from "globals";
 export default defineConfig([
   ...nextVitals,
   ...nextTs,
-  globalIgnores([".next/**", "out/**", "build/**", "next-env.d.ts", "local/**"]),
+  globalIgnores([
+    ".next/**",
+    "out/**",
+    "build/**",
+    "next-env.d.ts",
+    "local/**",
+  ]),
   {
     files: ["bin/**/*.mjs"],
     languageOptions: { globals: globals.node },

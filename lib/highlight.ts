@@ -157,7 +157,8 @@ export async function highlightFiles(
     // The new side wins for context lines: it's what the code looks like now.
     oldRefs.forEach((ref, i) => {
       const line = file.hunks[ref.hunk].lines[ref.line];
-      if (line.type === "del") line.html = oldHtml[i] ?? escapeHtml(line.content);
+      if (line.type === "del")
+        line.html = oldHtml[i] ?? escapeHtml(line.content);
     });
     newRefs.forEach((ref, i) => {
       const line = file.hunks[ref.hunk].lines[ref.line];
@@ -197,9 +198,12 @@ export function renderDiffHunk(hunk: string): Array<{
   content: string;
 }> {
   return hunk.split("\n").map((line) => {
-    if (line.startsWith("@@")) return { type: "header" as const, content: line };
-    if (line.startsWith("+")) return { type: "add" as const, content: line.slice(1) };
-    if (line.startsWith("-")) return { type: "del" as const, content: line.slice(1) };
+    if (line.startsWith("@@"))
+      return { type: "header" as const, content: line };
+    if (line.startsWith("+"))
+      return { type: "add" as const, content: line.slice(1) };
+    if (line.startsWith("-"))
+      return { type: "del" as const, content: line.slice(1) };
     return { type: "context" as const, content: line.replace(/^ /, "") };
   });
 }

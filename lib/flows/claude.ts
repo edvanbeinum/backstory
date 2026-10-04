@@ -73,7 +73,9 @@ export const claudeRunner: Runner = async <T>(
 
   const start = stdout.indexOf("{");
   if (start === -1) {
-    throw new Error(`Claude Code returned no JSON${stderr.trim() ? `: ${stderr.trim().slice(0, 500)}` : "."}`);
+    throw new Error(
+      `Claude Code returned no JSON${stderr.trim() ? `: ${stderr.trim().slice(0, 500)}` : "."}`,
+    );
   }
   const result = JSON.parse(stdout.slice(start)) as {
     is_error?: boolean;
@@ -83,7 +85,9 @@ export const claudeRunner: Runner = async <T>(
     modelUsage?: Record<string, unknown>;
   };
   if (result.is_error || result.structured_output === undefined) {
-    throw new Error(`Claude Code failed: ${result.result ?? "no structured output"}`);
+    throw new Error(
+      `Claude Code failed: ${result.result ?? "no structured output"}`,
+    );
   }
   return {
     output: result.structured_output,
@@ -94,8 +98,12 @@ export const claudeRunner: Runner = async <T>(
 
 /** A run can use more than one model; the one that cost the most did the work. */
 function mainModel(usage: Record<string, unknown> | undefined): string | null {
-  const cost = (u: unknown) => ((u as { costUSD?: number })?.costUSD ?? 0);
-  return Object.entries(usage ?? {}).sort((a, b) => cost(b[1]) - cost(a[1]))[0]?.[0] ?? null;
+  const cost = (u: unknown) => (u as { costUSD?: number })?.costUSD ?? 0;
+  return (
+    Object.entries(usage ?? {}).sort(
+      (a, b) => cost(b[1]) - cost(a[1]),
+    )[0]?.[0] ?? null
+  );
 }
 
 export async function claudeAvailable(): Promise<boolean> {

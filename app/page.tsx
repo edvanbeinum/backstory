@@ -136,7 +136,10 @@ export default function Page() {
   /** Bumped when a flow run finishes. */
   const [flowsTick, setFlowsTick] = useState(0);
   const [columnTab, setColumnTab] = useState<ColumnTab>("flows");
-  const [flowSel, setFlowSel] = useState<FlowSelection>({ index: 0, mode: "diff" });
+  const [flowSel, setFlowSel] = useState<FlowSelection>({
+    index: 0,
+    mode: "diff",
+  });
   const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
   const [map, setMap] = useState<MapResponse | null>(null);
   const [dataModel, setDataModel] = useState<DataResponse | null>(null);
@@ -327,7 +330,9 @@ export default function Page() {
       try {
         const data = await getJson<SessionResponse>(
           `/api/session?repo=${encodeURIComponent(path)}` +
-            (refRef.current ? `&ref=${encodeURIComponent(refRef.current)}` : "") +
+            (refRef.current
+              ? `&ref=${encodeURIComponent(refRef.current)}`
+              : "") +
             (opts.fresh ? "&fresh=1" : ""),
         );
         if (seq !== sessionSeq.current) return; // superseded by a newer fetch
@@ -376,7 +381,6 @@ export default function Page() {
           }
           return next;
         });
-
       } catch (err) {
         if (seq !== sessionSeq.current) return;
         // A background failure keeps the last good view — the repo may just
@@ -485,11 +489,13 @@ export default function Page() {
       if (kinds.length === 0) return;
 
       const agentKinds = ["review", "outbox"];
-      if (kinds.some((kind) => agentKinds.includes(kind))) setReviewTick((t) => t + 1);
+      if (kinds.some((kind) => agentKinds.includes(kind)))
+        setReviewTick((t) => t + 1);
       if (kinds.includes("flows")) setFlowsTick((t) => t + 1);
       // A review request, a queued round or a finished flow run changes
       // nothing on disk.
-      if (kinds.every((kind) => kind === "flows" || agentKinds.includes(kind))) return;
+      if (kinds.every((kind) => kind === "flows" || agentKinds.includes(kind)))
+        return;
 
       setWorkingTick((t) => t + 1);
       void loadSession(repoPath, {
@@ -618,11 +624,14 @@ export default function Page() {
    * viewer's own; "Show in diff" from a step switches for this view only.
    */
   const [layoutPref, setLayoutPref] = useState<"diagrams" | "code">("diagrams");
-  const [layoutOverride, setLayoutOverride] = useState<"diagrams" | "code" | null>(null);
+  const [layoutOverride, setLayoutOverride] = useState<
+    "diagrams" | "code" | null
+  >(null);
   const [jumpTo, setJumpTo] = useState<string | null>(null);
   useEffect(() => {
     try {
-      if (window.localStorage.getItem(LAYOUT_KEY) === "code") setLayoutPref("code");
+      if (window.localStorage.getItem(LAYOUT_KEY) === "code")
+        setLayoutPref("code");
     } catch {
       // Storage blocked: lead with the diagrams.
     }
@@ -643,25 +652,34 @@ export default function Page() {
   useEffect(() => {
     // Only once the session says there are none: before it loads, a
     // ?comment= link's tab must survive.
-    if (session && !hasComments && columnTab === "comments") setColumnTab("flows");
+    if (session && !hasComments && columnTab === "comments")
+      setColumnTab("flows");
   }, [session, hasComments, columnTab]);
 
   // "All changes" follows HEAD: when the diff is fetched again, so are its
   // flows, or the last head's flows would sit on the new head's lines.
-  const flows = useFlows(session ? repoPath : "", rev, `${flowsTick}:${workingDiffKey}`);
+  const flows = useFlows(
+    session ? repoPath : "",
+    rev,
+    `${flowsTick}:${workingDiffKey}`,
+  );
   const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
   // Diagrams lead only where there are flows to lead with: an untraced
   // view opens on the diff, with "Trace this change" in the column.
-  const hasFlows = rev !== WORKING_REV && flowSet !== null && flowSet.flows.length > 0;
+  const hasFlows =
+    rev !== WORKING_REV && flowSet !== null && flowSet.flows.length > 0;
   // Decided once per view, when its flows have loaded. Status is null for a
   // moment on every move and "running" through a regenerate; deciding then
   // would flash the diff and remount it. A trace landing later doesn't flip
   // the view either, so a note being typed survives; the switch appears.
   const viewKey = `${repoPath}@${rev}`;
-  const [lead, setLead] = useState<{ view: string; lead: boolean } | null>(null);
+  const [lead, setLead] = useState<{ view: string; lead: boolean } | null>(
+    null,
+  );
   const settled = flows.status !== null && flows.status.status !== "running";
   useEffect(() => {
-    if (settled && lead?.view !== viewKey) setLead({ view: viewKey, lead: hasFlows });
+    if (settled && lead?.view !== viewKey)
+      setLead({ view: viewKey, lead: hasFlows });
   }, [settled, lead, viewKey, hasFlows]);
   const flowsLead = lead?.lead ?? false;
   const layout = layoutOverride ?? (flowsLead ? layoutPref : "code");
@@ -702,11 +720,18 @@ export default function Page() {
   }, [pendingFile, layout]);
 
   /** Notes on the change's shape, pinned on the data cards and under flow titles. */
-  const questions = useMemo(() => designQuestions(flowSet, dataModel), [flowSet, dataModel]);
+  const questions = useMemo(
+    () => designQuestions(flowSet, dataModel),
+    [flowSet, dataModel],
+  );
   const entityNotes = useMemo(() => {
     const out = new Map<string, string[]>();
     for (const q of questions) {
-      if (q.on.entity) out.set(q.on.entity, [...(out.get(q.on.entity) ?? []), q.short.replace(`${q.on.entity} gains `, "")]);
+      if (q.on.entity)
+        out.set(q.on.entity, [
+          ...(out.get(q.on.entity) ?? []),
+          q.short.replace(`${q.on.entity} gains `, ""),
+        ]);
     }
     return out;
   }, [questions]);
@@ -726,7 +751,11 @@ export default function Page() {
       (dataModel?.entities ?? []).flatMap((e) =>
         e.fields
           .filter((f) => f.state !== "same")
-          .map((f) => ({ entity: e.name, field: f.item.name, state: f.state as DataField["state"] })),
+          .map((f) => ({
+            entity: e.name,
+            field: f.item.name,
+            state: f.state as DataField["state"],
+          })),
       ),
     [dataModel],
   );
@@ -738,7 +767,8 @@ export default function Page() {
       info.set(name, { description, state: "neighbour" });
     }
     for (const n of map?.nodes ?? []) {
-      if (n.state !== "neighbour") info.set(n.name, { description: n.description, state: n.state });
+      if (n.state !== "neighbour")
+        info.set(n.name, { description: n.description, state: n.state });
     }
     return info;
   }, [map]);
@@ -750,14 +780,20 @@ export default function Page() {
 
   // A regenerate can return fewer flows than the one selected.
   useEffect(() => {
-    if (flowSet && flowSel.index >= flowSet.flows.length) setFlowSel({ index: 0, mode: "diff" });
+    if (flowSet && flowSel.index >= flowSet.flows.length)
+      setFlowSel({ index: 0, mode: "diff" });
   }, [flowSet, flowSel.index]);
 
   const selectedFlow = flowSet?.flows[flowSel.index] ?? null;
   const flowMode =
-    selectedFlow?.before === null && flowSel.mode === "before" ? "diff" : flowSel.mode;
+    selectedFlow?.before === null && flowSel.mode === "before"
+      ? "diff"
+      : flowSel.mode;
   const rows = useMemo(
-    () => (selectedFlow && flowSet ? flowRows(selectedFlow, flowMode, flowSet.hunks) : []),
+    () =>
+      selectedFlow && flowSet
+        ? flowRows(selectedFlow, flowMode, flowSet.hunks)
+        : [],
     [selectedFlow, flowMode, flowSet],
   );
 
@@ -766,7 +802,10 @@ export default function Page() {
     if (!showColumn || columnTab !== "flows" || rows.length === 0) return null;
     const marks = new Map<string, FileMarks>();
     for (const row of rows) {
-      const entry = marks.get(row.step.file) ?? { old: new Map(), new: new Map() };
+      const entry = marks.get(row.step.file) ?? {
+        old: new Map(),
+        new: new Map(),
+      };
       const side = entry[row.side];
       const number = row.kind === "del" ? row.was : (row.now ?? row.was);
       side.set(row.step.line, [
@@ -834,7 +873,6 @@ export default function Page() {
     [rev, threads, anchoredIds, linkedCounts],
   );
 
-
   /**
    * Commits a thread can be pinned to: the unpushed ones first, then a slice
    * of pushed history. The right commit is often neither the guess nor the
@@ -842,7 +880,10 @@ export default function Page() {
    * — so the picker has to offer the whole branch.
    */
   const pinCandidates = useMemo(
-    () => [...(session?.commits ?? []), ...(session?.history ?? []).slice(0, 15)],
+    () => [
+      ...(session?.commits ?? []),
+      ...(session?.history ?? []).slice(0, 15),
+    ],
     [session],
   );
 
@@ -966,7 +1007,7 @@ export default function Page() {
       flushingDrafts.current.add(threadId);
 
       try {
-        for (let attempt = 0; ; ) {
+        for (let attempt = 0; ;) {
           const pending = pendingDrafts.current.get(threadId);
           if (!pending || pending.saved) return; // written, or discarded
 
@@ -1224,22 +1265,31 @@ export default function Page() {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session, rev, threads, commentId, toggleDone, selectComment, showColumn, columnTab]);
+  }, [
+    session,
+    rev,
+    threads,
+    commentId,
+    toggleDone,
+    selectComment,
+    showColumn,
+    columnTab,
+  ]);
 
   return (
     <div className="min-h-screen">
       {repoPath && (
-      <RepoBar
-        repoPath={repoPath}
-        onRepoPathChange={selectRepo}
-        session={session}
-        loading={sessionLoading || diffLoading}
-        onRefresh={() => void loadSession(repoPath, { fresh: true })}
-        live={live}
-        recents={recents}
-        onRemoveRecent={removeRecent}
-        onBackToInbox={backToInbox}
-      />
+        <RepoBar
+          repoPath={repoPath}
+          onRepoPathChange={selectRepo}
+          session={session}
+          loading={sessionLoading || diffLoading}
+          onRefresh={() => void loadSession(repoPath, { fresh: true })}
+          live={live}
+          recents={recents}
+          onRemoveRecent={removeRecent}
+          onBackToInbox={backToInbox}
+        />
       )}
 
       {!repoPath ? (
@@ -1296,91 +1346,94 @@ export default function Page() {
               />
             )}
             <div className="space-y-3 p-4 pt-3">
-            {session.github.pr && <PrTitle pr={session.github.pr} />}
+              {session.github.pr && <PrTitle pr={session.github.pr} />}
 
-            {revNotice && (
-              <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                <AlertIcon size={13} className="mt-0.5 shrink-0 text-[var(--attention)]" />
-                <span className="flex-1">
-                  <span className="mono">{revNotice}</span> isn&apos;t waiting
-                  to be pushed any more — it may already be on GitHub. Showing
-                  the latest instead.
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setRevNotice(null)}
-                  className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                >
-                  Dismiss
-                </button>
-              </p>
-            )}
+              {revNotice && (
+                <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                  <AlertIcon
+                    size={13}
+                    className="mt-0.5 shrink-0 text-[var(--attention)]"
+                  />
+                  <span className="flex-1">
+                    <span className="mono">{revNotice}</span> isn&apos;t waiting
+                    to be pushed any more — it may already be on GitHub. Showing
+                    the latest instead.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setRevNotice(null)}
+                    className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                  >
+                    Dismiss
+                  </button>
+                </p>
+              )}
 
-            {session.github.unavailable && !session.github.pr && (
-              <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
-                {session.github.unavailable}
-              </p>
-            )}
+              {session.github.unavailable && !session.github.pr && (
+                <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
+                  {session.github.unavailable}
+                </p>
+              )}
 
-            {linkNotice && (
-              <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                <AlertIcon
-                  size={13}
-                  className="mt-0.5 shrink-0 text-[var(--attention)]"
-                />
-                <span className="flex-1">{linkNotice}</span>
-                <button
-                  type="button"
-                  onClick={() => setLinkNotice(null)}
-                  className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                >
-                  Dismiss
-                </button>
-              </p>
-            )}
+              {linkNotice && (
+                <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                  <AlertIcon
+                    size={13}
+                    className="mt-0.5 shrink-0 text-[var(--attention)]"
+                  />
+                  <span className="flex-1">{linkNotice}</span>
+                  <button
+                    type="button"
+                    onClick={() => setLinkNotice(null)}
+                    className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                  >
+                    Dismiss
+                  </button>
+                </p>
+              )}
 
-            {/* Not dismissible, and it stays until a write actually lands:
+              {/* Not dismissible, and it stays until a write actually lands:
                 the whole point is that you find out your words are only in
                 this window before you close it. */}
-            {draftNotice && (
-              <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                <AlertIcon
-                  size={13}
-                  className="mt-0.5 shrink-0 text-[var(--attention)]"
-                />
-                <span className="flex-1">
-                  A draft reply hasn&apos;t reached differ — it&apos;s still
-                  here and still being retried, but copy it somewhere safe
-                  before closing this window.
-                </span>
-              </p>
-            )}
+              {draftNotice && (
+                <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                  <AlertIcon
+                    size={13}
+                    className="mt-0.5 shrink-0 text-[var(--attention)]"
+                  />
+                  <span className="flex-1">
+                    A draft reply hasn&apos;t reached differ — it&apos;s still
+                    here and still being retried, but copy it somewhere safe
+                    before closing this window.
+                  </span>
+                </p>
+              )}
 
-            {commentNotice && (
-              <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                <AlertIcon
-                  size={13}
-                  className="mt-0.5 shrink-0 text-[var(--attention)]"
-                />
-                <span className="flex-1">
-                  That comment isn&apos;t on this pull request any more —
-                  showing the first open one instead.
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setCommentNotice(null)}
-                  className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                >
-                  Dismiss
-                </button>
-              </p>
-            )}
+              {commentNotice && (
+                <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                  <AlertIcon
+                    size={13}
+                    className="mt-0.5 shrink-0 text-[var(--attention)]"
+                  />
+                  <span className="flex-1">
+                    That comment isn&apos;t on this pull request any more —
+                    showing the first open one instead.
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setCommentNotice(null)}
+                    className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                  >
+                    Dismiss
+                  </button>
+                </p>
+              )}
 
-            {layout === "diagrams" ? (
-              // Flow-first: the change, then where it landed and what it does.
-              // The diff is a click away, from any step.
-              <div className="mx-auto w-full max-w-[1280px] space-y-4">
-                <ChangePane
+              {layout === "diagrams" ? (
+                // Flow-first: the change, then where it landed and what it does.
+                // The diff is a click away, from any step.
+                <div className="mx-auto w-full max-w-[1280px] space-y-4">
+                  <ChangePane
                     session={session}
                     rev={rev}
                     onRevChange={(next) => {
@@ -1411,7 +1464,7 @@ export default function Page() {
                     layout={layout}
                     onLayout={canChooseLayout ? chooseLayout : null}
                   />
-                <SideColumn
+                  <SideColumn
                     full
                     tab={columnTab}
                     onTab={setColumnTab}
@@ -1421,7 +1474,11 @@ export default function Page() {
                     header={
                       rev !== WORKING_REV ? (
                         <>
-                          <MapStrip map={map} onHover={setHoveredComponent} onOpenFile={openFile} />
+                          <MapStrip
+                            map={map}
+                            onHover={setHoveredComponent}
+                            onOpenFile={openFile}
+                          />
                           <DataStrip data={dataModel} notes={entityNotes} />
                         </>
                       ) : null
@@ -1437,8 +1494,8 @@ export default function Page() {
                         code={inlineCode}
                         jumpTo={pendingJump}
                         components={componentInfo}
-                      dataFields={dataFields}
-                      flowNotes={flowNotes}
+                        dataFields={dataFields}
+                        flowNotes={flowNotes}
                         onJumped={() => setJumpTo(null)}
                         coverage={
                           flowSet && diff && diff.rev === rev ? (
@@ -1446,7 +1503,9 @@ export default function Page() {
                               set={flowSet}
                               files={diff.files}
                               tracing={
-                                flows.status?.status === "ready" ? flows.status.tracing : []
+                                flows.status?.status === "ready"
+                                  ? flows.status.tracing
+                                  : []
                               }
                               onTrace={flows.trace}
                               inline={inlineCode && { repo: repoPath, rev }}
@@ -1472,111 +1531,117 @@ export default function Page() {
                       />
                     }
                   />
-              </div>
-            ) : (
-            /* Two columns, two independent selections: the flow or comment
+                </div>
+              ) : (
+                /* Two columns, two independent selections: the flow or comment
                 you're working on stays put on the left while you browse
                 changes on the right. Stacks below xl, where side-by-side would
                 squeeze the diff too hard. */
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-0">
-              {showColumn && (
-                <SideColumn
-                  tab={columnTab}
-                  onTab={setColumnTab}
-                  flowCount={flowSet ? flowSet.flows.length : null}
-                  commentCount={threads.length}
-                  showComments={hasComments}
-                  header={
-                    rev !== WORKING_REV ? (
-                      <>
-                          <MapStrip map={map} onHover={setHoveredComponent} onOpenFile={openFile} />
-                          <DataStrip data={dataModel} notes={entityNotes} />
-                        </>
-                    ) : null
-                  }
-                  flows={
-                    <FlowPanel
-                      api={flows}
-                      selection={{ ...flowSel, mode: flowMode }}
-                      onSelect={setFlowSel}
-                      rows={rows}
-                      filesInDiff={filesInDiff}
-                      navRef={flowNavRef}
-                      code={inlineCode}
-                      jumpTo={pendingJump}
-                      components={componentInfo}
-                      dataFields={dataFields}
-                      flowNotes={flowNotes}
-                      onJumped={() => setJumpTo(null)}
-                      coverage={
-                        flowSet && diff && diff.rev === rev ? (
-                          <FlowCoverage
-                            set={flowSet}
-                            files={diff.files}
-                            tracing={
-                              flows.status?.status === "ready" ? flows.status.tracing : []
-                            }
-                            onTrace={flows.trace}
-                            inline={inlineCode && { repo: repoPath, rev }}
-                          />
+                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-0">
+                  {showColumn && (
+                    <SideColumn
+                      tab={columnTab}
+                      onTab={setColumnTab}
+                      flowCount={flowSet ? flowSet.flows.length : null}
+                      commentCount={threads.length}
+                      showComments={hasComments}
+                      header={
+                        rev !== WORKING_REV ? (
+                          <>
+                            <MapStrip
+                              map={map}
+                              onHover={setHoveredComponent}
+                              onOpenFile={openFile}
+                            />
+                            <DataStrip data={dataModel} notes={entityNotes} />
+                          </>
                         ) : null
                       }
+                      flows={
+                        <FlowPanel
+                          api={flows}
+                          selection={{ ...flowSel, mode: flowMode }}
+                          onSelect={setFlowSel}
+                          rows={rows}
+                          filesInDiff={filesInDiff}
+                          navRef={flowNavRef}
+                          code={inlineCode}
+                          jumpTo={pendingJump}
+                          components={componentInfo}
+                          dataFields={dataFields}
+                          flowNotes={flowNotes}
+                          onJumped={() => setJumpTo(null)}
+                          coverage={
+                            flowSet && diff && diff.rev === rev ? (
+                              <FlowCoverage
+                                set={flowSet}
+                                files={diff.files}
+                                tracing={
+                                  flows.status?.status === "ready"
+                                    ? flows.status.tracing
+                                    : []
+                                }
+                                onTrace={flows.trace}
+                                inline={inlineCode && { repo: repoPath, rev }}
+                              />
+                            ) : null
+                          }
+                        />
+                      }
+                      comments={
+                        <CommentPane
+                          threads={threads}
+                          thread={selectedThread}
+                          index={commentIndex}
+                          onStep={stepComment}
+                          repo={session.repo}
+                          pr={session.github.pr}
+                          commit={commitForRev}
+                          branch={session.repo.branch}
+                          commitCandidates={pinCandidates}
+                          onToggleDone={toggleDone}
+                          onLinkCommit={linkCommit}
+                          onDraftChange={saveDraft}
+                        />
+                      }
                     />
-                  }
-                  comments={
-                    <CommentPane
+                  )}
+
+                  <div className="min-w-0 flex-1">
+                    <ChangePane
+                      session={session}
+                      rev={rev}
+                      onRevChange={(next) => {
+                        // Remember anything that isn't in the offered list, so a
+                        // pasted sha survives the next refresh.
+                        if (
+                          !session.commits.some((c) => c.sha === next) &&
+                          !session.history.some((c) => c.sha === next)
+                        ) {
+                          pickedRevs.current = [
+                            ...new Set([...pickedRevs.current, next]),
+                          ];
+                        }
+                        setRev(next);
+                      }}
+                      commit={commitForRev}
+                      diff={diff}
+                      loading={diffLoading}
+                      error={diffError}
                       threads={threads}
                       thread={selectedThread}
-                      index={commentIndex}
-                      onStep={stepComment}
-                      repo={session.repo}
-                      pr={session.github.pr}
-                      commit={commitForRev}
-                      branch={session.repo.branch}
-                      commitCandidates={pinCandidates}
-                      onToggleDone={toggleDone}
-                      onLinkCommit={linkCommit}
-                      onDraftChange={saveDraft}
+                      focusedThreadId={focusedThreadId}
+                      pushed={revIsPushed}
+                      reviewTick={reviewTick}
+                      flowMarks={flowMarks}
+                      fileComponents={map?.fileComponents ?? null}
+                      hoveredComponent={hoveredComponent}
+                      layout={layout}
+                      onLayout={canChooseLayout ? chooseLayout : null}
                     />
-                  }
-                />
+                  </div>
+                </div>
               )}
-
-              <div className="min-w-0 flex-1">
-                <ChangePane
-                  session={session}
-                  rev={rev}
-                  onRevChange={(next) => {
-                    // Remember anything that isn't in the offered list, so a
-                    // pasted sha survives the next refresh.
-                    if (
-                      !session.commits.some((c) => c.sha === next) &&
-                      !session.history.some((c) => c.sha === next)
-                    ) {
-                      pickedRevs.current = [
-                        ...new Set([...pickedRevs.current, next]),
-                      ];
-                    }
-                    setRev(next);
-                  }}
-                  commit={commitForRev}
-                  diff={diff}
-                  loading={diffLoading}
-                  error={diffError}
-                  threads={threads}
-                  thread={selectedThread}
-                  focusedThreadId={focusedThreadId}
-                  pushed={revIsPushed}
-                  reviewTick={reviewTick}
-                  flowMarks={flowMarks}
-                  fileComponents={map?.fileComponents ?? null}
-                  hoveredComponent={hoveredComponent}
-                  layout={layout}
-                  onLayout={canChooseLayout ? chooseLayout : null}
-                />
-              </div>
-            </div>
-            )}
             </div>
           </main>
         </div>

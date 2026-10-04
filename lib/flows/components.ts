@@ -13,8 +13,11 @@ import type { FlowSet } from "./types";
  * it makes, then, for a type that's only ever called, the file defining it.
  */
 
-const cache = ((globalThis as { __differLaneComponents?: Map<string, Map<string, string | null>> })
-  .__differLaneComponents ??= new Map());
+const cache = ((
+  globalThis as {
+    __differLaneComponents?: Map<string, Map<string, string | null>>;
+  }
+).__differLaneComponents ??= new Map());
 
 /** Bumped when the lookup changes, so a running server drops old answers. */
 const LOOKUP_VERSION = "3";
@@ -22,7 +25,11 @@ const LOOKUP_VERSION = "3";
 /** The type's own name: `Native::InitialLibrary` is defined as `InitialLibrary`. */
 const shortName = (name: string) => name.split(/::|\./).pop() ?? name;
 
-async function definedIn(root: string, head: string, name: string): Promise<string[]> {
+async function definedIn(
+  root: string,
+  head: string,
+  name: string,
+): Promise<string[]> {
   const short = shortName(name);
   if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(short)) return [];
   const out = await gitTry(root, [
@@ -52,9 +59,14 @@ const snake = (name: string) =>
  * `Foo` in `Foo.swift`. An admin resource also called `User` is not it.
  */
 function bestDefinition(name: string, files: string[]): string | null {
-  const conventional = [`/${snake(name)}.rb`, `/${shortName(name)}.swift`, `/${shortName(name)}.ts`];
+  const conventional = [
+    `/${snake(name)}.rb`,
+    `/${shortName(name)}.swift`,
+    `/${shortName(name)}.ts`,
+  ];
   const score = (f: string) =>
-    (conventional.some((c) => `/${f}`.endsWith(c)) ? 100 : 0) - f.split("/").length;
+    (conventional.some((c) => `/${f}`.endsWith(c)) ? 100 : 0) -
+    f.split("/").length;
   return [...files].sort((a, b) => score(b) - score(a))[0] ?? null;
 }
 
@@ -68,19 +80,28 @@ function vote(model: Model, files: string[]): string | null {
   return best ? (model.elements.get(best)?.name ?? best) : null;
 }
 
-export async function attachComponents(root: string, set: FlowSet): Promise<FlowSet> {
+export async function attachComponents(
+  root: string,
+  set: FlowSet,
+): Promise<FlowSet> {
   const read = await readModelAt(root, set.head);
   if (!read) return set;
   const { model } = read;
 
   // Keyed on everything the answer depends on: the lanes (a traced hunk
   // adds new ones) and each element's name and globs (the model can change).
-  const lanes = [...new Set(set.flows.flatMap((f) => f.participants.map((p) => p.name)))].sort();
+  const lanes = [
+    ...new Set(set.flows.flatMap((f) => f.participants.map((p) => p.name))),
+  ].sort();
   const signature = createHash("sha1")
     .update(LOOKUP_VERSION)
     .update(set.head)
     .update(JSON.stringify(lanes))
-    .update(JSON.stringify([...model.elements.values()].map((e) => [e.id, e.name, e.globs])))
+    .update(
+      JSON.stringify(
+        [...model.elements.values()].map((e) => [e.id, e.name, e.globs]),
+      ),
+    )
     .digest("hex");
   let components = cache.get(signature);
   if (!components) {
@@ -99,7 +120,9 @@ export async function attachComponents(root: string, set: FlowSet): Promise<Flow
         continue;
       }
       const fromCalls = vote(model, lane.calls);
-      const home = fromCalls ? null : bestDefinition(name, await definedIn(root, set.head, name));
+      const home = fromCalls
+        ? null
+        : bestDefinition(name, await definedIn(root, set.head, name));
       components.set(name, fromCalls ?? (home ? vote(model, [home]) : null));
     }
     cache.set(signature, components);
@@ -110,7 +133,10 @@ export async function attachComponents(root: string, set: FlowSet): Promise<Flow
     ...set,
     flows: set.flows.map((f) => ({
       ...f,
-      participants: f.participants.map((p) => ({ ...p, component: resolved.get(p.name) ?? null })),
+      participants: f.participants.map((p) => ({
+        ...p,
+        component: resolved.get(p.name) ?? null,
+      })),
     })),
   };
 }

@@ -19,7 +19,10 @@ export async function GET(request: Request) {
   const side = searchParams.get("side") === "old" ? "old" : "new";
   if (!repoPath || !rev || !path || !line) {
     return NextResponse.json<ApiError>(
-      { error: "`repo`, `rev`, `path` and `line` are required.", kind: "missing-path" },
+      {
+        error: "`repo`, `rev`, `path` and `line` are required.",
+        kind: "missing-path",
+      },
       { status: 400 },
     );
   }
@@ -27,9 +30,18 @@ export async function GET(request: Request) {
     const repo = await resolveRepo(repoPath);
     const range = await viewRange(repo, rev);
     if (!range) {
-      return NextResponse.json<ApiError>({ error: "No commit to read from.", kind: "git" }, { status: 404 });
+      return NextResponse.json<ApiError>(
+        { error: "No commit to read from.", kind: "git" },
+        { status: 404 },
+      );
     }
-    const found = await snippet({ root: repo.root, ...range, path, side, line });
+    const found = await snippet({
+      root: repo.root,
+      ...range,
+      path,
+      side,
+      line,
+    });
     if (!found) {
       return NextResponse.json<ApiError>(
         { error: `${path}:${line} isn't there.`, kind: "git" },

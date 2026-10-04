@@ -40,7 +40,9 @@ export function FlowCoverage({
 
   const jump = (file: string, side: "old" | "new", line: number) => {
     const section = document.getElementById(`file-${encodeURIComponent(file)}`);
-    const row = section?.querySelector<HTMLElement>(`tr[data-${side}-line="${line}"]`);
+    const row = section?.querySelector<HTMLElement>(
+      `tr[data-${side}-line="${line}"]`,
+    );
     (row ?? section)?.scrollIntoView({ block: "center" });
   };
 
@@ -53,15 +55,23 @@ export function FlowCoverage({
         onClick={() => setOpen((v) => !v)}
       >
         {off.length > 0 &&
-          (open ? <ChevronDownIcon size={12} /> : <ChevronRightIcon size={12} />)}
+          (open ? (
+            <ChevronDownIcon size={12} />
+          ) : (
+            <ChevronRightIcon size={12} />
+          ))}
         <span>
-          <b className="font-semibold text-[var(--fg)]">{on}</b> of {hunks.length} changed{" "}
-          {hunks.length === 1 ? "hunk is" : "hunks are"} on a flow
+          <b className="font-semibold text-[var(--fg)]">{on}</b> of{" "}
+          {hunks.length} changed {hunks.length === 1 ? "hunk is" : "hunks are"}{" "}
+          on a flow
           {off.length > 0 &&
             (inline ? (
               <span className="text-[var(--attention)]">
                 {" "}
-                · read {off.length === 1 ? "this one" : `these ${off.length}`} yourself
+                · read {off.length === 1
+                  ? "this one"
+                  : `these ${off.length}`}{" "}
+                yourself
               </span>
             ) : (
               <> · {off.length} not</>
@@ -76,41 +86,52 @@ export function FlowCoverage({
             const key = `${h.file}:${h.side}:${h.line}`;
             return (
               <li key={key}>
-              <div className="flex items-start gap-2 px-3 py-2">
-                <div className="min-w-0 flex-1">
-                  <button
-                    type="button"
-                    className="mono truncate text-[var(--accent)] hover:underline"
-                    onClick={() =>
-                      inline ? setReading((r) => (r === key ? null : key)) : jump(h.file, h.side, h.line)
-                    }
-                  >
-                    {h.file.split("/").pop()}:{h.line}
-                  </button>
-                  {target?.reason && (
-                    <div className="text-[11px] text-[var(--fg-subtle)]">{target.reason}</div>
+                <div className="flex items-start gap-2 px-3 py-2">
+                  <div className="min-w-0 flex-1">
+                    <button
+                      type="button"
+                      className="mono truncate text-[var(--accent)] hover:underline"
+                      onClick={() =>
+                        inline
+                          ? setReading((r) => (r === key ? null : key))
+                          : jump(h.file, h.side, h.line)
+                      }
+                    >
+                      {h.file.split("/").pop()}:{h.line}
+                    </button>
+                    {target?.reason && (
+                      <div className="text-[11px] text-[var(--fg-subtle)]">
+                        {target.reason}
+                      </div>
+                    )}
+                  </div>
+                  {target && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => onTrace(target.id)}
+                      className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-2 py-[2px] text-[11px] font-medium hover:border-[var(--fg-subtle)] disabled:opacity-70"
+                    >
+                      {busy ? (
+                        <>
+                          <Spinner className="!h-3 !w-3" /> Tracing…
+                        </>
+                      ) : (
+                        "Trace a flow from here"
+                      )}
+                    </button>
                   )}
                 </div>
-                {target && (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => onTrace(target.id)}
-                    className="inline-flex shrink-0 items-center gap-1 rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-2 py-[2px] text-[11px] font-medium hover:border-[var(--fg-subtle)] disabled:opacity-70"
-                  >
-                    {busy ? (
-                      <>
-                        <Spinner className="!h-3 !w-3" /> Tracing…
-                      </>
-                    ) : (
-                      "Trace a flow from here"
-                    )}
-                  </button>
+                {inline && reading === key && (
+                  <StepCode
+                    repo={inline.repo}
+                    rev={inline.rev}
+                    path={h.file}
+                    side={h.side}
+                    line={h.line}
+                    height={220}
+                  />
                 )}
-              </div>
-              {inline && reading === key && (
-                <StepCode repo={inline.repo} rev={inline.rev} path={h.file} side={h.side} line={h.line} height={220} />
-              )}
               </li>
             );
           })}

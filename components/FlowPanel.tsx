@@ -2,9 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { componentPath, groupLanes, summarise, type FlowMode, type FlowRow } from "@/lib/flows/rows";
+import {
+  componentPath,
+  groupLanes,
+  summarise,
+  type FlowMode,
+  type FlowRow,
+} from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
-import { FlowSequence, type ComponentInfo, type DataField } from "./FlowSequence";
+import {
+  FlowSequence,
+  type ComponentInfo,
+  type DataField,
+} from "./FlowSequence";
 import { StepCode } from "./StepCode";
 import { AlertIcon, ChevronRightIcon, SyncIcon } from "./icons";
 import { Spinner } from "./ui";
@@ -28,16 +38,24 @@ export interface FlowSelection {
 
 /** Ask the diff to show a line that's outside the hunks on screen. */
 export function revealLine(path: string, side: "old" | "new", line: number) {
-  window.dispatchEvent(new CustomEvent("differ:reveal", { detail: { path, side, line } }));
+  window.dispatchEvent(
+    new CustomEvent("differ:reveal", { detail: { path, side, line } }),
+  );
 }
 
 const anchorFor = (key: string) =>
-  document.querySelector<HTMLElement>(`tr[data-flow-steps~="${CSS.escape(key)}"]`);
+  document.querySelector<HTMLElement>(
+    `tr[data-flow-steps~="${CSS.escape(key)}"]`,
+  );
 
 function scrollToReadingLine(el: HTMLElement) {
   const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   window.scrollTo({
-    top: window.scrollY + el.getBoundingClientRect().top - window.innerHeight * READING_LINE + 10,
+    top:
+      window.scrollY +
+      el.getBoundingClientRect().top -
+      window.innerHeight * READING_LINE +
+      10,
     behavior: smooth ? "smooth" : "auto",
   });
 }
@@ -82,7 +100,11 @@ export function FlowPanel({
     return (
       <Notice tone="danger">
         Couldn&apos;t load flows: {error}{" "}
-        <button type="button" className="text-[var(--accent)]" onClick={api.reload}>
+        <button
+          type="button"
+          className="text-[var(--accent)]"
+          onClick={api.reload}
+        >
           Try again
         </button>
       </Notice>
@@ -98,15 +120,20 @@ export function FlowPanel({
   if (status.status === "unavailable") {
     return status.reason === "uncommitted" ? (
       <Notice>
-        Flows are traced for commits. Pick a commit, or All changes, to see what the code
-        does for each user action it touches.
+        Flows are traced for commits. Pick a commit, or All changes, to see what
+        the code does for each user action it touches.
       </Notice>
     ) : (
       <Notice tone="attention">
-        Flows need Claude Code: differ runs <code className="mono">claude -p</code> with your
-        login, and couldn&apos;t find <code className="mono">claude</code> on its PATH. The rest of
-        differ works without it.{" "}
-        <button type="button" className="text-[var(--accent)]" onClick={api.reload}>
+        Flows need Claude Code: differ runs{" "}
+        <code className="mono">claude -p</code> with your login, and
+        couldn&apos;t find <code className="mono">claude</code> on its PATH. The
+        rest of differ works without it.{" "}
+        <button
+          type="button"
+          className="text-[var(--accent)]"
+          onClick={api.reload}
+        >
           Look again
         </button>
       </Notice>
@@ -123,9 +150,10 @@ export function FlowPanel({
           Trace this change
         </button>
         <p className="mx-auto mt-2 max-w-[56ch] text-[12px] text-[var(--fg-muted)]">
-          Claude Code reads the change and follows each user action it touches, drawing what the
-          code does as flows. It takes about a minute and usually costs $0.10–0.40 on your Claude
-          account; the result is kept, so this view won&apos;t ask again.
+          Claude Code reads the change and follows each user action it touches,
+          drawing what the code does as flows. It takes about a minute and
+          usually costs $0.10–0.40 on your Claude account; the result is kept,
+          so this view won&apos;t ask again.
         </p>
       </div>
     );
@@ -136,8 +164,13 @@ export function FlowPanel({
   if (status.status === "failed") {
     return (
       <Notice tone="danger">
-        Tracing flows failed: <span className="mono text-[11px]">{status.error}</span>{" "}
-        <button type="button" className="text-[var(--accent)]" onClick={api.retry}>
+        Tracing flows failed:{" "}
+        <span className="mono text-[11px]">{status.error}</span>{" "}
+        <button
+          type="button"
+          className="text-[var(--accent)]"
+          onClick={api.retry}
+        >
           Try again
         </button>
       </Notice>
@@ -200,12 +233,18 @@ function ReadyFlows({
   flowNotes?: Map<number, string[]>;
 }) {
   const flow = set.flows[selection.index] ?? null;
-  const summaries = useMemo(() => set.flows.map((f) => summarise(f, set.hunks)), [set]);
+  const summaries = useMemo(
+    () => set.flows.map((f) => summarise(f, set.hunks)),
+    [set],
+  );
   const { lanes, groups } = useMemo(
     () => (flow ? groupLanes(flow, rows) : { lanes: [], groups: [] }),
     [flow, rows],
   );
-  const path = useMemo(() => (flow ? componentPath(flow, rows) : []), [flow, rows]);
+  const path = useMemo(
+    () => (flow ? componentPath(flow, rows) : []),
+    [flow, rows],
+  );
 
   const [active, setActive] = useState<string[]>([]);
   const [missing, setMissing] = useState<string | null>(null);
@@ -221,7 +260,9 @@ function ReadyFlows({
       const line = window.innerHeight * READING_LINE;
       let best: HTMLElement | null = null;
       let bestDist = Infinity;
-      for (const tr of document.querySelectorAll<HTMLElement>("tr[data-flow-steps]")) {
+      for (const tr of document.querySelectorAll<HTMLElement>(
+        "tr[data-flow-steps]",
+      )) {
         const r = tr.getBoundingClientRect();
         if (r.bottom < 0 || r.top > window.innerHeight) continue;
         const d = Math.abs((r.top + r.bottom) / 2 - line);
@@ -267,7 +308,8 @@ function ReadyFlows({
     const r = row.getBoundingClientRect();
     const box = scroller.getBoundingClientRect();
     if (r.top < box.top + 80) scroller.scrollTop -= box.top + 80 - r.top;
-    else if (r.bottom > box.bottom - 60) scroller.scrollTop += r.bottom - (box.bottom - 60);
+    else if (r.bottom > box.bottom - 60)
+      scroller.scrollTop += r.bottom - (box.bottom - 60);
   }, [active]);
 
   const goTo = useCallback(
@@ -342,7 +384,10 @@ function ReadyFlows({
       // light together, so the lit row alone can leave j stuck.
       let at = rows.findIndex((r) => r.key === cursor.current);
       if (at === -1 && !code) at = rows.findIndex((r) => activeKeys.has(r.key));
-      const next = rows[Math.min(rows.length - 1, Math.max(0, at === -1 ? 0 : at + delta))];
+      const next =
+        rows[
+          Math.min(rows.length - 1, Math.max(0, at === -1 ? 0 : at + delta))
+        ];
       cursor.current = next.key;
       if (code) setOpen(new Set([next.key]));
       else goTo(next);
@@ -413,18 +458,26 @@ function ReadyFlows({
         ))}
         {flow && summary && (
           <div className="ml-1.5 min-w-0 flex-1">
-            <div className="text-[14px] font-semibold leading-5">{flow.trigger}</div>
+            <div className="text-[14px] font-semibold leading-5">
+              {flow.trigger}
+            </div>
             <div className="text-[12px] leading-4 text-[var(--fg-muted)]">
               {flow.isNew ? (
-                <span className="text-[var(--success)]">New flow · {stepWord(summary.afterSteps)}</span>
+                <span className="text-[var(--success)]">
+                  New flow · {stepWord(summary.afterSteps)}
+                </span>
               ) : summary.changed ? (
                 <>
                   {summary.removed > 0 && (
-                    <span className="text-[var(--danger)]">{stepWord(summary.removed)} removed</span>
+                    <span className="text-[var(--danger)]">
+                      {stepWord(summary.removed)} removed
+                    </span>
                   )}
                   {summary.removed > 0 && summary.added > 0 && ", "}
                   {summary.added > 0 && (
-                    <span className="text-[var(--success)]">{summary.added} added</span>
+                    <span className="text-[var(--success)]">
+                      {summary.added} added
+                    </span>
                   )}
                   {" · "}
                   {stepWord(summary.beforeSteps ?? 0)} → {summary.afterSteps}
@@ -439,7 +492,10 @@ function ReadyFlows({
               </div>
             ))}
             {path.length > 0 && (
-              <div className="flow-path" title="The map's components this flow passes through, in order">
+              <div
+                className="flow-path"
+                title="The map's components this flow passes through, in order"
+              >
                 {path.map((c, i) => (
                   <span key={c}>
                     {i > 0 && <span className="arrow">→</span>}
@@ -459,7 +515,11 @@ function ReadyFlows({
               disabled={mode === "before" && flow?.before === null}
               onClick={() => onSelect({ ...selection, mode })}
             >
-              {mode === "diff" ? "Diff" : mode === "before" ? "Before" : "After"}
+              {mode === "diff"
+                ? "Diff"
+                : mode === "before"
+                  ? "Before"
+                  : "After"}
             </button>
           ))}
         </span>
@@ -503,31 +563,40 @@ function ReadyFlows({
                   </span>
                 </span>
                 <span className="flex-1" />
-                <span className="shrink-0">Click a step, or press j / k, to see its code</span>
+                <span className="shrink-0">
+                  Click a step, or press j / k, to see its code
+                </span>
               </>
             ) : (
-            <>
-              <span className="flow-here">
-                <i />
-                <span className="truncate">
-                  {missing ??
-                    (hereRow
-                      ? `In view: ${hereRow.step.file.split("/").pop()}:${hereRow.step.line} · ${
-                          hereRow.kind === "del" ? `was step ${hereRow.was}` : `step ${hereRow.now ?? hereRow.was}`
-                        }`
-                      : "No step of this flow in view")}
+              <>
+                <span className="flow-here">
+                  <i />
+                  <span className="truncate">
+                    {missing ??
+                      (hereRow
+                        ? `In view: ${hereRow.step.file.split("/").pop()}:${hereRow.step.line} · ${
+                            hereRow.kind === "del"
+                              ? `was step ${hereRow.was}`
+                              : `step ${hereRow.now ?? hereRow.was}`
+                          }`
+                        : "No step of this flow in view")}
+                  </span>
                 </span>
-              </span>
-              <span className="flex-1" />
-              <span className="shrink-0">Click a step to jump to its line</span>
-            </>
+                <span className="flex-1" />
+                <span className="shrink-0">
+                  Click a step to jump to its line
+                </span>
+              </>
             )
           }
         />
       )}
 
       {traceError && (
-        <Notice tone="danger">The last trace failed, so these are the flows from before it: {traceError}</Notice>
+        <Notice tone="danger">
+          The last trace failed, so these are the flows from before it:{" "}
+          {traceError}
+        </Notice>
       )}
       {!code && coverage}
       <Regenerate set={set} onRegenerate={api.regenerate} />
@@ -538,10 +607,18 @@ function ReadyFlows({
 /** "claude-sonnet-5-5" → "Sonnet 5.5". */
 function modelName(id: string) {
   const m = id.match(/^claude-([a-z]+)-(\d+)-(\d+)/);
-  return m ? `${m[1].charAt(0).toUpperCase()}${m[1].slice(1)} ${m[2]}.${m[3]}` : id;
+  return m
+    ? `${m[1].charAt(0).toUpperCase()}${m[1].slice(1)} ${m[2]}.${m[3]}`
+    : id;
 }
 
-function Regenerate({ set, onRegenerate }: { set: FlowSet; onRegenerate: () => void }) {
+function Regenerate({
+  set,
+  onRegenerate,
+}: {
+  set: FlowSet;
+  onRegenerate: () => void;
+}) {
   return (
     <p className="flex items-center gap-2 px-0.5 text-[11px] text-[var(--fg-subtle)]">
       <span>
@@ -561,21 +638,29 @@ function Regenerate({ set, onRegenerate }: { set: FlowSet; onRegenerate: () => v
   );
 }
 
-function Generating({ startedAt, phase }: { startedAt: number | null; phase: string }) {
+function Generating({
+  startedAt,
+  phase,
+}: {
+  startedAt: number | null;
+  phase: string;
+}) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
   }, []);
-  const seconds = startedAt ? Math.max(0, Math.round((now - startedAt) / 1000)) : 0;
+  const seconds = startedAt
+    ? Math.max(0, Math.round((now - startedAt) / 1000))
+    : 0;
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--canvas)] px-4 py-6 text-center">
       <div className="flex items-center justify-center gap-2 text-[13px] font-medium">
         <Spinner /> Tracing flows…
       </div>
       <p className="mt-1 text-[12px] text-[var(--fg-muted)]">
-        {phase} · {seconds} s. Claude Code reads the change and follows each user action it
-        touches; it usually takes a minute or two.
+        {phase} · {seconds} s. Claude Code reads the change and follows each
+        user action it touches; it usually takes a minute or two.
       </p>
     </div>
   );
@@ -604,7 +689,9 @@ function Notice({
           className={`mt-0.5 shrink-0 ${tone === "danger" ? "text-[var(--danger)]" : "text-[var(--attention)]"}`}
         />
       )}
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">{children}</div>
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1">
+        {children}
+      </div>
     </div>
   );
 }

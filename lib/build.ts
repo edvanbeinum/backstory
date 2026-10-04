@@ -12,7 +12,10 @@ import path from "node:path";
 function readBuildId(): string {
   if (process.env.NODE_ENV === "development") return "development";
   try {
-    return readFileSync(path.join(process.cwd(), ".next", "BUILD_ID"), "utf8").trim();
+    return readFileSync(
+      path.join(process.cwd(), ".next", "BUILD_ID"),
+      "utf8",
+    ).trim();
   } catch {
     return "unknown";
   }

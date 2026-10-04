@@ -144,7 +144,10 @@ export function NoteCard({
       )}
       <div className="flex items-start gap-2">
         {sent && (
-          <NoteTick done={note.done} onToggle={(done) => onTick(note.id, done)} />
+          <NoteTick
+            done={note.done}
+            onToggle={(done) => onTick(note.id, done)}
+          />
         )}
         <p className="min-w-0 flex-1 whitespace-pre-wrap text-[13px] leading-5">
           {note.body}
@@ -156,11 +159,19 @@ export function NoteCard({
         )}
         <div className="flex shrink-0 gap-1 opacity-60 group-hover:opacity-100">
           {!sent && (
-            <Button size="sm" variant="invisible" onClick={() => setEditing(true)}>
+            <Button
+              size="sm"
+              variant="invisible"
+              onClick={() => setEditing(true)}
+            >
               Edit
             </Button>
           )}
-          <Button size="sm" variant="invisible" onClick={() => onRemove(note.id)}>
+          <Button
+            size="sm"
+            variant="invisible"
+            onClick={() => onRemove(note.id)}
+          >
             Delete
           </Button>
         </div>

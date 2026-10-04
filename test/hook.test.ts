@@ -41,8 +41,14 @@ test("queued notes block the stop and become the agent's instructions", async ()
     seen,
   );
   try {
-    const out = await stopHook(INPUT, { base, print: (o: string) => printed.push(o) });
-    assert.deepEqual(JSON.parse(out), { decision: "block", reason: "## a.ts:3\nfix it\n" });
+    const out = await stopHook(INPUT, {
+      base,
+      print: (o: string) => printed.push(o),
+    });
+    assert.deepEqual(JSON.parse(out), {
+      decision: "block",
+      reason: "## a.ts:3\nfix it\n",
+    });
     assert.deepEqual(printed, [out]);
     const url = new URL(seen[0].split(" ")[1], base);
     assert.equal(seen[0].split(" ")[0], "POST");
@@ -60,8 +66,12 @@ test("the notes are printed even when the confirmation fails", async () => {
   let calls = 0;
   const server = createServer((req, res) => {
     calls++;
-    res.writeHead(calls === 1 ? 200 : 500, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(calls === 1 ? { message: "fix it", ids: ["r1"] } : {}));
+    res.writeHead(calls === 1 ? 200 : 500, {
+      "Content-Type": "application/json",
+    });
+    res.end(
+      JSON.stringify(calls === 1 ? { message: "fix it", ids: ["r1"] } : {}),
+    );
   });
   await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
   const { port } = server.address() as AddressInfo;
@@ -121,7 +131,10 @@ test("a differ that hangs is given up on at the timeout", async () => {
   const { port } = server.address() as AddressInfo;
   const started = Date.now();
   try {
-    const out = await stopHook(INPUT, { base: `http://127.0.0.1:${port}`, timeoutMs: 200 });
+    const out = await stopHook(INPUT, {
+      base: `http://127.0.0.1:${port}`,
+      timeoutMs: 200,
+    });
     assert.equal(out, "");
     assert.ok(Date.now() - started < 1500);
   } finally {

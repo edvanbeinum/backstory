@@ -95,10 +95,17 @@ test("migration carries all three link shapes plus drafts", async () => {
   assert.equal(ios.draft_only.commits[0] ?? null, null);
 
   const rails = await getResponses("Indee/indee-rails#1589");
-  assert.deepEqual(rails.tagged_commit.commits[0], { sha: SHA_B, patchId: PATCH_B });
+  assert.deepEqual(rails.tagged_commit.commits[0], {
+    sha: SHA_B,
+    patchId: PATCH_B,
+  });
   assert.equal(rails.tagged_commit.done, true);
   assert.equal(rails.tagged_ack.done, true, "an ack was also a done signal");
-  assert.equal(rails.tagged_ack.commits[0] ?? null, null, "but it never had a commit");
+  assert.equal(
+    rails.tagged_ack.commits[0] ?? null,
+    null,
+    "but it never had a commit",
+  );
 
   // Renamed, not deleted — recovering a store by hand is why it's JSON.
   assert.equal(await exists(path.join(home, "links.json")), false);
@@ -163,7 +170,10 @@ test("a tick and a draft save on the same record don't clobber each other", asyn
   const forPr = await getResponses("o/r#1");
   assert.equal(forPr.t1.done, true, "the tick survived");
   assert.equal(forPr.t1.reply, "Addressed in abc1234", "the draft survived");
-  assert.deepEqual(forPr.t1.commits[0] ?? null, { sha: SHA_A, patchId: PATCH_A });
+  assert.deepEqual(forPr.t1.commits[0] ?? null, {
+    sha: SHA_A,
+    patchId: PATCH_A,
+  });
   assert.ok(await exists(path.join(home, "responses.json")));
 });
 
@@ -209,7 +219,11 @@ test("a patch leaves fields it doesn't mention alone", async () => {
   useTempHome();
 
   await updateResponses("o/r#1", {
-    t1: { done: true, reply: "draft", addCommit: { sha: SHA_A, patchId: null } },
+    t1: {
+      done: true,
+      reply: "draft",
+      addCommit: { sha: SHA_A, patchId: null },
+    },
   });
   await updateResponses("o/r#1", { t1: { commits: [] } });
 
@@ -235,7 +249,11 @@ test("garbage in the file is dropped, not thrown", async () => {
 
   const forPr = await getResponses("o/r#1");
   assert.equal(forPr.good.done, true);
-  assert.equal(forPr.bad_commit.commits[0] ?? null, null, "an unusable sha is dropped");
+  assert.equal(
+    forPr.bad_commit.commits[0] ?? null,
+    null,
+    "an unusable sha is dropped",
+  );
   assert.equal(forPr.bad_commit.done, true, "without losing the tick");
   assert.ok(!("not a key!" in forPr));
 });
@@ -244,7 +262,10 @@ test("invalid input is rejected before anything is written", async () => {
   useTempHome();
 
   await assert.rejects(
-    () => updateResponses("o/r#1", { t1: { addCommit: { sha: "xyz", patchId: null } } }),
+    () =>
+      updateResponses("o/r#1", {
+        t1: { addCommit: { sha: "xyz", patchId: null } },
+      }),
     /Invalid commit sha/,
   );
   await assert.rejects(

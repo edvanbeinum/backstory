@@ -29,7 +29,8 @@ export function layeredLayout<N extends { id: string }>(
 ): { placed: Map<string, N & Box>; height: number } {
   const ids = nodes.map((n) => n.id);
   const into = new Map<string, string[]>(ids.map((id) => [id, []]));
-  for (const e of edges) if (e.source !== e.destination) into.get(e.destination)?.push(e.source);
+  for (const e of edges)
+    if (e.source !== e.destination) into.get(e.destination)?.push(e.source);
 
   const rank = new Map<string, number>();
   const visiting = new Set<string>();
@@ -51,17 +52,27 @@ export function layeredLayout<N extends { id: string }>(
   let y = o.pad;
   for (const row of rows.filter(Boolean)) {
     const pos = (n: N) => {
-      const xs = (into.get(n.id) ?? []).map((s) => placed.get(s)).filter(Boolean) as Box[];
-      return xs.length ? xs.reduce((a, p) => a + p.x + p.w / 2, 0) / xs.length : Infinity;
+      const xs = (into.get(n.id) ?? [])
+        .map((s) => placed.get(s))
+        .filter(Boolean) as Box[];
+      return xs.length
+        ? xs.reduce((a, p) => a + p.x + p.w / 2, 0) / xs.length
+        : Infinity;
     };
     row.sort((a, b) => pos(a) - pos(b));
     const perLine = Math.max(
       1,
-      Math.min(row.length, Math.floor((width - 2 * o.pad + o.colGap) / (o.minW + o.colGap))),
+      Math.min(
+        row.length,
+        Math.floor((width - 2 * o.pad + o.colGap) / (o.minW + o.colGap)),
+      ),
     );
     for (let start = 0; start < row.length; start += perLine) {
       const line = row.slice(start, start + perLine);
-      const w = Math.min(o.maxW, (width - 2 * o.pad - (line.length - 1) * o.colGap) / line.length);
+      const w = Math.min(
+        o.maxW,
+        (width - 2 * o.pad - (line.length - 1) * o.colGap) / line.length,
+      );
       const total = line.length * w + (line.length - 1) * o.colGap;
       let x = (width - total) / 2;
       const hs = line.map((n) => height(n, w));
@@ -79,24 +90,43 @@ export function layeredLayout<N extends { id: string }>(
  * An arrow from one box to another, leaving and arriving at evenly spread
  * points along the facing edges, so several arrows don't stack.
  */
-export function edgePath(a: Box, b: Box, ai: number, an: number, bi: number, bn: number) {
+export function edgePath(
+  a: Box,
+  b: Box,
+  ai: number,
+  an: number,
+  bi: number,
+  bn: number,
+) {
   const ax = a.x + (a.w * (ai + 1)) / (an + 1);
   const bx = b.x + (b.w * (bi + 1)) / (bn + 1);
   if (b.y > a.y + a.h / 2) {
     const y1 = a.y + a.h;
     const y2 = b.y;
     const mid = (y1 + y2) / 2;
-    return { d: `M${ax} ${y1} C${ax} ${mid} ${bx} ${mid} ${bx} ${y2 - 1}`, lx: (ax + bx) / 2, ly: mid };
+    return {
+      d: `M${ax} ${y1} C${ax} ${mid} ${bx} ${mid} ${bx} ${y2 - 1}`,
+      lx: (ax + bx) / 2,
+      ly: mid,
+    };
   }
   if (b.y + b.h < a.y + a.h / 2) {
     const y1 = a.y;
     const y2 = b.y + b.h;
     const mid = (y1 + y2) / 2;
-    return { d: `M${ax} ${y1} C${ax} ${mid} ${bx} ${mid} ${bx} ${y2 + 1}`, lx: (ax + bx) / 2, ly: mid };
+    return {
+      d: `M${ax} ${y1} C${ax} ${mid} ${bx} ${mid} ${bx} ${y2 + 1}`,
+      lx: (ax + bx) / 2,
+      ly: mid,
+    };
   }
   // Same row: loop underneath.
   const y1 = a.y + a.h;
   const y2 = b.y + b.h;
   const dip = Math.max(y1, y2) + 28;
-  return { d: `M${ax} ${y1} C${ax} ${dip} ${bx} ${dip} ${bx} ${y2 + 1}`, lx: (ax + bx) / 2, ly: dip - 6 };
+  return {
+    d: `M${ax} ${y1} C${ax} ${dip} ${bx} ${dip} ${bx} ${y2 + 1}`,
+    lx: (ax + bx) / 2,
+    ly: dip - 6,
+  };
 }

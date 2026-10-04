@@ -67,7 +67,11 @@ export const TAKE_TIMEOUT_MS = 2000;
  */
 export async function stopHook(
   input,
-  { base, timeoutMs = TAKE_TIMEOUT_MS, print = (out) => process.stdout.write(out + "\n") },
+  {
+    base,
+    timeoutMs = TAKE_TIMEOUT_MS,
+    print = (out) => process.stdout.write(out + "\n"),
+  },
 ) {
   let event;
   try {
@@ -79,7 +83,8 @@ export async function stopHook(
   const session = event?.session_id;
   if (typeof cwd !== "string" || typeof session !== "string") return "";
 
-  const url = (op) => `${base}/api/outbox?${new URLSearchParams({ [op]: "", cwd, session })}`;
+  const url = (op) =>
+    `${base}/api/outbox?${new URLSearchParams({ [op]: "", cwd, session })}`;
   let taken;
   try {
     taken = await post(url("take"), null, timeoutMs);
@@ -92,7 +97,11 @@ export async function stopHook(
   print(out);
   // After printing, so a lost answer means the notes come again, not never.
   try {
-    await post(url("ack"), { ids: Array.isArray(taken.ids) ? taken.ids : [] }, timeoutMs);
+    await post(
+      url("ack"),
+      { ids: Array.isArray(taken.ids) ? taken.ids : [] },
+      timeoutMs,
+    );
   } catch {
     // They stay claimed, and are taken again once the claim lapses.
   }

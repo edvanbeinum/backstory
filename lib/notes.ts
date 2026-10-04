@@ -39,10 +39,12 @@ function isStoredNote(value: unknown): value is Note {
   return (
     typeof n.id === "string" &&
     (n.rev === undefined || isRev(n.rev)) &&
-    (n.path === null || (typeof n.path === "string" && n.path.length <= MAX_PATH)) &&
+    (n.path === null ||
+      (typeof n.path === "string" && n.path.length <= MAX_PATH)) &&
     (n.side === "old" || n.side === "new") &&
     (n.line === null || (Number.isInteger(n.line) && (n.line as number) > 0)) &&
-    (n.quote === null || (typeof n.quote === "string" && n.quote.length <= MAX_QUOTE)) &&
+    (n.quote === null ||
+      (typeof n.quote === "string" && n.quote.length <= MAX_QUOTE)) &&
     typeof n.body === "string" &&
     n.body.length <= MAX_BODY &&
     typeof n.createdAt === "number" &&
@@ -102,7 +104,8 @@ export function parseChange(body: unknown): NotesChange {
   switch (b.op) {
     case "save": {
       const note = b.note as Note;
-      if (!isStoredNote(note) || !isId(note.id)) throw new Error("Invalid note");
+      if (!isStoredNote(note) || !isId(note.id))
+        throw new Error("Invalid note");
       if (!note.body.trim()) throw new Error("Invalid note: empty");
       return { op: "save", note };
     }
@@ -110,11 +113,13 @@ export function parseChange(body: unknown): NotesChange {
       if (!isId(b.id)) throw new Error("Invalid note id");
       return { op: "remove", id: b.id };
     case "send":
-      if (!Array.isArray(b.ids) || !b.ids.every(isId)) throw new Error("Invalid note id");
+      if (!Array.isArray(b.ids) || !b.ids.every(isId))
+        throw new Error("Invalid note id");
       if (typeof b.at !== "number") throw new Error("Invalid send time");
       return { op: "send", ids: b.ids, at: b.at };
     case "unsend":
-      if (!Array.isArray(b.ids) || !b.ids.every(isId)) throw new Error("Invalid note id");
+      if (!Array.isArray(b.ids) || !b.ids.every(isId))
+        throw new Error("Invalid note id");
       return { op: "unsend", ids: b.ids };
     case "tick":
       if (!isId(b.id)) throw new Error("Invalid note id");
@@ -151,7 +156,8 @@ export async function changeNotes(
       case "save": {
         const prior = forRoot[change.note.id];
         // Only a draft's words can change: a sent note is what the agent read.
-        if (prior && prior.sentAt !== null) throw new Error("Invalid edit: already sent");
+        if (prior && prior.sentAt !== null)
+          throw new Error("Invalid edit: already sent");
         forRoot[change.note.id] = normalize({
           ...change.note,
           // An edit changes what you said, not when you first said it.
@@ -167,7 +173,8 @@ export async function changeNotes(
       case "send":
         for (const id of change.ids) {
           const note = forRoot[id];
-          if (note && note.sentAt === null) forRoot[id] = { ...note, sentAt: change.at };
+          if (note && note.sentAt === null)
+            forRoot[id] = { ...note, sentAt: change.at };
         }
         break;
       case "unsend":

@@ -128,9 +128,7 @@ export function ReplyComposer({
   const touched = useRef(false);
 
   const selectedIsReal =
-    commit !== null &&
-    commit.sha !== WORKING_REV &&
-    commit.sha !== BRANCH_REV;
+    commit !== null && commit.sha !== WORKING_REV && commit.sha !== BRANCH_REV;
 
   // What the reply names: every commit you linked, or — before you've linked
   // anything — the change on screen, so the wording is ready when you do.
@@ -161,7 +159,6 @@ export function ReplyComposer({
       setCustom(templateText("url", targets, urls));
     }
   }, [template, custom, targets, urls]);
-
 
   // Persist the draft, debounced — the point is that it survives a reload,
   // a collapse, or switching commits, not that every keystroke hits disk.
@@ -231,7 +228,6 @@ export function ReplyComposer({
   // comments are answered without a commit at all.
   const commitTemplatesDisabled = targets.length === 0;
 
-
   // Unlinking a commit while an "Addressed in <sha>" template is selected
   // would otherwise leave an empty box that looks broken. Back to your own
   // words, not to a stance differ picked.
@@ -246,7 +242,9 @@ export function ReplyComposer({
     <div className="rounded-md border border-[var(--border)] bg-[var(--canvas)]">
       <div className="flex flex-wrap items-center gap-1 border-b border-[var(--border-muted)] px-2 py-1.5">
         {TEMPLATES.map((option) => {
-          const disabled = Boolean(option.needsCommit && commitTemplatesDisabled);
+          const disabled = Boolean(
+            option.needsCommit && commitTemplatesDisabled,
+          );
           return (
             <button
               key={option.id}
@@ -267,82 +265,80 @@ export function ReplyComposer({
       </div>
 
       <>
-          <p className="flex flex-wrap items-center gap-x-2 border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1 text-[11px] text-[var(--fg-muted)]">
-            {/* The card above already names the linked commits; saying it
+        <p className="flex flex-wrap items-center gap-x-2 border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1 text-[11px] text-[var(--fg-muted)]">
+          {/* The card above already names the linked commits; saying it
                 again here was the same fact twice in adjacent boxes. */}
-            {pinned.length > 0 ? null : target ? (
-              <>
-                Drafting against{" "}
-                <span className="mono">{target.shortSha}</span>, the change on
-                screen.
-              </>
-            ) : (
-              <span className="text-[var(--fg-muted)]">
-                No commit linked — the wordings above that name one are off.
-              </span>
-            )}
+          {pinned.length > 0 ? null : target ? (
+            <>
+              Drafting against <span className="mono">{target.shortSha}</span>,
+              the change on screen.
+            </>
+          ) : (
+            <span className="text-[var(--fg-muted)]">
+              No commit linked — the wordings above that name one are off.
+            </span>
+          )}
 
-            <span className="flex-1" />
+          <span className="flex-1" />
+        </p>
+        <textarea
+          value={text}
+          readOnly={template !== "custom"}
+          onChange={(event) => {
+            touched.current = true;
+            setCustom(event.target.value);
+          }}
+          rows={template === "custom" ? 3 : 2}
+          className={`mono w-full resize-y bg-transparent px-3 py-2 text-[12px] leading-5 outline-none ${
+            template === "custom" ? "" : "text-[var(--fg-muted)]"
+          }`}
+        />
 
-          </p>
-          <textarea
-            value={text}
-            readOnly={template !== "custom"}
-            onChange={(event) => {
-              touched.current = true;
-              setCustom(event.target.value);
-            }}
-            rows={template === "custom" ? 3 : 2}
-            className={`mono w-full resize-y bg-transparent px-3 py-2 text-[12px] leading-5 outline-none ${
-              template === "custom" ? "" : "text-[var(--fg-muted)]"
-            }`}
-          />
+        <div className="flex items-center gap-2 border-t border-[var(--border-muted)] px-2 py-1.5">
+          <CopyButton value={text} label="Copy reply" />
+          {threadUrl && (
+            <a
+              href={threadUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] hover:underline"
+            >
+              Open thread <LinkExternalIcon size={12} />
+            </a>
+          )}
 
-          <div className="flex items-center gap-2 border-t border-[var(--border-muted)] px-2 py-1.5">
-            <CopyButton value={text} label="Copy reply" />
-            {threadUrl && (
-              <a
-                href={threadUrl}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] hover:underline"
-              >
-                Open thread <LinkExternalIcon size={12} />
-              </a>
-            )}
-
-            {/* Say plainly that the text is safe — an unsaved-looking box is
+          {/* Say plainly that the text is safe — an unsaved-looking box is
                 the reason drafts felt risky in the first place. */}
-            {draft && template === "custom" && (
-              <span className="text-[11px] text-[var(--fg-muted)]">
-                Draft saved
-              </span>
-            )}
-            {draft && onDraftChange && (
-              <button
-                type="button"
-                onClick={() => {
-                  setCustom("");
-                  savedRef.current = "";
-                  touched.current = false;
-                  onDraftChange(null);
-                }}
-                className="text-[11px] text-[var(--accent)] hover:underline"
-              >
-                Discard draft
-              </button>
-            )}
+          {draft && template === "custom" && (
+            <span className="text-[11px] text-[var(--fg-muted)]">
+              Draft saved
+            </span>
+          )}
+          {draft && onDraftChange && (
+            <button
+              type="button"
+              onClick={() => {
+                setCustom("");
+                savedRef.current = "";
+                touched.current = false;
+                onDraftChange(null);
+              }}
+              className="text-[11px] text-[var(--accent)] hover:underline"
+            >
+              Discard draft
+            </button>
+          )}
 
-            <span className="flex-1" />
-            {url && (
-              <CopyButton
-                value={url}
-                label="Copy link"
-                variant="invisible"
-                copiedLabel="Copied"
-              />
-            )}
-          </div>
+          <span className="flex-1" />
+          {url && (
+            <CopyButton
+              value={url}
+              label="Copy link"
+              variant="invisible"
+              copiedLabel="Copied"
+            />
+          )}
+        </div>
       </>
     </div>
   );
