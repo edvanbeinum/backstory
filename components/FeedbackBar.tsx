@@ -129,6 +129,7 @@ export function FeedbackBar({
       await outbox.send({
         noteIds: drafts.map((n) => n.id),
         message: await buildMessage(),
+        // eslint-disable-next-line react-hooks/purity -- runs on click, not in render
         at: Date.now(),
       });
     } catch (err) {
@@ -144,6 +145,7 @@ export function FeedbackBar({
     try {
       const message = await buildMessage();
       if (await copyToClipboard(message)) {
+        // eslint-disable-next-line react-hooks/purity -- runs on click, not in render
         const at = Date.now();
         const noteIds = drafts.map((n) => n.id);
         // Not recording how it left is no reason to leave it a draft.
