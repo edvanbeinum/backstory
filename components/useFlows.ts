@@ -58,10 +58,14 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
   );
 
   // A new view starts blank rather than showing the last one's flows.
-  useEffect(() => {
-    viewRef.current = `${repo}@${rev}`;
+  const [shownView, setShownView] = useState(`${repo}@${rev}`);
+  if (shownView !== `${repo}@${rev}`) {
+    setShownView(`${repo}@${rev}`);
     setAnswer(null);
     setError(null);
+  }
+  useEffect(() => {
+    viewRef.current = `${repo}@${rev}`;
   }, [repo, rev]);
 
   useEffect(() => {

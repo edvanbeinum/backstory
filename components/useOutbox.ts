@@ -64,10 +64,12 @@ export function useOutbox(
     };
   }, [root, tick, version]);
 
-  useEffect(() => {
+  const [shownRoot, setShownRoot] = useState(root);
+  if (shownRoot !== root) {
+    setShownRoot(root);
     setState(EMPTY);
     setError(null);
-  }, [root]);
+  }
 
   const call = useCallback(
     async <T>(

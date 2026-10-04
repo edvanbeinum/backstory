@@ -52,8 +52,12 @@ export function useNotes(root: string): NotesApi {
     }
   }, [url]);
 
-  useEffect(() => {
+  const [shownUrl, setShownUrl] = useState(url);
+  if (shownUrl !== url) {
+    setShownUrl(url);
     setNotes([]);
+  }
+  useEffect(() => {
     void load();
   }, [load]);
 
