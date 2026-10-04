@@ -192,11 +192,15 @@ test("a repo with no model uses one kept locally, without a structural diff", as
 });
 
 test("a model that lists no tests or ignores keeps the built-in ones", async () => {
-  const { parseModel } = await import("../lib/model");
-  const model = parseModel(
-    JSON.stringify({ properties: {}, model: { softwareSystems: [] } }),
-  );
-  assert.equal(model.isTest("test/models/item_test.rb"), true);
-  assert.equal(model.isIgnored("package-lock.json"), true);
-  assert.equal(model.isTest("app/models/item.rb"), false);
+  const { parseDsl, parseModel } = await import("../lib/model");
+  for (const model of [
+    parseModel(
+      JSON.stringify({ properties: {}, model: { softwareSystems: [] } }),
+    ),
+    parseDsl("workspace {\n    model {\n    }\n}\n"),
+  ]) {
+    assert.equal(model.isTest("test/models/item_test.rb"), true);
+    assert.equal(model.isIgnored("package-lock.json"), true);
+    assert.equal(model.isTest("app/models/item.rb"), false);
+  }
 });

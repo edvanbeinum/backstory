@@ -4,6 +4,7 @@ import path from "node:path";
 
 import picomatch from "picomatch";
 
+import { readDsl } from "./dsl";
 import { gitLine, gitTry } from "./exec";
 
 /**
@@ -48,6 +49,28 @@ export interface Model {
   embeddedDsl: string | null;
 }
 
+/** A model as either reader finds it, before differ builds its matchers. */
+export interface Workspace {
+  properties: Record<string, string>;
+  elements: WorkspaceElement[];
+  relationships: WorkspaceRelationship[];
+}
+
+export interface WorkspaceElement {
+  id: string;
+  name: string;
+  description: string;
+  type: ElementType;
+  parent: string | null;
+  properties: Record<string, string>;
+}
+
+export interface WorkspaceRelationship {
+  source: string;
+  destination: string;
+  description: string;
+}
+
 interface RawElement {
   id: string;
   name?: string;
@@ -86,21 +109,21 @@ const orDefault = (
   fallback: () => (path: string) => boolean,
 ) => (globs.length > 0 ? matcher(globs) : (path: string) => fallback()(path));
 
-export function parseModel(json: string): Model {
-  const raw = JSON.parse(json) as RawWorkspace;
-  const elements = new Map<string, ModelElement>();
+/** A Structurizr JSON export, with its numeric ids turned into DSL identifiers. */
+export function fromJson(raw: RawWorkspace): Workspace {
+  const elements: WorkspaceElement[] = [];
   const byNumericId = new Map<string, string>();
   const rawRels: RawRelationship[] = [];
 
   const visit = (el: RawElement, type: ElementType, parent: string | null) => {
     const id = el.properties?.["structurizr.dsl.identifier"] ?? el.id;
-    elements.set(id, {
+    elements.push({
       id,
       name: el.name ?? id,
       description: el.description ?? "",
       type,
       parent,
-      globs: splitGlobs(el.properties?.["code.globs"]),
+      properties: el.properties ?? {},
     });
     byNumericId.set(el.id, id);
     rawRels.push(...(el.relationships ?? []));
@@ -111,22 +134,58 @@ export function parseModel(json: string): Model {
   for (const s of raw.model?.softwareSystems ?? [])
     visit(s, "softwareSystem", null);
 
-  // Several arrows between one pair read as one, labelled with all of them.
-  const grouped = new Map<
-    string,
-    { rel: ModelRelationship; labels: string[] }
-  >();
+  const relationships: WorkspaceRelationship[] = [];
   for (const r of rawRels) {
     if (r.linkedRelationshipId) continue;
     const source = byNumericId.get(r.sourceId);
     const destination = byNumericId.get(r.destinationId);
     if (!source || !destination) continue;
+    relationships.push({
+      source,
+      destination,
+      description: r.description ?? "",
+    });
+  }
+  return { properties: raw.properties ?? {}, elements, relationships };
+}
+
+export function buildModel(ws: Workspace): Model {
+  const elements = new Map<string, ModelElement>();
+  for (const el of ws.elements) {
+    elements.set(el.id, {
+      id: el.id,
+      name: el.name,
+      description: el.description,
+      type: el.type,
+      parent: el.parent,
+      globs: splitGlobs(el.properties["code.globs"]),
+    });
+  }
+
+  // The export lists each arrow under its source element; ordering the DSL's
+  // the same way gives both readers the same map, edge for edge.
+  const order = new Map(ws.elements.map((e, i) => [e.id, i]));
+  const rels = ws.relationships
+    .map((r, i) => ({ r, i }))
+    .sort(
+      (a, b) =>
+        (order.get(a.r.source) ?? 0) - (order.get(b.r.source) ?? 0) ||
+        a.i - b.i,
+    )
+    .map(({ r }) => r);
+
+  // Several arrows between one pair read as one, labelled with all of them.
+  const grouped = new Map<
+    string,
+    { rel: ModelRelationship; labels: string[] }
+  >();
+  for (const { source, destination, description } of rels) {
     const key = `${source} → ${destination}`;
     const entry = grouped.get(key) ?? {
       rel: { key, source, destination, description: "" },
       labels: [],
     };
-    entry.labels.push(r.description ?? "");
+    entry.labels.push(description);
     grouped.set(key, entry);
   }
   const relationships = new Map<string, ModelRelationship>();
@@ -138,7 +197,6 @@ export function parseModel(json: string): Model {
     .filter((e) => e.globs.length > 0)
     .map((e) => ({ id: e.id, test: matcher(e.globs) }));
 
-  const embedded = raw.properties?.["structurizr.dsl"];
   return {
     elements,
     relationships,
@@ -146,18 +204,29 @@ export function parseModel(json: string): Model {
     // A model that doesn't say which files are tests or ignored keeps the
     // built-in patterns, rather than counting every test as app code.
     isTest: orDefault(
-      splitGlobs(raw.properties?.["code.tests"]),
+      splitGlobs(ws.properties["code.tests"]),
       () => DEFAULT_TESTS,
     ),
     isIgnored: orDefault(
-      splitGlobs(raw.properties?.["code.ignore"]),
+      splitGlobs(ws.properties["code.ignore"]),
       () => DEFAULT_IGNORE,
     ),
+    embeddedDsl: null,
+  };
+}
+
+export function parseModel(json: string): Model {
+  const raw = JSON.parse(json) as RawWorkspace;
+  const embedded = raw.properties?.["structurizr.dsl"];
+  return {
+    ...buildModel(fromJson(raw)),
     embeddedDsl: embedded
       ? Buffer.from(embedded, "base64").toString("utf8")
       : null,
   };
 }
+
+export const parseDsl = (text: string): Model => buildModel(readDsl(text));
 
 /** A file's contents at a commit, or null if it isn't there. */
 export async function showFile(
