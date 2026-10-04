@@ -388,7 +388,12 @@ export async function getHistory(
     `refs/remotes/origin/${defaultBranch}`,
     `refs/heads/${defaultBranch}`,
   ]) {
-    const exists = await gitLine(root, ["rev-parse", "--verify", "--quiet", ref]);
+    const exists = await gitLine(root, [
+      "rev-parse",
+      "--verify",
+      "--quiet",
+      ref,
+    ]);
     if (exists) {
       fork = await gitLine(root, ["merge-base", ref, start]);
       break;
@@ -689,11 +694,11 @@ export async function isOnBranch(
   sha: string,
   tip = "HEAD",
 ): Promise<boolean> {
-  const { code } = await run(
-    "git",
-    ["merge-base", "--is-ancestor", sha, tip],
-    { cwd: root, allowExitCodes: [1, 128], timeout: 10_000 },
-  ).catch(() => ({ code: 1 }));
+  const { code } = await run("git", ["merge-base", "--is-ancestor", sha, tip], {
+    cwd: root,
+    allowExitCodes: [1, 128],
+    timeout: 10_000,
+  }).catch(() => ({ code: 1 }));
   return code === 0;
 }
 

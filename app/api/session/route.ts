@@ -23,11 +23,7 @@ import {
   type ResponsePatch,
   type ResponseRecord,
 } from "@/lib/responses";
-import type {
-  ApiError,
-  ReviewThread,
-  SessionResponse,
-} from "@/lib/types";
+import type { ApiError, ReviewThread, SessionResponse } from "@/lib/types";
 
 /** A branch you're only reading has no working tree of its own. */
 const EMPTY_WORKING_TREE = {
@@ -167,11 +163,10 @@ export async function GET(request: Request) {
     // Ordered here rather than in the client so the spine, the ‹ › stepper,
     // `j`/`k` and the "first open comment" fallback can't disagree about what
     // "next" means.
-    const allThreads = [...rawGithub.threads, ...summaryThreads].sort(
-      (a, b) =>
-        (a.comments[0]?.createdAt ?? "").localeCompare(
-          b.comments[0]?.createdAt ?? "",
-        ),
+    const allThreads = [...rawGithub.threads, ...summaryThreads].sort((a, b) =>
+      (a.comments[0]?.createdAt ?? "").localeCompare(
+        b.comments[0]?.createdAt ?? "",
+      ),
     );
     const github = { ...rawGithub, threads: allThreads };
     if (allThreads.length > 0) {

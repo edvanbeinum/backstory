@@ -27,6 +27,11 @@ export async function viewRange(
   }
   const head = await resolveRev(repo.root, rev);
   if (!head) return null;
-  const base = await gitLine(repo.root, ["rev-parse", "--verify", "--quiet", `${head}^1`]);
+  const base = await gitLine(repo.root, [
+    "rev-parse",
+    "--verify",
+    "--quiet",
+    `${head}^1`,
+  ]);
   return { base, head };
 }

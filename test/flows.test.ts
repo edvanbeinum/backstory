@@ -117,9 +117,39 @@ const HEAD_ANSWER: HeadOutput = {
       isNew: false,
       participants,
       steps: [
-        { id: "load.fetch", from: "Loader", to: "Repo", file: "src/Loader.ts", line: 3, caller: "Loader.load", label: "fetchOnce()", symbol: "fetchOnce()", nesting: 0 },
-        { id: "load.render", from: "Loader", to: "Loader", file: "src/Loader.ts", line: 4, caller: "Loader.load", label: "render(items)", symbol: "render(this.items)", nesting: 0 },
-        { id: "load.ghost", from: "Loader", to: "Repo", file: "src/Loader.ts", line: 2, caller: "Loader.load", label: "ghost()", symbol: "ghost(", nesting: 0 },
+        {
+          id: "load.fetch",
+          from: "Loader",
+          to: "Repo",
+          file: "src/Loader.ts",
+          line: 3,
+          caller: "Loader.load",
+          label: "fetchOnce()",
+          symbol: "fetchOnce()",
+          nesting: 0,
+        },
+        {
+          id: "load.render",
+          from: "Loader",
+          to: "Loader",
+          file: "src/Loader.ts",
+          line: 4,
+          caller: "Loader.load",
+          label: "render(items)",
+          symbol: "render(this.items)",
+          nesting: 0,
+        },
+        {
+          id: "load.ghost",
+          from: "Loader",
+          to: "Repo",
+          file: "src/Loader.ts",
+          line: 2,
+          caller: "Loader.load",
+          label: "ghost()",
+          symbol: "ghost(",
+          nesting: 0,
+        },
       ],
     },
   ],
@@ -135,10 +165,40 @@ const BASE_ANSWER = {
       isNew: false,
       participants,
       steps: [
-        { id: "load.fetch-1", from: "Loader", to: "Repo", file: "src/Loader.ts", line: 3, caller: "Loader.load", label: "fetchAll()", symbol: "fetchAll()", nesting: 0 },
-        { id: "load.fetch-2", from: "Loader", to: "Repo", file: "src/Loader.ts", line: 4, caller: "Loader.load", label: "fetchAll() again", symbol: "fetchAll()", nesting: 0 },
+        {
+          id: "load.fetch-1",
+          from: "Loader",
+          to: "Repo",
+          file: "src/Loader.ts",
+          line: 3,
+          caller: "Loader.load",
+          label: "fetchAll()",
+          symbol: "fetchAll()",
+          nesting: 0,
+        },
+        {
+          id: "load.fetch-2",
+          from: "Loader",
+          to: "Repo",
+          file: "src/Loader.ts",
+          line: 4,
+          caller: "Loader.load",
+          label: "fetchAll() again",
+          symbol: "fetchAll()",
+          nesting: 0,
+        },
         // Claude gets the carried step's line wrong; differ keeps the proven one.
-        { id: "load.render", from: "Loader", to: "Loader", file: "src/Loader.ts", line: 99, caller: "Loader.load", label: "render(items)", symbol: "render(this.items)", nesting: 0 },
+        {
+          id: "load.render",
+          from: "Loader",
+          to: "Loader",
+          file: "src/Loader.ts",
+          line: 99,
+          caller: "Loader.load",
+          label: "render(items)",
+          symbol: "render(this.items)",
+          nesting: 0,
+        },
       ],
     },
   ],
@@ -148,18 +208,32 @@ test("flows are traced at the head, then walked back to the base", async () => {
   const prompts: string[] = [];
   const runner: Runner = async <T>(prompt: string) => {
     prompts.push(prompt);
-    const answer = prompt.includes("as it ran at the base") ? BASE_ANSWER : HEAD_ANSWER;
-    return { output: structuredClone(answer) as T, costUsd: 0.5, model: "claude-test" };
+    const answer = prompt.includes("as it ran at the base")
+      ? BASE_ANSWER
+      : HEAD_ANSWER;
+    return {
+      output: structuredClone(answer) as T,
+      costUsd: 0.5,
+      model: "claude-test",
+    };
   };
 
-  const set = await generateFlows({ root: repo, base: BASE, head: HEAD, runner });
+  const set = await generateFlows({
+    root: repo,
+    base: BASE,
+    head: HEAD,
+    runner,
+  });
 
   assert.equal(prompts.length, 2);
   // Tests are off the flows.
   assert.deepEqual(set.appFiles, ["src/Loader.ts"]);
   assert.ok(!prompts[0].includes("Loader.test.ts"));
   // The render step was carried to its base line before Claude saw it.
-  assert.match(prompts[1], /"id": "load.render"[\s\S]*?"line": 5[\s\S]*?"status": "carried"/);
+  assert.match(
+    prompts[1],
+    /"id": "load.render"[\s\S]*?"line": 5[\s\S]*?"status": "carried"/,
+  );
   assert.match(prompts[1], /"id": "load.fetch"[\s\S]*?"status": "affected"/);
 
   const [flow] = set.flows;
@@ -184,7 +258,9 @@ test("flows are traced at the head, then walked back to the base", async () => {
   assert.deepEqual(set.hunks[0].flows, ["load"]);
 
   // The cache is SARIF, and reads back the same.
-  const roundTrip = fromSarif(JSON.parse(JSON.stringify(toSarif(set, `file://${repo}`))));
+  const roundTrip = fromSarif(
+    JSON.parse(JSON.stringify(toSarif(set, `file://${repo}`))),
+  );
   assert.deepEqual(roundTrip.flows, set.flows);
   assert.deepEqual(roundTrip.hunks, set.hunks);
 });
@@ -197,7 +273,12 @@ test("a new flow needs one run and has no before side", async () => {
     answer.flows[0].isNew = true;
     return { output: answer as T, costUsd: 0.3, model: "claude-test" };
   };
-  const set = await generateFlows({ root: repo, base: BASE, head: HEAD, runner });
+  const set = await generateFlows({
+    root: repo,
+    base: BASE,
+    head: HEAD,
+    runner,
+  });
   assert.equal(runs, 1);
   assert.equal(set.flows[0].before, null);
 });
@@ -208,18 +289,40 @@ test("a hunk traced later is found by where it is, though the ids have moved", a
     answer.flows[0].isNew = true;
     return { output: answer as T, costUsd: 0.3, model: "claude-test" };
   };
-  const set = await generateFlows({ root: repo, base: BASE, head: HEAD, runner: newFlow });
+  const set = await generateFlows({
+    root: repo,
+    base: BASE,
+    head: HEAD,
+    runner: newFlow,
+  });
   // Traced when another file counted as app code: Loader's hunk was H2.
   const loader = { ...set.hunks[0], id: "H2", flows: [] };
-  const traced = { ...set, flows: [], hunks: [{ ...loader, id: "H1", file: "app/assets/site.css" }, loader] };
+  const traced = {
+    ...set,
+    flows: [],
+    hunks: [{ ...loader, id: "H1", file: "app/assets/site.css" }, loader],
+  };
   const prompts: string[] = [];
   const runner: Runner = async <T>(prompt: string) => {
     prompts.push(prompt);
     return newFlow<T>(prompt, {}, repo);
   };
-  const after = await traceHunk({ root: repo, base: BASE, head: HEAD, runner, set: traced, hunkId: "H2" });
+  const after = await traceHunk({
+    root: repo,
+    base: BASE,
+    head: HEAD,
+    runner,
+    set: traced,
+    hunkId: "H2",
+  });
   assert.match(prompts[0], /src\/Loader\.ts/);
-  assert.deepEqual(after.hunks.map((h) => [h.id, h.flows]), [["H1", []], ["H2", ["load"]]]);
+  assert.deepEqual(
+    after.hunks.map((h) => [h.id, h.flows]),
+    [
+      ["H1", []],
+      ["H2", ["load"]],
+    ],
+  );
 });
 
 test("a change with no app code makes no runs", async () => {
@@ -243,20 +346,34 @@ test("a symbol is found on a nearby line, or running over several", async () => 
   const lines = [
     "def grants",
     "  user.access_grants",
-    "    .where(grantable_type: \"Container\")",
+    '    .where(grantable_type: "Container")',
     "    .group(:grantable_id)",
     "end",
     "",
     "def plays",
-    "  Ahoy::Event.where(name: \"play\")",
+    '  Ahoy::Event.where(name: "play")',
   ];
   const read = async (_file: string, line: number) => lines[line - 1] ?? null;
   // Claude cited the line before the call: the step moves to where it is.
-  assert.equal(await locate(read, "f.rb", 7, 'Ahoy::Event.where(name: "play")'), 8);
+  assert.equal(
+    await locate(read, "f.rb", 7, 'Ahoy::Event.where(name: "play")'),
+    8,
+  );
   // A chained call split across lines starts on its first line.
-  assert.equal(await locate(read, "f.rb", 2, 'user.access_grants.where(grantable_type: "Container")'), 2);
+  assert.equal(
+    await locate(
+      read,
+      "f.rb",
+      2,
+      'user.access_grants.where(grantable_type: "Container")',
+    ),
+    2,
+  );
   // Too far away stays unverified.
-  assert.equal(await locate(read, "f.rb", 1, 'Ahoy::Event.where(name: "play")'), null);
+  assert.equal(
+    await locate(read, "f.rb", 1, 'Ahoy::Event.where(name: "play")'),
+    null,
+  );
   assert.equal(await locate(read, "f.rb", 3, "nowhere()"), null);
 });
 
@@ -269,8 +386,29 @@ test("generated files are not app code", async () => {
 
 test("every hunk reaches the prompt, however big the ones before it", async () => {
   const { hunkText } = await import("../lib/flows/hunks");
-  const big = { id: "H1", file: "big.ts", oldFile: "big.ts", oldStart: 0, oldLines: 0, newStart: 1, newLines: 3000, text: Array.from({ length: 3000 }, (_, i) => `+line ${i} of a very large new file`) };
-  const small = { id: "H2", file: "small.ts", oldFile: "small.ts", oldStart: 3, oldLines: 1, newStart: 3, newLines: 1, text: ["-a", "+b"] };
+  const big = {
+    id: "H1",
+    file: "big.ts",
+    oldFile: "big.ts",
+    oldStart: 0,
+    oldLines: 0,
+    newStart: 1,
+    newLines: 3000,
+    text: Array.from(
+      { length: 3000 },
+      (_, i) => `+line ${i} of a very large new file`,
+    ),
+  };
+  const small = {
+    id: "H2",
+    file: "small.ts",
+    oldFile: "small.ts",
+    oldStart: 3,
+    oldLines: 1,
+    newStart: 3,
+    newLines: 1,
+    text: ["-a", "+b"],
+  };
   const text = hunkText([big, small], 8_000);
   assert.match(text, /^H1  big\.ts/);
   assert.match(text, /read the file for the rest/);
@@ -281,12 +419,17 @@ test("every hunk reaches the prompt, however big the ones before it", async () =
   assert.match(tight, /H2  small\.ts/);
 });
 
-
 test("the hunk list stays near its budget, headers included", async () => {
   const { hunkText } = await import("../lib/flows/hunks");
   const many = Array.from({ length: 600 }, (_, i) => ({
-    id: `H${i + 1}`, file: `app/models/model_${i}.rb`, oldFile: `app/models/model_${i}.rb`,
-    oldStart: 1, oldLines: 1, newStart: 1, newLines: 1, text: ["-a", "+b"],
+    id: `H${i + 1}`,
+    file: `app/models/model_${i}.rb`,
+    oldFile: `app/models/model_${i}.rb`,
+    oldStart: 1,
+    oldLines: 1,
+    newStart: 1,
+    newLines: 1,
+    text: ["-a", "+b"],
   }));
   const text = hunkText(many, 20_000);
   // Headers past the budget still count; the list stops at its cap.

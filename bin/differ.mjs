@@ -32,7 +32,13 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DEFAULT_PORT, hookPort, readStdin, recordPort, stopHook } from "./hook.mjs";
+import {
+  DEFAULT_PORT,
+  hookPort,
+  readStdin,
+  recordPort,
+  stopHook,
+} from "./hook.mjs";
 import * as launchd from "./launchd.mjs";
 
 // First, before anything that could start, restart or wait on a server: the
@@ -41,7 +47,9 @@ if (process.argv[2] === "hook") {
   // A backstop for anything that hangs past the take's own timeout.
   setTimeout(() => process.exit(0), 5000);
   if (process.argv[3] === "stop") {
-    await stopHook(await readStdin(), { base: `http://127.0.0.1:${hookPort()}` });
+    await stopHook(await readStdin(), {
+      base: `http://127.0.0.1:${hookPort()}`,
+    });
   }
   process.exit(0);
 }
@@ -169,7 +177,10 @@ function findServer() {
 /** The build a fresh server would run — what /api/health reports as `build`. */
 function builtId(server) {
   try {
-    return readFileSync(path.join(path.dirname(server), ".next", "BUILD_ID"), "utf8").trim();
+    return readFileSync(
+      path.join(path.dirname(server), ".next", "BUILD_ID"),
+      "utf8",
+    ).trim();
   } catch {
     return null;
   }
@@ -260,7 +271,9 @@ async function review() {
     }
 
     if (result.status === 404) {
-      console.error("differ: the review request expired (did differ restart?).");
+      console.error(
+        "differ: the review request expired (did differ restart?).",
+      );
       process.exit(1);
     }
     switch (result.body?.state) {
@@ -275,7 +288,9 @@ async function review() {
         );
         process.exit(0);
       case "superseded":
-        console.error("differ: another `differ review` took over this checkout.");
+        console.error(
+          "differ: another `differ review` took over this checkout.",
+        );
         process.exit(1);
       default:
         console.error(`differ: ${result.body?.error ?? "unexpected response"}`);
@@ -320,7 +335,11 @@ function requireServer() {
 
 if (args.command === "uninstall") {
   const had = launchd.supported() && (await launchd.uninstallAgent());
-  console.log(had ? "differ: login agent removed, server stopped." : "differ: no login agent installed.");
+  console.log(
+    had
+      ? "differ: login agent removed, server stopped."
+      : "differ: no login agent installed.",
+  );
   process.exit(0);
 }
 
@@ -331,13 +350,18 @@ if (args.command === "install") {
   }
   requireServer();
   // Reinstalling is also how to restart onto a rebuild.
-  if ((await launchd.ensureAgent(agentSpec())) === "started") await launchd.restartAgent();
+  if ((await launchd.ensureAgent(agentSpec())) === "started")
+    await launchd.restartAgent();
   if (!(await waitForHealth(args.port, builtId(server)))) {
-    console.error(`differ: server didn't come up on :${args.port} — see ${serverLog}`);
+    console.error(
+      `differ: server didn't come up on :${args.port} — see ${serverLog}`,
+    );
     process.exit(1);
   }
   recordPort(args.port);
-  console.log(`differ: login agent installed — serving ${base} (log: ${serverLog})`);
+  console.log(
+    `differ: login agent installed — serving ${base} (log: ${serverLog})`,
+  );
   process.exit(0);
 }
 
@@ -355,9 +379,12 @@ if (
   const build = builtId(server);
   if (build && running.build !== build) {
     say(`differ: restarting the server onto the new build…`);
-    if ((await launchd.ensureAgent(agentSpec())) === "started") await launchd.restartAgent();
+    if ((await launchd.ensureAgent(agentSpec())) === "started")
+      await launchd.restartAgent();
     if (!(await waitForHealth(args.port, build))) {
-      console.error(`differ: server didn't come back on :${args.port} — see ${serverLog}`);
+      console.error(
+        `differ: server didn't come back on :${args.port} — see ${serverLog}`,
+      );
       process.exit(1);
     }
   }
@@ -382,7 +409,9 @@ if (agentManaged()) {
     );
   }
   if (!(await waitForHealth(args.port))) {
-    console.error(`differ: server didn't come up on :${args.port} — see ${serverLog}`);
+    console.error(
+      `differ: server didn't come up on :${args.port} — see ${serverLog}`,
+    );
     process.exit(1);
   }
   if (args.review) await review();
@@ -410,7 +439,9 @@ if (args.review) {
   });
   child.unref();
   if (!(await waitForHealth(args.port))) {
-    console.error(`differ: server didn't come up on :${args.port} — see ${serverLog}`);
+    console.error(
+      `differ: server didn't come up on :${args.port} — see ${serverLog}`,
+    );
     process.exit(1);
   }
   await review();

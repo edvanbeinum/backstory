@@ -1,4 +1,11 @@
-import type { Constraint, DataModel, Entity, Field, Relationship, RelationshipKind } from "./types";
+import type {
+  Constraint,
+  DataModel,
+  Entity,
+  Field,
+  Relationship,
+  RelationshipKind,
+} from "./types";
 
 /**
  * Rails's data model: fields and constraints from `db/schema.rb`, which
@@ -34,7 +41,9 @@ const IRREGULAR: Record<string, string> = {
   medium: "media",
   analysis: "analyses",
 };
-const SINGULAR = Object.fromEntries(Object.entries(IRREGULAR).map(([one, many]) => [many, one]));
+const SINGULAR = Object.fromEntries(
+  Object.entries(IRREGULAR).map(([one, many]) => [many, one]),
+);
 
 /** Inflect the last word of a snake_case name: "access_grant" → "access_grants". */
 function lastWord(word: string, fn: (w: string) => string) {
@@ -54,7 +63,10 @@ function pluralWord(word: string): string {
 }
 
 function parseSchema(schema: string) {
-  const tables = new Map<string, { fields: Field[]; constraints: Constraint[] }>();
+  const tables = new Map<
+    string,
+    { fields: Field[]; constraints: Constraint[] }
+  >();
   const foreignKeys: { from: string; to: string; column: string }[] = [];
   let current: { fields: Field[]; constraints: Constraint[] } | null = null;
 
@@ -70,7 +82,9 @@ function parseSchema(schema: string) {
       current = null;
       continue;
     }
-    const fk = line.match(/^add_foreign_key "([^"]+)", "([^"]+)"(?:.*column: "([^"]+)")?/);
+    const fk = line.match(
+      /^add_foreign_key "([^"]+)", "([^"]+)"(?:.*column: "([^"]+)")?/,
+    );
     if (fk) {
       foreignKeys.push({ from: fk[1], to: fk[2], column: fk[3] ?? "" });
       continue;
@@ -88,8 +102,13 @@ function parseSchema(schema: string) {
     }
     // A unique index or constraint is a rule about the data; a plain index
     // is a performance detail and stays out of the view.
-    const unique = line.match(/^t\.(?:index|unique_constraint) \[([^\]]+)\](.*)$/);
-    if (unique && (/unique: true/.test(unique[2]) || line.startsWith("t.unique_constraint"))) {
+    const unique = line.match(
+      /^t\.(?:index|unique_constraint) \[([^\]]+)\](.*)$/,
+    );
+    if (
+      unique &&
+      (/unique: true/.test(unique[2]) || line.startsWith("t.unique_constraint"))
+    ) {
       current.constraints.push({
         kind: "unique",
         fields: unique[1].split(",").map((f) => f.trim().replace(/"/g, "")),
@@ -158,11 +177,15 @@ function parseModel(file: string, text: string): ModelDecl | null {
   }
   if (!name) return null;
 
-  const table = text.match(/self\.table_name\s*=\s*["']([^"']+)["']/)?.[1] ?? tableFor(name);
+  const table =
+    text.match(/self\.table_name\s*=\s*["']([^"']+)["']/)?.[1] ??
+    tableFor(name);
   const relationships: Relationship[] = [];
   const enums = new Map<string, string[]>();
   for (const line of text.split("\n")) {
-    const rel = line.match(/^\s*(belongs_to|has_many|has_one|has_and_belongs_to_many)\s+:(\w+)(.*)$/);
+    const rel = line.match(
+      /^\s*(belongs_to|has_many|has_one|has_and_belongs_to_many)\s+:(\w+)(.*)$/,
+    );
     if (rel) {
       const opts = rel[3];
       const polymorphic = /polymorphic:\s*true/.test(opts);
@@ -176,8 +199,14 @@ function parseModel(file: string, text: string): ModelDecl | null {
       const sourceName = opts.match(/\bsource:\s*:(\w+)/)?.[1];
       // What the code says outranks what's guessed from a name: class_name
       // beats an inferred source: target.
-      const source = sourceType ?? className ?? (sourceName ? classify(singular(sourceName)) : undefined);
-      const base = rel[1] === "belongs_to" || rel[1] === "has_one" ? rel[2] : singular(rel[2]);
+      const source =
+        sourceType ??
+        className ??
+        (sourceName ? classify(singular(sourceName)) : undefined);
+      const base =
+        rel[1] === "belongs_to" || rel[1] === "has_one"
+          ? rel[2]
+          : singular(rel[2]);
       relationships.push({
         name: rel[2],
         kind: KINDS[rel[1]],
@@ -187,7 +216,12 @@ function parseModel(file: string, text: string): ModelDecl | null {
         ...(through ? { through } : {}),
         // A belongs-to lives in this entity's own columns.
         ...(rel[1] === "belongs_to"
-          ? { fields: [...(polymorphic ? [`${rel[2]}_type`] : []), foreignKey ?? `${rel[2]}_id`] }
+          ? {
+              fields: [
+                ...(polymorphic ? [`${rel[2]}_type`] : []),
+                foreignKey ?? `${rel[2]}_id`,
+              ],
+            }
           : {}),
       });
       continue;
@@ -198,7 +232,9 @@ function parseModel(file: string, text: string): ModelDecl | null {
       const values =
         en[2] === "{"
           ? [...en[3].matchAll(/["']?(\w+)["']?\s*:/g)].map((m) => m[1])
-          : [...en[3].matchAll(/:(\w+)|["'](\w+)["']/g)].map((m) => m[1] ?? m[2]);
+          : [...en[3].matchAll(/:(\w+)|["'](\w+)["']/g)].map(
+              (m) => m[1] ?? m[2],
+            );
       enums.set(en[1], values);
     }
   }
@@ -245,7 +281,9 @@ export function readRails(src: RailsSources): DataModel {
       if (!rel.polymorphic || rel.kind !== "belongs to") continue;
       rel.candidates = [...entities.values()]
         .filter((other) =>
-          other.relationships.some((r) => r.as === rel.name && r.target === entity.name),
+          other.relationships.some(
+            (r) => r.as === rel.name && r.target === entity.name,
+          ),
         )
         .map((other) => other.name)
         .sort();

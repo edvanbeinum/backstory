@@ -151,8 +151,8 @@ body {
 
 .mono {
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
 }
 
 /* Shiki emits both themes as custom properties on every token; pick one. */
@@ -177,8 +177,8 @@ body {
   width: 100%;
   border-collapse: collapse;
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 12px;
   line-height: 20px;
   tab-size: 4;
@@ -352,8 +352,8 @@ tr.note-row td {
 }
 .md code {
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 85%;
   padding: 0.2em 0.4em;
   border-radius: 6px;
@@ -748,7 +748,9 @@ tr.note-row td {
 .flow-svg path {
   fill: none;
   stroke-width: 2;
-  transition: stroke 160ms ease, stroke-width 160ms ease;
+  transition:
+    stroke 160ms ease,
+    stroke-width 160ms ease;
 }
 .flow-svg path.k-ctx {
   stroke: var(--fg);
@@ -791,8 +793,8 @@ tr.note-row td {
 .flow-row .m,
 .flow-row .lab {
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 12px;
   line-height: 18px;
 }
@@ -915,13 +917,25 @@ tr.note-row td {
   color: var(--danger);
 }
 tr.flow-inview td {
-  background: color-mix(in srgb, var(--accent-subtle) 80%, var(--canvas)) !important;
+  background: color-mix(
+    in srgb,
+    var(--accent-subtle) 80%,
+    var(--canvas)
+  ) !important;
 }
 tr.line-add.flow-inview td {
-  background: color-mix(in srgb, var(--accent-subtle) 80%, var(--diff-add-bg)) !important;
+  background: color-mix(
+    in srgb,
+    var(--accent-subtle) 80%,
+    var(--diff-add-bg)
+  ) !important;
 }
 tr.line-del.flow-inview td {
-  background: color-mix(in srgb, var(--accent-subtle) 70%, var(--diff-del-bg)) !important;
+  background: color-mix(
+    in srgb,
+    var(--accent-subtle) 70%,
+    var(--diff-del-bg)
+  ) !important;
 }
 tr.flow-inview td.diff-num {
   box-shadow: inset 3px 0 0 var(--accent);
@@ -974,7 +988,11 @@ tr.flow-inview td.diff-num {
 .map-thumb {
   flex-shrink: 0;
   border-radius: 4px;
-  background-image: radial-gradient(circle, var(--border-muted) 1px, transparent 1.2px);
+  background-image: radial-gradient(
+    circle,
+    var(--border-muted) 1px,
+    transparent 1.2px
+  );
   background-size: 8px 8px;
 }
 .map-btn {
@@ -1012,7 +1030,11 @@ tr.flow-inview td.diff-num {
 }
 .map-canvas {
   position: relative;
-  background-image: radial-gradient(circle, var(--border-muted) 1px, transparent 1.2px);
+  background-image: radial-gradient(
+    circle,
+    var(--border-muted) 1px,
+    transparent 1.2px
+  );
   background-size: 16px 16px;
   background-position: 8px 8px;
 }
@@ -1131,8 +1153,8 @@ tr.flow-inview td.diff-num {
   text-overflow: ellipsis;
   white-space: nowrap;
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 11.5px;
   color: var(--accent);
 }
@@ -1436,7 +1458,8 @@ section.file-linked .file-owner {
   line-height: 18px;
 }
 tr.step-code-target td {
-  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--accent) 35%, transparent),
+  box-shadow:
+    inset 0 1px 0 color-mix(in srgb, var(--accent) 35%, transparent),
     inset 0 -1px 0 color-mix(in srgb, var(--accent) 35%, transparent);
 }
 tr.step-code-target td.diff-num {
@@ -1488,8 +1511,8 @@ tr.step-code-target td.diff-num {
 }
 .data-card-head .name {
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 13px;
   font-weight: 600;
 }
@@ -1551,8 +1574,8 @@ tr.step-code-target td.diff-num {
 }
 .data-row .mono {
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
 }
 .data-row .type,
 .data-row .was {
@@ -1573,8 +1596,8 @@ tr.step-code-target td.diff-num {
 /* A flow step that uses a field the change touched. */
 .flow-badge.data {
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 10.5px;
 }
 .flow-badge.data.added {
@@ -1608,8 +1631,8 @@ tr.step-code-target td.diff-num {
 }
 .data-edge-label {
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
 }
 .data-edge-label.added::before {
   content: none;
@@ -1652,8 +1675,8 @@ tr.step-code-target td.diff-num {
 .data-card.compact .name {
   flex: 1;
   font-family:
-    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
-    "Liberation Mono", monospace;
+    ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
+    monospace;
   font-size: 12px;
   color: var(--fg-muted);
 }

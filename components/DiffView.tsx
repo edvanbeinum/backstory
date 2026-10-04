@@ -8,13 +8,12 @@ import type {
   DiffFile as DiffFileType,
   DiffResponse,
   Note,
-  PullRequestInfo,
   RepoInfo,
   ReviewThread,
 } from "@/lib/types";
 import { DiffFile, type FileMarks } from "./DiffFile";
 import { FileNav } from "./FileNav";
-import { AlertIcon, CommentIcon } from "./icons";
+import { AlertIcon } from "./icons";
 import { Spinner } from "./ui";
 import type { NotesApi } from "./useNotes";
 
@@ -51,9 +50,15 @@ function marksFor(
 ): FileMarks | null {
   if (!marks) return null;
   const a = file.newPath ? marks.get(file.newPath) : undefined;
-  const b = file.oldPath && file.oldPath !== file.newPath ? marks.get(file.oldPath) : undefined;
+  const b =
+    file.oldPath && file.oldPath !== file.newPath
+      ? marks.get(file.oldPath)
+      : undefined;
   if (!a || !b) return a ?? b ?? null;
-  return { old: new Map([...a.old, ...b.old]), new: new Map([...a.new, ...b.new]) };
+  return {
+    old: new Map([...a.old, ...b.old]),
+    new: new Map([...a.new, ...b.new]),
+  };
 }
 
 /** One shared empty list, so files without notes keep a stable prop. */
@@ -65,7 +70,6 @@ export function DiffView({
   error,
   threads,
   repo,
-  pr,
   commit,
   focusedThreadId,
   notes = null,
@@ -79,7 +83,6 @@ export function DiffView({
   error: string | null;
   threads: ReviewThread[];
   repo: RepoInfo;
-  pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
   /** Set when this diff takes notes */
@@ -155,7 +158,6 @@ export function DiffView({
                 : []),
             ]}
             repo={repo}
-            pr={pr}
             commit={commit}
             focusedThreadId={focusedThreadId}
             notes={notes}
@@ -170,8 +172,6 @@ export function DiffView({
           />
         ))
       )}
-
-
     </div>
   );
 }

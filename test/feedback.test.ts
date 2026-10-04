@@ -65,9 +65,15 @@ test("a note on a repeated line that moved is not guessed at", () => {
 });
 
 test("an old-side note only lands on a removed line", () => {
-  assert.equal(locateNote(file, note({ side: "old", line: 11, quote: "gone" })), 11);
+  assert.equal(
+    locateNote(file, note({ side: "old", line: 11, quote: "gone" })),
+    11,
+  );
   // Old line 10 is context, not a removal.
-  assert.equal(locateNote(file, note({ side: "old", line: 10, quote: "keep" })), null);
+  assert.equal(
+    locateNote(file, note({ side: "old", line: 10, quote: "keep" })),
+    null,
+  );
 });
 
 test("anchorNotes sorts notes by side and keeps the unplaceable", () => {
@@ -76,9 +82,18 @@ test("anchorNotes sorts notes by side and keeps the unplaceable", () => {
     note({ id: "b", side: "old", line: 11, quote: "gone" }),
     note({ id: "c", quote: "nope" }),
   ]);
-  assert.deepEqual(byNewLine.get(11)?.map((n) => n.id), ["a"]);
-  assert.deepEqual(byOldLine.get(11)?.map((n) => n.id), ["b"]);
-  assert.deepEqual(unanchored.map((n) => n.id), ["c"]);
+  assert.deepEqual(
+    byNewLine.get(11)?.map((n) => n.id),
+    ["a"],
+  );
+  assert.deepEqual(
+    byOldLine.get(11)?.map((n) => n.id),
+    ["b"],
+  );
+  assert.deepEqual(
+    unanchored.map((n) => n.id),
+    ["c"],
+  );
 });
 
 test("formatFeedback quotes lines, uses current numbers in line order, and ends with general notes", () => {
@@ -124,7 +139,10 @@ test("formatFeedback quotes lines, uses current numbers in line order, and ends 
 });
 
 test("a quote holding backticks gets a fence that can't close early", () => {
-  const text = formatFeedback([note({ quote: "a ``` b", line: 99 })], working([]));
+  const text = formatFeedback(
+    [note({ quote: "a ``` b", line: 99 })],
+    working([]),
+  );
   assert.match(text, /^````typescript\na ``` b\n````$/m);
 });
 
@@ -154,13 +172,19 @@ test("notes persist per checkout, and edits keep their original time", async () 
   assert.deepEqual(Object.keys(raw), ["/repo/b"]);
 
   await assert.rejects(
-    changeNotes("/repo/b", { op: "save", note: note({ id: "x", body: "   " }) }),
+    changeNotes("/repo/b", {
+      op: "save",
+      note: note({ id: "x", body: "   " }),
+    }),
     /empty/,
   );
 });
 
 test("a note on a file with no uncommitted changes says so", () => {
-  const text = formatFeedback([note({ path: "src/gone.ts", line: 7 })], working([file]));
+  const text = formatFeedback(
+    [note({ path: "src/gone.ts", line: 7 })],
+    working([file]),
+  );
   assert.match(
     text,
     /^## src\/gone\.ts \(was line 7; the file has no uncommitted changes now\)$/m,
@@ -183,7 +207,11 @@ test("sending makes a round; only sent notes tick; only drafts edit", async () =
   let notes = await getNotes(root);
   assert.deepEqual(
     notes.map((n) => [n.id, n.sentAt]),
-    [["a", 5_000], ["b", 5_000], ["c", null]],
+    [
+      ["a", 5_000],
+      ["b", 5_000],
+      ["c", null],
+    ],
   );
 
   // What the agent read is fixed.
@@ -201,7 +229,10 @@ test("sending makes a round; only sent notes tick; only drafts edit", async () =
   await changeNotes(root, { op: "clearDrafts" });
   await changeNotes(root, { op: "clearDone" });
   notes = await getNotes(root);
-  assert.deepEqual(notes.map((n) => n.id), ["b"]);
+  assert.deepEqual(
+    notes.map((n) => n.id),
+    ["b"],
+  );
 });
 
 test("a withdrawn round's notes are drafts again, and editable", async () => {
@@ -244,7 +275,9 @@ test("notes saved before rounds existed read as drafts", async () => {
 test("a change with an unknown op is refused", () => {
   assert.throws(() => parseChange({ op: "nuke" }), /unknown op/);
   assert.throws(() => parseChange({ op: "tick", id: "a" }), /Invalid tick/);
-  assert.deepEqual(parseChange({ op: "clearDone", extra: 1 }), { op: "clearDone" });
+  assert.deepEqual(parseChange({ op: "clearDone", extra: 1 }), {
+    op: "clearDone",
+  });
 });
 
 const OLD = "a".repeat(40);
@@ -255,11 +288,36 @@ test("a note on a commit names it, and says whether it's pushed — not how to f
   const text = formatFeedback(
     [
       note({ rev: GONE, path: "src/c.ts", line: 2, quote: "c", body: "third" }),
-      note({ rev: WORKING_REV, path: "src/w.ts", line: 9, quote: "w", body: "fourth" }),
+      note({
+        rev: WORKING_REV,
+        path: "src/w.ts",
+        line: 9,
+        quote: "w",
+        body: "fourth",
+      }),
       note({ rev: NEW, path: "src/b.ts", line: 4, quote: "b", body: "second" }),
-      note({ rev: OLD, side: "old", path: "src/a.ts", line: 3, quote: "a", body: "first" }),
-      note({ rev: BRANCH_REV, path: "src/h.ts", line: 1, quote: "h", body: "branch" }),
-      note({ rev: "d".repeat(40), path: "src/d.ts", line: 5, quote: "d", body: "unknown" }),
+      note({
+        rev: OLD,
+        side: "old",
+        path: "src/a.ts",
+        line: 3,
+        quote: "a",
+        body: "first",
+      }),
+      note({
+        rev: BRANCH_REV,
+        path: "src/h.ts",
+        line: 1,
+        quote: "h",
+        body: "branch",
+      }),
+      note({
+        rev: "d".repeat(40),
+        path: "src/d.ts",
+        line: 5,
+        quote: "d",
+        body: "unknown",
+      }),
     ],
     {
       // Nothing loaded: commits' lines are trusted as left, the rest say so.
@@ -296,5 +354,8 @@ test("a commit note placed against its loaded diff uses that diff's line", () =>
       commits: [{ sha: NEW, subject: "Finish it", pushed: false }],
     },
   );
-  assert.match(text, /^## src\/a\.ts:12 \(in bbbbbbb "Finish it", not yet pushed\)$/m);
+  assert.match(
+    text,
+    /^## src\/a\.ts:12 \(in bbbbbbb "Finish it", not yet pushed\)$/m,
+  );
 });

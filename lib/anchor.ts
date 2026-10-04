@@ -39,8 +39,11 @@ export function anchorThreads(
     }
   }
 
-  const add = (map: Map<number, ReviewThread[]>, key: number, t: ReviewThread) =>
-    map.set(key, [...(map.get(key) ?? []), t]);
+  const add = (
+    map: Map<number, ReviewThread[]>,
+    key: number,
+    t: ReviewThread,
+  ) => map.set(key, [...(map.get(key) ?? []), t]);
 
   for (const thread of threads) {
     // `line` is null once GitHub marks a thread outdated; originalLine still

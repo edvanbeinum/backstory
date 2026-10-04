@@ -23,14 +23,19 @@ export interface FlowRow {
 
 /** Longest common subsequence of step ids: which steps both sides share. */
 function commonIds(a: string[], b: string[]): Set<string> {
-  const dp = Array.from({ length: a.length + 1 }, () => new Array<number>(b.length + 1).fill(0));
+  const dp = Array.from({ length: a.length + 1 }, () =>
+    new Array<number>(b.length + 1).fill(0),
+  );
   for (let i = a.length - 1; i >= 0; i--) {
     for (let j = b.length - 1; j >= 0; j--) {
-      dp[i][j] = a[i] === b[j] ? dp[i + 1][j + 1] + 1 : Math.max(dp[i + 1][j], dp[i][j + 1]);
+      dp[i][j] =
+        a[i] === b[j]
+          ? dp[i + 1][j + 1] + 1
+          : Math.max(dp[i + 1][j], dp[i][j + 1]);
     }
   }
   const out = new Set<string>();
-  for (let i = 0, j = 0; i < a.length && j < b.length; ) {
+  for (let i = 0, j = 0; i < a.length && j < b.length;) {
     if (a[i] === b[j]) {
       out.add(a[i]);
       i++;
@@ -47,14 +52,26 @@ function againNote(steps: FlowStep[], step: FlowStep): string | null {
   const start = steps.findIndex((s) => s.id === step.sameAs);
   if (start === -1) return null;
   let end = start;
-  while (end + 1 < steps.length && steps[end + 1].nesting > steps[start].nesting) end++;
-  return end > start ? `runs ${start + 1}–${end + 1} again` : `runs ${start + 1} again`;
+  while (
+    end + 1 < steps.length &&
+    steps[end + 1].nesting > steps[start].nesting
+  )
+    end++;
+  return end > start
+    ? `runs ${start + 1}–${end + 1} again`
+    : `runs ${start + 1} again`;
 }
 
 const sameWords = (a: FlowStep, b: FlowStep) =>
-  a.label === b.label && (a.returns ?? "") === (b.returns ?? "") && (a.repeat ?? "") === (b.repeat ?? "");
+  a.label === b.label &&
+  (a.returns ?? "") === (b.returns ?? "") &&
+  (a.repeat ?? "") === (b.repeat ?? "");
 
-export function flowRows(flow: Flow, mode: FlowMode, hunks: FlowHunk[]): FlowRow[] {
+export function flowRows(
+  flow: Flow,
+  mode: FlowMode,
+  hunks: FlowHunk[],
+): FlowRow[] {
   const after = flow.after;
   const before = flow.before ?? [];
   const row = (
@@ -74,14 +91,23 @@ export function flowRows(flow: Flow, mode: FlowMode, hunks: FlowHunk[]): FlowRow
     again: againNote(list, step),
   });
 
-  if (mode === "after") return after.map((s, i) => row("ctx", s, "new", null, i + 1, after));
-  if (mode === "before") return before.map((s, i) => row("ctx", s, "old", i + 1, null, before));
+  if (mode === "after")
+    return after.map((s, i) => row("ctx", s, "new", null, i + 1, after));
+  if (mode === "before")
+    return before.map((s, i) => row("ctx", s, "old", i + 1, null, before));
 
   // A new flow: "+" only for steps on lines the change added. A step on
   // code that was already there is context the new trigger now reaches.
   if (flow.before === null) {
     return after.map((s, i) =>
-      row(isAddedLine(hunks, s.file, s.line) ? "add" : "ctx", s, "new", null, i + 1, after),
+      row(
+        isAddedLine(hunks, s.file, s.line) ? "add" : "ctx",
+        s,
+        "new",
+        null,
+        i + 1,
+        after,
+      ),
     );
   }
 
@@ -154,7 +180,8 @@ export function lanesFor(flow: Flow, rows: FlowRow[]): Flow["participants"] {
   return [...known, ...extra];
 }
 
-const words = (name: string) => name.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z0-9]+|[^A-Za-z0-9]+/g) ?? [name];
+const words = (name: string) =>
+  name.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z0-9]+|[^A-Za-z0-9]+/g) ?? [name];
 
 /**
  * Short lane names, as the approved mockup draws them: a CamelCase prefix
@@ -162,7 +189,9 @@ const words = (name: string) => name.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z0-9]+|[^A-
  * "MovementProgressView" reads "ViewModel" and "View"), unless that leaves two lanes
  * with one name. The full name stays in the chip's title.
  */
-export function shortLabels(lanes: { name: string; label: string }[]): Map<string, string> {
+export function shortLabels(
+  lanes: { name: string; label: string }[],
+): Map<string, string> {
   const split = lanes.map((l) => words(l.label));
   const short = split.map((w, i) => {
     let best = 0;
@@ -171,7 +200,12 @@ export function shortLabels(lanes: { name: string; label: string }[]): Map<strin
       let k = 0;
       // A prefix must leave both names a word: "View" beside "ViewModel" keeps
       // "View", not "".
-      while (k < w.length - 1 && k < split[j].length - 1 && w[k] === split[j][k]) k++;
+      while (
+        k < w.length - 1 &&
+        k < split[j].length - 1 &&
+        w[k] === split[j][k]
+      )
+        k++;
       best = Math.max(best, k);
     }
     return w.slice(best).join("");
@@ -179,7 +213,10 @@ export function shortLabels(lanes: { name: string; label: string }[]): Map<strin
   const seen = new Map<string, number>();
   for (const label of short) seen.set(label, (seen.get(label) ?? 0) + 1);
   return new Map(
-    lanes.map((l, i) => [l.name, (seen.get(short[i]) ?? 0) > 1 ? l.label : short[i]]),
+    lanes.map((l, i) => [
+      l.name,
+      (seen.get(short[i]) ?? 0) > 1 ? l.label : short[i],
+    ]),
   );
 }
 
@@ -207,10 +244,13 @@ export function groupLanes(
   const lanes = lanesFor(flow, rows);
   const firstSeen = new Map<string, number>();
   rows.forEach((r, i) => {
-    for (const name of [r.step.from, r.step.to]) if (!firstSeen.has(name)) firstSeen.set(name, i);
+    for (const name of [r.step.from, r.step.to])
+      if (!firstSeen.has(name)) firstSeen.set(name, i);
   });
   const order = new Map<string, number>();
-  for (const p of [...lanes].sort((a, b) => (firstSeen.get(a.name) ?? 0) - (firstSeen.get(b.name) ?? 0))) {
+  for (const p of [...lanes].sort(
+    (a, b) => (firstSeen.get(a.name) ?? 0) - (firstSeen.get(b.name) ?? 0),
+  )) {
     const key = groupKey(p);
     if (!order.has(key)) order.set(key, order.size);
   }
@@ -225,7 +265,13 @@ export function groupLanes(
   sorted.forEach((p, i) => {
     const last = groups[groups.length - 1];
     if (last && groupKey(sorted[last.start]) === groupKey(p)) last.end = i;
-    else groups.push({ component: p.external ? null : (p.component ?? null), external: p.external, start: i, end: i });
+    else
+      groups.push({
+        component: p.external ? null : (p.component ?? null),
+        external: p.external,
+        start: i,
+        end: i,
+      });
   });
   return { lanes: sorted, groups };
 }
@@ -237,7 +283,8 @@ export function componentPath(flow: Flow, rows: FlowRow[]): string[] {
   for (const r of rows) {
     for (const name of [r.step.from, r.step.to]) {
       const c = byName.get(name);
-      if (c && !c.external && c.component && !path.includes(c.component)) path.push(c.component);
+      if (c && !c.external && c.component && !path.includes(c.component))
+        path.push(c.component);
     }
   }
   return path;

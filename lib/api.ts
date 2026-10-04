@@ -33,7 +33,8 @@ export function crossSite(request: Request): NextResponse | null {
   const site = request.headers.get("sec-fetch-site");
   const origin = request.headers.get("origin");
   const host = request.headers.get("host");
-  const foreignOrigin = origin !== null && host !== null && new URL(origin).host !== host;
+  const foreignOrigin =
+    origin !== null && host !== null && new URL(origin).host !== host;
   if ((site && site !== "same-origin" && site !== "none") || foreignOrigin) {
     return NextResponse.json<ApiError>(
       { error: "Requests from other sites aren't accepted.", kind: "internal" },

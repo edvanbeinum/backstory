@@ -24,7 +24,15 @@ function useWide() {
 }
 
 const FlowsIcon = ({ size = 16 }: { size?: number }) => (
-  <svg width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
+  <svg
+    width={size}
+    height={size}
+    viewBox="0 0 16 16"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="1.4"
+    aria-hidden="true"
+  >
     <path d="M3 2v12M13 2v12M3 5h9M12 5l-2-1.5M12 5l-2 1.5M13 10H4M4 10l2-1.5M4 10l2 1.5" />
   </svg>
 );
@@ -67,6 +75,7 @@ export function SideColumn({
   useEffect(() => {
     try {
       const stored = Number(window.localStorage.getItem(WIDTH_KEY));
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
       if (stored >= MIN_WIDTH && stored <= MAX_WIDTH) setWidth(stored);
     } catch {
       // Storage blocked: the default width will do.
@@ -81,7 +90,10 @@ export function SideColumn({
     const box = row.getBoundingClientRect();
     let latest = DEFAULT_WIDTH;
     const move = (e: PointerEvent) => {
-      latest = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, ((e.clientX - box.left) / box.width) * 100));
+      latest = Math.min(
+        MAX_WIDTH,
+        Math.max(MIN_WIDTH, ((e.clientX - box.left) / box.width) * 100),
+      );
       setWidth(latest);
     };
     const up = () => {
@@ -89,7 +101,10 @@ export function SideColumn({
       window.removeEventListener("pointermove", move);
       window.removeEventListener("pointerup", up);
       try {
-        window.localStorage.setItem(WIDTH_KEY, String(Math.round(latest * 10) / 10));
+        window.localStorage.setItem(
+          WIDTH_KEY,
+          String(Math.round(latest * 10) / 10),
+        );
       } catch {
         // As above.
       }
@@ -99,7 +114,10 @@ export function SideColumn({
   }, []);
 
   const tabs = (
-    <div role="tablist" className="flex gap-2 border-b border-[var(--border-muted)]">
+    <div
+      role="tablist"
+      className="flex gap-2 border-b border-[var(--border-muted)]"
+    >
       <button
         type="button"
         role="tab"
@@ -136,7 +154,11 @@ export function SideColumn({
           aria-label={open ? "Collapse" : "Expand"}
           onClick={() => setOpen((v) => !v)}
         >
-          {open ? <ChevronDownIcon size={14} /> : <ChevronRightIcon size={14} />}
+          {open ? (
+            <ChevronDownIcon size={14} />
+          ) : (
+            <ChevronRightIcon size={14} />
+          )}
         </button>
       )}
     </div>

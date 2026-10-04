@@ -33,9 +33,7 @@ export function FileNav({
   const deletions = files.reduce((n, f) => n + f.deletions, 0);
 
   const jump = (path: string) => {
-    const element = document.getElementById(
-      `file-${encodeURIComponent(path)}`,
-    );
+    const element = document.getElementById(`file-${encodeURIComponent(path)}`);
     if (!element) return;
     element.scrollIntoView({ behavior: "smooth", block: "start" });
     element.classList.add("flash");

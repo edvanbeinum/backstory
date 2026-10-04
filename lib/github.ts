@@ -266,18 +266,16 @@ async function loadThreads(repo: RepoInfo, number: number) {
       side: node.diffSide,
       // Filled in by the session route, which is where the store is read.
       response: NO_RESPONSE,
-      comments: node.comments.nodes.map(
-        (c): ReviewComment => ({
-          id: c.id,
-          databaseId: c.databaseId,
-          author: c.author?.login ?? "ghost",
-          avatarUrl: c.author?.avatarUrl ?? null,
-          body: c.body,
-          createdAt: c.createdAt,
-          url: c.url,
-          diffHunk: c.diffHunk,
-        }),
-      ),
+      comments: node.comments.nodes.map((c): ReviewComment => ({
+        id: c.id,
+        databaseId: c.databaseId,
+        author: c.author?.login ?? "ghost",
+        avatarUrl: c.author?.avatarUrl ?? null,
+        body: c.body,
+        createdAt: c.createdAt,
+        url: c.url,
+        diffHunk: c.diffHunk,
+      })),
     }),
   );
 

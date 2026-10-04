@@ -165,7 +165,9 @@ function heading(
   }
 
   if (where) qualifiers.push(where);
-  return qualifiers.length > 0 ? `${location} (${qualifiers.join("; ")})` : location;
+  return qualifiers.length > 0
+    ? `${location} (${qualifiers.join("; ")})`
+    : location;
 }
 
 /** Commits oldest first, then the branch as a whole, then uncommitted work. */
@@ -185,7 +187,10 @@ function revRank(rev: string, commits: NoteCommit[]): number {
  * then uncommitted work — and in diff order within each; general notes go
  * last, as the summing-up.
  */
-export function formatFeedback(notes: Note[], context: FeedbackContext): string {
+export function formatFeedback(
+  notes: Note[],
+  context: FeedbackContext,
+): string {
   const { diffs, commits } = context;
   const general = notes.filter((n) => !n.path);
   const onLines = notes.filter((n) => n.path);
@@ -226,7 +231,11 @@ export function formatFeedback(notes: Note[], context: FeedbackContext): string 
     const lines = [`## ${heading(note, files, at, where)}`];
     if (note.quote !== null) {
       const f = fence(note.quote);
-      lines.push(`${f}${file?.lang ?? langForPath(note.path) ?? ""}`, note.quote, f);
+      lines.push(
+        `${f}${file?.lang ?? langForPath(note.path) ?? ""}`,
+        note.quote,
+        f,
+      );
     }
     lines.push(note.body.trim());
     parts.push(lines.join("\n"));

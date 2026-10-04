@@ -132,7 +132,11 @@ export function TickStrip({
     <nav
       aria-label="Review comments"
       className="thin-scroll flex items-center gap-1.5 overflow-x-auto border-b border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 lg:hidden"
-      style={{ position: "sticky", top: "var(--header-height, 0px)", zIndex: 20 }}
+      style={{
+        position: "sticky",
+        top: "var(--header-height, 0px)",
+        zIndex: 20,
+      }}
     >
       <span className="mono shrink-0 pr-1 text-[10px] text-[var(--fg-muted)]">
         {done}/{threads.length}

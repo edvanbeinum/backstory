@@ -25,8 +25,12 @@ export function coverage(set: FlowSet, files: DiffFile[]): ViewHunk[] {
     if (!app.has(file.path)) continue;
     const zero = set.hunks.filter((h) => h.file === file.path);
     for (const hunk of file.hunks) {
-      const added = hunk.lines.filter((l) => l.type === "add").map((l) => l.newNo!);
-      const removed = hunk.lines.filter((l) => l.type === "del").map((l) => l.oldNo!);
+      const added = hunk.lines
+        .filter((l) => l.type === "add")
+        .map((l) => l.newNo!);
+      const removed = hunk.lines
+        .filter((l) => l.type === "del")
+        .map((l) => l.oldNo!);
       if (added.length === 0 && removed.length === 0) continue;
       const inside = zero.filter(
         (z) =>

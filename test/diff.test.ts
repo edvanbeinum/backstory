@@ -78,7 +78,8 @@ Binary files a/logo.png and b/logo.png differ
 });
 
 test("handles quoted paths with spaces and unicode", () => {
-  const [file] = parseUnifiedDiff(`diff --git "a/src/caf\\303\\251 menu.ts" "b/src/caf\\303\\251 menu.ts"
+  const [file] =
+    parseUnifiedDiff(`diff --git "a/src/caf\\303\\251 menu.ts" "b/src/caf\\303\\251 menu.ts"
 --- "a/src/caf\\303\\251 menu.ts"
 +++ "b/src/caf\\303\\251 menu.ts"
 @@ -1 +1 @@

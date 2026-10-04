@@ -1,6 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import { present, type Presented } from "@/lib/data/present";
 import type {
@@ -32,7 +39,8 @@ function summary(shown: Presented[]) {
   if (added.length) {
     parts.push(
       <span className="text-[var(--success)]">
-        {added.map((p) => p.entity.name).join(", ")} {added.length === 1 ? "is" : "are"} new
+        {added.map((p) => p.entity.name).join(", ")}{" "}
+        {added.length === 1 ? "is" : "are"} new
       </span>,
     );
   }
@@ -44,7 +52,11 @@ function summary(shown: Presented[]) {
     );
   }
   if (removed.length) {
-    parts.push(<span className="text-[var(--danger)]">{removed.map((p) => p.entity.name).join(", ")} removed</span>);
+    parts.push(
+      <span className="text-[var(--danger)]">
+        {removed.map((p) => p.entity.name).join(", ")} removed
+      </span>,
+    );
   }
   if (!added.length && !removed.length) parts.push(<>no new entities</>);
   return parts.map((part, i) => (
@@ -55,7 +67,9 @@ function summary(shown: Presented[]) {
   ));
 }
 
-const fieldType = (f: Field) => (f.values ? `enum (${f.values.join(", ")})` : f.type) + (f.required ? "" : "?");
+const fieldType = (f: Field) =>
+  (f.values ? `enum (${f.values.join(", ")})` : f.type) +
+  (f.required ? "" : "?");
 
 function relText(r: Relationship) {
   const target = r.polymorphic
@@ -70,10 +84,26 @@ function ruleText(c: Constraint) {
     : `${c.fields.join(", ")} → ${c.target ?? "?"}`;
 }
 
-function Row({ state, children, was }: { state: string; children: React.ReactNode; was?: string }) {
+function Row({
+  state,
+  children,
+  was,
+}: {
+  state: string;
+  children: React.ReactNode;
+  was?: string;
+}) {
   return (
     <div className={`data-row ${state}`}>
-      <span className="mark">{state === "added" ? "+" : state === "removed" ? "−" : state === "changed" ? "~" : ""}</span>
+      <span className="mark">
+        {state === "added"
+          ? "+"
+          : state === "removed"
+            ? "−"
+            : state === "changed"
+              ? "~"
+              : ""}
+      </span>
       <span className="text">
         {children}
         {was && <span className="was"> was {was}</span>}
@@ -111,18 +141,33 @@ function EntityCard({
     );
   }
   const d = p.details;
-  const hasDetails = d.rules.length + d.linkFields.length + d.timestamps.length > 0;
+  const hasDetails =
+    d.rules.length + d.linkFields.length + d.timestamps.length > 0;
   return (
-    <div className={`data-card ${p.state} ${open ? "open" : ""}`} title={e.file ?? undefined}>
-      <button type="button" className="data-card-head" onClick={onToggle} aria-expanded={open}>
+    <div
+      className={`data-card ${p.state} ${open ? "open" : ""}`}
+      title={e.file ?? undefined}
+    >
+      <button
+        type="button"
+        className="data-card-head"
+        onClick={onToggle}
+        aria-expanded={open}
+      >
         <span className="name">{e.name}</span>
         {p.state === "added" && <span className="map-tag new">New</span>}
-        {p.state === "removed" && <span className="map-tag removed">Removed</span>}
+        {p.state === "removed" && (
+          <span className="map-tag removed">Removed</span>
+        )}
         <span className="flex-1" />
         {e.component && <span className="file-owner">{e.component}</span>}
       </button>
       <button type="button" className="data-card-line" onClick={onToggle}>
-        <span>{p.state === "added" ? p.summary.replace(/^New · /, "") || "New" : p.summary}</span>
+        <span>
+          {p.state === "added"
+            ? p.summary.replace(/^New · /, "") || "New"
+            : p.summary}
+        </span>
         <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
       </button>
       {notes.map((n) => (
@@ -135,8 +180,13 @@ function EntityCard({
           {p.fields.length > 0 && (
             <div className="data-section">
               {p.fields.map((f) => (
-                <Row key={f.item.name} state={f.state} was={f.before ? fieldType(f.before) : undefined}>
-                  <span className="mono">{f.item.name}</span> <span className="type">{fieldType(f.item)}</span>
+                <Row
+                  key={f.item.name}
+                  state={f.state}
+                  was={f.before ? fieldType(f.before) : undefined}
+                >
+                  <span className="mono">{f.item.name}</span>{" "}
+                  <span className="type">{fieldType(f.item)}</span>
                 </Row>
               ))}
             </div>
@@ -144,15 +194,25 @@ function EntityCard({
           {p.relationships.length > 0 && (
             <div className="data-section">
               {p.relationships.map((r) => (
-                <Row key={r.item.name} state={r.state} was={r.before ? relText(r.before) : undefined}>
+                <Row
+                  key={r.item.name}
+                  state={r.state}
+                  was={r.before ? relText(r.before) : undefined}
+                >
                   {relText(r.item)}
                 </Row>
               ))}
             </div>
           )}
           {hasDetails && (
-            <button type="button" className="data-more" onClick={() => setDetails((v) => !v)}>
-              {details ? "Hide details" : "Details: rules, link columns, timestamps"}
+            <button
+              type="button"
+              className="data-more"
+              onClick={() => setDetails((v) => !v)}
+            >
+              {details
+                ? "Hide details"
+                : "Details: rules, link columns, timestamps"}
             </button>
           )}
           {details && (
@@ -164,7 +224,8 @@ function EntityCard({
               ))}
               {[...d.linkFields, ...d.timestamps].map((f) => (
                 <Row key={f.item.name} state={f.state}>
-                  <span className="mono">{f.item.name}</span> <span className="type">{fieldType(f.item)}</span>
+                  <span className="mono">{f.item.name}</span>{" "}
+                  <span className="type">{fieldType(f.item)}</span>
                 </Row>
               ))}
             </div>
@@ -196,12 +257,17 @@ function dataEdges(entities: EntityDiff[], changed: Set<string>): DataEdge[] {
     for (const d of e.relationships) {
       const r = d.item;
       if (r.kind !== "belongs to" && r.kind !== "many to many") continue;
-      const targets = r.polymorphic ? (r.candidates ?? []) : r.target ? [r.target] : [];
+      const targets = r.polymorphic
+        ? (r.candidates ?? [])
+        : r.target
+          ? [r.target]
+          : [];
       for (const t of targets) {
         if (!shown.has(t) || t === e.name) continue;
         // An unchanged link is drawn only between two changed entities: the
         // rest is context that the cards' grey neighbours don't need.
-        if (d.state === "same" && !(changed.has(e.name) && changed.has(t))) continue;
+        if (d.state === "same" && !(changed.has(e.name) && changed.has(t)))
+          continue;
         out.push({
           key: `${e.name}.${r.name}→${t}`,
           source: e.name,
@@ -225,11 +291,18 @@ function DataGraph({
   notes?: Map<string, string[]>;
 }) {
   const changedNames = useMemo(
-    () => new Set(shown.filter((p) => p.state !== "same").map((p) => p.entity.name)),
+    () =>
+      new Set(
+        shown.filter((p) => p.state !== "same").map((p) => p.entity.name),
+      ),
     [shown],
   );
   const edges = useMemo(
-    () => dataEdges(shown.map((p) => p.entity), changedNames),
+    () =>
+      dataEdges(
+        shown.map((p) => p.entity),
+        changedNames,
+      ),
     [shown, changedNames],
   );
   // Changed entities, and only the neighbours a changed one links to.
@@ -245,13 +318,19 @@ function DataGraph({
   const cards = useRef(new Map<string, HTMLDivElement>());
   const { placed, height } = useMemo(
     () =>
-      layeredLayout(nodes, edges, width, (n) => heights.get(n.id) ?? (n.state === "same" ? 36 : 64), {
-        minW: 220,
-        maxW: 300,
-        rowGap: 64,
-        colGap: 22,
-        pad: 12,
-      }),
+      layeredLayout(
+        nodes,
+        edges,
+        width,
+        (n) => heights.get(n.id) ?? (n.state === "same" ? 36 : 64),
+        {
+          minW: 220,
+          maxW: 300,
+          rowGap: 64,
+          colGap: 22,
+          pad: 12,
+        },
+      ),
     [nodes, edges, width, heights],
   );
 
@@ -263,7 +342,8 @@ function DataGraph({
       let changed = false;
       for (const [id, el] of cards.current) {
         next.set(id, el.offsetHeight);
-        if (Math.abs((current.get(id) ?? -1) - el.offsetHeight) > 1) changed = true;
+        if (Math.abs((current.get(id) ?? -1) - el.offsetHeight) > 1)
+          changed = true;
       }
       return changed ? next : current;
     });
@@ -279,7 +359,9 @@ function DataGraph({
     const out = new Map<string, string[]>();
     const inn = new Map<string, string[]>();
     for (const e of [...edges].sort(
-      (a, b) => (placed.get(a.destination)?.x ?? 0) - (placed.get(b.destination)?.x ?? 0),
+      (a, b) =>
+        (placed.get(a.destination)?.x ?? 0) -
+        (placed.get(b.destination)?.x ?? 0),
     )) {
       out.set(e.source, [...(out.get(e.source) ?? []), e.key]);
       inn.set(e.destination, [...(inn.get(e.destination) ?? []), e.key]);
@@ -293,7 +375,14 @@ function DataGraph({
     if (!a || !b) return null;
     const outs = ends.out.get(e.source) ?? [];
     const ins = ends.inn.get(e.destination) ?? [];
-    return edgePath(a, b, outs.indexOf(e.key), outs.length, ins.indexOf(e.key), ins.length);
+    return edgePath(
+      a,
+      b,
+      outs.indexOf(e.key),
+      outs.length,
+      ins.indexOf(e.key),
+      ins.length,
+    );
   };
 
   return (
@@ -306,7 +395,16 @@ function DataGraph({
             ["del", "var(--danger)"],
             ["chg", "var(--attention)"],
           ].map(([k, fill]) => (
-            <marker key={k} id={`data-${k}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <marker
+              key={k}
+              id={`data-${k}`}
+              viewBox="0 0 10 10"
+              refX="9"
+              refY="5"
+              markerWidth="7"
+              markerHeight="7"
+              orient="auto-start-reverse"
+            >
               <path d="M0 1 9 5 0 9z" style={{ fill }} />
             </marker>
           ))}
@@ -314,12 +412,27 @@ function DataGraph({
         {edges.map((e) => {
           const r = route(e);
           if (!r) return null;
-          const kind = e.state === "added" ? "add" : e.state === "removed" ? "del" : e.state === "changed" ? "chg" : "quiet";
+          const kind =
+            e.state === "added"
+              ? "add"
+              : e.state === "removed"
+                ? "del"
+                : e.state === "changed"
+                  ? "chg"
+                  : "quiet";
           const cls = e.state === "same" ? "same data" : e.state;
           return (
-            <g key={e.key} onMouseEnter={() => setHover(e.key)} onMouseLeave={() => setHover(null)}>
+            <g
+              key={e.key}
+              onMouseEnter={() => setHover(e.key)}
+              onMouseLeave={() => setHover(null)}
+            >
               <path d={r.d} className="map-hit" />
-              <path d={r.d} className={`map-edge ${cls} ${hover === e.key ? "hover" : ""}`} markerEnd={`url(#data-${kind})`} />
+              <path
+                d={r.d}
+                className={`map-edge ${cls} ${hover === e.key ? "hover" : ""}`}
+                markerEnd={`url(#data-${kind})`}
+              />
               <title>{`${e.source} → ${e.destination}: ${e.label}`}</title>
             </g>
           );
@@ -331,7 +444,11 @@ function DataGraph({
         const r = route(e);
         if (!r) return null;
         return (
-          <div key={e.key} className={`map-label ${e.state} data-edge-label`} style={{ left: r.lx, top: r.ly }}>
+          <div
+            key={e.key}
+            className={`map-label ${e.state} data-edge-label`}
+            style={{ left: r.lx, top: r.ly }}
+          >
             {e.label}
           </div>
         );
@@ -379,7 +496,9 @@ export function DataStrip({
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.max(320, entry.contentRect.width - 22)));
+    const observer = new ResizeObserver(([entry]) =>
+      setWidth(Math.max(320, entry.contentRect.width - 22)),
+    );
     observer.observe(el);
     return () => observer.disconnect();
   }, [data]);
@@ -420,16 +539,30 @@ export function DataStrip({
   return (
     <div ref={boxRef} className="map-strip">
       <div className="data-glyph" aria-hidden="true">
-        <svg width="28" height="28" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.2">
+        <svg
+          width="28"
+          height="28"
+          viewBox="0 0 16 16"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="1.2"
+        >
           <ellipse cx="8" cy="3.5" rx="5.5" ry="2" />
           <path d="M2.5 3.5v9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-9M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2" />
         </svg>
       </div>
       <div className="min-w-0 flex-1">
         <div className="text-[14px] font-semibold">Data</div>
-        <div className="truncate text-[12px] text-[var(--fg-muted)]">{summary(shown)}</div>
+        <div className="truncate text-[12px] text-[var(--fg-muted)]">
+          {summary(shown)}
+        </div>
       </div>
-      <button type="button" className="map-btn" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+      <button
+        type="button"
+        className="map-btn"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
         {open ? "Hide data" : "Show data"}
         <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
       </button>
@@ -439,9 +572,13 @@ export function DataStrip({
             <DataGraph shown={shown} width={width} notes={notes} />
           </div>
           <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
-            From {data.source === "rails" ? "db/schema.rb and the models" : "the Core Data model"}, at the base and
-            the head. Click an entity for its fields. Arrows point from the entity holding a link to
-            the one it links to; grey boxes are unchanged entities a changed one links to.
+            From{" "}
+            {data.source === "rails"
+              ? "db/schema.rb and the models"
+              : "the Core Data model"}
+            , at the base and the head. Click an entity for its fields. Arrows
+            point from the entity holding a link to the one it links to; grey
+            boxes are unchanged entities a changed one links to.
           </p>
         </div>
       )}

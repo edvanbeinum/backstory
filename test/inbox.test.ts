@@ -21,11 +21,36 @@ const record = (over: Partial<ResponseRecord> = {}): ResponseRecord => ({
  * comments as your checklist.
  */
 const CLI_TRUNK = [
-  { number: 14034, state: "CLOSED", isCrossRepository: true, headRepositoryOwner: { login: "flynnjustin24" } },
-  { number: 13940, state: "MERGED", isCrossRepository: true, headRepositoryOwner: { login: "pstoeckle" } },
-  { number: 13929, state: "CLOSED", isCrossRepository: true, headRepositoryOwner: { login: "SkyMeilin" } },
-  { number: 13797, state: "CLOSED", isCrossRepository: true, headRepositoryOwner: { login: "dx-nadee" } },
-  { number: 13607, state: "CLOSED", isCrossRepository: true, headRepositoryOwner: { login: "Harsith2k5" } },
+  {
+    number: 14034,
+    state: "CLOSED",
+    isCrossRepository: true,
+    headRepositoryOwner: { login: "flynnjustin24" },
+  },
+  {
+    number: 13940,
+    state: "MERGED",
+    isCrossRepository: true,
+    headRepositoryOwner: { login: "pstoeckle" },
+  },
+  {
+    number: 13929,
+    state: "CLOSED",
+    isCrossRepository: true,
+    headRepositoryOwner: { login: "SkyMeilin" },
+  },
+  {
+    number: 13797,
+    state: "CLOSED",
+    isCrossRepository: true,
+    headRepositoryOwner: { login: "dx-nadee" },
+  },
+  {
+    number: 13607,
+    state: "CLOSED",
+    isCrossRepository: true,
+    headRepositoryOwner: { login: "Harsith2k5" },
+  },
 ];
 
 test("a same-repo PR always beats a fork's", () => {
@@ -40,13 +65,31 @@ test("a same-repo PR always beats a fork's", () => {
 
 test("an open PR beats a merged one, and the newest breaks the tie", () => {
   const rows = [
-    { number: 3, state: "MERGED", isCrossRepository: false, headRepositoryOwner: null },
-    { number: 4, state: "OPEN", isCrossRepository: false, headRepositoryOwner: null },
-    { number: 9, state: "CLOSED", isCrossRepository: false, headRepositoryOwner: null },
+    {
+      number: 3,
+      state: "MERGED",
+      isCrossRepository: false,
+      headRepositoryOwner: null,
+    },
+    {
+      number: 4,
+      state: "OPEN",
+      isCrossRepository: false,
+      headRepositoryOwner: null,
+    },
+    {
+      number: 9,
+      state: "CLOSED",
+      isCrossRepository: false,
+      headRepositoryOwner: null,
+    },
   ];
   assert.equal(pickPullRequest(rows, "me")?.number, 4);
   assert.equal(
-    pickPullRequest(rows.filter((r) => r.state !== "OPEN"), "me")?.number,
+    pickPullRequest(
+      rows.filter((r) => r.state !== "OPEN"),
+      "me",
+    )?.number,
     9,
   );
 });
@@ -76,16 +119,23 @@ test("progress counts threads and review bodies alike", () => {
 
 test("a tick on a thread GitHub has since deleted can't inflate the count", () => {
   // Otherwise `done` could climb past `total` and the meter would overflow.
-  const responses = { gone: record({ done: true }), t1: record({ done: true }) };
+  const responses = {
+    gone: record({ done: true }),
+    t1: record({ done: true }),
+  };
   const progress = countProgress(["t1"], responses);
   assert.equal(progress.done, 1);
   assert.equal(progress.total, 1);
 });
 
 test("more threads than one page returned is reported, not hidden", () => {
-  const progress = countProgress(["t1"], { t1: record({ done: true }) }, {
-    reportedTotal: 140,
-  });
+  const progress = countProgress(
+    ["t1"],
+    { t1: record({ done: true }) },
+    {
+      reportedTotal: 140,
+    },
+  );
   assert.equal(progress.total, 140);
   assert.equal(progress.truncated, true);
 });

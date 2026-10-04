@@ -44,7 +44,10 @@ export async function GET(request: Request) {
 
   if (!repoPath || !rev || !filePath) {
     return NextResponse.json<ApiError>(
-      { error: "`repo`, `rev` and `path` are all required.", kind: "missing-path" },
+      {
+        error: "`repo`, `rev` and `path` are all required.",
+        kind: "missing-path",
+      },
       { status: 400 },
     );
   }

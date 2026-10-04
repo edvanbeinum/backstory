@@ -87,8 +87,8 @@ to `~/.differ/server.log`. After a rebuild, the next `differ` restarts it onto
 the new build. `differ uninstall` removes the agent; `differ --foreground`
 runs a server tied to the terminal instead, as it does on other platforms.
 
-Then install the window: in Chrome ⋮ → *Cast, save and share* → *Install
-page as app…* (Safari: *File → Add to Dock*). From now on differ has its own
+Then install the window: in Chrome ⋮ → _Cast, save and share_ → _Install
+page as app…_ (Safari: _File → Add to Dock_). From now on differ has its own
 dock icon and Cmd-Tab entry.
 
 The flow that makes this worth it: run `differ` in a terminal inside any
@@ -159,7 +159,11 @@ about two seconds and the agent stops as usual.
 {
   "hooks": {
     "Stop": [
-      { "hooks": [{ "type": "command", "command": "differ hook stop", "timeout": 10 }] }
+      {
+        "hooks": [
+          { "type": "command", "command": "differ hook stop", "timeout": 10 }
+        ]
+      }
     ]
   }
 }
@@ -302,7 +306,7 @@ review?" is a glance rather than a memory test.
 
 differ does **not** decide when a comment is handled. It used to guess which
 commit answered one — the newest commit touching the file — and the guess
-always found *something*, so no comment ever read as outstanding and the list
+always found _something_, so no comment ever read as outstanding and the list
 couldn't work as a checklist. On a six-comment PR, all six showed a plausible
 link and none showed as open.
 
@@ -329,12 +333,12 @@ a plain 👍 or "No change needed".
 Rebasing a stack rewrites every sha, which would break every linked commit. So
 a link stores the commit's **patch-id** — a hash of its diff alone — alongside
 the sha. A rebased commit keeps its patch-id, so a stale link is re-matched to
-the rewritten commit automatically and marked *re-matched after a rebase*.
+the rewritten commit automatically and marked _re-matched after a rebase_.
 
-| you did | result |
-|---|---|
-| rebase / restack (clean) | heals silently |
-| reword a commit message | heals — same diff, same patch-id |
+| you did                                              | result                              |
+| ---------------------------------------------------- | ----------------------------------- |
+| rebase / restack (clean)                             | heals silently                      |
+| reword a commit message                              | heals — same diff, same patch-id    |
 | squash, amend the content, rebase through a conflict | `26ef8f7 gone`, asks for a new link |
 
 **A rebase never unticks anything.** Healing writes the link and only the
@@ -347,11 +351,11 @@ reply to a guessed commit would be worse than admitting the link broke. Same
 when two commits share a patch-id (revert-then-reapply) — ambiguous never
 auto-resolves.
 
-Note that "still on the branch" means *reachable from HEAD*, not "the object
+Note that "still on the branch" means _reachable from HEAD_, not "the object
 exists": rebased-away commits linger in the object database and would
 otherwise look healthy.
 
-**View file** — every file header has a *View file* toggle that swaps the
+**View file** — every file header has a _View file_ toggle that swaps the
 hunks for the entire file at that commit, change still highlighted in place,
 for when three lines of context isn't enough to judge the change. It scrolls
 you to the first change rather than dumping you at line 1, and review threads
@@ -381,22 +385,22 @@ origin/main`), so the commit list is never a mystery.
 
 ## Layout
 
-| Path | What's in it |
-|---|---|
-| `app/api/inbox` | every worktree of every known repo, with its PR and counts |
-| `app/api/session` | one branch: repo state, commits, PR, review threads |
-| `app/api/responses` | the tick, the draft reply, the linked commit |
-| `app/api/diff` | one commit's parsed and highlighted diff |
-| `app/api/file` | one file at full context, for *View file* |
-| `lib/git.ts` | base resolution, commits, patches, working tree |
-| `lib/github.ts` | `gh` PR lookup and GraphQL threads, with soft failure |
-| `lib/inbox.ts` | the batched per-repo query behind the inbox |
-| `lib/responses.ts` | `~/.differ/responses.json`, and the one-way migration |
-| `lib/progress.ts` | the single definition of "3 of 7 handled" |
-| `lib/diff.ts` | unified diff parser |
-| `lib/anchor.ts` | which thread belongs on which line |
-| `lib/highlight.ts` | Shiki, both themes, per line |
-| `components/` | the GitHub-style UI |
+| Path                | What's in it                                               |
+| ------------------- | ---------------------------------------------------------- |
+| `app/api/inbox`     | every worktree of every known repo, with its PR and counts |
+| `app/api/session`   | one branch: repo state, commits, PR, review threads        |
+| `app/api/responses` | the tick, the draft reply, the linked commit               |
+| `app/api/diff`      | one commit's parsed and highlighted diff                   |
+| `app/api/file`      | one file at full context, for _View file_                  |
+| `lib/git.ts`        | base resolution, commits, patches, working tree            |
+| `lib/github.ts`     | `gh` PR lookup and GraphQL threads, with soft failure      |
+| `lib/inbox.ts`      | the batched per-repo query behind the inbox                |
+| `lib/responses.ts`  | `~/.differ/responses.json`, and the one-way migration      |
+| `lib/progress.ts`   | the single definition of "3 of 7 handled"                  |
+| `lib/diff.ts`       | unified diff parser                                        |
+| `lib/anchor.ts`     | which thread belongs on which line                         |
+| `lib/highlight.ts`  | Shiki, both themes, per line                               |
+| `components/`       | the GitHub-style UI                                        |
 
 Diffs are parsed and highlighted server-side. Each file is highlighted as two
 contiguous blocks (old side and new side) rather than line by line, so

@@ -23,10 +23,18 @@ export async function GET(request: Request) {
   try {
     const repo = await resolveRepo(repoPath);
     const range = await viewRange(repo, rev);
-    if (!range) return NextResponse.json({ status: "none", baseModel: false, entities: [] });
-    return NextResponse.json(await buildData(repo.root, range.base, range.head), {
-      headers: { "Cache-Control": "no-store" },
-    });
+    if (!range)
+      return NextResponse.json({
+        status: "none",
+        baseModel: false,
+        entities: [],
+      });
+    return NextResponse.json(
+      await buildData(repo.root, range.base, range.head),
+      {
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   } catch (err) {
     return errorResponse(err);
   }

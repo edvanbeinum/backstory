@@ -22,7 +22,12 @@ export interface MapNode {
   state: NodeState;
   files: string[];
   /** Each file's own change, in `files` order */
-  fileStats: { path: string; additions: number; deletions: number; status: string }[];
+  fileStats: {
+    path: string;
+    additions: number;
+    deletions: number;
+    status: string;
+  }[];
   additions: number;
   deletions: number;
   newFiles: number;
@@ -65,15 +70,21 @@ interface FileStat {
   status: string;
 }
 
-async function fileStats(root: string, base: string | null, head: string): Promise<FileStat[]> {
-  const range = base ? [base, head] : ["4b825dc642cb6eb9a060e54bf8d69288fbee4904", head];
+async function fileStats(
+  root: string,
+  base: string | null,
+  head: string,
+): Promise<FileStat[]> {
+  const range = base
+    ? [base, head]
+    : ["4b825dc642cb6eb9a060e54bf8d69288fbee4904", head];
   const [{ stdout: numstat }, { stdout: names }] = await Promise.all([
     git(root, ["diff", "--numstat", "-M", "-z", ...range]),
     git(root, ["diff", "--name-status", "-M", "-z", ...range]),
   ]);
   const statusOf = new Map<string, string>();
   const nameParts = names.split("\0");
-  for (let i = 0; i < nameParts.length - 1; ) {
+  for (let i = 0; i < nameParts.length - 1;) {
     const status = nameParts[i++];
     if (!status) break;
     if (status.startsWith("R") || status.startsWith("C")) {
@@ -135,14 +146,21 @@ export async function buildMap(
   const model = headRead.model;
   // A local model is the same for every commit; comparing it with itself
   // would claim "no structural change" when nothing was checked.
-  const baseRead = base && !headRead.local ? await readModelAt(root, base) : null;
+  const baseRead =
+    base && !headRead.local ? await readModelAt(root, base) : null;
   const baseModel = baseRead && !baseRead.local ? baseRead.model : null;
 
   // Files: each to its one leaf element. A deleted file maps by the base
   // model, where its element may still exist.
   const touched = new Map<
     string,
-    { files: string[]; fileStats: MapNode["fileStats"]; additions: number; deletions: number; newFiles: number }
+    {
+      files: string[];
+      fileStats: MapNode["fileStats"];
+      additions: number;
+      deletions: number;
+      newFiles: number;
+    }
   >();
   const fileComponents: Record<string, string> = {};
   const unmapped: string[] = [];
@@ -160,9 +178,20 @@ export async function buildMap(
       ambiguous.push({ file: f.path, ids });
       continue;
     }
-    const entry = touched.get(ids[0]) ?? { files: [], fileStats: [], additions: 0, deletions: 0, newFiles: 0 };
+    const entry = touched.get(ids[0]) ?? {
+      files: [],
+      fileStats: [],
+      additions: 0,
+      deletions: 0,
+      newFiles: 0,
+    };
     entry.files.push(f.path);
-    entry.fileStats.push({ path: f.path, additions: f.additions, deletions: f.deletions, status: f.status });
+    entry.fileStats.push({
+      path: f.path,
+      additions: f.additions,
+      deletions: f.deletions,
+      status: f.status,
+    });
     entry.additions += f.additions;
     entry.deletions += f.deletions;
     if (f.status === "A") entry.newFiles++;
@@ -196,7 +225,13 @@ export async function buildMap(
   }
   for (const [key, r] of baseModel?.relationships ?? []) {
     if (!model.relationships.has(key)) {
-      edges.set(key, { key, source: r.source, destination: r.destination, description: r.description, state: "removed" });
+      edges.set(key, {
+        key,
+        source: r.source,
+        destination: r.destination,
+        description: r.description,
+        state: "removed",
+      });
     }
   }
 
@@ -207,7 +242,10 @@ export async function buildMap(
   // Containers and systems that hold changed components aren't drawn twice.
   const parents = new Set<string>();
   for (const id of changed) {
-    for (let p = (model.elements.get(id) ?? baseModel?.elements.get(id))?.parent; p; ) {
+    for (
+      let p = (model.elements.get(id) ?? baseModel?.elements.get(id))?.parent;
+      p;
+    ) {
       parents.add(p);
       p = (model.elements.get(p) ?? baseModel?.elements.get(p))?.parent ?? null;
     }
@@ -268,8 +306,13 @@ export async function buildMap(
     stale: headRead.stale,
     local: headRead.local,
     nodes,
-    edges: [...edges.values()].filter((e) => shown.has(e.source) && shown.has(e.destination)),
-    hidden: Math.max(0, leaves - nodes.filter((n) => n.state !== "removed").length),
+    edges: [...edges.values()].filter(
+      (e) => shown.has(e.source) && shown.has(e.destination),
+    ),
+    hidden: Math.max(
+      0,
+      leaves - nodes.filter((n) => n.state !== "removed").length,
+    ),
     fileComponents,
     unmapped,
     ambiguous,

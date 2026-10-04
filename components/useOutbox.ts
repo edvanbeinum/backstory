@@ -17,9 +17,12 @@ export interface OutboxApi {
    * or, with `via: "clipboard"`, record that it was copied. Resolves the
    * filed round, or null (with `error` set) if it didn't land.
    */
-  send: (
-    round: { noteIds: string[]; message: string; at: number; via?: "clipboard" },
-  ) => Promise<OutboxRound | null>;
+  send: (round: {
+    noteIds: string[];
+    message: string;
+    at: number;
+    via?: "clipboard";
+  }) => Promise<OutboxRound | null>;
   /** Give a waiting round to whichever session stops here next */
   retarget: (id: string) => Promise<void>;
   /** Withdraw a waiting round; its notes go back to drafts */
@@ -61,13 +64,19 @@ export function useOutbox(
     };
   }, [root, tick, version]);
 
-  useEffect(() => {
+  const [shownRoot, setShownRoot] = useState(root);
+  if (shownRoot !== root) {
+    setShownRoot(root);
     setState(EMPTY);
     setError(null);
-  }, [root]);
+  }
 
   const call = useCallback(
-    async <T,>(method: string, params: Record<string, string>, body?: object) => {
+    async <T>(
+      method: string,
+      params: Record<string, string>,
+      body?: object,
+    ) => {
       try {
         const response = await fetch(
           `${OUTBOX_API}?${new URLSearchParams({ repo: root, ...params })}`,

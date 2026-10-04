@@ -23,8 +23,8 @@ function Avatar({ url, login }: { url: string | null; login: string }) {
       </span>
     );
   }
-  // eslint-disable-next-line @next/next/no-img-element
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={url}
       alt=""
@@ -87,7 +87,10 @@ function DiffHunkPreview({ hunk }: { hunk: string }) {
             }
 
             return (
-              <tr key={index} className={type === "context" ? "" : `line-${type}`}>
+              <tr
+                key={index}
+                className={type === "context" ? "" : `line-${type}`}
+              >
                 <td className="diff-marker">
                   {type === "add" ? "+" : type === "del" ? "-" : " "}
                 </td>
@@ -109,8 +112,6 @@ export function ReviewThreadCard({
   showContext = false,
   defaultCollapsed,
   highlighted = false,
-  onPin,
-  pinCandidates,
   onDraftChange,
   hideComposer = false,
 }: {
@@ -122,8 +123,6 @@ export function ReviewThreadCard({
   showContext?: boolean;
   defaultCollapsed?: boolean;
   highlighted?: boolean;
-  onPin?: (threadId: string, sha: string | null) => void;
-  pinCandidates?: CommitSummary[];
   onDraftChange?: (threadId: string, text: string | null) => void;
   /**
    * The response panel already owns the composer for the selected comment.
@@ -144,9 +143,7 @@ export function ReviewThreadCard({
     <div
       id={`thread-${thread.id}`}
       className={`overflow-hidden rounded-md border bg-[var(--canvas)] ${
-        highlighted
-          ? "border-[var(--attention)]"
-          : "border-[var(--border)]"
+        highlighted ? "border-[var(--attention)]" : "border-[var(--border)]"
       }`}
     >
       <button

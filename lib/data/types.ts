@@ -13,7 +13,8 @@ export interface Field {
   values?: string[];
 }
 
-export type RelationshipKind = "belongs to" | "has many" | "has one" | "many to many";
+export type RelationshipKind =
+  "belongs to" | "has many" | "has one" | "many to many";
 
 export interface Relationship {
   name: string;

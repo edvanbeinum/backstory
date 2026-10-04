@@ -144,7 +144,9 @@ export function hunkText(hunks: Hunk[], maxChars = 60_000): string {
     out.push(block);
   }
   if (hunks.length > MAX_LISTED) {
-    out.push(`(${hunks.length - MAX_LISTED} more hunks not listed: this change is too broad to trace whole.)`);
+    out.push(
+      `(${hunks.length - MAX_LISTED} more hunks not listed: this change is too broad to trace whole.)`,
+    );
   }
   return out.join("\n\n");
 }

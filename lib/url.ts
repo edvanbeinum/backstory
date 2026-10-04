@@ -88,10 +88,7 @@ export function readUrlState(): UrlState {
  * bury the previous page under dozens of history entries, and the URL only
  * needs to be *current*, not a trail.
  */
-export function writeUrlState(
-  state: UrlState,
-  opts: { push?: boolean } = {},
-) {
+export function writeUrlState(state: UrlState, opts: { push?: boolean } = {}) {
   if (typeof window === "undefined") return;
 
   const next = buildUrl(state, window.location.pathname);

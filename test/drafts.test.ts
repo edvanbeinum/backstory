@@ -93,7 +93,10 @@ test("a draft still waiting on its write is never confirmed", () => {
   const drafts = new Map([["t1", pending("mine")]]);
   // Even against data that happens to match — that text got there some other
   // way, and this one still has a write owed to it.
-  assert.deepEqual(confirmedDrafts(session([thread("t1", "mine")]), drafts, KEY), []);
+  assert.deepEqual(
+    confirmedDrafts(session([thread("t1", "mine")]), drafts, KEY),
+    [],
+  );
 });
 
 test("everything else in the session comes through untouched", () => {

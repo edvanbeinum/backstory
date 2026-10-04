@@ -44,7 +44,8 @@ export async function GET(request: Request) {
 
   if (id) {
     const review = await awaitReview(id, LONG_POLL_MS, request.signal);
-    if (!review) return bad("No such review request — it may have expired.", 404);
+    if (!review)
+      return bad("No such review request — it may have expired.", 404);
     return NextResponse.json(
       { state: review.state, answer: review.answer },
       NO_STORE,
@@ -54,7 +55,9 @@ export async function GET(request: Request) {
   if (root) {
     const review = waitingReview(root);
     return NextResponse.json(
-      { waiting: review ? { id: review.id, createdAt: review.createdAt } : null },
+      {
+        waiting: review ? { id: review.id, createdAt: review.createdAt } : null,
+      },
       NO_STORE,
     );
   }
@@ -97,7 +100,8 @@ export async function POST(request: Request) {
   }
 
   // Gone means the agent stopped waiting — the window keeps your notes.
-  if (!settled) return bad("The agent isn't waiting for this review any more.", 410);
+  if (!settled)
+    return bad("The agent isn't waiting for this review any more.", 410);
   return NextResponse.json({ ok: true }, NO_STORE);
 }
 

@@ -44,7 +44,11 @@ function changed(root: string) {
   registry.events.emit("change", root);
 }
 
-function settle(request: ReviewRequest, state: ReviewState, answer: string | null) {
+function settle(
+  request: ReviewRequest,
+  state: ReviewState,
+  answer: string | null,
+) {
   request.state = state;
   request.answer = answer;
   registry.events.emit(`settled:${request.id}`);

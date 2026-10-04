@@ -6,19 +6,43 @@ import { findings } from "../lib/findings";
 import type { Flow, FlowSet, FlowStep } from "../lib/flows/types";
 
 let n = 0;
-const step = (from: string, to: string, label: string, site = `f${++n}.rb:1`): FlowStep => {
+const step = (
+  from: string,
+  to: string,
+  label: string,
+  site = `f${++n}.rb:1`,
+): FlowStep => {
   const [file, line] = site.split(":");
-  return { id: `s${++n}`, from, to, file, line: Number(line), caller: from, label, symbol: label, nesting: 0, verified: true };
+  return {
+    id: `s${++n}`,
+    from,
+    to,
+    file,
+    line: Number(line),
+    caller: from,
+    label,
+    symbol: label,
+    nesting: 0,
+    verified: true,
+  };
 };
 
-const flow = (name: string, after: FlowStep[], external: string[] = []): Flow => {
+const flow = (
+  name: string,
+  after: FlowStep[],
+  external: string[] = [],
+): Flow => {
   const names = [...new Set(after.flatMap((s) => [s.from, s.to]))];
   return {
     id: name.toLowerCase().replace(/\W+/g, "-"),
     name,
     trigger: name,
     isNew: true,
-    participants: names.map((p) => ({ name: p, label: p, external: external.includes(p) })),
+    participants: names.map((p) => ({
+      name: p,
+      label: p,
+      external: external.includes(p),
+    })),
     before: null,
     after,
   };
@@ -48,15 +72,29 @@ test("a core entity gaining a vendor's fields is noted, on that entity", () => {
         file: "app/models/item.rb",
         component: "Catalog",
         fields: [
-          { state: "same", item: { name: "title", type: "string", required: true } },
-          { state: "added", item: { name: "zoom_meeting_uuid", type: "string", required: false } },
+          {
+            state: "same",
+            item: { name: "title", type: "string", required: true },
+          },
+          {
+            state: "added",
+            item: {
+              name: "zoom_meeting_uuid",
+              type: "string",
+              required: false,
+            },
+          },
         ],
         relationships: [],
         constraints: [],
       },
     ],
   };
-  const flows = set([flow("Import", [step("Controller", "ZoomClient", "ZoomClient.new.recordings")])]);
+  const flows = set([
+    flow("Import", [
+      step("Controller", "ZoomClient", "ZoomClient.new.recordings"),
+    ]),
+  ]);
   const found = findings(flows, data);
   assert.deepEqual(kinds(found), ["vendor-fields"]);
   assert.equal(found[0].title, "Item (Catalog) gains 1 Zoom field");
@@ -64,10 +102,20 @@ test("a core entity gaining a vendor's fields is noted, on that entity", () => {
 });
 
 test("raw HTTP beside a vendor client is noted; HTTP inside the client isn't", () => {
-  const picker = flow("Picker", [step("Controller", "ZoomClient", "ZoomClient.new.recordings")]);
-  const leaky = flow("Job", [step("ImportZoomRecordingJob", "Net::HTTP", "Net::HTTP.start")], ["Net::HTTP"]);
+  const picker = flow("Picker", [
+    step("Controller", "ZoomClient", "ZoomClient.new.recordings"),
+  ]);
+  const leaky = flow(
+    "Job",
+    [step("ImportZoomRecordingJob", "Net::HTTP", "Net::HTTP.start")],
+    ["Net::HTTP"],
+  );
   assert.deepEqual(kinds(findings(set([picker, leaky]), null)), ["two-ways"]);
-  const owned = flow("Job", [step("ZoomClient", "Net::HTTP", "http.request")], ["Net::HTTP"]);
+  const owned = flow(
+    "Job",
+    [step("ZoomClient", "Net::HTTP", "http.request")],
+    ["Net::HTTP"],
+  );
   assert.deepEqual(kinds(findings(set([picker, owned]), null)), []);
 });
 
@@ -76,17 +124,33 @@ test("raw HTTP is credited only to the vendor it names", () => {
     step("Controller", "ZoomClient", "ZoomClient.new.recordings"),
     step("Controller", "StripeClient", "StripeClient.charge"),
   ]);
-  const slack = flow("Notify", [step("NotifyJob", "Net::HTTP", "Net::HTTP.post(webhook_url)")], ["Net::HTTP"]);
+  const slack = flow(
+    "Notify",
+    [step("NotifyJob", "Net::HTTP", "Net::HTTP.post(webhook_url)")],
+    ["Net::HTTP"],
+  );
   assert.deepEqual(kinds(findings(set([clients, slack]), null)), []);
-  const zoom = flow("Import", [step("ImportZoomRecordingJob", "NetHTTP", "http.request")], ["NetHTTP"]);
+  const zoom = flow(
+    "Import",
+    [step("ImportZoomRecordingJob", "NetHTTP", "http.request")],
+    ["NetHTTP"],
+  );
   const found = findings(set([clients, slack, zoom]), null);
-  assert.deepEqual(found.map((f) => f.id), ["two-ways:Zoom"]);
+  assert.deepEqual(
+    found.map((f) => f.id),
+    ["two-ways:Zoom"],
+  );
   assert.equal(found[0].evidence.length, 1);
 });
 
 test("a lane only starting like an HTTP library isn't raw HTTP", () => {
-  const picker = flow("Picker", [step("Controller", "ZoomClient", "ZoomClient.new.recordings")]);
-  const named = flow("Zoom", [step("ZoomWebhook", "RequestsController", "zoom requests"), step("ZoomWebhook", "Fetcher", "zoom fetch")]);
+  const picker = flow("Picker", [
+    step("Controller", "ZoomClient", "ZoomClient.new.recordings"),
+  ]);
+  const named = flow("Zoom", [
+    step("ZoomWebhook", "RequestsController", "zoom requests"),
+    step("ZoomWebhook", "Fetcher", "zoom fetch"),
+  ]);
   assert.deepEqual(kinds(findings(set([picker, named]), null)), []);
 });
 
@@ -105,7 +169,10 @@ test("two flows making the same calls from different code are noted; from the sa
   assert.deepEqual(note.on, { flows: [0, 1] });
   // Two ways into one screen reach the same lines: shared, not copied.
   const shared = set([
-    flow("From Exercise", calls("ProgressView", ["v.rb:1", "v.rb:2", "v.rb:3"])),
+    flow(
+      "From Exercise",
+      calls("ProgressView", ["v.rb:1", "v.rb:2", "v.rb:3"]),
+    ),
     flow("From History", calls("ProgressView", ["v.rb:1", "v.rb:2", "v.rb:3"])),
   ]);
   assert.deepEqual(kinds(findings(shared, null)), []);

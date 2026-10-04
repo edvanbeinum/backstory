@@ -75,7 +75,12 @@ export async function POST(request: Request) {
   const root = rootParam(searchParams);
   if (!root) return bad("`repo` must be an absolute path.");
 
-  let body: { noteIds?: unknown; message?: unknown; at?: unknown; via?: unknown };
+  let body: {
+    noteIds?: unknown;
+    message?: unknown;
+    at?: unknown;
+    via?: unknown;
+  };
   try {
     body = await request.json();
   } catch {
@@ -89,10 +94,12 @@ export async function POST(request: Request) {
   ) {
     return bad("`noteIds` must list the notes being sent.");
   }
-  if (typeof message !== "string" || !message.trim()) return bad("`message` is required.");
+  if (typeof message !== "string" || !message.trim())
+    return bad("`message` is required.");
   if (message.length > MAX_MESSAGE) return bad("That review is too long.");
   if (typeof at !== "number") return bad("`at` is required.");
-  if (via !== undefined && via !== CLIPBOARD) return bad("`via` can only be \"clipboard\".");
+  if (via !== undefined && via !== CLIPBOARD)
+    return bad('`via` can only be "clipboard".');
 
   try {
     // An agent waiting in `differ review` gets it now, as it always has — but
@@ -111,7 +118,10 @@ export async function POST(request: Request) {
     );
     if (waiting && !answerReview(waiting.id, { answer: message })) {
       // It stopped waiting while the writes happened: queue it for the hook.
-      return NextResponse.json({ round: await requeue(root, round.id), notes }, NO_STORE);
+      return NextResponse.json(
+        { round: await requeue(root, round.id), notes },
+        NO_STORE,
+      );
     }
     return NextResponse.json({ round, notes }, NO_STORE);
   } catch (err) {
@@ -124,7 +134,10 @@ export async function POST(request: Request) {
  * be one. When the second fails, undo the first rather than leave a round
  * with drafts, or sent notes with no round.
  */
-async function undoIfFails<T>(write: Promise<T>, undo: () => Promise<void>): Promise<T> {
+async function undoIfFails<T>(
+  write: Promise<T>,
+  undo: () => Promise<void>,
+): Promise<T> {
   try {
     return await write;
   } catch (err) {
@@ -140,7 +153,8 @@ async function undoIfFails<T>(write: Promise<T>, undo: () => Promise<void>): Pro
 async function takeFor(searchParams: URLSearchParams) {
   const cwd = searchParams.get("cwd");
   const session = searchParams.get("session");
-  if (!cwd || !path.isAbsolute(cwd)) return bad("`cwd` must be an absolute path.");
+  if (!cwd || !path.isAbsolute(cwd))
+    return bad("`cwd` must be an absolute path.");
   if (!isSessionId(session)) return bad("`session` must be a session id.");
 
   try {
@@ -163,7 +177,8 @@ async function takeFor(searchParams: URLSearchParams) {
 async function ackFor(searchParams: URLSearchParams, request: Request) {
   const cwd = searchParams.get("cwd");
   const session = searchParams.get("session");
-  if (!cwd || !path.isAbsolute(cwd)) return bad("`cwd` must be an absolute path.");
+  if (!cwd || !path.isAbsolute(cwd))
+    return bad("`cwd` must be an absolute path.");
   if (!isSessionId(session)) return bad("`session` must be a session id.");
 
   let body: { ids?: unknown };
@@ -179,7 +194,10 @@ async function ackFor(searchParams: URLSearchParams, request: Request) {
 
   try {
     const repo = await resolveRepo(cwd);
-    return NextResponse.json({ delivered: await ack(repo.root, session, ids) }, NO_STORE);
+    return NextResponse.json(
+      { delivered: await ack(repo.root, session, ids) },
+      NO_STORE,
+    );
   } catch (err) {
     return errorResponse(err);
   }
@@ -202,7 +220,8 @@ export async function PATCH(request: Request) {
 
   try {
     const round = await retarget(root, id, null);
-    if (!round) return bad("That round has already been delivered or withdrawn.", 410);
+    if (!round)
+      return bad("That round has already been delivered or withdrawn.", 410);
     return NextResponse.json({ round }, NO_STORE);
   } catch (err) {
     return errorResponse(err);
@@ -217,7 +236,8 @@ export async function DELETE(request: Request) {
 
   try {
     const round = await cancel(root, id);
-    if (!round) return bad("That round has already been delivered or withdrawn.", 410);
+    if (!round)
+      return bad("That round has already been delivered or withdrawn.", 410);
     const notes = await undoIfFails(
       changeNotes(root, { op: "unsend", ids: round.noteIds }),
       () => revert(root, id, round),

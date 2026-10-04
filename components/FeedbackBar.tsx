@@ -94,13 +94,17 @@ export function FeedbackBar({
       ...new Set(
         drafts
           .map((n) => n.rev)
-          .filter((r) => (r === WORKING_REV || r === BRANCH_REV) && !diffs.has(r)),
+          .filter(
+            (r) => (r === WORKING_REV || r === BRANCH_REV) && !diffs.has(r),
+          ),
       ),
     ];
     await Promise.all(
       moving.map(async (rev) => {
         const params = new URLSearchParams({ repo: session.repo.root, rev });
-        const response = await fetch(`${DIFF_API}?${params}`, { cache: "no-store" });
+        const response = await fetch(`${DIFF_API}?${params}`, {
+          cache: "no-store",
+        });
         if (!response.ok) throw new Error(`Couldn't load ${label(rev)}.`);
         diffs.set(rev, ((await response.json()) as DiffResponse).files);
       }),
@@ -125,6 +129,7 @@ export function FeedbackBar({
       await outbox.send({
         noteIds: drafts.map((n) => n.id),
         message: await buildMessage(),
+        // eslint-disable-next-line react-hooks/purity -- runs on click, not in render
         at: Date.now(),
       });
     } catch (err) {
@@ -140,6 +145,7 @@ export function FeedbackBar({
     try {
       const message = await buildMessage();
       if (await copyToClipboard(message)) {
+        // eslint-disable-next-line react-hooks/purity -- runs on click, not in render
         const at = Date.now();
         const noteIds = drafts.map((n) => n.id);
         // Not recording how it left is no reason to leave it a draft.
@@ -176,7 +182,9 @@ export function FeedbackBar({
     const file = fileForNote(files, note);
     const target =
       document.getElementById(`note-${note.id}`) ??
-      (file ? document.getElementById(`file-${encodeURIComponent(file.path)}`) : null);
+      (file
+        ? document.getElementById(`file-${encodeURIComponent(file.path)}`)
+        : null);
     target?.scrollIntoView({ block: "center", behavior: "smooth" });
   };
 
@@ -190,9 +198,9 @@ export function FeedbackBar({
     >
       {review.waiting && (
         <p className="text-[12px] text-[var(--fg-muted)]">
-          An agent is waiting for your review. Leave notes on any change —
-          its commits, or what&apos;s uncommitted — then send them, or let it
-          carry on.
+          An agent is waiting for your review. Leave notes on any change — its
+          commits, or what&apos;s uncommitted — then send them, or let it carry
+          on.
         </p>
       )}
       <div className="flex flex-wrap items-center gap-2">
@@ -210,7 +218,11 @@ export function FeedbackBar({
 
         <div className="ml-auto flex items-center gap-1.5">
           {!writing && (
-            <Button size="sm" variant="invisible" onClick={() => setWriting(true)}>
+            <Button
+              size="sm"
+              variant="invisible"
+              onClick={() => setWriting(true)}
+            >
               Add a general note
             </Button>
           )}
@@ -253,7 +265,11 @@ export function FeedbackBar({
             </Button>
           )}
           {review.waiting && count > 0 && (
-            <Button size="sm" variant="invisible" onClick={() => void review.dismiss()}>
+            <Button
+              size="sm"
+              variant="invisible"
+              onClick={() => void review.dismiss()}
+            >
               Dismiss
             </Button>
           )}
@@ -428,7 +444,9 @@ function branchCommits(session: SessionResponse): NoteCommit[] {
 function changeLabel(rev: string, commits: NoteCommit[]): string {
   if (rev === WORKING_REV) return "Uncommitted";
   if (rev === BRANCH_REV) return "All changes";
-  return rev.slice(0, 7) + (commits.some((c) => c.sha === rev) ? "" : " (gone)");
+  return (
+    rev.slice(0, 7) + (commits.some((c) => c.sha === rev) ? "" : " (gone)")
+  );
 }
 
 /** Who Send will reach, said the way the window says it. */
@@ -446,8 +464,9 @@ function queueTarget(lastSeen: OutboxApi["lastSeen"]): string {
 function sentAs(round: RoundGroup, sent: OutboxRound[]): OutboxRound | null {
   const ids = new Set(round.notes.map((n) => n.id));
   return (
-    sent.find((r) => r.queuedAt === round.sentAt && r.noteIds.some((id) => ids.has(id))) ??
-    null
+    sent.find(
+      (r) => r.queuedAt === round.sentAt && r.noteIds.some((id) => ids.has(id)),
+    ) ?? null
   );
 }
 
@@ -461,7 +480,8 @@ function roundStatus(
 ): string {
   if (!sent) return `Sent ${sinceLabel(round.sentAt)}`;
   if (sent.deliveredAt === null) {
-    if (sent.forSession === null) return "Queued for the next session to stop here";
+    if (sent.forSession === null)
+      return "Queued for the next session to stop here";
     const at = seen[sent.forSession];
     return at
       ? `Queued for the session active here ${sinceLabel(at)}`
@@ -469,7 +489,8 @@ function roundStatus(
   }
   const when = sinceLabel(sent.deliveredAt);
   if (sent.deliveredTo === "clipboard") return `Copied ${when}`;
-  if (sent.deliveredTo === "differ review") return `Sent to the waiting agent ${when}`;
+  if (sent.deliveredTo === "differ review")
+    return `Sent to the waiting agent ${when}`;
   return `Delivered ${when} to session ${shortSession(sent.deliveredTo ?? "")}`;
 }
 
@@ -520,10 +541,11 @@ function Round({
   const total = round.notes.length;
   const complete = done === total;
   const [open, setOpen] = useState(!complete);
-
-  useEffect(() => {
+  const [wasComplete, setWasComplete] = useState(complete);
+  if (wasComplete !== complete) {
+    setWasComplete(complete);
     if (complete) setOpen(false);
-  }, [complete]);
+  }
 
   return (
     <div>
@@ -567,7 +589,9 @@ function Round({
           {round.notes.map((note) => (
             <li key={note.id} className="flex items-start gap-2">
               <NoteTick done={note.done} onToggle={(d) => onTick(note.id, d)} />
-              <div className={`min-w-0 flex-1 ${note.done ? "opacity-60" : ""}`}>
+              <div
+                className={`min-w-0 flex-1 ${note.done ? "opacity-60" : ""}`}
+              >
                 {note.path && (
                   <button
                     type="button"

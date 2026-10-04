@@ -33,9 +33,6 @@ export function RepoBrowser({
   const [data, setData] = useState<BrowseResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Start where the open repo lives, so the first thing you see is its
-  // neighbourhood rather than your home directory.
-  const [dir, setDir] = useState<string | null>(null);
 
   const load = useCallback(
     async (target: string | null) => {
@@ -66,7 +63,7 @@ export function RepoBrowser({
     const start = currentRepo
       ? currentRepo.slice(0, currentRepo.lastIndexOf("/")) || null
       : null;
-    setDir(start);
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches when its key changes
     void load(start);
   }, [currentRepo, load]);
 
@@ -78,10 +75,7 @@ export function RepoBrowser({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const go = (target: string) => {
-    setDir(target);
-    void load(target);
-  };
+  const go = (target: string) => void load(target);
 
   return (
     <div

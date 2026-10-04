@@ -37,7 +37,10 @@ test("with no session seen, the first to stop takes the round, and only once", a
   const queued = await queueRound(ROOT, round(["n1"]));
   assert.equal(queued.forSession, null);
 
-  const [first, second] = await Promise.all([take(ROOT, "s-a"), take(ROOT, "s-b")]);
+  const [first, second] = await Promise.all([
+    take(ROOT, "s-a"),
+    take(ROOT, "s-b"),
+  ]);
   assert.equal(first.length + second.length, 1);
   const winner = first.length ? "s-a" : "s-b";
   assert.equal(await ack(ROOT, winner, [queued.id]), 1);
@@ -58,7 +61,10 @@ test("send aims at the session last seen stopping here", async () => {
   // Another session stopping here doesn't get it.
   assert.deepEqual(await take(ROOT, "s-old"), []);
   const taken = await take(ROOT, "s-mine");
-  assert.deepEqual(taken.map((r) => r.id), [queued.id]);
+  assert.deepEqual(
+    taken.map((r) => r.id),
+    [queued.id],
+  );
   await ack(ROOT, "s-mine", [queued.id]);
   // And the next stop finds nothing — the hook doesn't loop.
   assert.deepEqual(await take(ROOT, "s-mine"), []);
@@ -144,7 +150,10 @@ test("revert undoes a filing or a withdrawal exactly", async () => {
 test("requeue turns a round filed as answered back into a queued one", async () => {
   useTempHome();
   await take(ROOT, "s-1");
-  const answered = await queueRound(ROOT, { ...round(["n1"]), deliveredTo: DIFFER_REVIEW });
+  const answered = await queueRound(ROOT, {
+    ...round(["n1"]),
+    deliveredTo: DIFFER_REVIEW,
+  });
   const queued = await requeue(ROOT, answered.id);
   assert.equal(queued?.deliveredAt, null);
   assert.equal(queued?.forSession, "s-1");
@@ -153,7 +162,10 @@ test("requeue turns a round filed as answered back into a queued one", async () 
 
 test("a copied round is recorded as delivered and never taken", async () => {
   useTempHome();
-  const copied = await queueRound(ROOT, { ...round(["n1"]), deliveredTo: CLIPBOARD });
+  const copied = await queueRound(ROOT, {
+    ...round(["n1"]),
+    deliveredTo: CLIPBOARD,
+  });
   assert.equal(copied.deliveredTo, CLIPBOARD);
   assert.notEqual(copied.deliveredAt, null);
   assert.deepEqual(await take(ROOT, "s-any"), []);

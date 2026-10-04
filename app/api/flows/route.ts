@@ -33,16 +33,22 @@ async function resolve(request: Request) {
   return { repo, range, searchParams };
 }
 
-const uncommitted: FlowsStatus = { status: "unavailable", reason: "uncommitted" };
+const uncommitted: FlowsStatus = {
+  status: "unavailable",
+  reason: "uncommitted",
+};
 
 export async function GET(request: Request) {
   try {
     const r = await resolve(request);
     if ("error" in r) return r.error;
     if (!r.range) return NextResponse.json(uncommitted);
-    return NextResponse.json(await flowsStatus({ root: r.repo.root, ...r.range }), {
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      await flowsStatus({ root: r.repo.root, ...r.range }),
+      {
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   } catch (err) {
     return errorResponse(err);
   }
@@ -60,7 +66,9 @@ export async function POST(request: Request) {
     const hunk = r.searchParams.get("hunk");
     const status = hunk
       ? await startTrace(view, hunk)
-      : await startFlows(view, { regenerate: r.searchParams.get("regenerate") === "1" });
+      : await startFlows(view, {
+          regenerate: r.searchParams.get("regenerate") === "1",
+        });
     return NextResponse.json(status);
   } catch (err) {
     return errorResponse(err);

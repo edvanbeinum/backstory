@@ -6,7 +6,8 @@ import { LABEL, parsePort, renderPlist } from "../bin/launchd.mjs";
 const spec = {
   server: "/opt/differ/standalone/server.js",
   port: 4460,
-  pathEnv: "/Users/me/.nvm/versions/node/v22/bin:/opt/homebrew/bin:/usr/bin:/bin",
+  pathEnv:
+    "/Users/me/.nvm/versions/node/v22/bin:/opt/homebrew/bin:/usr/bin:/bin",
   log: "/Users/me/.differ/server.log",
 };
 
@@ -34,5 +35,8 @@ test("paths are XML-escaped", () => {
 
 test("the same inputs render the same plist, so an unchanged agent isn't rewritten", () => {
   assert.equal(renderPlist(spec), renderPlist({ ...spec }));
-  assert.notEqual(renderPlist(spec), renderPlist({ ...spec, pathEnv: "/usr/bin" }));
+  assert.notEqual(
+    renderPlist(spec),
+    renderPlist({ ...spec, pathEnv: "/usr/bin" }),
+  );
 });
