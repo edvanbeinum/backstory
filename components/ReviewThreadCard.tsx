@@ -23,8 +23,8 @@ function Avatar({ url, login }: { url: string | null; login: string }) {
       </span>
     );
   }
-  // eslint-disable-next-line @next/next/no-img-element
   return (
+    // eslint-disable-next-line @next/next/no-img-element
     <img
       src={url}
       alt=""
@@ -112,8 +112,6 @@ export function ReviewThreadCard({
   showContext = false,
   defaultCollapsed,
   highlighted = false,
-  onPin,
-  pinCandidates,
   onDraftChange,
   hideComposer = false,
 }: {
@@ -125,8 +123,6 @@ export function ReviewThreadCard({
   showContext?: boolean;
   defaultCollapsed?: boolean;
   highlighted?: boolean;
-  onPin?: (threadId: string, sha: string | null) => void;
-  pinCandidates?: CommitSummary[];
   onDraftChange?: (threadId: string, text: string | null) => void;
   /**
    * The response panel already owns the composer for the selected comment.

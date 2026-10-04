@@ -17,7 +17,6 @@ import type {
   DiffFile as DiffFileType,
   FileViewResponse,
   Note,
-  PullRequestInfo,
   RepoInfo,
   ReviewThread,
 } from "@/lib/types";
@@ -28,7 +27,7 @@ import {
   UnfoldIcon,
 } from "./icons";
 import { NoteCard, NoteComposer } from "./NoteCard";
-import { Badge, copyToClipboard, CopyButton, Spinner } from "./ui";
+import { copyToClipboard, CopyButton, Spinner } from "./ui";
 import type { NotesApi } from "./useNotes";
 
 /** A flow step anchored on a line: its row key, and the chip to show. */
@@ -64,7 +63,6 @@ export function DiffFile({
   file,
   threads,
   repo,
-  pr,
   commit,
   focusedThreadId,
   notes = null,
@@ -77,7 +75,6 @@ export function DiffFile({
   file: DiffFileType;
   threads: ReviewThread[];
   repo: RepoInfo;
-  pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
   /** Set when this diff takes notes */
@@ -351,9 +348,6 @@ export function DiffFile({
                         showHunkHeader={!showWhole}
                         byNewLine={byNewLine}
                         byOldLine={byOldLine}
-                        repo={repo}
-                        pr={pr}
-                        commit={commit}
                         focusedThreadId={focusedThreadId}
                         filePath={file.path}
                         copiedLine={copiedLine}
@@ -437,9 +431,6 @@ function HunkRows({
   showHunkHeader = true,
   byNewLine,
   byOldLine,
-  repo,
-  pr,
-  commit,
   focusedThreadId,
   filePath,
   copiedLine,
@@ -457,9 +448,6 @@ function HunkRows({
   showHunkHeader?: boolean;
   byNewLine: Map<number, ReviewThread[]>;
   byOldLine: Map<number, ReviewThread[]>;
-  repo: RepoInfo;
-  pr: PullRequestInfo | null;
-  commit: CommitSummary | null;
   focusedThreadId: string | null;
   filePath: string;
   copiedLine: string | null;

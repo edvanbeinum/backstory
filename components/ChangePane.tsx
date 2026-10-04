@@ -272,7 +272,6 @@ export function ChangePane({
           error={error}
           threads={threads}
           repo={session.repo}
-          pr={session.github.pr}
           commit={commit}
           focusedThreadId={focusedThreadId}
           notes={noteRev ? notes : null}

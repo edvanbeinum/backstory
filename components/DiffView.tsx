@@ -8,13 +8,12 @@ import type {
   DiffFile as DiffFileType,
   DiffResponse,
   Note,
-  PullRequestInfo,
   RepoInfo,
   ReviewThread,
 } from "@/lib/types";
 import { DiffFile, type FileMarks } from "./DiffFile";
 import { FileNav } from "./FileNav";
-import { AlertIcon, CommentIcon } from "./icons";
+import { AlertIcon } from "./icons";
 import { Spinner } from "./ui";
 import type { NotesApi } from "./useNotes";
 
@@ -71,7 +70,6 @@ export function DiffView({
   error,
   threads,
   repo,
-  pr,
   commit,
   focusedThreadId,
   notes = null,
@@ -85,7 +83,6 @@ export function DiffView({
   error: string | null;
   threads: ReviewThread[];
   repo: RepoInfo;
-  pr: PullRequestInfo | null;
   commit: CommitSummary | null;
   focusedThreadId: string | null;
   /** Set when this diff takes notes */
@@ -161,7 +158,6 @@ export function DiffView({
                 : []),
             ]}
             repo={repo}
-            pr={pr}
             commit={commit}
             focusedThreadId={focusedThreadId}
             notes={notes}

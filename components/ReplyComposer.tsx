@@ -4,12 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
 import type { CommitSummary, PullRequestInfo, RepoInfo } from "@/lib/types";
-import {
-  CheckIcon,
-  ChevronDownIcon,
-  LinkExternalIcon,
-  LinkIcon,
-} from "./icons";
+import { LinkExternalIcon } from "./icons";
 import { CopyButton } from "./ui";
 
 type Template = "url" | "sha" | "thumbsUp" | "noChange" | "custom";

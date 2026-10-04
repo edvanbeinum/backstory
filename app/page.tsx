@@ -16,7 +16,7 @@ import type { MapResponse } from "@/lib/map";
 import { SideColumn, type ColumnTab } from "@/components/SideColumn";
 import { useFlows } from "@/components/useFlows";
 import { flowRows, type FlowRow } from "@/lib/flows/rows";
-import { AlertIcon, FileDiffIcon } from "@/components/icons";
+import { AlertIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
 import { PrTitle } from "@/components/PrTitle";
@@ -53,7 +53,6 @@ import type {
   ApiError,
   CommitSummary,
   DiffResponse,
-  ReviewThread,
   SessionResponse,
 } from "@/lib/types";
 
@@ -831,48 +830,6 @@ export default function Page() {
     [diff],
   );
 
-  /** Thread ids whose file is touched by the diff currently on screen. */
-  const anchoredIds = useMemo(() => {
-    const paths = new Set(
-      (diff?.files ?? []).flatMap((file) =>
-        [file.newPath, file.oldPath].filter((p): p is string => Boolean(p)),
-      ),
-    );
-    return new Set(
-      threads.filter((t) => t.path && paths.has(t.path)).map((t) => t.id),
-    );
-  }, [diff, threads]);
-
-  /**
-   * How many threads a commit answers. A commit's linked threads (pinned, or
-   * inferred from the file) are known for every commit without fetching any
-   * diffs — that's what makes the rail navigable. For the commit on screen we
-   * can also count open threads that land in its diff.
-   */
-  const linkedCounts = useMemo(() => {
-    const counts = new Map<string, number>();
-    for (const thread of threads) {
-      // A comment can answer to several commits, and each of them genuinely
-      // carries it — so each gets counted.
-      for (const commit of thread.response.commits) {
-        if (commit.missing) continue;
-        counts.set(commit.sha, (counts.get(commit.sha) ?? 0) + 1);
-      }
-    }
-    return counts;
-  }, [threads]);
-
-  const threadCountFor = useCallback(
-    (candidate: string) => {
-      const linked = linkedCounts.get(candidate) ?? 0;
-      if (linked > 0) return linked;
-      if (candidate !== rev) return 0;
-      return threads.filter((t) => !t.isResolved && anchoredIds.has(t.id))
-        .length;
-    },
-    [rev, threads, anchoredIds, linkedCounts],
-  );
-
   /**
    * Commits a thread can be pinned to: the unpushed ones first, then a slice
    * of pushed history. The right commit is often neither the guess nor the
@@ -926,12 +883,6 @@ export default function Page() {
       if (next) selectComment(next.id);
     },
     [threads, commentIndex, selectComment],
-  );
-
-  /** Paths the working tree touches — drives the "uncommitted" answer state. */
-  const workingPaths = useMemo(
-    () => new Set(session?.working.changedPaths ?? []),
-    [session],
   );
 
   /** Sent with every write; see `keyFor`. */
@@ -1162,12 +1113,6 @@ export default function Page() {
       void loadSession(repoPath, { background: true });
     },
     [writeResponse, repoPath, loadSession],
-  );
-
-  /** The composer's commit picker speaks in shas. */
-  const pinThread = useCallback(
-    (threadId: string, sha: string | null) => void linkCommit(threadId, sha),
-    [linkCommit],
   );
 
   /** Back to the home screen. Clearing the repo is what the inbox *is*. */

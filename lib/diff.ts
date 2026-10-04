@@ -1,5 +1,5 @@
 import { langForPath } from "./lang";
-import type { DiffFile, DiffHunk, DiffLine, FileStatus } from "./types";
+import type { DiffFile, DiffHunk, DiffLine } from "./types";
 
 /**
  * Undo git's C-style path quoting: `"src/caf\303\251.ts"` → `src/café.ts`.

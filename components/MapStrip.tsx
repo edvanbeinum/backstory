@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
-import { edgePath, layeredLayout, type Box } from "./graph";
+import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
 
 /**
@@ -19,8 +19,6 @@ const MAX_NODE_W = 280;
 const MAX_FILES = 4;
 const COL_GAP = 18;
 const PAD = 14;
-
-type Placed = MapNode & Box;
 
 /**
  * A box's height before it's measured: name, the description wrapped, and

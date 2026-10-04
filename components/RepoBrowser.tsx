@@ -35,7 +35,7 @@ export function RepoBrowser({
   const [error, setError] = useState<string | null>(null);
   // Start where the open repo lives, so the first thing you see is its
   // neighbourhood rather than your home directory.
-  const [dir, setDir] = useState<string | null>(null);
+  const [, setDir] = useState<string | null>(null);
 
   const load = useCallback(
     async (target: string | null) => {
