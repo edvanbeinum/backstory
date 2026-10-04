@@ -426,11 +426,16 @@ npm run check    # typecheck, lint, format check, tests
 npm run verify   # all of check, plus the build
 ```
 
-`npm install` turns on a pre-push hook (`.githooks/pre-push`) that runs
-`npm run check` and refuses the push if it fails; `git push --no-verify` skips
-it. If you already set `core.hooksPath` yourself, `npm install` leaves it alone
-and says the hook isn't installed. GitHub Actions runs `npm run verify` on
-every pull request and on pushes to `main`.
+GitHub Actions runs `npm run verify` on every pull request and on pushes to
+`main`. To catch failures before they leave your machine, opt in to the
+pre-push hook, which runs `npm run check` and refuses the push if it fails:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This sets the hooks path for this repo only, so it overrides any global
+`core.hooksPath` you have here. `git push --no-verify` skips the hook once.
 
 ## Notes
 

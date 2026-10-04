@@ -1,12 +1,6 @@
 import assert from "node:assert/strict";
-import { execFileSync, spawnSync } from "node:child_process";
-import {
-  existsSync,
-  mkdtempSync,
-  readFileSync,
-  realpathSync,
-  rmSync,
-} from "node:fs";
+import { execFileSync } from "node:child_process";
+import { readFileSync, realpathSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -16,50 +10,7 @@ const scripts: Record<string, string> = JSON.parse(
   readFileSync(path.join(ROOT, "package.json"), "utf8"),
 ).scripts;
 
-/**
- * Strip the user's git config and any GIT_* a pre-push hook exported, so git
- * sees only the temp directory it's given.
- */
-function gitEnv(dir: string) {
-  const env = { ...process.env };
-  for (const key of Object.keys(env)) {
-    if (key.startsWith("GIT_")) delete env[key];
-  }
-  env.GIT_CONFIG_GLOBAL = "/dev/null";
-  env.GIT_CONFIG_NOSYSTEM = "1";
-  env.GIT_CEILING_DIRECTORIES = path.dirname(dir);
-  return env;
-}
-
-function prepare(dir: string) {
-  const run = spawnSync("sh", ["-c", scripts.prepare], {
-    cwd: dir,
-    env: gitEnv(dir),
-    encoding: "utf8",
-  });
-  assert.equal(run.status, 0, run.stderr);
-  return run.stderr;
-}
-
-function hooksPath(repo: string) {
-  return execFileSync("git", ["config", "core.hooksPath"], {
-    cwd: repo,
-    env: gitEnv(repo),
-    encoding: "utf8",
-  }).trim();
-}
-
-test("npm install points git at the repo's hooks, and pre-push runs the check", () => {
-  const repo = mkdtempSync(path.join(os.tmpdir(), "differ-prepare-"));
-  try {
-    execFileSync("git", ["init", "-q"], { cwd: repo, env: gitEnv(repo) });
-    assert.equal(prepare(repo), "");
-    assert.equal(hooksPath(repo), ".githooks");
-    assert.equal(prepare(repo), "", "a second install is silent");
-  } finally {
-    rmSync(repo, { recursive: true, force: true });
-  }
-
+test("the committed pre-push hook is executable and runs the check", () => {
   // Check git's recorded mode, not the disk: it's what every clone, worktree
   // and CI checkout gets.
   const entry = execFileSync(
@@ -70,31 +21,6 @@ test("npm install points git at the repo's hooks, and pre-push runs the check", 
   assert.match(entry, /^100755 /);
   const hook = readFileSync(path.join(ROOT, ".githooks", "pre-push"), "utf8");
   assert.match(hook, /^\s*if ! npm run check; then/m);
-});
-
-test("npm install leaves a hooks path the user set, and says the hook isn't installed", () => {
-  const repo = mkdtempSync(path.join(os.tmpdir(), "differ-prepare-"));
-  try {
-    execFileSync("git", ["init", "-q"], { cwd: repo, env: gitEnv(repo) });
-    execFileSync("git", ["config", "core.hooksPath", ".husky"], {
-      cwd: repo,
-      env: gitEnv(repo),
-    });
-    assert.match(prepare(repo), /already \.husky.*isn't installed/);
-    assert.equal(hooksPath(repo), ".husky");
-  } finally {
-    rmSync(repo, { recursive: true, force: true });
-  }
-});
-
-test("outside a git repo, npm install's prepare does nothing and succeeds", () => {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "differ-tarball-"));
-  try {
-    prepare(dir);
-    assert.equal(existsSync(path.join(dir, ".git")), false);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
 });
 
 test("tests never see the real store", () => {
