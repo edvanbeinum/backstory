@@ -135,15 +135,42 @@ and differ can't see how you're working. Notes remember the text of their line, 
 agent's next edit moves it — and when they can't be sure where it went, they
 say so rather than guess.
 
-Notes leave differ the same way replies do. **Copy for agent** puts them on
-the clipboard as one markdown message, each note under the `path:line` it
-refers to with the line quoted.
+**Send to agent** hands them over as one markdown message, each note under
+the `path:line` it refers to with the line quoted. The agent doesn't have to
+be waiting: if it's busy, the round is queued in `~/.differ/outbox.json` and
+the agent's Claude Code Stop hook collects it the next time it finishes a
+turn, then carries on with your notes. **Copy** puts the same message on the
+clipboard instead.
+
+A queued round is aimed at the session last seen stopping in that checkout,
+and says so — "Queued for the session active here 5m ago" — so a second
+session there can't walk off with it. Until one has been seen, it goes to
+whichever stops first. Once collected it reads "Delivered 2m ago". While it
+waits you can **Cancel** it, which returns its notes to drafts, or, if the
+session it was aimed at has ended, **Send to the next session instead**.
+
+The hook is installed once, globally, in `~/.claude/settings.json`, and runs
+for every session. It stays silent until a checkout has notes queued, and
+never gets in the agent's way: with differ not running, unreachable or
+erroring, or in a directory that isn't a checkout, it prints nothing within
+about two seconds and the agent stops as usual.
+
+```json
+{
+  "hooks": {
+    "Stop": [
+      { "hooks": [{ "type": "command", "command": "differ hook stop", "timeout": 10 }] }
+    ]
+  }
+}
+```
 
 Or let the agent ask. `differ review` opens the uncommitted changes and waits;
 the window says an agent is waiting and offers **Send to agent** (or **Looks
-good**). Sending prints your notes to the command's stdout and exits it — so an
-agent that runs it reads your review as the command's output. For Claude Code,
-copy the command in:
+good**). While it waits, Send goes straight to it rather than into the queue:
+your notes are printed to the command's stdout and it exits — so an agent that
+runs it reads your review as the command's output. That works for any agent,
+not only Claude Code. For Claude Code, copy the command in:
 
 ```bash
 mkdir -p ~/.claude/commands
@@ -153,8 +180,8 @@ cp packaging/claude/differ-review.md ~/.claude/commands/
 and type `/differ-review` in a session. The agent runs `differ review` in the
 background and picks up where it left off once you send.
 
-Sent notes don't vanish. Whichever way they left — sent or copied — they
-become a **round**: fixed, since that's what the agent read, each with a tick.
+Sent notes don't vanish. Whichever way they left — sent, queued or copied —
+they become a **round**: fixed, since that's what the agent read, each with a tick.
 When the agent's edits land, check each note against the diff and tick it
 yourself; nothing else marks a note handled, not even the agent touching its
 line. The bar keeps every round's count ("2 of 3 handled"), so an open note

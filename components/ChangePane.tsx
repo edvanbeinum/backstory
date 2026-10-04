@@ -15,6 +15,7 @@ import { DiffView } from "./DiffView";
 import { CommitPicker } from "./CommitPicker";
 import { FeedbackBar } from "./FeedbackBar";
 import { useNotes } from "./useNotes";
+import { useOutbox } from "./useOutbox";
 import { useReview } from "./useReview";
 import {
   CommentIcon,
@@ -142,7 +143,7 @@ export function ChangePane({
   thread: ReviewThread | null;
   focusedThreadId: string | null;
   pushed: boolean;
-  /** Moves when an agent starts or stops waiting for a review */
+  /** Moves when an agent starts or stops waiting, or a round is queued or collected */
   reviewTick: number;
   /** The selected flow's steps, anchored on the diff's lines */
   flowMarks?: Map<string, FileMarks> | null;
@@ -156,6 +157,7 @@ export function ChangePane({
 }) {
   const notes = useNotes(session.repo.root);
   const review = useReview(session.repo.root, reviewTick);
+  const outbox = useOutbox(session.repo.root, reviewTick, notes.reload);
 
   // The change on screen as a note records it: a commit by its full sha,
   // which is what stays comparable across views. Null until the diff showing
@@ -302,6 +304,7 @@ export function ChangePane({
             diff={noteRev ? diff : null}
             session={session}
             review={review}
+            outbox={outbox}
             onRevChange={onRevChange}
           />
         </div>

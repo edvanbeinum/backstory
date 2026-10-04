@@ -83,6 +83,8 @@ export type NotesChange =
   | { op: "remove"; id: string }
   /** Hand these drafts over as one round */
   | { op: "send"; ids: string[]; at: number }
+  /** A queued round withdrawn before any agent took it: drafts again */
+  | { op: "unsend"; ids: string[] }
   | { op: "tick"; id: string; done: boolean }
   | { op: "clearDrafts" }
   /** Forget every sent note you've ticked */
@@ -111,6 +113,9 @@ export function parseChange(body: unknown): NotesChange {
       if (!Array.isArray(b.ids) || !b.ids.every(isId)) throw new Error("Invalid note id");
       if (typeof b.at !== "number") throw new Error("Invalid send time");
       return { op: "send", ids: b.ids, at: b.at };
+    case "unsend":
+      if (!Array.isArray(b.ids) || !b.ids.every(isId)) throw new Error("Invalid note id");
+      return { op: "unsend", ids: b.ids };
     case "tick":
       if (!isId(b.id)) throw new Error("Invalid note id");
       if (typeof b.done !== "boolean") throw new Error("Invalid tick");
@@ -163,6 +168,14 @@ export async function changeNotes(
         for (const id of change.ids) {
           const note = forRoot[id];
           if (note && note.sentAt === null) forRoot[id] = { ...note, sentAt: change.at };
+        }
+        break;
+      case "unsend":
+        for (const id of change.ids) {
+          const note = forRoot[id];
+          if (note && note.sentAt !== null) {
+            forRoot[id] = { ...note, sentAt: null, done: false, doneAt: null };
+          }
         }
         break;
       case "tick": {

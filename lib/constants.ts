@@ -11,6 +11,7 @@ export const BRANCH_REV = "branch";
 export const DIFF_API = "/api/diff";
 export const NOTES_API = "/api/notes";
 export const REVIEW_API = "/api/review";
+export const OUTBOX_API = "/api/outbox";
 
 export const STORAGE_KEY = "differ.repoPath";
 

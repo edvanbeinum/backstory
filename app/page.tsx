@@ -128,7 +128,10 @@ export default function Page() {
   const [linkNotice, setLinkNotice] = useState<string | null>(null);
   /** Bumped by watcher events; retriggers the working-tree diff fetch. */
   const [workingTick, setWorkingTick] = useState(0);
-  /** Bumped when an agent starts or stops waiting for a review. */
+  /**
+   * Bumped when an agent starts or stops waiting for a review, or a sent
+   * round is queued, collected or withdrawn.
+   */
   const [reviewTick, setReviewTick] = useState(0);
   /** Bumped when a flow run finishes. */
   const [flowsTick, setFlowsTick] = useState(0);
@@ -481,10 +484,12 @@ export default function Page() {
       }
       if (kinds.length === 0) return;
 
-      if (kinds.includes("review")) setReviewTick((t) => t + 1);
+      const agentKinds = ["review", "outbox"];
+      if (kinds.some((kind) => agentKinds.includes(kind))) setReviewTick((t) => t + 1);
       if (kinds.includes("flows")) setFlowsTick((t) => t + 1);
-      // A review request or a finished flow run changes nothing on disk.
-      if (kinds.every((kind) => kind === "review" || kind === "flows")) return;
+      // A review request, a queued round or a finished flow run changes
+      // nothing on disk.
+      if (kinds.every((kind) => kind === "flows" || agentKinds.includes(kind))) return;
 
       setWorkingTick((t) => t + 1);
       void loadSession(repoPath, {

@@ -12,6 +12,9 @@
  *                       wait for you to review the uncommitted changes, then
  *                       print your notes to stdout and exit — for an agent
  *                       session to run and read
+ *   differ hook stop    the Claude Code Stop hook: hand a finishing session
+ *                       any notes queued for it (reads the hook's JSON on
+ *                       stdin; silent when there are none or differ is down)
  *   differ install      (re)install the login agent and restart the server
  *   differ uninstall    stop the server and remove the login agent
  *   differ --foreground run the server in this terminal instead
@@ -29,9 +32,19 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { DEFAULT_PORT, hookPort, readStdin, recordPort, stopHook } from "./hook.mjs";
 import * as launchd from "./launchd.mjs";
 
-const DEFAULT_PORT = 4460;
+// First, before anything that could start, restart or wait on a server: the
+// hook runs on every turn of every session and must only ever ask.
+if (process.argv[2] === "hook") {
+  // A backstop for anything that hangs past the take's own timeout.
+  setTimeout(() => process.exit(0), 5000);
+  if (process.argv[3] === "stop") {
+    await stopHook(await readStdin(), { base: `http://127.0.0.1:${hookPort()}` });
+  }
+  process.exit(0);
+}
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = path.resolve(HERE, "..");
 
@@ -61,6 +74,7 @@ function parseArgs(argv) {
         "usage: differ [path] [--port N] [--no-open] [--foreground]\n" +
           "       differ review [path] [--port N] [--no-open]\n" +
           "       differ install [--port N] | differ uninstall\n" +
+          "       differ hook stop   (Claude Code Stop hook; see the README)\n" +
           "Opens the repo (default: cwd) in the differ review app.\n" +
           "`review` then waits for you to send notes on the uncommitted\n" +
           "changes, prints them to stdout, and exits.\n" +
@@ -184,6 +198,7 @@ async function handOff() {
     console.error(`differ: ${body?.error ?? "not a git repository"}`);
     return null;
   }
+  recordPort(args.port);
   if (args.open) openWindow(`${base}/`);
   return body.repo;
 }
@@ -321,6 +336,7 @@ if (args.command === "install") {
     console.error(`differ: server didn't come up on :${args.port} — see ${serverLog}`);
     process.exit(1);
   }
+  recordPort(args.port);
   console.log(`differ: login agent installed — serving ${base} (log: ${serverLog})`);
   process.exit(0);
 }
@@ -400,6 +416,7 @@ if (args.review) {
   await review();
 }
 
+recordPort(args.port);
 const child = spawn("node", [server], {
   env,
   stdio: ["ignore", "inherit", "inherit"],

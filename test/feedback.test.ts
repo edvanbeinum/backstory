@@ -204,6 +204,22 @@ test("sending makes a round; only sent notes tick; only drafts edit", async () =
   assert.deepEqual(notes.map((n) => n.id), ["b"]);
 });
 
+test("a withdrawn round's notes are drafts again, and editable", async () => {
+  process.env.DIFFER_HOME = mkdtempSync(path.join(tmpdir(), "differ-test-"));
+  const root = "/repo/unsend";
+
+  await changeNotes(root, { op: "save", note: note({ id: "a" }) });
+  await changeNotes(root, { op: "send", ids: ["a"], at: 5_000 });
+  await changeNotes(root, { op: "tick", id: "a", done: true });
+  await changeNotes(root, { op: "unsend", ids: ["a"] });
+
+  const [a] = await getNotes(root);
+  assert.equal(a.sentAt, null);
+  assert.equal(a.done, false);
+  await changeNotes(root, { op: "save", note: { ...a, body: "reworded" } });
+  assert.equal((await getNotes(root))[0].body, "reworded");
+});
+
 test("notes saved before rounds existed read as drafts", async () => {
   const home = mkdtempSync(path.join(tmpdir(), "differ-test-"));
   process.env.DIFFER_HOME = home;

@@ -5,6 +5,7 @@ import { errorResponse } from "@/lib/api";
 import { gitLine } from "@/lib/exec";
 import { resolveRepo } from "@/lib/git";
 import { onFlowsChange } from "@/lib/flows/store";
+import { onOutboxChange } from "@/lib/outbox";
 import { onReviewChange } from "@/lib/review";
 import type { ApiError } from "@/lib/types";
 
@@ -28,9 +29,10 @@ export const dynamic = "force-dynamic";
  *
  * Events carry a coarse kind so the client can decide how hard to refresh:
  * "remote" (refs/remotes moved — bypass the GitHub cache), "git" (local git
- * state), "worktree" (file edits), and "review" — not the filesystem at all,
- * but an agent starting or stopping waiting for your notes on this checkout.
- * "flows" is the other non-filesystem kind: a flow run finished.
+ * state), "worktree" (file edits), and three that aren't the filesystem at
+ * all: "review", an agent starting or stopping waiting for your notes on this
+ * checkout; "outbox", a sent round queued, collected or withdrawn; and
+ * "flows", a flow run finished.
  */
 
 const DEBOUNCE_MS = 400;
@@ -163,6 +165,9 @@ export async function GET(request: Request) {
       const stopReviews = onReviewChange((changedRoot) => {
         if (changedRoot === root) send({ kinds: ["review"] });
       });
+      const stopOutbox = onOutboxChange((changedRoot) => {
+        if (changedRoot === root) send({ kinds: ["outbox"] });
+      });
       const stopFlows = onFlowsChange((changedRoot) => {
         if (changedRoot === root) send({ kinds: ["flows"] });
       });
@@ -181,6 +186,7 @@ export async function GET(request: Request) {
       const cleanup = () => {
         closed = true;
         stopReviews();
+        stopOutbox();
         stopFlows();
         clearInterval(heartbeat);
         if (debounce) clearTimeout(debounce);
