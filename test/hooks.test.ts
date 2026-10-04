@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import {
   existsSync,
   mkdtempSync,
@@ -32,20 +32,30 @@ function gitEnv(dir: string) {
 }
 
 function prepare(dir: string) {
-  execFileSync("sh", ["-c", scripts.prepare], { cwd: dir, env: gitEnv(dir) });
+  const run = spawnSync("sh", ["-c", scripts.prepare], {
+    cwd: dir,
+    env: gitEnv(dir),
+    encoding: "utf8",
+  });
+  assert.equal(run.status, 0, run.stderr);
+  return run.stderr;
+}
+
+function hooksPath(repo: string) {
+  return execFileSync("git", ["config", "core.hooksPath"], {
+    cwd: repo,
+    env: gitEnv(repo),
+    encoding: "utf8",
+  }).trim();
 }
 
 test("npm install points git at the repo's hooks, and pre-push runs the check", () => {
   const repo = mkdtempSync(path.join(os.tmpdir(), "differ-prepare-"));
   try {
     execFileSync("git", ["init", "-q"], { cwd: repo, env: gitEnv(repo) });
-    prepare(repo);
-    const hooksPath = execFileSync("git", ["config", "core.hooksPath"], {
-      cwd: repo,
-      env: gitEnv(repo),
-      encoding: "utf8",
-    }).trim();
-    assert.equal(hooksPath, ".githooks");
+    assert.equal(prepare(repo), "");
+    assert.equal(hooksPath(repo), ".githooks");
+    assert.equal(prepare(repo), "", "a second install is silent");
   } finally {
     rmSync(repo, { recursive: true, force: true });
   }
@@ -60,6 +70,21 @@ test("npm install points git at the repo's hooks, and pre-push runs the check", 
   assert.match(entry, /^100755 /);
   const hook = readFileSync(path.join(ROOT, ".githooks", "pre-push"), "utf8");
   assert.match(hook, /^\s*if ! npm run check; then/m);
+});
+
+test("npm install leaves a hooks path the user set, and says the hook isn't installed", () => {
+  const repo = mkdtempSync(path.join(os.tmpdir(), "differ-prepare-"));
+  try {
+    execFileSync("git", ["init", "-q"], { cwd: repo, env: gitEnv(repo) });
+    execFileSync("git", ["config", "core.hooksPath", ".husky"], {
+      cwd: repo,
+      env: gitEnv(repo),
+    });
+    assert.match(prepare(repo), /already \.husky.*isn't installed/);
+    assert.equal(hooksPath(repo), ".husky");
+  } finally {
+    rmSync(repo, { recursive: true, force: true });
+  }
 });
 
 test("outside a git repo, npm install's prepare does nothing and succeeds", () => {

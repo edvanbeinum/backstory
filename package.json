@@ -10,7 +10,7 @@
     "build": "next build",
     "postbuild": "cp -R public .next/standalone/public && mkdir -p .next/standalone/.next && cp -R .next/static .next/standalone/.next/static",
     "start": "next start -H 127.0.0.1",
-    "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 && git config core.hooksPath .githooks || true",
+    "prepare": "git rev-parse --is-inside-work-tree >/dev/null 2>&1 || exit 0; p=\"$(git config core.hooksPath)\"; if [ -z \"$p\" ]; then git config core.hooksPath .githooks; elif [ \"$p\" != .githooks ]; then echo \"differ: core.hooksPath is already $p, so differ's pre-push hook isn't installed. CI still runs npm run verify.\" >&2; fi",
     "test": "DIFFER_HOME=\"$(mktemp -d)\" tsx --test \"test/*.test.ts\"",
     "lint": "eslint .",
     "format": "prettier --write .",
