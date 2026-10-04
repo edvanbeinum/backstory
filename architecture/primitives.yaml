@@ -127,10 +127,3 @@ blocks:
 
 invariants:
   - rule: Every read-modify-write of a store file runs inside `withStore`, and a batch is one write, not a loop of single-key writes.
-    origin: >-
-      1a1e64a (Ed, 2026-08-08). Merging `links.json` and `drafts.json` into one
-      response record meant a debounced draft save and a tick could land
-      together and overwrite each other. The fix was a per-store mutex
-      (`withStore`), field-wise patches, and a unique temp filename per write.
-      The tests fail without the mutex. Confirmed as an invariant in #4,
-      2026-10-04.

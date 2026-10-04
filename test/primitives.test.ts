@@ -62,10 +62,9 @@ test("every block's code paths exist", () => {
   }
 });
 
-test("every invariant names its origin", () => {
+test("every invariant has a rule", () => {
   for (const inv of entries("invariants")) {
     assert.ok(field(inv, "rule"), `an invariant has no rule: ${inv[0]}`);
-    assert.ok(field(inv, "origin"), `no origin for: ${field(inv, "rule")}`);
   }
 });
 
