@@ -224,12 +224,11 @@ export function ReplyComposer({
   // Unlinking a commit while an "Addressed in <sha>" template is selected
   // would otherwise leave an empty box that looks broken. Back to your own
   // words, not to a stance differ picked.
-  useEffect(() => {
-    if (!commitTemplatesDisabled) return;
-    if (template === "url" || template === "sha" || template === "thumbsUp") {
-      setTemplate("custom");
-    }
-  }, [commitTemplatesDisabled, template]);
+  if (
+    commitTemplatesDisabled &&
+    (template === "url" || template === "sha" || template === "thumbsUp")
+  )
+    setTemplate("custom");
 
   return (
     <div className="rounded-md border border-[var(--border)] bg-[var(--canvas)]">
