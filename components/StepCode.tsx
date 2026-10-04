@@ -31,11 +31,16 @@ export function StepCode({
 }) {
   const [data, setData] = useState<Snippet | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const snippetKey = [repo, rev, path, side, line].join("\0");
+  const [shownKey, setShownKey] = useState(snippetKey);
+  if (shownKey !== snippetKey) {
+    setShownKey(snippetKey);
+    setData(null);
+    setError(null);
+  }
 
   useEffect(() => {
     let cancelled = false;
-    setData(null);
-    setError(null);
     const params = new URLSearchParams({
       repo,
       rev,
