@@ -1,0 +1,9 @@
+#!/bin/sh
+# Clear the GIT_DIR and friends git exports to hooks, or the tests' git calls
+# in temp repos would act on this repo instead.
+unset $(git rev-parse --local-env-vars)
+
+if ! npm run check; then
+  echo "npm run check failed; push refused (git push --no-verify skips this)" >&2
+  exit 1
+fi

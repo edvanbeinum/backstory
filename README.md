@@ -418,6 +418,25 @@ anchoring rules — including the one that matters most: a comment whose line
 isn't in the current diff must fall through to "unanchored" and still be shown,
 never silently dropped.
 
+`npm test` points `DIFFER_HOME` at a fresh temp directory, so tests never read
+or write your real `~/.differ`.
+
+```bash
+npm run check    # typecheck, lint, format check, tests
+npm run verify   # all of check, plus the build
+```
+
+GitHub Actions runs `npm run verify` on every pull request and on pushes to
+`main`. To catch failures before they leave your machine, opt in to the
+pre-push hook, which runs `npm run check` and refuses the push if it fails:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+This sets the hooks path for this repo only, so it overrides any global
+`core.hooksPath` you have here. `git push --no-verify` skips the hook once.
+
 ## Notes
 
 - The server binds to `127.0.0.1` — it runs git against whatever path you give
