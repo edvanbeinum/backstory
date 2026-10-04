@@ -10,7 +10,7 @@
     "build": "next build",
     "postbuild": "cp -R public .next/standalone/public && mkdir -p .next/standalone/.next && cp -R .next/static .next/standalone/.next/static",
     "start": "next start -H 127.0.0.1",
-    "test": "tsx --test \"test/*.test.ts\"",
+    "test": "DIFFER_HOME=\"$(mktemp -d)\" tsx --test \"test/*.test.ts\"",
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
