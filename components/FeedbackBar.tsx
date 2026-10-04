@@ -541,10 +541,11 @@ function Round({
   const total = round.notes.length;
   const complete = done === total;
   const [open, setOpen] = useState(!complete);
-
-  useEffect(() => {
+  const [wasComplete, setWasComplete] = useState(complete);
+  if (wasComplete !== complete) {
+    setWasComplete(complete);
     if (complete) setOpen(false);
-  }, [complete]);
+  }
 
   return (
     <div>
