@@ -82,9 +82,10 @@ const isClaim = (value: unknown) =>
     isSessionId(value.session) &&
     typeof value.until === "number");
 
-function isRound(
-  value: unknown,
-): value is Omit<OutboxRound, "id" | "root" | "claim"> & {
+function isRound(value: unknown): value is Omit<
+  OutboxRound,
+  "id" | "root" | "claim"
+> & {
   claim?: OutboxRound["claim"];
 } {
   if (!value || typeof value !== "object" || Array.isArray(value)) return false;
