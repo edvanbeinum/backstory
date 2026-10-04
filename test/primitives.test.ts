@@ -18,7 +18,6 @@ function section(key: string): string[] {
   return end === -1 ? rest : rest.slice(0, end);
 }
 
-/** One entry per `  - ` item: its own lines, item line first. */
 function entries(key: string): string[][] {
   const out: string[][] = [];
   for (const line of section(key)) {
