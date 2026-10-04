@@ -223,11 +223,14 @@ export function DiffFile({
   ]);
 
   // A different commit means a different file revision; drop the cached view.
-  useEffect(() => {
+  const revision = `${commit?.sha}:${file.path}`;
+  const [shownRevision, setShownRevision] = useState(revision);
+  if (shownRevision !== revision) {
+    setShownRevision(revision);
     setWhole(null);
     setShowWhole(false);
     setWholeError(null);
-  }, [commit?.sha, file.path]);
+  }
 
   return (
     <section
