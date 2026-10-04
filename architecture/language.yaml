@@ -1,0 +1,129 @@
+# The words, building blocks and rules agents plan differ's changes with.
+# Some code still uses avoided words until the renames in the follow-up issue land; use the names here.
+
+terms:
+  - name: flow
+    means: "What the code does for one user action a change touches: the data, the Flows tab and the feature."
+    drawing: sequence
+    avoid:
+      - sequence, for the data
+      - trace as a noun (trace stays the verb, as in "Trace this change")
+  - name: participant
+    means: One actor in a flow, a type the calls go between (`FlowParticipant`, SARIF `logicalLocations`).
+    drawing: lane
+    avoid:
+      - lane, for the data
+  - name: view
+    means: 'The two commits being compared: one commit and its first parent, or "All changes" from the fork point to HEAD (`lib/view.ts`).'
+    avoid:
+      - view, for the Diff / Before / After switch
+  - name: flow mode
+    means: The Diff / Before / After switch on a flow (`FlowMode` in `lib/flows/rows.ts`).
+    avoid:
+      - view
+  - name: column
+    means: "A vertical region of the page. The side column (left: map strip, data strip, and the Flows and Comments tabs) and the diff column (the change picker and the diff)."
+    avoid:
+      - pane
+      - rail
+  - name: panel
+    means: One tab's content inside the side column. The flows panel, the comments panel, and the response panel inside it.
+    avoid:
+      - pane
+  - name: strip
+    means: A one-line summary bar at the top of the side column that opens an overlay. The map strip and the data strip.
+    avoid: []
+  - name: Rails
+    means: Ruby on Rails, the framework the data model reader understands.
+    boundary: "`lib/data/` only"
+    avoid:
+      - rail, for any layout
+  - name: store
+    means: "`lib/store.ts`: the small click-driven JSON files in `~/.differ`, each read and written whole."
+    avoid:
+      - store, for the flow cache
+  - name: flow cache
+    means: "`lib/flows/store.ts`: one cached SARIF file per view in `~/.differ/flows/`, plus the queue of runs that make them."
+    avoid:
+      - store
+
+blocks:
+  - name: git reader
+    code:
+      - lib/git.ts
+      - lib/exec.ts
+      - lib/browse.ts
+      - lib/pushed.ts
+      - lib/view.ts
+    summary: Reads repos, commits, patches and the working tree through git, and works out what counts as not yet pushed.
+    read: 'README "How "not yet pushed" is decided"'
+  - name: diff and anchors
+    code:
+      - lib/diff.ts
+      - lib/anchor.ts
+      - lib/highlight.ts
+      - lib/snippet.ts
+    summary: Parses and highlights diffs, and puts each review thread on the line it was written against.
+    read: "`lib/anchor.ts`, the comment on `anchorThreads`"
+  - name: GitHub
+    code:
+      - lib/github.ts
+      - lib/inbox.ts
+    summary: Pull requests and review threads through `gh`, degrading to "unavailable" rather than failing.
+    read: 'README "Three levels"'
+  - name: store
+    code:
+      - lib/store.ts
+      - lib/responses.ts
+      - lib/drafts.ts
+      - lib/notes.ts
+      - lib/outbox.ts
+    summary: The JSON files in `~/.differ` and the modules that keep their records.
+    read: "`lib/store.ts` header"
+  - name: flow engine
+    code:
+      - lib/flows/
+    summary: Traces a view's flows with `claude -p`, checks each step against its line, and caches the result.
+    read: '`lib/flows/generate.ts` header, then README "Diagrams: the map, the data model and flows"'
+  - name: model reader (the map)
+    code:
+      - lib/model.ts
+      - lib/map.ts
+    summary: Reads the repo's C4 model and marks the components a change touched, added or removed.
+    read: "`lib/model.ts` header"
+  - name: data model reader
+    code:
+      - lib/data/
+    summary: Reads the data model (Rails schema and models, or Core Data) at both ends of a view and diffs it.
+    read: 'README "Diagrams: the map, the data model and flows"'
+  - name: agent review loop
+    code:
+      - lib/review.ts
+      - lib/feedback.ts
+      - lib/outbox.ts
+      - bin/hook.mjs
+    summary: Notes on an agent's work, sent to a waiting `differ review` or queued for the agent's Stop hook.
+    read: 'README "Reviewing an agent''s work"'
+  - name: live updates
+    code:
+      - app/api/watch/
+      - components/useStaleReload.ts
+    summary: Watches the worktree and git dir and pushes change events to the window over SSE.
+    read: "`app/api/watch/route.ts` header"
+  - name: UI columns and panels
+    code:
+      - app/page.tsx
+      - components/
+      - lib/recents.ts
+    summary: The page, its side column and diff column, the panels and strips inside them, and the recent repos kept in the browser's localStorage.
+    read: "`components/SideColumn.tsx`, the comment on `SideColumn`"
+  - name: CLI and launchd
+    code:
+      - bin/differ.mjs
+      - bin/launchd.mjs
+      - packaging/
+    summary: The `differ` command, the login agent that keeps the server running, and the Homebrew formula.
+    read: 'README "Running it as an app"'
+
+invariants:
+  - rule: Every read-modify-write of a store file runs inside `withStore`, and a batch is one write, not a loop of single-key writes.

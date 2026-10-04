@@ -13,3 +13,8 @@ Rules a tool can't check.
 - Lead a comment with what the code does, in the active voice, then the reason. Write "Strip the user's git config and any `GIT_*` a pre-push hook exported, so git sees only the temp directory it's given", not "Git with none of the user's config, and no `GIT_*` left over from a hook that is running these tests, so it only ever sees the temp directory it's given." Keep people's names out of code and comments.
 
 Formatting and lint rules live in `eslint.config.mjs` and Prettier, not here. Run `npm run verify` before you finish; CI runs it too, and the pre-push hook runs `npm run check`.
+
+# Before you plan
+
+- Read `architecture/language.yaml` before planning, and use its terms for names.
+- When you add or rename a block or a term, update `architecture/language.yaml` in the same change.
