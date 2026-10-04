@@ -78,7 +78,6 @@ blocks:
       - lib/drafts.ts
       - lib/notes.ts
       - lib/outbox.ts
-      - lib/recents.ts
     summary: The JSON files in `~/.differ` and the modules that keep their records.
     read: "`lib/store.ts` header"
   - name: flow engine
@@ -115,7 +114,8 @@ blocks:
     code:
       - app/page.tsx
       - components/
-    summary: The page, its side column and diff column, and the panels and strips inside them.
+      - lib/recents.ts
+    summary: The page, its side column and diff column, the panels and strips inside them, and the recent repos kept in the browser's localStorage.
     read: "`components/SideColumn.tsx`, the comment on `SideColumn`"
   - name: CLI and launchd
     code:
