@@ -127,13 +127,11 @@ export function ReplyComposer({
 
   // What the reply names: every commit you linked, or — before you've linked
   // anything — the change on screen, so the wording is ready when you do.
-  const pinned: LinkTarget[] = linkedShas.map((sha) => ({
-    sha,
-    shortSha: sha.slice(0, 7),
-  }));
-
-  const targets: LinkTarget[] =
-    pinned.length > 0 ? pinned : selectedIsReal && commit ? [commit] : [];
+  const targets = useMemo<LinkTarget[]>(() => {
+    if (linkedShas.length > 0)
+      return linkedShas.map((sha) => ({ sha, shortSha: sha.slice(0, 7) }));
+    return selectedIsReal && commit ? [commit] : [];
+  }, [linkedShas, selectedIsReal, commit]);
   const target: LinkTarget | null = targets[0] ?? null;
 
   const urls = useMemo(
@@ -263,7 +261,7 @@ export function ReplyComposer({
         <p className="flex flex-wrap items-center gap-x-2 border-b border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1 text-[11px] text-[var(--fg-muted)]">
           {/* The card above already names the linked commits; saying it
                 again here was the same fact twice in adjacent boxes. */}
-          {pinned.length > 0 ? null : target ? (
+          {linkedShas.length > 0 ? null : target ? (
             <>
               Drafting against <span className="mono">{target.shortSha}</span>,
               the change on screen.
