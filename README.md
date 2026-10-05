@@ -26,16 +26,37 @@ Beside the diff, or in place of it, differ draws what a change did to the
 system, so you can see where it landed before reading its lines:
 
 - **The map** is a C4 component view of the repo, with the components the
-  change touched, added or removed. It reads `architecture/workspace.json`
-  (a [Structurizr](https://docs.structurizr.com) export) from the repo, at the
-  change's base and head. A repo that doesn't commit one can keep a model at
-  `~/.differ/models/<repo>/workspace.json`; it shows where a change landed, but
-  not what it added or removed.
+  change touched, added or removed. It reads `architecture/workspace.dsl`, a
+  [Structurizr](https://docs.structurizr.com) model, from the repo at the
+  change's base and head. A repo that doesn't commit a model can keep one at
+  `~/.differ/models/<repo>/workspace.dsl`; it shows where a change landed,
+  but not what it added or removed.
 - **The data model** shows the entities the change touched: new fields,
   relationships and rules. It reads `db/schema.rb` and the models (Rails) or
   the `.xcdatamodeld` (Core Data). Nothing is run.
 - **Flows** are sequence diagrams of what the code does for each user action
   the change touches, before and after, beside the code they come from.
+
+differ reads the DSL itself, so nothing needs exporting. It reads the
+part of the DSL that describes elements and arrows:
+
+- `workspace`, `!identifiers hierarchical` (or the default `flat`), `model`,
+  and `properties` at the top and inside elements. `code.globs` on an element
+  says which files belong to it; `code.tests` and `code.ignore` on the
+  workspace say which files are tests or not code at all.
+- `person`, `softwareSystem`, `container` and `component`, nested, named
+  (`id = container "…"`) or not, with `tags`, `technology`, `url`,
+  `description` and `perspectives` inside them.
+- Arrows, `a -> b "…"` in the model or `-> b "…"` inside an element, with
+  ids written in full or relative to the block they're in.
+- Comments (`//`, `#`, `/* … */`), `\"` in strings, and `\` at a line's end to
+  carry on to the next.
+
+`views`, `styles`, `configuration` and other blocks at the workspace's top
+level are skipped. Anything else in the model, any `!` directive other than
+`!identifiers`, and `workspace extends` stop the map: `group`,
+`deploymentEnvironment` or `!include`, say. The strip names what it met and
+its line, rather than drawing a model with pieces missing.
 
 Flows are traced by **Claude Code**, through your own `claude` login: differ
 runs `claude -p` over a copy of the commit, with read-only tools. That means:

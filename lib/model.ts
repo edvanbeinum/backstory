@@ -4,16 +4,15 @@ import path from "node:path";
 
 import picomatch from "picomatch";
 
+import { DslError, readDsl } from "./dsl";
 import { gitLine, gitTry } from "./exec";
 
 /**
- * The repo's C4 model: `architecture/workspace.json`, exported by Structurizr
- * from the committed `workspace.dsl`. differ only reads it. Elements are keyed
- * by their DSL identifier (`ios.progress`), which survives elements being
- * added, unlike Structurizr's numeric ids.
+ * The repo's C4 model: `architecture/workspace.dsl`, in Structurizr's DSL.
+ * differ only reads it. Elements are keyed by their DSL identifier
+ * (`ios.progress`), which survives elements being added.
  */
 
-export const MODEL_JSON = "architecture/workspace.json";
 export const MODEL_DSL = "architecture/workspace.dsl";
 
 export type ElementType =
@@ -44,30 +43,28 @@ export interface Model {
   match: (path: string) => string[];
   isTest: (path: string) => boolean;
   isIgnored: (path: string) => boolean;
-  /** The DSL embedded in the JSON at export, for the stale check */
-  embeddedDsl: string | null;
 }
 
-interface RawElement {
+/** A model as the DSL reader finds it, before differ builds its matchers. */
+export interface Workspace {
+  properties: Record<string, string>;
+  elements: WorkspaceElement[];
+  relationships: WorkspaceRelationship[];
+}
+
+export interface WorkspaceElement {
   id: string;
-  name?: string;
-  description?: string;
-  properties?: Record<string, string>;
-  relationships?: RawRelationship[];
-  containers?: RawElement[];
-  components?: RawElement[];
+  name: string;
+  description: string;
+  type: ElementType;
+  parent: string | null;
+  properties: Record<string, string>;
 }
 
-interface RawRelationship {
-  sourceId: string;
-  destinationId: string;
-  description?: string;
-  linkedRelationshipId?: string;
-}
-
-interface RawWorkspace {
-  properties?: Record<string, string>;
-  model?: { people?: RawElement[]; softwareSystems?: RawElement[] };
+export interface WorkspaceRelationship {
+  source: string;
+  destination: string;
+  description: string;
 }
 
 const splitGlobs = (value: string | undefined) =>
@@ -86,47 +83,31 @@ const orDefault = (
   fallback: () => (path: string) => boolean,
 ) => (globs.length > 0 ? matcher(globs) : (path: string) => fallback()(path));
 
-export function parseModel(json: string): Model {
-  const raw = JSON.parse(json) as RawWorkspace;
+export function buildModel(ws: Workspace): Model {
   const elements = new Map<string, ModelElement>();
-  const byNumericId = new Map<string, string>();
-  const rawRels: RawRelationship[] = [];
-
-  const visit = (el: RawElement, type: ElementType, parent: string | null) => {
-    const id = el.properties?.["structurizr.dsl.identifier"] ?? el.id;
-    elements.set(id, {
-      id,
-      name: el.name ?? id,
-      description: el.description ?? "",
-      type,
-      parent,
-      globs: splitGlobs(el.properties?.["code.globs"]),
+  for (const el of ws.elements) {
+    elements.set(el.id, {
+      id: el.id,
+      name: el.name,
+      description: el.description,
+      type: el.type,
+      parent: el.parent,
+      globs: splitGlobs(el.properties["code.globs"]),
     });
-    byNumericId.set(el.id, id);
-    rawRels.push(...(el.relationships ?? []));
-    for (const c of el.containers ?? []) visit(c, "container", id);
-    for (const c of el.components ?? []) visit(c, "component", id);
-  };
-  for (const p of raw.model?.people ?? []) visit(p, "person", null);
-  for (const s of raw.model?.softwareSystems ?? [])
-    visit(s, "softwareSystem", null);
+  }
 
   // Several arrows between one pair read as one, labelled with all of them.
   const grouped = new Map<
     string,
     { rel: ModelRelationship; labels: string[] }
   >();
-  for (const r of rawRels) {
-    if (r.linkedRelationshipId) continue;
-    const source = byNumericId.get(r.sourceId);
-    const destination = byNumericId.get(r.destinationId);
-    if (!source || !destination) continue;
+  for (const { source, destination, description } of ws.relationships) {
     const key = `${source} → ${destination}`;
     const entry = grouped.get(key) ?? {
       rel: { key, source, destination, description: "" },
       labels: [],
     };
-    entry.labels.push(r.description ?? "");
+    entry.labels.push(description);
     grouped.set(key, entry);
   }
   const relationships = new Map<string, ModelRelationship>();
@@ -138,7 +119,6 @@ export function parseModel(json: string): Model {
     .filter((e) => e.globs.length > 0)
     .map((e) => ({ id: e.id, test: matcher(e.globs) }));
 
-  const embedded = raw.properties?.["structurizr.dsl"];
   return {
     elements,
     relationships,
@@ -146,18 +126,17 @@ export function parseModel(json: string): Model {
     // A model that doesn't say which files are tests or ignored keeps the
     // built-in patterns, rather than counting every test as app code.
     isTest: orDefault(
-      splitGlobs(raw.properties?.["code.tests"]),
+      splitGlobs(ws.properties["code.tests"]),
       () => DEFAULT_TESTS,
     ),
     isIgnored: orDefault(
-      splitGlobs(raw.properties?.["code.ignore"]),
+      splitGlobs(ws.properties["code.ignore"]),
       () => DEFAULT_IGNORE,
     ),
-    embeddedDsl: embedded
-      ? Buffer.from(embedded, "base64").toString("utf8")
-      : null,
   };
 }
+
+export const parseDsl = (text: string): Model => buildModel(readDsl(text));
 
 /** A file's contents at a commit, or null if it isn't there. */
 export async function showFile(
@@ -172,7 +151,7 @@ export async function showFile(
 
 /**
  * A model kept on this machine for a repo that doesn't commit one:
- * `~/.differ/models/<repo>/workspace.json`, named after the main checkout's
+ * `~/.differ/models/<repo>/workspace.dsl`, named after the main checkout's
  * folder so every worktree finds it. One model for every commit, so it can
  * say where a change landed but not what it added or removed.
  */
@@ -187,46 +166,42 @@ export async function localModelDir(root: string): Promise<string> {
   return path.join(home, "models", path.basename(path.dirname(common)));
 }
 
-async function readLocalModel(root: string) {
-  const dir = await localModelDir(root);
-  const json = await fs
-    .readFile(path.join(dir, "workspace.json"), "utf8")
-    .catch(() => null);
-  if (!json) return null;
-  const dsl = await fs
-    .readFile(path.join(dir, "workspace.dsl"), "utf8")
-    .catch(() => null);
-  return { json, dsl };
+export interface ModelRead {
+  /** Null when the file is there but couldn't be read: see `error` */
+  model: Model | null;
+  local: boolean;
+  error: string | null;
 }
 
+function read(text: string, local: boolean): ModelRead {
+  try {
+    return { model: parseDsl(text), local, error: null };
+  } catch (e) {
+    return {
+      model: null,
+      local,
+      error: e instanceof DslError ? e.message : String(e),
+    };
+  }
+}
+
+/**
+ * The model at the rev, or else the one kept on this machine. A DSL that
+ * fails to read gives its error and no model, so flows filter files as in a
+ * repo with no model: a change the model would mark as tests or ignored can
+ * still cost a `claude -p` trace. That's the cost any repo without a model
+ * already pays, and the map strip shows the error so it gets fixed.
+ */
 export async function readModelAt(
   root: string,
   rev: string,
-): Promise<{ model: Model; stale: boolean; local: boolean } | null> {
-  let json = await showFile(root, rev, MODEL_JSON);
-  let dsl: string | null = null;
-  let local = false;
-  if (json) {
-    dsl = await showFile(root, rev, MODEL_DSL);
-  } else {
-    const found = await readLocalModel(root);
-    if (!found) return null;
-    ({ json, dsl } = found);
-    local = true;
-  }
-  let model: Model;
-  try {
-    model = parseModel(json);
-  } catch {
-    return null;
-  }
-  // The JSON carries the DSL it was exported from. If the DSL has moved on,
-  // someone edited the model and didn't re-export.
-  const stale =
-    dsl !== null &&
-    model.embeddedDsl !== null &&
-    dsl.trim() !== model.embeddedDsl.trim();
-  return { model, stale, local };
+): Promise<ModelRead | null> {
+  const dsl = await showFile(root, rev, MODEL_DSL);
+  if (dsl !== null) return read(dsl, false);
+  const local = await fs
+    .readFile(path.join(await localModelDir(root), "workspace.dsl"), "utf8")
+    .catch(() => null);
+  return local === null ? null : read(local, true);
 }
 
 /**

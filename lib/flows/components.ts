@@ -84,9 +84,8 @@ export async function attachComponents(
   root: string,
   set: FlowSet,
 ): Promise<FlowSet> {
-  const read = await readModelAt(root, set.head);
-  if (!read) return set;
-  const { model } = read;
+  const model = (await readModelAt(root, set.head))?.model;
+  if (!model) return set;
 
   // Keyed on everything the answer depends on: the participants (a traced
   // hunk adds new ones) and each element's name and globs (the model can

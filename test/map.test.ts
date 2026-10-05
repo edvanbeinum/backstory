@@ -5,117 +5,120 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
-import { buildMap } from "../lib/map";
+import { buildMap, type MapResponse } from "../lib/map";
 
-const repo = mkdtempSync(path.join(os.tmpdir(), "differ-map-test-"));
-after(() => rmSync(repo, { recursive: true, force: true }));
+const dirs: string[] = [];
+after(() => {
+  for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
+});
 
-const sh = (...args: string[]) =>
-  execFileSync("git", ["-C", repo, ...args], { encoding: "utf8" }).trim();
-const write = (file: string, text: string) => {
-  mkdirSync(path.dirname(path.join(repo, file)), { recursive: true });
-  writeFileSync(path.join(repo, file), text);
+const tempDir = (prefix: string) => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), prefix));
+  dirs.push(dir);
+  return dir;
 };
 
+const write = (root: string, file: string, text: string) => {
+  mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+  writeFileSync(path.join(root, file), text);
+};
+
+function gitRepo() {
+  const dir = tempDir("differ-map-test-");
+  const sh = (...args: string[]) =>
+    execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" }).trim();
+  sh("init", "-q");
+  sh("config", "user.email", "t@example.com");
+  sh("config", "user.name", "Test");
+  const commit = (files: Record<string, string>, message: string) => {
+    for (const [file, text] of Object.entries(files)) write(dir, file, text);
+    sh("add", ".");
+    sh("commit", "-qm", message);
+    return sh("rev-parse", "HEAD");
+  };
+  return { dir, commit };
+}
+
 interface Comp {
-  id: string;
   key: string;
   name: string;
   globs: string;
 }
 
-/** A Structurizr export, cut down to what differ reads. */
-function workspace(
-  comps: Comp[],
-  rels: [string, string, string][],
-  dsl: string,
-) {
-  const byKey = new Map(comps.map((c) => [c.key, c.id]));
-  return JSON.stringify({
-    properties: {
-      "code.tests": "test/**",
-      "structurizr.dsl": Buffer.from(dsl).toString("base64"),
-    },
-    model: {
-      softwareSystems: [
-        {
-          id: "1",
-          name: "App",
-          properties: { "structurizr.dsl.identifier": "app" },
-          containers: [
-            {
-              id: "2",
-              name: "Web",
-              properties: { "structurizr.dsl.identifier": "app.web" },
-              components: comps.map((c) => ({
-                id: c.id,
-                name: c.name,
-                properties: {
-                  "structurizr.dsl.identifier": `app.web.${c.key}`,
-                  "code.globs": c.globs,
-                },
-                relationships: rels
-                  .filter(([from]) => from === c.key)
-                  .map(([, to, description], i) => ({
-                    id: `${c.id}${i}`,
-                    sourceId: c.id,
-                    destinationId: byKey.get(to),
-                    description,
-                  })),
-              })),
-            },
-          ],
-        },
-      ],
-    },
-  });
+interface Spec {
+  comps: Comp[];
+  rels: [string, string, string][];
 }
 
-const a = { id: "10", key: "a", name: "Alpha", globs: "src/a/**" };
-const b = { id: "11", key: "b", name: "Beta", globs: "src/b/** src/{x,y}.ts" };
-const c = { id: "12", key: "c", name: "Gamma", globs: "src/c/**" };
+function dsl({ comps, rels }: Spec) {
+  const components = comps.map(
+    (c) => `                ${c.key} = component "${c.name}" {
+                    properties {
+                        "code.globs" "${c.globs}"
+                    }
+                }`,
+  );
+  const arrows = rels.map(
+    ([from, to, description]) =>
+      `        app.web.${from} -> app.web.${to} "${description}"`,
+  );
+  return `workspace {
+    !identifiers hierarchical
+    properties {
+        "code.tests" "test/**"
+    }
+    model {
+        app = softwareSystem "App" {
+            web = container "Web" {
+${components.join("\n")}
+            }
+        }
+${arrows.join("\n")}
+    }
+}
+`;
+}
 
-sh("init", "-q");
-sh("config", "user.email", "t@example.com");
-sh("config", "user.name", "Test");
-write("architecture/workspace.dsl", "v1");
-write(
-  "architecture/workspace.json",
-  workspace([a, b], [["a", "b", "Calls"]], "v1"),
-);
-write("src/a/one.ts", "1\n");
-write("src/b/two.ts", "2\n");
-sh("add", ".");
-sh("commit", "-qm", "base");
-const BASE = sh("rev-parse", "HEAD");
+const a = { key: "a", name: "Alpha", globs: "src/a/**" };
+const b = { key: "b", name: "Beta", globs: "src/b/** src/{x,y}.ts" };
+const c = { key: "c", name: "Gamma", globs: "src/c/**" };
 
-write("architecture/workspace.dsl", "v2");
-write(
-  "architecture/workspace.json",
-  workspace(
-    [a, b, c],
-    [
-      ["a", "b", "Asks"],
-      ["b", "c", "Stores in"],
-    ],
-    "v2",
-  ),
-);
-write("src/a/one.ts", "1\nmore\n");
-write("src/b/.hidden", "dotfile\n");
-write("src/x.ts", "brace\n");
-write("src/c/three.ts", "3\n");
-write("src/loose.ts", "nobody's\n");
-write("test/a.test.ts", "t\n");
-sh("add", ".");
-sh("commit", "-qm", "head");
-const HEAD = sh("rev-parse", "HEAD");
+const BASE: Spec = { comps: [a, b], rels: [["a", "b", "Calls"]] };
+const HEAD: Spec = {
+  comps: [a, b, c],
+  rels: [
+    ["a", "b", "Asks"],
+    ["b", "c", "Stores in"],
+  ],
+};
 
-test("the map compares models by identifier and arrows by their ends", async () => {
-  const map = await buildMap(repo, BASE, HEAD);
+const asDsl = (spec: Spec) => ({ "architecture/workspace.dsl": dsl(spec) });
+
+function change() {
+  const repo = gitRepo();
+  const base = repo.commit(
+    { "src/a/one.ts": "1\n", "src/b/two.ts": "2\n", ...asDsl(BASE) },
+    "base",
+  );
+  const head = repo.commit(
+    {
+      "src/a/one.ts": "1\nmore\n",
+      "src/b/.hidden": "dotfile\n",
+      "src/x.ts": "brace\n",
+      "src/c/three.ts": "3\n",
+      "src/loose.ts": "nobody's\n",
+      "test/a.test.ts": "t\n",
+      ...asDsl(HEAD),
+    },
+    "head",
+  );
+  return { ...repo, base, head };
+}
+
+function assertTheChange(map: MapResponse) {
   assert.equal(map.status, "ok");
   assert.equal(map.baseModel, true);
-  assert.equal(map.stale, false);
+  assert.equal(map.error, null);
 
   const state = Object.fromEntries(map.nodes.map((n) => [n.name, n.state]));
   assert.deepEqual(state, {
@@ -136,69 +139,89 @@ test("the map compares models by identifier and arrows by their ends", async () 
   assert.equal(map.fileComponents["src/b/.hidden"], "Beta");
   assert.equal(map.fileComponents["src/x.ts"], "Beta");
   assert.deepEqual(map.unmapped, ["src/loose.ts"]);
+}
+
+const changeRepo = change();
+
+test("the map compares models by identifier and arrows by their ends", async () => {
+  assertTheChange(
+    await buildMap(changeRepo.dir, changeRepo.base, changeRepo.head),
+  );
 });
 
-test("a DSL edited without a re-export reads as stale", async () => {
-  write("architecture/workspace.dsl", "v3");
-  sh("commit", "-qam", "edit the DSL only");
-  const map = await buildMap(repo, HEAD, sh("rev-parse", "HEAD"));
-  assert.equal(map.stale, true);
+test("a head DSL that can't be read says why", async () => {
+  const repo = change();
+  const head = repo.commit(
+    {
+      "architecture/workspace.dsl": "workspace {\n    !include model.dsl\n}\n",
+      "src/a/one.ts": "1\nmore\nagain\n",
+    },
+    "add a DSL the reader can't take",
+  );
+  const map = await buildMap(repo.dir, repo.head, head);
+  assert.equal(map.status, "none");
+  assert.equal(map.error, "`!include` on line 2 isn't supported");
+  assert.deepEqual(map.nodes, []);
+});
+
+test("a base DSL that can't be read counts as no base model, and says why", async () => {
+  const repo = gitRepo();
+  const base = repo.commit(
+    {
+      "src/a/one.ts": "1\n",
+      "architecture/workspace.dsl":
+        'workspace {\n    model {\n        group "G" {\n        }\n    }\n}\n',
+    },
+    "base",
+  );
+  const head = repo.commit(
+    { "src/a/one.ts": "1\nmore\n", ...asDsl(HEAD) },
+    "head",
+  );
+  const map = await buildMap(repo.dir, base, head);
+  assert.equal(map.status, "ok");
+  assert.equal(map.baseModel, false);
+  assert.equal(map.error, null);
+  assert.match(map.baseError ?? "", /`group` on line 3/);
+  assert.ok(map.nodes.length > 0);
+  assert.ok(map.nodes.every((n) => n.state !== "added"));
 });
 
 test("a base with no model adds nothing", async () => {
-  const map = await buildMap(repo, null, BASE);
+  const map = await buildMap(changeRepo.dir, null, changeRepo.base);
   assert.equal(map.baseModel, false);
   assert.ok(map.nodes.every((n) => n.state !== "added"));
 });
 
-test("a repo with no model uses one kept locally, without a structural diff", async () => {
-  const plain = mkdtempSync(path.join(os.tmpdir(), "differ-local-model-"));
-  const home = mkdtempSync(path.join(os.tmpdir(), "differ-home-"));
+test("a repo with no model uses a DSL kept locally, without a structural diff", async () => {
+  const repo = gitRepo();
+  const home = tempDir("differ-home-");
+  const base = repo.commit({ README: "x\n" }, "base");
+  const head = repo.commit({ "src/a/one.ts": "1\n" }, "head");
+  write(
+    path.join(home, "models", path.basename(repo.dir)),
+    "workspace.dsl",
+    dsl(BASE),
+  );
+
   const previousHome = process.env.DIFFER_HOME;
-  const git = (...args: string[]) =>
-    execFileSync("git", ["-C", plain, ...args], { encoding: "utf8" }).trim();
+  process.env.DIFFER_HOME = home;
   try {
-    git("init", "-q");
-    git("config", "user.email", "t@example.com");
-    git("config", "user.name", "Test");
-    writeFileSync(path.join(plain, "README"), "x\n");
-    git("add", ".");
-    git("commit", "-qm", "base");
-    const base = git("rev-parse", "HEAD");
-    mkdirSync(path.join(plain, "src", "a"), { recursive: true });
-    writeFileSync(path.join(plain, "src", "a", "one.ts"), "1\n");
-    git("add", ".");
-    git("commit", "-qm", "head");
-
-    const dir = path.join(home, "models", path.basename(plain));
-    mkdirSync(dir, { recursive: true });
-    writeFileSync(
-      path.join(dir, "workspace.json"),
-      workspace([a, b], [["a", "b", "Calls"]], "v1"),
-    );
-    writeFileSync(path.join(dir, "workspace.dsl"), "v1");
-
-    process.env.DIFFER_HOME = home;
-    const map = await buildMap(plain, base, git("rev-parse", "HEAD"));
+    const map = await buildMap(repo.dir, base, head);
     assert.equal(map.status, "ok");
     assert.equal(map.local, true);
     assert.equal(map.baseModel, false);
-    assert.equal(map.stale, false);
     assert.equal(map.fileComponents["src/a/one.ts"], "Alpha");
   } finally {
     // Restore npm test's throwaway DIFFER_HOME so later tests can use it.
     if (previousHome === undefined) delete process.env.DIFFER_HOME;
     else process.env.DIFFER_HOME = previousHome;
-    rmSync(plain, { recursive: true, force: true });
-    rmSync(home, { recursive: true, force: true });
   }
 });
 
 test("a model that lists no tests or ignores keeps the built-in ones", async () => {
-  const { parseModel } = await import("../lib/model");
-  const model = parseModel(
-    JSON.stringify({ properties: {}, model: { softwareSystems: [] } }),
-  );
+  const { parseDsl } = await import("../lib/model");
+  const model = parseDsl("workspace {\n    model {\n    }\n}\n");
   assert.equal(model.isTest("test/models/item_test.rb"), true);
   assert.equal(model.isIgnored("package-lock.json"), true);
   assert.equal(model.isTest("app/models/item.rb"), false);
