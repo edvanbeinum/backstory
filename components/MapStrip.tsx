@@ -496,7 +496,6 @@ function summary(map: MapResponse) {
   return parts;
 }
 
-/** The reader's messages quote the DSL in backticks. */
 function Ticked({ text }: { text: string }) {
   return (
     <span>
