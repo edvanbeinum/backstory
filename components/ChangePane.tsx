@@ -101,9 +101,8 @@ export function openingChangeFor(thread: ReviewThread | null): string | null {
 }
 
 /**
- * The right column: the change you're inspecting, independent of which
- * comment is on the left. Selecting a commit in the rail lands here and
- * leaves the comment alone.
+ * The diff column: the change picker and the diff of the change you picked.
+ * Picking a change leaves the selected comment alone.
  */
 export function ChangePane({
   session,
@@ -168,7 +167,7 @@ export function ChangePane({
   /**
    * Any commit on the branch, so the diff column isn't limited to the three
    * chips. Reading your own commits before pushing is what differ was built
-   * for; it just no longer needs a rail of its own to do it.
+   * for; it just no longer needs a list of its own to do it.
    */
   const commitCandidates = useMemo(
     () => [...session.commits, ...session.history],

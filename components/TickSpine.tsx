@@ -7,7 +7,7 @@ import { TickCheck, useTickPulse } from "./Tick";
 /**
  * The 48px column of ticks.
  *
- * It replaced a 300px rail that repeated, in text, everything the comments
+ * It replaced a 300px list that repeated, in text, everything the comments
  * panel beside it already showed. What a standing list is actually for is two
  * things — how far through you are, and jumping to any comment in one click —
  * and both survive at this width. The diff gets the rest.
@@ -113,7 +113,7 @@ function SpineTick({
 }
 
 /**
- * Below `lg` the column becomes a strip under the header. The old 300px rail
+ * Below `lg` the column becomes a strip under the header. The old 300px list
  * simply vanished at that width with nothing in its place, which left the
  * checklist unreachable on a narrow window.
  */

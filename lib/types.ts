@@ -73,7 +73,7 @@ export interface BaseInfo {
   /** Human-readable explanation for the header */
   label: string;
   /**
-   * Where the rail's divider actually sits: parent of the oldest unpushed
+   * Where the push boundary actually sits: parent of the oldest unpushed
    * commit. Diverges from `sha` after a rebase, when the upstream's merge
    * base falls behind the commits that are genuinely unpushed.
    */

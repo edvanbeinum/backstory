@@ -120,7 +120,7 @@ export default function Page() {
   /** Previously-opened repos for the RepoBar dropdown. */
   const [recents, setRecents] = useState<RecentRepo[]>([]);
 
-  /** Which rail is showing. Comments is the default; commits is self-review. */
+  /** The review thread open in the comments panel. */
   const [commentId, setCommentId] = useState<string | null>(null);
   /** Set when a URL asked for a comment that isn't in this PR. */
   const [commentNotice, setCommentNotice] = useState<string | null>(null);
@@ -1142,8 +1142,8 @@ export default function Page() {
     setRepoPath(trimmed);
   }, []);
 
-  // j/k through whichever rail is showing, the way you'd move through a list
-  // in a TUI — comments when that's the rail, commits when it isn't.
+  // j/k move through a list the way they would in a TUI: flow steps when the
+  // Flows tab is open, else comments when there are any, else changes.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -1285,7 +1285,7 @@ export default function Page() {
 
           <main className="min-w-0 flex-1 space-y-3 pb-16">
             {/* Below lg the spine can't sit beside the content, and the old
-                rail simply vanished at this width — leaving the checklist
+                300px list simply vanished at this width — leaving the checklist
                 unreachable. Same squares, laid out sideways. */}
             {hasComments && (
               <TickStrip
