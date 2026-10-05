@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChangePane, openingChangeFor } from "@/components/ChangePane";
-import { CommentPane } from "@/components/CommentPane";
+import { CommentsPanel } from "@/components/CommentsPanel";
 import type { FileMarks } from "@/components/DiffFile";
 import { FlowCoverage } from "@/components/FlowCoverage";
 import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
@@ -1464,7 +1464,7 @@ export default function Page() {
                       />
                     }
                     comments={
-                      <CommentPane
+                      <CommentsPanel
                         threads={threads}
                         thread={selectedThread}
                         index={commentIndex}
@@ -1538,7 +1538,7 @@ export default function Page() {
                         />
                       }
                       comments={
-                        <CommentPane
+                        <CommentsPanel
                           threads={threads}
                           thread={selectedThread}
                           index={commentIndex}

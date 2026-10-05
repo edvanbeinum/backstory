@@ -20,7 +20,7 @@ import { ReviewThreadCard } from "./ReviewThreadCard";
  * The tick leads, above the comment rather than below it, because it's the
  * thing you came here to do.
  */
-export function CommentPane({
+export function CommentsPanel({
   threads,
   thread,
   index,
