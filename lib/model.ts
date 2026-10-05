@@ -43,6 +43,8 @@ export interface Model {
   match: (path: string) => string[];
   isTest: (path: string) => boolean;
   isIgnored: (path: string) => boolean;
+  /** The workspace's own properties, such as `differ.drafted` */
+  properties: Record<string, string>;
 }
 
 /** A model as the DSL reader finds it, before differ builds its matchers. */
@@ -133,6 +135,7 @@ export function buildModel(ws: Workspace): Model {
       splitGlobs(ws.properties["code.ignore"]),
       () => DEFAULT_IGNORE,
     ),
+    properties: ws.properties,
   };
 }
 
@@ -166,20 +169,43 @@ export async function localModelDir(root: string): Promise<string> {
   return path.join(home, "models", path.basename(path.dirname(common)));
 }
 
+export const localModelFile = async (root: string) =>
+  path.join(await localModelDir(root), "workspace.dsl");
+
+/**
+ * The workspace property a drafted model carries, with the day it was
+ * drafted. A property, not the header comment, because the reader skips
+ * comments; removing it after correcting a draft drops the Draft chip.
+ */
+export const DRAFTED_PROPERTY = "differ.drafted";
+
 export interface ModelRead {
   /** Null when the file is there but couldn't be read: see `error` */
   model: Model | null;
   local: boolean;
+  /** The local model's path; null for a committed one */
+  file: string | null;
+  drafted: string | null;
   error: string | null;
 }
 
-function read(text: string, local: boolean): ModelRead {
+function read(text: string, file: string | null): ModelRead {
+  const local = file !== null;
   try {
-    return { model: parseDsl(text), local, error: null };
+    const model = parseDsl(text);
+    return {
+      model,
+      local,
+      file,
+      drafted: model.properties[DRAFTED_PROPERTY] ?? null,
+      error: null,
+    };
   } catch (e) {
     return {
       model: null,
       local,
+      file,
+      drafted: null,
       error: e instanceof DslError ? e.message : String(e),
     };
   }
@@ -197,11 +223,10 @@ export async function readModelAt(
   rev: string,
 ): Promise<ModelRead | null> {
   const dsl = await showFile(root, rev, MODEL_DSL);
-  if (dsl !== null) return read(dsl, false);
-  const local = await fs
-    .readFile(path.join(await localModelDir(root), "workspace.dsl"), "utf8")
-    .catch(() => null);
-  return local === null ? null : read(local, true);
+  if (dsl !== null) return read(dsl, null);
+  const file = await localModelFile(root);
+  const local = await fs.readFile(file, "utf8").catch(() => null);
+  return local === null ? null : read(local, file);
 }
 
 /**

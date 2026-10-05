@@ -94,6 +94,12 @@ primitives:
     symbols:
       - claudeRunner
     use: "The only `claude -p` call site."
+  - name: a commit's files
+    block: flow engine
+    file: lib/flows/generate.ts
+    symbols:
+      - withSnapshot
+    use: "A commit's tracked files in a temp dir, for Claude to read: none of the worktree's untracked, ignored or uncommitted files."
   - name: read the C4 model
     block: model reader (the map)
     file: lib/model.ts

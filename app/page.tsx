@@ -141,6 +141,9 @@ export default function Page() {
   });
   const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
   const [map, setMap] = useState<MapResponse | null>(null);
+  /** Bumped when a model draft is written, so the map is read again */
+  const [modelTick, setModelTick] = useState(0);
+  const onModelChange = useCallback(() => setModelTick((t) => t + 1), []);
   const [dataModel, setDataModel] = useState<DataResponse | null>(null);
   /** The map component under the pointer: its files are outlined in the diff. */
   const [hoveredComponent, setHoveredComponent] = useState<string | null>(null);
@@ -579,7 +582,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [repoPath, rev, haveSession, workingDiffKey]);
+  }, [repoPath, rev, haveSession, workingDiffKey, modelTick]);
 
   const commitForRev = useMemo((): CommitSummary | null => {
     if (rev === WORKING_REV) return WORKING_COMMIT;
@@ -1425,8 +1428,10 @@ export default function Page() {
                         <>
                           <MapStrip
                             map={map}
+                            repo={repoPath}
                             onHover={setHoveredComponent}
                             onOpenFile={openFile}
+                            onModelChange={onModelChange}
                           />
                           <DataStrip data={dataModel} notes={entityNotes} />
                         </>
@@ -1499,8 +1504,10 @@ export default function Page() {
                           <>
                             <MapStrip
                               map={map}
+                              repo={repoPath}
                               onHover={setHoveredComponent}
                               onOpenFile={openFile}
+                              onModelChange={onModelChange}
                             />
                             <DataStrip data={dataModel} notes={entityNotes} />
                           </>

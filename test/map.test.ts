@@ -212,8 +212,53 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
     assert.equal(map.local, true);
     assert.equal(map.baseModel, false);
     assert.equal(map.fileComponents["src/a/one.ts"], "Alpha");
+    assert.equal(
+      map.modelFile,
+      path.join(home, "models", path.basename(repo.dir), "workspace.dsl"),
+    );
+    assert.equal(map.drafted, null);
   } finally {
     // Restore npm test's throwaway DIFFER_HOME so later tests can use it.
+    if (previousHome === undefined) delete process.env.DIFFER_HOME;
+    else process.env.DIFFER_HOME = previousHome;
+  }
+});
+
+test("a drafted local model says so and where it is; a committed one says neither", async () => {
+  const repo = gitRepo();
+  const home = tempDir("differ-home-");
+  const base = repo.commit({ README: "x\n" }, "base");
+  const head = repo.commit({ "src/a/one.ts": "1\n" }, "head");
+  const file = path.join(
+    home,
+    "models",
+    path.basename(repo.dir),
+    "workspace.dsl",
+  );
+  write(
+    path.dirname(file),
+    "workspace.dsl",
+    dsl(BASE).replace(
+      '"code.tests" "test/**"',
+      '"code.tests" "test/**"\n        "differ.drafted" "2026-10-05"',
+    ),
+  );
+
+  const previousHome = process.env.DIFFER_HOME;
+  process.env.DIFFER_HOME = home;
+  try {
+    const map = await buildMap(repo.dir, base, head);
+    assert.equal(map.drafted, "2026-10-05");
+    assert.equal(map.modelFile, file);
+
+    const committed = await buildMap(
+      changeRepo.dir,
+      changeRepo.base,
+      changeRepo.head,
+    );
+    assert.equal(committed.drafted, null);
+    assert.equal(committed.modelFile, null);
+  } finally {
     if (previousHome === undefined) delete process.env.DIFFER_HOME;
     else process.env.DIFFER_HOME = previousHome;
   }
