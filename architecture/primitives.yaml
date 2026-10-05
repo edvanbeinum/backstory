@@ -10,7 +10,7 @@ primitives:
       - git
       - gitTry
       - gitLine
-    use: Every git call. It turns off the pager, credential prompts and the user's diff config, so a request never hangs and patches parse.
+    use: "Every git call. It turns off the pager and credential prompts, so a request never hangs. Read patches through `patches`, whose flags keep the user's diff config out."
   - name: run a binary
     block: git reader
     file: lib/exec.ts
