@@ -224,7 +224,7 @@ test("a head DSL that can't be read says why, even with a JSON beside it", async
   assert.deepEqual(map.nodes, []);
 });
 
-test("a base DSL that can't be read counts as no base model", async () => {
+test("a base DSL that can't be read counts as no base model, and says why", async () => {
   const repo = gitRepo();
   const base = repo.commit(
     {
@@ -242,6 +242,7 @@ test("a base DSL that can't be read counts as no base model", async () => {
   assert.equal(map.status, "ok");
   assert.equal(map.baseModel, false);
   assert.equal(map.error, null);
+  assert.match(map.baseError ?? "", /`group` on line 3/);
   assert.ok(map.nodes.length > 0);
   assert.ok(map.nodes.every((n) => n.state !== "added"));
 });

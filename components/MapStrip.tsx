@@ -450,11 +450,17 @@ function summary(map: MapResponse) {
         <b>{changed.length}</b> touched
       </>,
       names(changed),
-      map.local
-        ? "local model, no structural diff"
-        : map.baseModel
-          ? "no structural change"
-          : "no model at base",
+      map.local ? (
+        "local model, no structural diff"
+      ) : map.baseModel ? (
+        "no structural change"
+      ) : map.baseError ? (
+        <span className="text-[var(--attention)]" title={map.baseError}>
+          couldn&apos;t read the base model, so nothing shows as new or removed
+        </span>
+      ) : (
+        "no model at base"
+      ),
     );
     return parts;
   }

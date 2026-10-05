@@ -48,6 +48,8 @@ export interface MapResponse {
   baseModel: boolean;
   /** Why the head's model file couldn't be read, when it couldn't */
   error: string | null;
+  /** Why the base's model file couldn't be read: nothing was compared */
+  baseError: string | null;
   /** The model is kept on this machine, not in the repo: no structural diff */
   local: boolean;
   nodes: MapNode[];
@@ -133,6 +135,7 @@ export async function buildMap(
     status: "none",
     baseModel: false,
     error: null,
+    baseError: null,
     local: false,
     nodes: [],
     edges: [],
@@ -149,8 +152,6 @@ export async function buildMap(
   // would claim "no structural change" when nothing was checked.
   const baseRead =
     base && !headRead.local ? await readModelAt(root, base) : null;
-  // A base model that fails to read counts as none, so nothing reads as
-  // added or removed.
   const baseModel = baseRead && !baseRead.local ? baseRead.model : null;
 
   // Files: each to its one leaf element. A deleted file maps by the base
@@ -307,6 +308,7 @@ export async function buildMap(
     status: "ok",
     baseModel: baseModel !== null,
     error: null,
+    baseError: baseRead?.error ?? null,
     local: headRead.local,
     nodes,
     edges: [...edges.values()].filter(
