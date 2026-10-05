@@ -263,6 +263,7 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
     dsl(BASE),
   );
 
+  const previousHome = process.env.DIFFER_HOME;
   process.env.DIFFER_HOME = home;
   try {
     const map = await buildMap(repo.dir, base, head);
@@ -271,7 +272,9 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
     assert.equal(map.baseModel, false);
     assert.equal(map.fileComponents["src/a/one.ts"], "Alpha");
   } finally {
-    delete process.env.DIFFER_HOME;
+    // Restore npm test's throwaway DIFFER_HOME so later tests can use it.
+    if (previousHome === undefined) delete process.env.DIFFER_HOME;
+    else process.env.DIFFER_HOME = previousHome;
   }
 });
 
