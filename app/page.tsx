@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ChangePane, openingChangeFor } from "@/components/ChangePane";
 import { CommentsPanel } from "@/components/CommentsPanel";
+import { DiffColumn, openingChangeFor } from "@/components/DiffColumn";
 import type { FileMarks } from "@/components/DiffFile";
 import { FlowCoverage } from "@/components/FlowCoverage";
 import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
@@ -1382,7 +1382,7 @@ export default function Page() {
                 // Flow-first: the change, then where it landed and what it does.
                 // The diff is a click away, from any step.
                 <div className="mx-auto w-full max-w-[1280px] space-y-4">
-                  <ChangePane
+                  <DiffColumn
                     session={session}
                     rev={rev}
                     onRevChange={(next) => {
@@ -1557,7 +1557,7 @@ export default function Page() {
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <ChangePane
+                    <DiffColumn
                       session={session}
                       rev={rev}
                       onRevChange={(next) => {

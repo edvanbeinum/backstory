@@ -104,7 +104,7 @@ export function openingChangeFor(thread: ReviewThread | null): string | null {
  * The diff column: the change picker and the diff of the change you picked.
  * Picking a change leaves the selected comment alone.
  */
-export function ChangePane({
+export function DiffColumn({
   session,
   rev,
   onRevChange,
