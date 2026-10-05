@@ -43,7 +43,7 @@ terms:
     avoid:
       - store, for the flow cache
   - name: flow cache
-    means: "`lib/flows/store.ts`: one cached SARIF file per view in `~/.differ/flows/`, plus the queue of runs that make them."
+    means: "`lib/flows/cache.ts`: one cached SARIF file per view in `~/.differ/flows/`, plus the queue of runs that make them."
     avoid:
       - store
 

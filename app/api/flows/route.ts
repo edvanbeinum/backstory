@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { crossSite, errorResponse } from "@/lib/api";
-import { flowsStatus, startFlows, startTrace } from "@/lib/flows/store";
+import { flowsStatus, startFlows, startTrace } from "@/lib/flows/cache";
 import type { FlowsStatus } from "@/lib/flows/types";
 import { resolveRepo } from "@/lib/git";
 import type { ApiError } from "@/lib/types";
