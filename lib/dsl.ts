@@ -397,11 +397,13 @@ export function readDsl(text: string): Workspace {
       trailing.line,
     );
 
+  // Look in the enclosing blocks first, innermost out, as Structurizr does:
+  // `-> api` inside `s.web` means `s.web.api`, even with a top-level `api`.
   const resolve = (id: string, prefixes: string[], line: number) => {
-    if (definedAt.has(id)) return id;
     for (const p of prefixes) {
       if (definedAt.has(`${p}.${id}`)) return `${p}.${id}`;
     }
+    if (definedAt.has(id)) return id;
     throw new DslError(
       `no element \`${id}\` for the arrow on line ${line}`,
       line,

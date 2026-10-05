@@ -124,6 +124,24 @@ test("an arrow can leave out its source, point forward, or use a short id", () =
   ]);
 });
 
+test("a short id finds the nearest element before a top-level one", () => {
+  const model = parseDsl(`workspace {
+    !identifiers hierarchical
+    model {
+        api = softwareSystem "Top API"
+        s = softwareSystem "S" {
+            web = container "Web" {
+                api = component "Inner API"
+                ui = component "UI" {
+                    -> api "Calls"
+                }
+            }
+        }
+    }
+}`);
+  assert.deepEqual([...model.relationships.keys()], ["s.web.ui → s.web.api"]);
+});
+
 test("comments count only at the start of a line", () => {
   const ws = readDsl(`workspace {
     # a hash comment
