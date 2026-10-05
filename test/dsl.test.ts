@@ -265,3 +265,22 @@ test("what the reader doesn't support fails on its line", () => {
   );
   fails(`workspace extends "base.dsl" {\n}`, 1, /`workspace extends`/);
 });
+
+test("a line continuation inside an id joins it, and later lines keep their numbers", () => {
+  const source = `workspace {
+    !identifiers hierarchical
+    model {
+        a = softwareSystem "A"
+        shop = softwareSystem "Shop" {
+            web = container "Web"
+        }
+        a -> shop.\\
+            web "Calls"
+        group "G" {
+        }
+    }
+}`;
+  fails(source, 10, /`group`/);
+  const model = parseDsl(source.replace(/ {8}group "G" \{\n {8}\}\n/, ""));
+  assert.equal(model.relationships.get("a → shop.web")?.description, "Calls");
+});

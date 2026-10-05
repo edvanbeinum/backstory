@@ -106,17 +106,19 @@ function tokenize(text: string): Token[] {
       tokens.push({ kind: "string", text: value, line: start });
       continue;
     }
+    const start = line;
     let word = "";
-    while (
-      i < text.length &&
-      text[i] !== "\n" &&
-      !isSpace(text[i]) &&
-      continuation(text, i) === null
-    ) {
+    while (i < text.length && text[i] !== "\n" && !isSpace(text[i])) {
+      const joinedHere = continuation(text, i);
+      if (joinedHere !== null) {
+        line++;
+        i = skipIndent(text, joinedHere);
+        continue;
+      }
       word += text[i++];
     }
     const kind = word === "{" ? "open" : word === "}" ? "close" : "word";
-    tokens.push({ kind, text: word, line });
+    tokens.push({ kind, text: word, line: start });
   }
   return tokens;
 }
