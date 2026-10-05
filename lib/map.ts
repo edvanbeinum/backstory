@@ -52,6 +52,10 @@ export interface MapResponse {
   baseError: string | null;
   /** The model is kept on this machine, not in the repo: no structural diff */
   local: boolean;
+  /** The local model's path, to correct it by hand; null for a committed one */
+  modelFile: string | null;
+  /** When Claude drafted the model, if it did */
+  drafted: string | null;
   nodes: MapNode[];
   edges: MapEdge[];
   /** Elements in the model that the focused map leaves out */
@@ -137,6 +141,8 @@ export async function buildMap(
     error: null,
     baseError: null,
     local: false,
+    modelFile: null,
+    drafted: null,
     nodes: [],
     edges: [],
     hidden: 0,
@@ -146,7 +152,13 @@ export async function buildMap(
     descriptions: {},
   };
   if (!headRead) return empty;
-  if (!headRead.model) return { ...empty, error: headRead.error };
+  if (!headRead.model)
+    return {
+      ...empty,
+      error: headRead.error,
+      local: headRead.local,
+      modelFile: headRead.file,
+    };
   const model = headRead.model;
   // A local model is the same for every commit; comparing it with itself
   // would claim "no structural change" when nothing was checked.
@@ -310,6 +322,8 @@ export async function buildMap(
     error: null,
     baseError: baseRead?.error ?? null,
     local: headRead.local,
+    modelFile: headRead.file,
+    drafted: headRead.drafted,
     nodes,
     edges: [...edges.values()].filter(
       (e) => shown.has(e.source) && shown.has(e.destination),

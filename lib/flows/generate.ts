@@ -126,7 +126,11 @@ async function snapshot(root: string, rev: string): Promise<string> {
   }
 }
 
-async function withSnapshot<T>(
+/**
+ * Runs `fn` over the commit's tracked files in a temp dir, deleted after: no
+ * untracked or ignored files, no build output, no uncommitted work.
+ */
+export async function withSnapshot<T>(
   root: string,
   rev: string,
   fn: (dir: string) => Promise<T>,
