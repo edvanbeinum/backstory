@@ -1,5 +1,4 @@
 # The words, building blocks and rules agents plan differ's changes with.
-# Some code still uses avoided words until the renames in the follow-up issue land; use the names here.
 
 terms:
   - name: flow
