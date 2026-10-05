@@ -31,7 +31,6 @@ type Token =
 
 const isSpace = (c: string) => c === " " || c === "\t" || c === "\r";
 
-/** A `\` at the end of a line joins the next one to it. */
 function continuation(text: string, i: number): number | null {
   if (text[i] !== "\\") return null;
   let j = i + 1;
