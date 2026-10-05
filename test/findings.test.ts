@@ -143,7 +143,7 @@ test("raw HTTP is credited only to the vendor it names", () => {
   assert.equal(found[0].evidence.length, 1);
 });
 
-test("a lane only starting like an HTTP library isn't raw HTTP", () => {
+test("a participant only starting like an HTTP library isn't raw HTTP", () => {
   const picker = flow("Picker", [
     step("Controller", "ZoomClient", "ZoomClient.new.recordings"),
   ]);

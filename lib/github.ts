@@ -10,6 +10,14 @@ import type {
 } from "./types";
 
 /**
+ * Reads pull requests, review threads and reviews, all through `gh`.
+ *
+ * A failure degrades to "unavailable" with a readable reason instead of
+ * throwing, because GitHub is a level up, not a requirement: the commits and
+ * diffs still work without it.
+ */
+
+/**
  * Threads arrive from GitHub with nothing attached; the session route reads
  * the store and replaces this. Shared and frozen so a stray write can't leak
  * one thread's state onto another.

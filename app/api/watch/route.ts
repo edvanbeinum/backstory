@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { errorResponse } from "@/lib/api";
 import { gitLine } from "@/lib/exec";
 import { resolveRepo } from "@/lib/git";
-import { onFlowsChange } from "@/lib/flows/store";
+import { onFlowsChange } from "@/lib/flows/cache";
 import { onOutboxChange } from "@/lib/outbox";
 import { onReviewChange } from "@/lib/review";
 import type { ApiError } from "@/lib/types";

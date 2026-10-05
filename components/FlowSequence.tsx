@@ -6,7 +6,7 @@ import {
   shortLabels,
   type FlowMode,
   type FlowRow,
-  type LaneGroup,
+  type ParticipantGroup,
 } from "@/lib/flows/rows";
 import type { FlowParticipant } from "@/lib/flows/types";
 import { STEP_CODE_H } from "./StepCode";
@@ -54,7 +54,7 @@ export interface ComponentInfo {
 
 export function FlowSequence({
   rows,
-  lanes,
+  participants,
   groups,
   mode,
   activeKeys,
@@ -66,9 +66,9 @@ export function FlowSequence({
   dataFields = NO_FIELDS,
 }: {
   rows: FlowRow[];
-  lanes: FlowParticipant[];
-  /** Lanes by component, in lane order */
-  groups: LaneGroup[];
+  participants: FlowParticipant[];
+  /** Participants by component, in lane order */
+  groups: ParticipantGroup[];
   mode: FlowMode;
   activeKeys: Set<string>;
   onRowClick: (row: FlowRow) => void;
@@ -95,17 +95,17 @@ export function FlowSequence({
     return () => observer.disconnect();
   }, []);
 
-  const labels = useMemo(() => shortLabels(lanes), [lanes]);
-  const bandName = (g: LaneGroup) =>
+  const labels = useMemo(() => shortLabels(participants), [participants]);
+  const bandName = (g: ParticipantGroup) =>
     g.component ?? (g.external ? "Framework" : "Not on the map");
 
   // Lanes share the width; a component group gets at least the room its
   // name needs, so the name is never cut. Wider than the column scrolls.
   const laneW = Math.max(
     MIN_LANE,
-    (width - GUTTER) / Math.max(lanes.length, 1),
+    (width - GUTTER) / Math.max(participants.length, 1),
   );
-  const spans: { g: LaneGroup; left: number; width: number }[] = [];
+  const spans: { g: ParticipantGroup; left: number; width: number }[] = [];
   const centre = new Map<string, number>();
   const laneWidth = new Map<string, number>();
   let cursor = 0;
@@ -114,20 +114,20 @@ export function FlowSequence({
     // Wide enough for the component's name and for its widest lane name.
     const widestLane = Math.max(
       0,
-      ...lanes
+      ...participants
         .slice(g.start, g.end + 1)
         .map((l) => (labels.get(l.name) ?? l.label).length * 7.2 + 34),
     );
     const w = Math.max(n * laneW, bandName(g).length * 7.6 + 32, widestLane);
     spans.push({ g, left: cursor, width: w });
     for (let k = 0; k < n; k++) {
-      const lane = lanes[g.start + k];
-      centre.set(lane.name, cursor + (w * (k + 0.5)) / n);
-      laneWidth.set(lane.name, w / n);
+      const p = participants[g.start + k];
+      centre.set(p.name, cursor + (w * (k + 0.5)) / n);
+      laneWidth.set(p.name, w / n);
     }
     cursor += w;
   }
-  const area = Math.max(cursor, laneW * lanes.length);
+  const area = Math.max(cursor, laneW * participants.length);
 
   // The boxes' title area is as tall as the longest description needs, so
   // nothing a box says is cut off.
@@ -152,7 +152,7 @@ export function FlowSequence({
     BOX_NAME_H + Math.max(0, ...boxes.map((b) => b.lines)) * 16 + 6;
   const inner = GUTTER + area;
   const narrowest = Math.min(...[...laneWidth.values(), laneW]);
-  const stagger = lanes.length > 1 && narrowest < STAGGER_BELOW;
+  const stagger = participants.length > 1 && narrowest < STAGGER_BELOW;
   const headH = (stagger ? 58 : 36) + BAND_H + BOX_PAD;
   const x = (name: string) => centre.get(name) ?? laneW / 2;
   const chipWidth = (name: string) =>
@@ -208,7 +208,7 @@ export function FlowSequence({
                 );
               })}
               {/* Each lifeline starts at its type's name, through the box. */}
-              {lanes.map((p, i) => {
+              {participants.map((p, i) => {
                 const top = BAND_H + (stagger && i % 2 === 1 ? 31 : 6) + 11;
                 return (
                   <span
@@ -218,7 +218,7 @@ export function FlowSequence({
                   />
                 );
               })}
-              {lanes.map((p, i) => (
+              {participants.map((p, i) => (
                 <span
                   key={p.name}
                   className={`flow-who ${p.external ? "external" : ""}`}
@@ -285,7 +285,7 @@ export function FlowSequence({
                   />
                 </marker>
               </defs>
-              {lanes.map((p) => (
+              {participants.map((p) => (
                 <line
                   key={p.name}
                   className="lifeline"

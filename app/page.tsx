@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ChangePane, openingChangeFor } from "@/components/ChangePane";
-import { CommentPane } from "@/components/CommentPane";
+import { CommentsPanel } from "@/components/CommentsPanel";
+import { DiffColumn, openingChangeFor } from "@/components/DiffColumn";
 import type { FileMarks } from "@/components/DiffFile";
 import { FlowCoverage } from "@/components/FlowCoverage";
 import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
@@ -120,7 +120,7 @@ export default function Page() {
   /** Previously-opened repos for the RepoBar dropdown. */
   const [recents, setRecents] = useState<RecentRepo[]>([]);
 
-  /** Which rail is showing. Comments is the default; commits is self-review. */
+  /** The review thread open in the comments panel. */
   const [commentId, setCommentId] = useState<string | null>(null);
   /** Set when a URL asked for a comment that isn't in this PR. */
   const [commentNotice, setCommentNotice] = useState<string | null>(null);
@@ -291,7 +291,7 @@ export default function Page() {
     if (!ready) return;
     const inWorkspace = Boolean(repoPath);
     writeUrlState(
-      { repo: repoPath || null, ref, rev, mode: null, comment: commentId },
+      { repo: repoPath || null, ref, rev, comment: commentId },
       { push: inWorkspace !== wasInWorkspace.current },
     );
     wasInWorkspace.current = inWorkspace;
@@ -374,7 +374,7 @@ export default function Page() {
 
           // Arriving with no rev asked for, on a comment that already names
           // the change answering it: show that change rather than an empty
-          // "Uncommitted" pane. Only ever a fallback — an explicit rev, and
+          // Uncommitted diff. Only ever a fallback — an explicit rev, and
           // anything you pick later, wins.
           if (next === WORKING_REV && !data.working.hasChanges) {
             const thread = data.github.threads.find((t) => t.id === landedOn);
@@ -681,7 +681,7 @@ export default function Page() {
   }
   // Decided once per view, when its flows have loaded. Status is null for a
   // moment on every move and "running" through a regenerate; deciding then
-  // would flash the diff and remount it. A trace landing later doesn't flip
+  // would flash the diff and remount it. A run landing later doesn't flip
   // the view either, so a note being typed survives; the switch appears.
   const [lead, setLead] = useState<{ view: string; lead: boolean } | null>(
     null,
@@ -870,9 +870,9 @@ export default function Page() {
       setFocusedThreadId(id);
       setColumnTab("comments");
       const thread = threads.find((t) => t.id === id) ?? null;
-      // null means leave the change column alone — the two panes are separate
-      // axes, and an unlinked comment has nothing to say about which change
-      // you should be looking at.
+      // null means leave the diff column alone — comments and changes are
+      // separate axes, and an unlinked comment has nothing to say about which
+      // change you should be looking at.
       const linked = openingChangeFor(thread);
       if (linked) setRev(linked);
       window.scrollTo({ top: 0 });
@@ -1142,8 +1142,8 @@ export default function Page() {
     setRepoPath(trimmed);
   }, []);
 
-  // j/k through whichever rail is showing, the way you'd move through a list
-  // in a TUI — comments when that's the rail, commits when it isn't.
+  // j/k move through a list the way they would in a TUI: flow steps when the
+  // Flows tab is open, else comments when there are any, else changes.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -1285,7 +1285,7 @@ export default function Page() {
 
           <main className="min-w-0 flex-1 space-y-3 pb-16">
             {/* Below lg the spine can't sit beside the content, and the old
-                rail simply vanished at this width — leaving the checklist
+                300px list simply vanished at this width — leaving the checklist
                 unreachable. Same squares, laid out sideways. */}
             {hasComments && (
               <TickStrip
@@ -1382,7 +1382,7 @@ export default function Page() {
                 // Flow-first: the change, then where it landed and what it does.
                 // The diff is a click away, from any step.
                 <div className="mx-auto w-full max-w-[1280px] space-y-4">
-                  <ChangePane
+                  <DiffColumn
                     session={session}
                     rev={rev}
                     onRevChange={(next) => {
@@ -1464,7 +1464,7 @@ export default function Page() {
                       />
                     }
                     comments={
-                      <CommentPane
+                      <CommentsPanel
                         threads={threads}
                         thread={selectedThread}
                         index={commentIndex}
@@ -1538,7 +1538,7 @@ export default function Page() {
                         />
                       }
                       comments={
-                        <CommentPane
+                        <CommentsPanel
                           threads={threads}
                           thread={selectedThread}
                           index={commentIndex}
@@ -1557,7 +1557,7 @@ export default function Page() {
                   )}
 
                   <div className="min-w-0 flex-1">
-                    <ChangePane
+                    <DiffColumn
                       session={session}
                       rev={rev}
                       onRevChange={(next) => {

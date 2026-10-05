@@ -11,6 +11,16 @@ import type {
   WorkingTreeInfo,
 } from "./types";
 
+/**
+ * Reads repos, commits, patches and the working tree, all through `git()`,
+ * and never writes to the repo.
+ *
+ * The base of "All changes" comes from the PR's `baseRefName` when there is
+ * a PR, so a stacked PR doesn't also show its parent branches. A commit
+ * linked to a thread survives a rebase because the link is kept by patch-id,
+ * not sha.
+ */
+
 export class RepoError extends Error {
   constructor(
     message: string,
@@ -322,7 +332,7 @@ export async function getCommitRange(
 }
 
 /**
- * Where the rail's divider sits: the parent of the oldest unpushed commit.
+ * Where the push boundary sits: the parent of the oldest unpushed commit.
  * Usually this equals the base merge-base, but after a rebase the two
  * diverge — the boundary hugs the unpushed commits, keeping the timeline
  * contiguous, while base.sha may point at a stale upstream's merge base.
@@ -353,13 +363,13 @@ export async function getBoundarySha(
 }
 
 /**
- * The already-pushed commits below the push boundary. Gives the left panel
- * its context: the unpushed work sits on top of this history rather than
- * floating alone.
+ * The already-pushed commits below the push boundary. Gives the change
+ * picker its context: the unpushed work sits on top of this history rather
+ * than floating alone.
  *
  * Scoped to the current branch: on a feature branch this stops at the fork
- * point instead of walking on into the default branch's history — the rail
- * is a timeline of *this branch*, not of main. On the default branch itself
+ * point instead of walking on into the default branch's history — the change
+ * picker is a timeline of *this branch*, not of main. On the default branch itself
  * (or when there's no default to compare against) main's history IS the
  * branch's history, so the walk from the merge base stands.
  */

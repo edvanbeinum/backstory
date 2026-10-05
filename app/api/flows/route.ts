@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { crossSite, errorResponse } from "@/lib/api";
-import { flowsStatus, startFlows, startTrace } from "@/lib/flows/store";
+import { flowsStatus, startFlows, startTrace } from "@/lib/flows/cache";
 import type { FlowsStatus } from "@/lib/flows/types";
 import { resolveRepo } from "@/lib/git";
 import type { ApiError } from "@/lib/types";
@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // A trace costs money and sends code to Claude: only differ's own page asks.
+  // Tracing costs money and sends code to Claude: only differ's own page asks.
   const refused = crossSite(request);
   if (refused) return refused;
   try {
