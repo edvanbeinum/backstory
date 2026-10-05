@@ -30,7 +30,9 @@ system, so you can see where it landed before reading its lines:
   [Structurizr](https://docs.structurizr.com) model, from the repo at the
   change's base and head. A repo that doesn't commit a model can keep one at
   `~/.differ/models/<repo>/workspace.dsl`; it shows where a change landed,
-  but not what it added or removed.
+  but not what it added or removed. With no model at all, **Draft a model**
+  in the map strip has Claude Code read the code at HEAD and write one
+  there, never into the repo: a draft, marked as one, for you to correct.
 - **The data model** shows the entities the change touched: new fields,
   relationships and rules. It reads `db/schema.rb` and the models (Rails) or
   the `.xcdatamodeld` (Core Data). Nothing is run.

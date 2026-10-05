@@ -1,10 +1,19 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
+import type { DraftStatus, ModelSourceResponse } from "@/lib/models/draft";
 import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
+import { Badge, Button, CopyButton, Spinner } from "./ui";
 
 /**
  * The map: a one-line strip at the top of the column, read once to orient,
@@ -518,16 +527,248 @@ function Ticked({ text }: { text: string }) {
   );
 }
 
+const CLAUDE_CODE_INSTALL = "https://code.claude.com/docs/en/setup";
+
+type Finished = Extract<DraftStatus, { status: "done" }>;
+type ModelAnswer = ModelSourceResponse | { error: string };
+
+/**
+ * The repo's model source and its draft, fetched only where a draft could
+ * be offered: no model at the view, or a local one. Polls while a draft
+ * runs, as the flows panel does; drafts are rare, so no watch event.
+ */
+function useModelDraft(repo: string, wanted: boolean, onDrafted: () => void) {
+  const [answer, setAnswer] = useState<{
+    repo: string;
+    source: ModelSourceResponse;
+  } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  /** Shown once, after a draft this window watched finish */
+  const [finished, setFinished] = useState<Finished | null>(null);
+  const wasRunning = useRef(false);
+  const onDraftedRef = useRef(onDrafted);
+  useEffect(() => {
+    onDraftedRef.current = onDrafted;
+  }, [onDrafted]);
+
+  const request = useCallback(
+    async (method: "GET" | "POST", redraft = false) => {
+      const params = new URLSearchParams({ repo });
+      if (redraft) params.set("redraft", "1");
+      try {
+        const response = await fetch(`/api/model?${params}`, {
+          method,
+          cache: "no-store",
+        });
+        const data = (await response.json()) as ModelAnswer;
+        if (!response.ok || "error" in data) {
+          setError("error" in data ? data.error : response.statusText);
+          return;
+        }
+        setError(null);
+        const status = data.job.status;
+        if (wasRunning.current && status === "done") {
+          setFinished(data.job as Finished);
+          onDraftedRef.current();
+        }
+        wasRunning.current = status === "running";
+        setAnswer({ repo, source: data });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      }
+    },
+    [repo],
+  );
+
+  useEffect(() => {
+    if (!wanted || !repo) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches when its key changes
+    void request("GET");
+  }, [wanted, repo, request]);
+
+  const source = answer?.repo === repo ? answer.source : null;
+  const running = source?.job.status === "running";
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(() => void request("GET"), 4000);
+    return () => clearInterval(timer);
+  }, [running, request]);
+
+  const start = useCallback(
+    (redraft = false) => {
+      setFinished(null);
+      void request("POST", redraft);
+    },
+    [request],
+  );
+  return { source, error, finished, start };
+}
+
+type DraftApi = ReturnType<typeof useModelDraft>;
+
+const formatSeconds = (ms: number) => {
+  const s = Math.max(0, Math.round(ms / 1000));
+  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
+};
+
+function Elapsed({ since }: { since: number }) {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  return <>{formatSeconds(now - since)}</>;
+}
+
+const filesLeft = (n: number) =>
+  `${n} ${n === 1 ? "file" : "files"} no component covers`;
+
+/** A draft's progress, failure or result: whatever the job says, if anything. */
+function DraftProgress({ draft }: { draft: DraftApi }) {
+  const job = draft.source?.job;
+  if (draft.error)
+    return (
+      <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
+        <AlertIcon size={11} /> {draft.error}
+      </span>
+    );
+  if (job?.status === "running")
+    return (
+      <span className="flex items-center gap-1.5 text-[12px] text-[var(--fg-muted)]">
+        <Spinner className="!h-3 !w-3" />
+        {job.phase} · <Elapsed since={job.startedAt} />
+      </span>
+    );
+  if (job?.status === "failed")
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--attention)]">
+        <AlertIcon size={11} />
+        <span className="truncate" title={job.error}>
+          The draft failed: {job.error}
+        </span>
+        <Button size="sm" onClick={() => draft.start(true)}>
+          Try again
+        </Button>
+      </span>
+    );
+  if (job?.status === "unavailable")
+    return (
+      <span className="text-[12px] text-[var(--attention)]">
+        Drafting a model needs{" "}
+        <a
+          className="text-[var(--accent)]"
+          href={CLAUDE_CODE_INSTALL}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Claude Code
+        </a>
+        : differ couldn&apos;t find <code className="mono">claude</code> on its
+        PATH.
+      </span>
+    );
+  if (draft.finished)
+    return (
+      <span className="text-[12px] text-[var(--fg-muted)]">
+        Drafted in {formatSeconds(draft.finished.durationMs)}
+        {draft.finished.unmatched > 0 &&
+          ` · ${filesLeft(draft.finished.unmatched)}`}
+        {draft.finished.ambiguous > 0 &&
+          ` · ${draft.finished.ambiguous} in more than one`}
+      </span>
+    );
+  return null;
+}
+
+/** The empty strip's offer, for a repo with no model at all. */
+function DraftOffer({ draft }: { draft: DraftApi }) {
+  const job = draft.source?.job;
+  const idle = !job || job.status === "idle" || job.status === "unavailable";
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[12px] text-[var(--fg-muted)]">
+          · no model in this repo
+        </span>
+        {idle && (
+          <Button size="sm" variant="primary" onClick={() => draft.start()}>
+            Draft a model
+          </Button>
+        )}
+        <DraftProgress draft={draft} />
+      </div>
+      {idle && (
+        <span className="text-[11px] text-[var(--fg-subtle)]">
+          Claude reads the code at HEAD, read-only, and drafts a C4 model kept
+          on this machine, never in the repo. It takes a few minutes and uses
+          your Claude Code account.
+        </span>
+      )}
+    </div>
+  );
+}
+
+/** A local model: whether Claude drafted it, its file, and Redraft. */
+function LocalModel({ map, draft }: { map: MapResponse; draft: DraftApi }) {
+  if (!map.modelFile) return null;
+  const running = draft.source?.job.status === "running";
+  return (
+    <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-[var(--fg-subtle)]">
+      {map.drafted && (
+        <Badge tone="draft" className="!py-0 !leading-4">
+          Draft
+        </Badge>
+      )}
+      <code className="mono min-w-0 truncate" title={map.modelFile}>
+        {map.modelFile}
+      </code>
+      <CopyButton
+        value={map.modelFile}
+        variant="invisible"
+        title="Copy the model file's path, to correct it"
+        label="Copy path"
+      />
+      {!running && (
+        <Button
+          size="sm"
+          variant="invisible"
+          onClick={() => {
+            if (
+              window.confirm(
+                "Redraft the model? Claude reads the code at HEAD again, which takes a few minutes on your Claude Code account. The current file is kept as workspace.dsl.bak.",
+              )
+            )
+              draft.start(true);
+          }}
+        >
+          Redraft
+        </Button>
+      )}
+      <DraftProgress draft={draft} />
+    </div>
+  );
+}
+
 export function MapStrip({
   map,
+  repo,
   onHover,
   onOpenFile,
+  onModelChange,
 }: {
   map: MapResponse | null;
+  repo: string;
   onHover: (component: string | null) => void;
   /** Bring a file into view; the page knows whether there's a diff to show it in */
   onOpenFile: (path: string) => void;
+  /** A draft was written: read the map again */
+  onModelChange: () => void;
 }) {
+  const draft = useModelDraft(
+    repo,
+    Boolean(map && (map.local || (map.status === "none" && !map.error))),
+    onModelChange,
+  );
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(560);
@@ -559,14 +800,18 @@ export function MapStrip({
 
   if (!map) return null;
   if (map.status === "none" || map.nodes.length === 0) {
+    const offer =
+      map.status === "none" && !map.error && draft.source?.source === "none";
     return (
-      <div className="map-strip quiet">
+      <div className="map-strip quiet flex-wrap">
         <span className="text-[13px] font-semibold">Map</span>
         {map.error ? (
           <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
             <AlertIcon size={11} /> Couldn&apos;t read the model:{" "}
             <Ticked text={map.error} />
           </span>
+        ) : offer ? (
+          <DraftOffer draft={draft} />
         ) : (
           <span className="text-[12px] text-[var(--fg-muted)]">
             {map.status === "none"
@@ -574,6 +819,7 @@ export function MapStrip({
               : "· this change touches no mapped component"}
           </span>
         )}
+        {map.local && <LocalModel map={map} draft={draft} />}
       </div>
     );
   }
@@ -608,6 +854,7 @@ export function MapStrip({
             {map.ambiguous.length > 0 && `${map.ambiguous.length} ambiguous`}
           </div>
         )}
+        {map.local && <LocalModel map={map} draft={draft} />}
       </div>
       <button
         type="button"
