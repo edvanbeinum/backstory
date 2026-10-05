@@ -693,7 +693,6 @@ function DraftProgress({ draft }: { draft: DraftApi }) {
   return null;
 }
 
-/** The empty strip's offer, for a repo with no model at all. */
 function DraftOffer({ draft }: { draft: DraftApi }) {
   const job = draft.source?.job;
   const idle = !job || job.status === "idle" || job.status === "unavailable";
@@ -721,7 +720,6 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
   );
 }
 
-/** A local model: whether Claude drafted it, its file, and Redraft. */
 function LocalModel({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   if (!map.modelFile) return null;
   const running = draft.source?.job.status === "running";
