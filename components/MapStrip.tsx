@@ -531,6 +531,7 @@ const CLAUDE_CODE_INSTALL = "https://code.claude.com/docs/en/setup";
 
 type Finished = Extract<DraftStatus, { status: "done" }>;
 type ModelAnswer = ModelSourceResponse | { error: string };
+type JobState = DraftStatus["status"];
 
 /**
  * The repo's model source and its draft, fetched only where a draft could
@@ -544,8 +545,11 @@ function useModelDraft(repo: string, wanted: boolean, onDrafted: () => void) {
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
   /** Shown once, after a draft this window watched finish */
-  const [finished, setFinished] = useState<Finished | null>(null);
-  const wasRunning = useRef(false);
+  const [finished, setFinished] = useState<{
+    repo: string;
+    job: Finished;
+  } | null>(null);
+  const last = useRef<{ repo: string; status: JobState } | null>(null);
   const onDraftedRef = useRef(onDrafted);
   useEffect(() => {
     onDraftedRef.current = onDrafted;
@@ -567,11 +571,15 @@ function useModelDraft(repo: string, wanted: boolean, onDrafted: () => void) {
         }
         setError(null);
         const status = data.job.status;
-        if (wasRunning.current && status === "done") {
-          setFinished(data.job as Finished);
+        const before = last.current?.repo === repo ? last.current.status : null;
+        // Read the map again on any done this window hasn't seen, not only
+        // after a running one: a draft can finish before the first poll.
+        if (status === "done" && before !== "done") {
+          if (before === "running")
+            setFinished({ repo, job: data.job as Finished });
           onDraftedRef.current();
         }
-        wasRunning.current = status === "running";
+        last.current = { repo, status };
         setAnswer({ repo, source: data });
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
@@ -601,7 +609,12 @@ function useModelDraft(repo: string, wanted: boolean, onDrafted: () => void) {
     },
     [request],
   );
-  return { source, error, finished, start };
+  return {
+    source,
+    error,
+    finished: finished?.repo === repo ? finished.job : null,
+    start,
+  };
 }
 
 type DraftApi = ReturnType<typeof useModelDraft>;
