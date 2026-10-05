@@ -77,7 +77,7 @@ export interface FlowSet {
 }
 
 export type FlowsStatus =
-  | { status: "ready"; flows: FlowSet; tracing: string[]; traceError?: string }
+  | { status: "ready"; flows: FlowSet; tracing: string[]; runError?: string }
   | { status: "running"; startedAt: number; phase: string }
   | { status: "idle" }
   | { status: "failed"; error: string }

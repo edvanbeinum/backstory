@@ -681,7 +681,7 @@ export default function Page() {
   }
   // Decided once per view, when its flows have loaded. Status is null for a
   // moment on every move and "running" through a regenerate; deciding then
-  // would flash the diff and remount it. A trace landing later doesn't flip
+  // would flash the diff and remount it. A run landing later doesn't flip
   // the view either, so a note being typed survives; the switch appears.
   const [lead, setLead] = useState<{ view: string; lead: boolean } | null>(
     null,
