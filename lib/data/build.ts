@@ -6,6 +6,11 @@ import { readRails } from "./rails";
 import type { DataModel, DataResponse } from "./types";
 
 /**
+ * Reads the data model (Rails schema and models, or Core Data) at both ends
+ * of a view and diffs it.
+ */
+
+/**
  * Every model file at a commit. Read one by one, a few at a time: git's
  * batch output gives sizes in bytes, and slicing decoded text by them
  * goes wrong at the first non-ASCII character.

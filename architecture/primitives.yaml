@@ -1,0 +1,134 @@
+# The capabilities differ already has, for new work to build from.
+# Build from these. If none fits, extend one. Ask before adding a new one.
+# `block` names a block in language.yaml; code in no block leaves it out.
+# The idea of naming primitives comes from https://kcd-slides-event-mega-its-time.pages.dev
+
+primitives:
+  - name: run git
+    block: git reader
+    file: lib/exec.ts
+    symbols:
+      - git
+      - gitTry
+      - gitLine
+    use: "Every git call. It turns off the pager and credential prompts, so a request never hangs. Read patches through `patches`, whose flags keep the user's diff config out."
+  - name: run a binary
+    block: git reader
+    file: lib/exec.ts
+    symbols:
+      - run
+    use: Every other child process. It passes argv and never a shell, and extends PATH so binaries resolve under launchd.
+  - name: open a repo
+    block: git reader
+    file: lib/git.ts
+    symbols:
+      - resolveRepo
+    use: "Turns a path into a `RepoInfo`, throwing a typed `RepoError` the routes can report."
+  - name: a view's commits
+    block: git reader
+    file: lib/view.ts
+    symbols:
+      - viewRange
+    use: "The same base and head that `/api/diff` diffs, so every view of a change agrees on its commits."
+  - name: patches
+    block: git reader
+    file: lib/git.ts
+    symbols:
+      - getCommitPatch
+      - getRangePatch
+      - getWorkingPatch
+    use: The patch text differ parses everywhere, with flags that keep a user's difftool config out of it.
+  - name: not yet pushed
+    block: git reader
+    file: lib/pushed.ts
+    symbols:
+      - pushedState
+    use: The one definition of "unpushed".
+  - name: file at a commit
+    block: model reader (the map)
+    file: lib/model.ts
+    symbols:
+      - showFile
+    use: Reads one file at a commit, or null when it isn't there. The data model reader already reuses it.
+  - name: parse a diff
+    block: diff and anchors
+    file: lib/diff.ts
+    symbols:
+      - parseUnifiedDiff
+    use: One parser for every diff.
+  - name: put threads on lines
+    block: diff and anchors
+    file: lib/anchor.ts
+    symbols:
+      - anchorThreads
+    use: Puts each review thread on its line, with the rule that never silently drops a thread.
+  - name: highlight
+    block: diff and anchors
+    file: lib/highlight.ts
+    symbols:
+      - highlightFiles
+    use: Shiki, in both themes, with line caps.
+  - name: run gh
+    block: GitHub
+    file: lib/github.ts
+    symbols:
+      - gh
+    use: Every `gh` call, with the pager and colour off and a timeout.
+  - name: PR and threads
+    block: GitHub
+    file: lib/github.ts
+    symbols:
+      - loadGitHubDataCached
+    use: A branch's PR, threads and reviews, cached, degrading to "unavailable" instead of throwing.
+  - name: store file
+    block: store
+    file: lib/store.ts
+    symbols:
+      - withStore
+      - readNamespaced
+      - writeNamespaced
+    use: Every store file read and write. It keeps the store invariant, validates on read and writes atomically.
+  - name: run Claude
+    block: flow engine
+    file: lib/flows/claude.ts
+    symbols:
+      - claudeRunner
+    use: "The only `claude -p` call site."
+  - name: read the C4 model
+    block: model reader (the map)
+    file: lib/model.ts
+    symbols:
+      - readModelAt
+    use: One reader for the C4 model at a commit.
+  - name: route errors
+    file: lib/api.ts
+    symbols:
+      - errorResponse
+    use: "Turns any thrown error into the `ApiError` shape the UI renders."
+  - name: refuse other sites
+    file: lib/api.ts
+    symbols:
+      - crossSite
+    use: Blocks a POST that another website sends to differ's local port.
+  - name: URL state
+    block: UI columns and panels
+    file: lib/url.ts
+    symbols:
+      - buildUrl
+      - writeUrlState
+    use: Builds and writes the page state into the URL, so a view can be shared.
+  - name: buttons and copy
+    block: UI columns and panels
+    file: components/ui.tsx
+    symbols:
+      - Button
+      - CopyButton
+      - copyToClipboard
+    use: The shared controls.
+  - name: graph layout
+    block: UI columns and panels
+    file: components/graph.ts
+    symbols:
+      - layeredLayout
+      - edgePath
+    use: Lays out and draws the map and data diagrams.
