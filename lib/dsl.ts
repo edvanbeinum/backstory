@@ -414,8 +414,8 @@ export function readDsl(text: string): Workspace {
     description: r.description,
   }));
 
-  // Structurizr's export lists people before software systems, wherever
-  // they're written; keeping its order keeps cached flows keyed the same.
+  // List people before software systems, as Structurizr's JSON export did,
+  // so flows cached while differ read that export keep their keys.
   return {
     properties,
     elements: [

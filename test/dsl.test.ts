@@ -4,49 +4,35 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { DslError, readDsl } from "../lib/dsl";
-import { buildModel, fromJson, parseDsl, type Model } from "../lib/model";
+import { parseDsl, type Model } from "../lib/model";
 
 const fixture = (file: string) =>
   readFileSync(path.join(__dirname, "fixtures", file), "utf8");
 
 const ids = (m: Model) => [...m.elements.keys()];
 
-test("the DSL and its Structurizr export give the same model", () => {
-  const dsl = parseDsl(fixture("workspace.dsl"));
-  const json = buildModel(fromJson(JSON.parse(fixture("workspace.json"))));
+test("a whole model reads, with its globs, tests and ignores", () => {
+  const model = parseDsl(fixture("workspace.dsl"));
+  assert.equal(model.elements.size, 22);
+  assert.equal(model.relationships.size, 35);
 
-  assert.deepEqual([...dsl.elements.values()], [...json.elements.values()]);
-  assert.deepEqual(
-    [...dsl.relationships.values()],
-    [...json.relationships.values()],
-  );
-  assert.equal(dsl.elements.size, 22);
-  assert.ok(dsl.relationships.size > 30);
-
-  for (const p of [
-    "ios/Shop/App.swift",
-    "ios/Shop/Shop.xcdatamodeld/.xccurrentversion",
-    "ios/Shop/Repositories/ProductVariant.swift",
-    "ios/Shop/Repositories/HabitLearner.swift",
-    "ios/Shop/Repositories/CartRepository.swift",
-    "ios/Shop/Features/Cart/CartView.swift",
-    "site/index.html",
-    "ios/ShopTests/CartTests.swift",
-    "AGENTS.md",
-    "src/nowhere.ts",
-  ]) {
-    assert.deepEqual(dsl.match(p), json.match(p), p);
-    assert.equal(dsl.isTest(p), json.isTest(p), p);
-    assert.equal(dsl.isIgnored(p), json.isIgnored(p), p);
-  }
-  assert.deepEqual(dsl.match("ios/Shop/Shop.xcdatamodeld/.xccurrentversion"), [
-    "shop.ios.shell",
-  ]);
-  assert.deepEqual(dsl.match("ios/Shop/Repositories/ProductVariant.swift"), [
-    "shop.ios.data",
-  ]);
-  assert.equal(dsl.isTest("ios/ShopTests/CartTests.swift"), true);
-  assert.equal(dsl.isIgnored("AGENTS.md"), true);
+  const expected: [string, string[]][] = [
+    ["ios/Shop/App.swift", ["shop.ios.shell"]],
+    ["ios/Shop/Shop.xcdatamodeld/.xccurrentversion", ["shop.ios.shell"]],
+    ["ios/Shop/Repositories/ProductVariant.swift", ["shop.ios.data"]],
+    ["ios/Shop/Repositories/HabitLearner.swift", ["shop.ios.suggestions"]],
+    ["ios/Shop/Repositories/CartRepository.swift", ["shop.ios.data"]],
+    ["ios/Shop/Features/Cart/CartView.swift", ["shop.ios.cart"]],
+    ["site/index.html", ["shop.site"]],
+    ["ios/ShopTests/CartTests.swift", []],
+    ["AGENTS.md", []],
+    ["src/nowhere.ts", []],
+  ];
+  for (const [p, ids] of expected) assert.deepEqual(model.match(p), ids, p);
+  assert.equal(model.isTest("ios/ShopTests/CartTests.swift"), true);
+  assert.equal(model.isTest("ios/Shop/App.swift"), false);
+  assert.equal(model.isIgnored("AGENTS.md"), true);
+  assert.equal(model.isIgnored("site/index.html"), false);
 });
 
 const nested = `

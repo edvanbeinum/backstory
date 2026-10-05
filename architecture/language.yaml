@@ -93,7 +93,7 @@ blocks:
       - lib/dsl.ts
       - lib/model.ts
       - lib/map.ts
-    summary: Reads the repo's C4 model from its Structurizr DSL (or a JSON export) and marks the components a change touched, added or removed.
+    summary: Reads the repo's C4 model from its Structurizr DSL and marks the components a change touched, added or removed.
     read: "`lib/model.ts` header"
   - name: data model reader
     code:

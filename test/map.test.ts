@@ -40,7 +40,6 @@ function gitRepo() {
 }
 
 interface Comp {
-  id: string;
   key: string;
   name: string;
   globs: string;
@@ -51,47 +50,7 @@ interface Spec {
   rels: [string, string, string][];
 }
 
-/** A Structurizr export, cut down to what differ reads. */
-function workspace({ comps, rels }: Spec) {
-  const byKey = new Map(comps.map((c) => [c.key, c.id]));
-  return JSON.stringify({
-    properties: { "code.tests": "test/**" },
-    model: {
-      softwareSystems: [
-        {
-          id: "1",
-          name: "App",
-          properties: { "structurizr.dsl.identifier": "app" },
-          containers: [
-            {
-              id: "2",
-              name: "Web",
-              properties: { "structurizr.dsl.identifier": "app.web" },
-              components: comps.map((c) => ({
-                id: c.id,
-                name: c.name,
-                properties: {
-                  "structurizr.dsl.identifier": `app.web.${c.key}`,
-                  "code.globs": c.globs,
-                },
-                relationships: rels
-                  .filter(([from]) => from === c.key)
-                  .map(([, to, description], i) => ({
-                    id: `${c.id}${i}`,
-                    sourceId: c.id,
-                    destinationId: byKey.get(to),
-                    description,
-                  })),
-              })),
-            },
-          ],
-        },
-      ],
-    },
-  });
-}
-
-/** The same model as `workspace`, as the DSL it would be exported from. */
+/** A model of one system and container, holding `comps` and their arrows. */
 function dsl({ comps, rels }: Spec) {
   const components = comps.map(
     (c) => `                ${c.key} = component "${c.name}" {
@@ -121,9 +80,9 @@ ${arrows.join("\n")}
 `;
 }
 
-const a = { id: "10", key: "a", name: "Alpha", globs: "src/a/**" };
-const b = { id: "11", key: "b", name: "Beta", globs: "src/b/** src/{x,y}.ts" };
-const c = { id: "12", key: "c", name: "Gamma", globs: "src/c/**" };
+const a = { key: "a", name: "Alpha", globs: "src/a/**" };
+const b = { key: "b", name: "Beta", globs: "src/b/** src/{x,y}.ts" };
+const c = { key: "c", name: "Gamma", globs: "src/c/**" };
 
 const BASE: Spec = { comps: [a, b], rels: [["a", "b", "Calls"]] };
 const HEAD: Spec = {
@@ -134,16 +93,13 @@ const HEAD: Spec = {
   ],
 };
 
-const asJson = (spec: Spec) => ({
-  "architecture/workspace.json": workspace(spec),
-});
 const asDsl = (spec: Spec) => ({ "architecture/workspace.dsl": dsl(spec) });
 
-/** A base and a head commit, with the model written by `models`. */
-function change(models: (spec: Spec) => Record<string, string>) {
+/** A base and a head commit, each with its model. */
+function change() {
   const repo = gitRepo();
   const base = repo.commit(
-    { "src/a/one.ts": "1\n", "src/b/two.ts": "2\n", ...models(BASE) },
+    { "src/a/one.ts": "1\n", "src/b/two.ts": "2\n", ...asDsl(BASE) },
     "base",
   );
   const head = repo.commit(
@@ -154,7 +110,7 @@ function change(models: (spec: Spec) => Record<string, string>) {
       "src/c/three.ts": "3\n",
       "src/loose.ts": "nobody's\n",
       "test/a.test.ts": "t\n",
-      ...models(HEAD),
+      ...asDsl(HEAD),
     },
     "head",
   );
@@ -187,30 +143,16 @@ function assertTheChange(map: MapResponse) {
   assert.deepEqual(map.unmapped, ["src/loose.ts"]);
 }
 
-const jsonRepo = change(asJson);
+const changeRepo = change();
 
 test("the map compares models by identifier and arrows by their ends", async () => {
-  assertTheChange(await buildMap(jsonRepo.dir, jsonRepo.base, jsonRepo.head));
+  assertTheChange(
+    await buildMap(changeRepo.dir, changeRepo.base, changeRepo.head),
+  );
 });
 
-test("a repo with only workspace.dsl maps the same change the same way", async () => {
-  const repo = change(asDsl);
-  assertTheChange(await buildMap(repo.dir, repo.base, repo.head));
-});
-
-test("when both files are committed, the DSL is the model", async () => {
-  const repo = change((spec) => ({
-    ...asDsl(spec),
-    "architecture/workspace.json": workspace({
-      ...spec,
-      comps: spec.comps.map((x) => ({ ...x, name: `${x.name} (JSON)` })),
-    }),
-  }));
-  assertTheChange(await buildMap(repo.dir, repo.base, repo.head));
-});
-
-test("a head DSL that can't be read says why, even with a JSON beside it", async () => {
-  const repo = change(asJson);
+test("a head DSL that can't be read says why", async () => {
+  const repo = change();
   const head = repo.commit(
     {
       "architecture/workspace.dsl": "workspace {\n    !include model.dsl\n}\n",
@@ -248,7 +190,7 @@ test("a base DSL that can't be read counts as no base model, and says why", asyn
 });
 
 test("a base with no model adds nothing", async () => {
-  const map = await buildMap(jsonRepo.dir, null, jsonRepo.base);
+  const map = await buildMap(changeRepo.dir, null, changeRepo.base);
   assert.equal(map.baseModel, false);
   assert.ok(map.nodes.every((n) => n.state !== "added"));
 });
@@ -280,15 +222,9 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
 });
 
 test("a model that lists no tests or ignores keeps the built-in ones", async () => {
-  const { parseDsl, parseModel } = await import("../lib/model");
-  for (const model of [
-    parseModel(
-      JSON.stringify({ properties: {}, model: { softwareSystems: [] } }),
-    ),
-    parseDsl("workspace {\n    model {\n    }\n}\n"),
-  ]) {
-    assert.equal(model.isTest("test/models/item_test.rb"), true);
-    assert.equal(model.isIgnored("package-lock.json"), true);
-    assert.equal(model.isTest("app/models/item.rb"), false);
-  }
+  const { parseDsl } = await import("../lib/model");
+  const model = parseDsl("workspace {\n    model {\n    }\n}\n");
+  assert.equal(model.isTest("test/models/item_test.rb"), true);
+  assert.equal(model.isIgnored("package-lock.json"), true);
+  assert.equal(model.isTest("app/models/item.rb"), false);
 });

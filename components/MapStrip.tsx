@@ -570,7 +570,7 @@ export function MapStrip({
         ) : (
           <span className="text-[12px] text-[var(--fg-muted)]">
             {map.status === "none"
-              ? "· no architecture/workspace.dsl or .json in this repo, and no local model"
+              ? "· no architecture/workspace.dsl in this repo, and no local model"
               : "· this change touches no mapped component"}
           </span>
         )}

@@ -8,13 +8,11 @@ import { DslError, readDsl } from "./dsl";
 import { gitLine, gitTry } from "./exec";
 
 /**
- * The repo's C4 model: `architecture/workspace.dsl`, read directly, or a
- * Structurizr JSON export where there's no DSL. differ only reads it.
- * Elements are keyed by their DSL identifier (`ios.progress`), which survives
- * elements being added, unlike Structurizr's numeric ids.
+ * The repo's C4 model: `architecture/workspace.dsl`, in Structurizr's DSL.
+ * differ only reads it. Elements are keyed by their DSL identifier
+ * (`ios.progress`), which survives elements being added.
  */
 
-export const MODEL_JSON = "architecture/workspace.json";
 export const MODEL_DSL = "architecture/workspace.dsl";
 
 export type ElementType =
@@ -47,7 +45,7 @@ export interface Model {
   isIgnored: (path: string) => boolean;
 }
 
-/** A model as either reader finds it, before differ builds its matchers. */
+/** A model as the DSL reader finds it, before differ builds its matchers. */
 export interface Workspace {
   properties: Record<string, string>;
   elements: WorkspaceElement[];
@@ -69,28 +67,6 @@ export interface WorkspaceRelationship {
   description: string;
 }
 
-interface RawElement {
-  id: string;
-  name?: string;
-  description?: string;
-  properties?: Record<string, string>;
-  relationships?: RawRelationship[];
-  containers?: RawElement[];
-  components?: RawElement[];
-}
-
-interface RawRelationship {
-  sourceId: string;
-  destinationId: string;
-  description?: string;
-  linkedRelationshipId?: string;
-}
-
-interface RawWorkspace {
-  properties?: Record<string, string>;
-  model?: { people?: RawElement[]; softwareSystems?: RawElement[] };
-}
-
 const splitGlobs = (value: string | undefined) =>
   value?.split(/\s+/).filter(Boolean) ?? [];
 
@@ -107,46 +83,6 @@ const orDefault = (
   fallback: () => (path: string) => boolean,
 ) => (globs.length > 0 ? matcher(globs) : (path: string) => fallback()(path));
 
-/** A Structurizr JSON export, with its numeric ids turned into DSL identifiers. */
-export function fromJson(raw: RawWorkspace): Workspace {
-  const elements: WorkspaceElement[] = [];
-  const byNumericId = new Map<string, string>();
-  const rawRels: RawRelationship[] = [];
-
-  const visit = (el: RawElement, type: ElementType, parent: string | null) => {
-    const id = el.properties?.["structurizr.dsl.identifier"] ?? el.id;
-    elements.push({
-      id,
-      name: el.name ?? id,
-      description: el.description ?? "",
-      type,
-      parent,
-      properties: el.properties ?? {},
-    });
-    byNumericId.set(el.id, id);
-    rawRels.push(...(el.relationships ?? []));
-    for (const c of el.containers ?? []) visit(c, "container", id);
-    for (const c of el.components ?? []) visit(c, "component", id);
-  };
-  for (const p of raw.model?.people ?? []) visit(p, "person", null);
-  for (const s of raw.model?.softwareSystems ?? [])
-    visit(s, "softwareSystem", null);
-
-  const relationships: WorkspaceRelationship[] = [];
-  for (const r of rawRels) {
-    if (r.linkedRelationshipId) continue;
-    const source = byNumericId.get(r.sourceId);
-    const destination = byNumericId.get(r.destinationId);
-    if (!source || !destination) continue;
-    relationships.push({
-      source,
-      destination,
-      description: r.description ?? "",
-    });
-  }
-  return { properties: raw.properties ?? {}, elements, relationships };
-}
-
 export function buildModel(ws: Workspace): Model {
   const elements = new Map<string, ModelElement>();
   for (const el of ws.elements) {
@@ -160,24 +96,12 @@ export function buildModel(ws: Workspace): Model {
     });
   }
 
-  // The export lists each arrow under its source element; ordering the DSL's
-  // the same way gives both readers the same map, edge for edge.
-  const order = new Map(ws.elements.map((e, i) => [e.id, i]));
-  const rels = ws.relationships
-    .map((r, i) => ({ r, i }))
-    .sort(
-      (a, b) =>
-        (order.get(a.r.source) ?? 0) - (order.get(b.r.source) ?? 0) ||
-        a.i - b.i,
-    )
-    .map(({ r }) => r);
-
   // Several arrows between one pair read as one, labelled with all of them.
   const grouped = new Map<
     string,
     { rel: ModelRelationship; labels: string[] }
   >();
-  for (const { source, destination, description } of rels) {
+  for (const { source, destination, description } of ws.relationships) {
     const key = `${source} → ${destination}`;
     const entry = grouped.get(key) ?? {
       rel: { key, source, destination, description: "" },
@@ -212,9 +136,6 @@ export function buildModel(ws: Workspace): Model {
   };
 }
 
-export const parseModel = (json: string): Model =>
-  buildModel(fromJson(JSON.parse(json) as RawWorkspace));
-
 export const parseDsl = (text: string): Model => buildModel(readDsl(text));
 
 /** A file's contents at a commit, or null if it isn't there. */
@@ -230,7 +151,7 @@ export async function showFile(
 
 /**
  * A model kept on this machine for a repo that doesn't commit one:
- * `~/.differ/models/<repo>/workspace.dsl` (or `.json`), named after the main checkout's
+ * `~/.differ/models/<repo>/workspace.dsl`, named after the main checkout's
  * folder so every worktree finds it. One model for every commit, so it can
  * say where a change landed but not what it added or removed.
  */
@@ -252,46 +173,35 @@ export interface ModelRead {
   error: string | null;
 }
 
-function read(text: string, format: "dsl" | "json", local: boolean): ModelRead {
+function read(text: string, local: boolean): ModelRead {
   try {
-    const model = format === "dsl" ? parseDsl(text) : parseModel(text);
-    return { model, local, error: null };
+    return { model: parseDsl(text), local, error: null };
   } catch (e) {
-    const error =
-      e instanceof DslError
-        ? e.message
-        : format === "json"
-          ? "workspace.json isn't valid JSON"
-          : String(e);
-    return { model: null, local, error };
+    return {
+      model: null,
+      local,
+      error: e instanceof DslError ? e.message : String(e),
+    };
   }
 }
 
 /**
- * The first model file found is the model: the DSL, then the JSON, at the
- * rev, then on this machine. A DSL that fails doesn't fall back to a JSON
- * beside it, which is a leftover export once the DSL is read directly.
- * Flows then filter files as in a repo with no model, so a change the model
- * would mark as tests or ignored can still cost a `claude -p` trace. That's
- * the cost any repo without a model already pays, and the map strip shows
- * the DSL's error so it gets fixed.
+ * The model at the rev, or else the one kept on this machine. A DSL that
+ * fails to read gives its error and no model, so flows filter files as in a
+ * repo with no model: a change the model would mark as tests or ignored can
+ * still cost a `claude -p` trace. That's the cost any repo without a model
+ * already pays, and the map strip shows the error so it gets fixed.
  */
 export async function readModelAt(
   root: string,
   rev: string,
 ): Promise<ModelRead | null> {
   const dsl = await showFile(root, rev, MODEL_DSL);
-  if (dsl !== null) return read(dsl, "dsl", false);
-  const json = await showFile(root, rev, MODEL_JSON);
-  if (json !== null) return read(json, "json", false);
-  const dir = await localModelDir(root);
-  for (const format of ["dsl", "json"] as const) {
-    const text = await fs
-      .readFile(path.join(dir, `workspace.${format}`), "utf8")
-      .catch(() => null);
-    if (text !== null) return read(text, format, true);
-  }
-  return null;
+  if (dsl !== null) return read(dsl, false);
+  const local = await fs
+    .readFile(path.join(await localModelDir(root), "workspace.dsl"), "utf8")
+    .catch(() => null);
+  return local === null ? null : read(local, true);
 }
 
 /**
