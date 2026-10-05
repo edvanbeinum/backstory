@@ -50,7 +50,6 @@ interface Spec {
   rels: [string, string, string][];
 }
 
-/** A model of one system and container, holding `comps` and their arrows. */
 function dsl({ comps, rels }: Spec) {
   const components = comps.map(
     (c) => `                ${c.key} = component "${c.name}" {
@@ -95,7 +94,6 @@ const HEAD: Spec = {
 
 const asDsl = (spec: Spec) => ({ "architecture/workspace.dsl": dsl(spec) });
 
-/** A base and a head commit, each with its model. */
 function change() {
   const repo = gitRepo();
   const base = repo.commit(
