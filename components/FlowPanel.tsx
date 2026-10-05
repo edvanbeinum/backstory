@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   componentPath,
-  groupLanes,
+  groupParticipants,
   summarise,
   type FlowMode,
   type FlowRow,
@@ -237,8 +237,9 @@ function ReadyFlows({
     () => set.flows.map((f) => summarise(f, set.hunks)),
     [set],
   );
-  const { lanes, groups } = useMemo(
-    () => (flow ? groupLanes(flow, rows) : { lanes: [], groups: [] }),
+  const { participants, groups } = useMemo(
+    () =>
+      flow ? groupParticipants(flow, rows) : { participants: [], groups: [] },
     [flow, rows],
   );
   const path = useMemo(
@@ -534,7 +535,7 @@ function ReadyFlows({
       {flow && (
         <FlowSequence
           rows={rows}
-          lanes={lanes}
+          participants={participants}
           groups={groups}
           mode={selection.mode}
           activeKeys={code ? open : activeKeys}

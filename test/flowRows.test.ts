@@ -4,7 +4,7 @@ import { test } from "node:test";
 import {
   componentPath,
   flowRows,
-  groupLanes,
+  groupParticipants,
   shortLabels,
   summarise,
 } from "../lib/flows/rows";
@@ -242,7 +242,7 @@ test("coverage counts the diff's own hunks, on a flow or not", async () => {
   );
 });
 
-test("lanes group by component, in the order the flow reaches them", () => {
+test("participants group by component, in the order the flow reaches them", () => {
   const call = (id: string, from: string, to: string) =>
     step(id, 1, { from, to });
   const f: Flow = {
@@ -276,9 +276,9 @@ test("lanes group by component, in the order the flow reaches them", () => {
     ],
   };
   const rows = flowRows(f, "after", hunks);
-  const { lanes, groups } = groupLanes(f, rows);
+  const { participants, groups } = groupParticipants(f, rows);
   assert.deepEqual(
-    lanes.map((l) => l.name),
+    participants.map((p) => p.name),
     ["Controller", "Library", "Scope", "Listing", "Router"],
   );
   assert.deepEqual(

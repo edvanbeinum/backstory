@@ -34,7 +34,7 @@ export interface Finding {
 }
 
 /**
- * Lanes that are raw HTTP: calling one means speaking a protocol, not a
+ * Participants that are raw HTTP: calling one means speaking a protocol, not a
  * domain. Names vary by tracer ("Net::HTTP", "NetHTTP", "Faraday::Connection"),
  * but the library's name must end there: "RequestsController" isn't HTTP.
  */
@@ -42,15 +42,15 @@ const HTTP =
   /^(Net(::)?HTTP|HTTParty|Faraday|RestClient|Excon|URLSession|fetch|axios|requests|http\.Client|OkHttp)(?![a-z0-9])/i;
 
 /** "ZoomClient" → "Zoom"; "ConnectedAccount::ZoomProvider" → "Zoom". */
-function vendorOf(lane: string): string | null {
-  const last = lane.split("::").pop() ?? lane;
+function vendorOf(participant: string): string | null {
+  const last = participant.split("::").pop() ?? participant;
   const m = last.match(
     /^([A-Z][a-z0-9]+)(Client|Provider|Gateway|Api|API|Adapter|Service)$/,
   );
   return m ? m[1] : null;
 }
 
-/** Outside systems the change talks to, from its lanes and its new namespaces. */
+/** Outside systems the change talks to, from its participants and its new namespaces. */
 export function vendors(
   set: FlowSet | null,
   data: DataResponse | null,
@@ -114,9 +114,9 @@ function twoWays(set: FlowSet | null): Finding[] {
   const clients = new Map<string, string>();
   for (const f of set.flows)
     for (const s of f.after)
-      for (const lane of [s.from, s.to]) {
-        const v = vendorOf(lane);
-        if (v && /Client$/.test(lane)) clients.set(v, lane);
+      for (const participant of [s.from, s.to]) {
+        const v = vendorOf(participant);
+        if (v && /Client$/.test(participant)) clients.set(v, participant);
       }
   const out: Finding[] = [];
   for (const [vendor, client] of clients) {

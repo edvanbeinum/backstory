@@ -171,7 +171,10 @@ export function summarise(flow: Flow, hunks: FlowHunk[]): FlowSummary {
 }
 
 /** Participants in lane order, keeping only the ones these rows use. */
-export function lanesFor(flow: Flow, rows: FlowRow[]): Flow["participants"] {
+export function participantsFor(
+  flow: Flow,
+  rows: FlowRow[],
+): Flow["participants"] {
   const used = new Set(rows.flatMap((r) => [r.step.from, r.step.to]));
   const known = flow.participants.filter((p) => used.has(p.name));
   const extra = [...used]
@@ -220,11 +223,11 @@ export function shortLabels(
   );
 }
 
-export interface LaneGroup {
+export interface ParticipantGroup {
   /** The component's name; null for framework types and for code the model doesn't place */
   component: string | null;
   external: boolean;
-  /** Lane indexes, inclusive */
+  /** Participant indexes, inclusive */
   start: number;
   end: number;
 }
@@ -233,22 +236,26 @@ const groupKey = (p: Flow["participants"][number]) =>
   p.external ? "\u0000external" : (p.component ?? "\u0000unplaced");
 
 /**
- * Lanes ordered so each component's types sit side by side, components in
- * the order the flow first reaches them, framework types at the far edge.
- * A call that crosses a group's edge is one component calling another.
+ * Participants ordered so each component's types sit side by side,
+ * components in the order the flow first reaches them, framework types at the
+ * far edge. A call that crosses a group's edge is one component calling
+ * another.
  */
-export function groupLanes(
+export function groupParticipants(
   flow: Flow,
   rows: FlowRow[],
-): { lanes: Flow["participants"]; groups: LaneGroup[] } {
-  const lanes = lanesFor(flow, rows);
+): {
+  participants: Flow["participants"];
+  groups: ParticipantGroup[];
+} {
+  const participants = participantsFor(flow, rows);
   const firstSeen = new Map<string, number>();
   rows.forEach((r, i) => {
     for (const name of [r.step.from, r.step.to])
       if (!firstSeen.has(name)) firstSeen.set(name, i);
   });
   const order = new Map<string, number>();
-  for (const p of [...lanes].sort(
+  for (const p of [...participants].sort(
     (a, b) => (firstSeen.get(a.name) ?? 0) - (firstSeen.get(b.name) ?? 0),
   )) {
     const key = groupKey(p);
@@ -256,12 +263,12 @@ export function groupLanes(
   }
   const rank = (p: Flow["participants"][number]) =>
     p.external ? Number.MAX_SAFE_INTEGER : (order.get(groupKey(p)) ?? 0);
-  const sorted = lanes
+  const sorted = participants
     .map((p, i) => ({ p, i }))
     .sort((a, b) => rank(a.p) - rank(b.p) || a.i - b.i)
     .map(({ p }) => p);
 
-  const groups: LaneGroup[] = [];
+  const groups: ParticipantGroup[] = [];
   sorted.forEach((p, i) => {
     const last = groups[groups.length - 1];
     if (last && groupKey(sorted[last.start]) === groupKey(p)) last.end = i;
@@ -273,7 +280,7 @@ export function groupLanes(
         end: i,
       });
   });
-  return { lanes: sorted, groups };
+  return { participants: sorted, groups };
 }
 
 /** The components a flow passes through, in the order it first reaches them. */
