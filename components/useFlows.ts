@@ -38,7 +38,7 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
         // "All changes" refetches as HEAD moves; a slower earlier answer
         // would put the old head's flows back beside the new diff.
         if (stale()) return null;
-        // A failed request is an HTTP error; a failed trace is a 200 whose
+        // A failed request is an HTTP error; a failed run is a 200 whose
         // status says so, and must reach the panel as one.
         if (!response.ok) {
           setError((data as { error: string }).error);
@@ -89,9 +89,9 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
     [request],
   );
   const start = useCallback(() => void request("POST"), [request]);
-  /** After a failed trace: trace again, which is a paid run the user asked for. */
+  /** After a failed run: trace again, which is a paid run the user asked for. */
   const retry = start;
-  /** After a failed load: only load again. Never a trace. */
+  /** After a failed load: only load again. Never a new run. */
   const reload = useCallback(() => void request("GET"), [request]);
   const trace = useCallback(
     (hunk: string) => void request("POST", { hunk }),

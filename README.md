@@ -202,7 +202,7 @@ The window follows the repo without reloading: the server watches the
 filesystem (the working tree, plus the git dir — resolved separately, so
 linked worktrees work) and pushes a debounced event over SSE whenever
 something changes. Commit in a terminal, Cmd-Tab over, and the commit is
-already in the rail. The green dot in the header shows the watch stream is
+already in the change picker. The green dot in the header shows the watch stream is
 connected.
 
 Local events (saves, commits, branch switches) refresh from git only; the

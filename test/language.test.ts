@@ -61,6 +61,18 @@ test("every block's code paths exist", () => {
   }
 });
 
+test("every file a term names exists", () => {
+  for (const term of entries("terms")) {
+    const means = field(term, "means") ?? "";
+    for (const [, p] of means.matchAll(/`((?:lib|app|components)\/[^`]+)`/g)) {
+      assert.ok(
+        existsSync(path.join(root, p)),
+        `${field(term, "name")}: ${p} doesn't exist`,
+      );
+    }
+  }
+});
+
 test("every invariant has a rule", () => {
   for (const inv of entries("invariants")) {
     assert.ok(field(inv, "rule"), `an invariant has no rule: ${inv[0]}`);

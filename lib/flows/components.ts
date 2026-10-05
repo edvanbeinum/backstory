@@ -5,19 +5,19 @@ import { readModelAt, type Model } from "../model";
 import type { FlowSet } from "./types";
 
 /**
- * Each lane's C4 component, worked out when the flows are shown rather than
+ * Each participant's C4 component, worked out when the flows are shown rather than
  * when they're traced, so flows traced before a model existed pick one up,
  * and editing the model updates them without tracing again.
  *
- * A lane's component is where its code lives: first the files of the calls
+ * A participant's component is where its code lives: first the files of the calls
  * it makes, then, for a type that's only ever called, the file defining it.
  */
 
 const cache = ((
   globalThis as {
-    __differLaneComponents?: Map<string, Map<string, string | null>>;
+    __differParticipantComponents?: Map<string, Map<string, string | null>>;
   }
-).__differLaneComponents ??= new Map());
+).__differParticipantComponents ??= new Map());
 
 /** Bumped when the lookup changes, so a running server drops old answers. */
 const LOOKUP_VERSION = "3";
@@ -88,15 +88,16 @@ export async function attachComponents(
   if (!read) return set;
   const { model } = read;
 
-  // Keyed on everything the answer depends on: the lanes (a traced hunk
-  // adds new ones) and each element's name and globs (the model can change).
-  const lanes = [
+  // Keyed on everything the answer depends on: the participants (a traced
+  // hunk adds new ones) and each element's name and globs (the model can
+  // change).
+  const participants = [
     ...new Set(set.flows.flatMap((f) => f.participants.map((p) => p.name))),
   ].sort();
   const signature = createHash("sha1")
     .update(LOOKUP_VERSION)
     .update(set.head)
-    .update(JSON.stringify(lanes))
+    .update(JSON.stringify(participants))
     .update(
       JSON.stringify(
         [...model.elements.values()].map((e) => [e.id, e.name, e.globs]),
@@ -106,20 +107,26 @@ export async function attachComponents(
   let components = cache.get(signature);
   if (!components) {
     components = new Map();
-    const lanes = new Map<string, { external: boolean; calls: string[] }>();
+    const participants = new Map<
+      string,
+      { external: boolean; calls: string[] }
+    >();
     for (const flow of set.flows) {
       for (const p of flow.participants) {
-        const lane = lanes.get(p.name) ?? { external: p.external, calls: [] };
-        lanes.set(p.name, lane);
+        const participant = participants.get(p.name) ?? {
+          external: p.external,
+          calls: [],
+        };
+        participants.set(p.name, participant);
       }
-      for (const s of flow.after) lanes.get(s.from)?.calls.push(s.file);
+      for (const s of flow.after) participants.get(s.from)?.calls.push(s.file);
     }
-    for (const [name, lane] of lanes) {
-      if (lane.external) {
+    for (const [name, participant] of participants) {
+      if (participant.external) {
         components.set(name, null);
         continue;
       }
-      const fromCalls = vote(model, lane.calls);
+      const fromCalls = vote(model, participant.calls);
       const home = fromCalls
         ? null
         : bestDefinition(name, await definedIn(root, set.head, name));

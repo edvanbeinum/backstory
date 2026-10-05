@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   componentPath,
-  groupLanes,
+  groupParticipants,
   summarise,
   type FlowMode,
   type FlowRow,
@@ -187,7 +187,7 @@ export function FlowPanel({
       filesInDiff={filesInDiff}
       navRef={navRef}
       coverage={coverage}
-      traceError={status.traceError}
+      runError={status.runError}
       code={code}
       jumpTo={jumpTo}
       onJumped={onJumped}
@@ -207,7 +207,7 @@ function ReadyFlows({
   filesInDiff,
   navRef,
   coverage,
-  traceError,
+  runError,
   code,
   jumpTo,
   onJumped,
@@ -224,7 +224,7 @@ function ReadyFlows({
   /** Walks the flow's steps; false when there are none, so j/k move commits */
   navRef: React.MutableRefObject<((delta: number) => boolean) | null>;
   coverage: React.ReactNode;
-  traceError?: string;
+  runError?: string;
   code: InlineCode | null;
   jumpTo: string | null;
   onJumped?: () => void;
@@ -237,8 +237,9 @@ function ReadyFlows({
     () => set.flows.map((f) => summarise(f, set.hunks)),
     [set],
   );
-  const { lanes, groups } = useMemo(
-    () => (flow ? groupLanes(flow, rows) : { lanes: [], groups: [] }),
+  const { participants, groups } = useMemo(
+    () =>
+      flow ? groupParticipants(flow, rows) : { participants: [], groups: [] },
     [flow, rows],
   );
   const path = useMemo(
@@ -534,7 +535,7 @@ function ReadyFlows({
       {flow && (
         <FlowSequence
           rows={rows}
-          lanes={lanes}
+          participants={participants}
           groups={groups}
           mode={selection.mode}
           activeKeys={code ? open : activeKeys}
@@ -597,10 +598,9 @@ function ReadyFlows({
         />
       )}
 
-      {traceError && (
+      {runError && (
         <Notice tone="danger">
-          The last trace failed, so these are the flows from before it:{" "}
-          {traceError}
+          The last run failed, so these are the flows from before it: {runError}
         </Notice>
       )}
       {!code && coverage}

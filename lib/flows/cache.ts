@@ -111,7 +111,7 @@ export async function flowsStatus(view: View): Promise<FlowsStatus> {
       status: "ready",
       flows: await attachComponents(view.root, cached),
       tracing: [...(registry.tracing.get(key) ?? [])],
-      traceError: registry.failures.get(key),
+      runError: registry.failures.get(key),
     };
   }
   const failure = registry.failures.get(key);
@@ -141,8 +141,8 @@ export async function startFlows(
   const key = jobKey(await repoDir(view.root), view);
   if (registry.jobs.has(key)) return flowsStatus(view);
   // Regenerating replaces the cached flows only when the new run succeeds:
-  // a failure keeps what was paid for. Runs share one queue, so a hunk
-  // trace already queued finishes first and this run's result replaces it.
+  // a failure keeps what was paid for. Runs share one queue, so a hunk's
+  // run already queued finishes first and this run's result replaces it.
   if (!opts.regenerate && (await readCache(key))) return flowsStatus(view);
 
   const job: Job = { startedAt: Date.now(), phase: "Waiting for another run" };
