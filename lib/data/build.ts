@@ -8,9 +8,6 @@ import type { DataModel, DataResponse } from "./types";
 /**
  * Reads the data model (Rails schema and models, or Core Data) at both ends
  * of a view and diffs it.
- *
- * Files are read one by one rather than in one batch, because git's batch
- * output gives sizes in bytes and the text is sliced in characters.
  */
 
 /**
