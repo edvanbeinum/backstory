@@ -16,9 +16,6 @@ import { ReviewThreadCard } from "./ReviewThreadCard";
  * what you're doing about it. Held still while you browse changes in the diff
  * column — comments and commits are separate axes, so the ‹ › stepper here
  * belongs to comments alone.
- *
- * The tick leads, above the comment rather than below it, because it's the
- * thing you came here to do.
  */
 export function CommentsPanel({
   threads,
