@@ -18,3 +18,9 @@ Formatting and lint rules live in `eslint.config.mjs` and Prettier, not here. Ru
 
 - Read `architecture/language.yaml` before planning, and use its terms for names.
 - When you add or rename a block or a term, update `architecture/language.yaml` in the same change.
+- Read `architecture/primitives.yaml` too. Build from its primitives. If none fits, extend one. Ask before adding a new primitive.
+- Say in your plan what the change composes, extends and adds, naming the primitives:
+  - **composes**: uses a primitive as it is.
+  - **extends**: changes an existing primitive, for example a new option or a new case.
+  - **adds**: a new primitive, something meant to be reused from more than one place. Agree it first. A helper private to one file is not an add.
+- When you rename or remove a primitive, update `architecture/primitives.yaml` in the same change. The test catches a rename or removal that is missed.

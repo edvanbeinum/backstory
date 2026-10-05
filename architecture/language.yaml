@@ -46,6 +46,10 @@ terms:
     means: "`lib/flows/store.ts`: one cached SARIF file per view in `~/.differ/flows/`, plus the queue of runs that make them."
     avoid:
       - store
+  - name: primitive
+    means: A named capability differ exposes for reuse, listed in `architecture/primitives.yaml`.
+    avoid:
+      - helper or utility, for a primitive (a helper is private to one file)
 
 blocks:
   - name: git reader
