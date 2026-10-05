@@ -50,6 +50,14 @@ export type DraftStatus =
   | { status: "failed"; error: string }
   | { status: "unavailable"; reason: "no-claude" };
 
+/** What `/api/model` answers: where the repo's model at HEAD comes from */
+export interface ModelSourceResponse {
+  source: "committed" | "local" | "none";
+  /** The local model's path, when there is one */
+  file: string | null;
+  job: DraftStatus;
+}
+
 /** Why a draft didn't start: the repo commits a model, or a local one needs `redraft`. */
 export interface DraftRefusal {
   status: "refused";
