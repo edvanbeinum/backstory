@@ -291,7 +291,7 @@ export default function Page() {
     if (!ready) return;
     const inWorkspace = Boolean(repoPath);
     writeUrlState(
-      { repo: repoPath || null, ref, rev, mode: null, comment: commentId },
+      { repo: repoPath || null, ref, rev, comment: commentId },
       { push: inWorkspace !== wasInWorkspace.current },
     );
     wasInWorkspace.current = inWorkspace;

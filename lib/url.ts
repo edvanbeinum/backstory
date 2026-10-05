@@ -10,9 +10,6 @@ import type { CommitSummary } from "./types";
  * statically prerendered client component, and `useSearchParams` would drag it
  * into a Suspense boundary for no benefit here.
  */
-/** Which list the rail is showing. Comments is the default. */
-export type RailMode = "comments" | "commits";
-
 export interface UrlState {
   repo: string | null;
   /**
@@ -22,8 +19,6 @@ export interface UrlState {
    */
   ref?: string | null;
   rev: string | null;
-  /** Rail mode; null means the default (comments) */
-  mode: RailMode | null;
   /** Selected review thread id */
   comment: string | null;
 }
@@ -33,15 +28,11 @@ export function parseUrlState(search: string): UrlState {
   const params = new URLSearchParams(search);
   const repo = params.get("repo")?.trim();
   const rev = params.get("rev")?.trim();
-  const mode = params.get("mode")?.trim();
   const comment = params.get("comment")?.trim();
 
   return {
     repo: repo ? repo : null,
     rev: rev ? rev : null,
-    // Anything other than the two known modes is treated as absent rather
-    // than trusted into state.
-    mode: mode === "comments" || mode === "commits" ? mode : null,
     comment: comment ? comment : null,
   };
 }
@@ -50,13 +41,6 @@ export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
   const params = new URLSearchParams();
   if (state.repo) params.set("repo", state.repo);
   if (state.ref) params.set("ref", state.ref);
-  // Only the non-default mode is worth spelling out.
-  if (state.mode === "commits") params.set("mode", "commits");
-
-  // Each param is emitted independently of mode, so a link carries where you
-  // were in *both* lists — toggling back to Commits returns you to the commit
-  // you were reading rather than resetting it.
-  //
   // `working` is the default landing spot; leaving it out keeps the common
   // URL short, and a missing rev falls back to it anyway.
   if (state.rev && state.rev !== WORKING_REV) params.set("rev", state.rev);
@@ -74,7 +58,6 @@ export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
 const EMPTY_STATE: UrlState = {
   repo: null,
   rev: null,
-  mode: null,
   comment: null,
 };
 

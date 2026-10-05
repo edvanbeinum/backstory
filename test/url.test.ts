@@ -62,7 +62,6 @@ test("omits the default rev to keep the common URL short", () => {
 const EMPTY = {
   repo: null,
   rev: null,
-  mode: null,
   comment: null,
 };
 
@@ -71,26 +70,27 @@ test("an empty query yields nulls, not empty strings", () => {
   assert.deepEqual(parseUrlState("?repo=&rev=  &comment=  "), EMPTY);
 });
 
-test("mode round-trips, and only the non-default one is written", () => {
-  assert.equal(parseUrlState("?mode=commits").mode, "commits");
-  assert.equal(parseUrlState("?mode=comments").mode, "comments");
-  // An unknown mode is treated as absent rather than trusted into state
-  assert.equal(parseUrlState("?mode=nonsense").mode, null);
+test("an old link with mode= still opens and drops it", () => {
+  const parsed = parseUrlState(
+    "?repo=/r&mode=commits&rev=abc1234&comment=PRRT_x",
+  );
 
-  assert.match(buildUrl({ repo: "/r", mode: "commits" }), /mode=commits/);
-  assert.doesNotMatch(buildUrl({ repo: "/r", mode: "comments" }), /mode=/);
+  assert.deepEqual(parsed, {
+    repo: "/r",
+    rev: "abc1234",
+    comment: "PRRT_x",
+  });
+  assert.doesNotMatch(buildUrl(parsed), /mode=/);
 });
 
 test("a link carries your place in both lists", () => {
   const url = buildUrl({
     repo: "/r",
-    mode: "commits",
     rev: "abc1234",
     comment: "PRRT_abc",
   });
   const parsed = parseUrlState(new URL(url, "http://x").search);
 
-  // Toggling back to comments should not have lost the selected comment
   assert.equal(parsed.rev, "abc1234");
   assert.equal(parsed.comment, "PRRT_abc");
 });
