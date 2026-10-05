@@ -533,11 +533,7 @@ type Finished = Extract<DraftStatus, { status: "done" }>;
 type ModelAnswer = ModelSourceResponse | { error: string };
 type JobState = DraftStatus["status"];
 
-/**
- * The repo's model source and its draft, fetched only where a draft could
- * be offered: no model at the view, or a local one. Polls while a draft
- * runs, as the flows panel does; drafts are rare, so no watch event.
- */
+/** Polls while a draft runs rather than adding a watch event: drafts are rare. */
 function useModelDraft(repo: string, wanted: boolean, onDrafted: () => void) {
   const [answer, setAnswer] = useState<{
     repo: string;

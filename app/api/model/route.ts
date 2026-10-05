@@ -15,12 +15,6 @@ import type { ApiError } from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/**
- * The repo's C4 model at HEAD, and drafting a local one. GET says where the
- * model comes from and how a draft is going; POST starts a draft, or with
- * `redraft=1` replaces the local model. The strip polls GET while one runs.
- */
-
 async function resolve(request: Request) {
   const { searchParams } = new URL(request.url);
   const repoPath = searchParams.get("repo");
