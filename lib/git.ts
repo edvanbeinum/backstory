@@ -11,6 +11,16 @@ import type {
   WorkingTreeInfo,
 } from "./types";
 
+/**
+ * Reads repos, commits, patches and the working tree, all through `git()`,
+ * and never writes to the repo.
+ *
+ * The base of "All changes" comes from the PR's `baseRefName` when there is
+ * a PR, so a stacked PR doesn't also show its parent branches. A commit
+ * linked to a thread survives a rebase because the link is kept by patch-id,
+ * not sha.
+ */
+
 export class RepoError extends Error {
   constructor(
     message: string,

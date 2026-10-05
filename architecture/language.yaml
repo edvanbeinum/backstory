@@ -60,7 +60,7 @@ blocks:
       - lib/pushed.ts
       - lib/view.ts
     summary: Reads repos, commits, patches and the working tree through git, and works out what counts as not yet pushed.
-    read: 'README "How "not yet pushed" is decided"'
+    read: '`lib/git.ts` header, then README "How "not yet pushed" is decided"'
   - name: diff and anchors
     code:
       - lib/diff.ts
@@ -74,7 +74,7 @@ blocks:
       - lib/github.ts
       - lib/inbox.ts
     summary: Pull requests and review threads through `gh`, degrading to "unavailable" rather than failing.
-    read: 'README "Three levels"'
+    read: '`lib/github.ts` header, then README "Three levels"'
   - name: store
     code:
       - lib/store.ts
@@ -99,7 +99,7 @@ blocks:
     code:
       - lib/data/
     summary: Reads the data model (Rails schema and models, or Core Data) at both ends of a view and diffs it.
-    read: 'README "Diagrams: the map, the data model and flows"'
+    read: '`lib/data/build.ts` header, then README "Diagrams: the map, the data model and flows"'
   - name: agent review loop
     code:
       - lib/review.ts
