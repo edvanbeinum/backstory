@@ -80,9 +80,7 @@ const isWithin = (inner: string, outer: string) =>
   inner === outer || inner.startsWith(`${outer}.`);
 
 export interface SerializeOptions {
-  /** Lines for the comment above `workspace` */
   header?: string[];
-  /** The `differ.drafted` property: the day the draft was made */
   drafted?: string;
 }
 

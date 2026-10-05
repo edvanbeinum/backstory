@@ -636,7 +636,6 @@ function Elapsed({ since }: { since: number }) {
 const filesLeft = (n: number) =>
   `${n} ${n === 1 ? "file" : "files"} no component covers`;
 
-/** A draft's progress, failure or result: whatever the job says, if anything. */
 function DraftProgress({ draft }: { draft: DraftApi }) {
   const job = draft.source?.job;
   if (draft.error)
