@@ -271,6 +271,10 @@ function read(text: string, format: "dsl" | "json", local: boolean): ModelRead {
  * The first model file found is the model: the DSL, then the JSON, at the
  * rev, then on this machine. A DSL that fails doesn't fall back to a JSON
  * beside it, which is a leftover export once the DSL is read directly.
+ * Flows then filter files as in a repo with no model, so a change the model
+ * would mark as tests or ignored can still cost a `claude -p` trace. That's
+ * the cost any repo without a model already pays, and the map strip shows
+ * the DSL's error so it gets fixed.
  */
 export async function readModelAt(
   root: string,
