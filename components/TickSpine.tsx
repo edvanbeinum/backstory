@@ -7,8 +7,8 @@ import { TickCheck, useTickPulse } from "./Tick";
 /**
  * The 48px column of ticks.
  *
- * It replaced a 300px rail that repeated, in text, everything the comment
- * pane beside it already showed. What a standing list is actually for is two
+ * It replaced a 300px rail that repeated, in text, everything the comments
+ * panel beside it already showed. What a standing list is actually for is two
  * things — how far through you are, and jumping to any comment in one click —
  * and both survive at this width. The diff gets the rest.
  *

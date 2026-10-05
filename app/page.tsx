@@ -374,7 +374,7 @@ export default function Page() {
 
           // Arriving with no rev asked for, on a comment that already names
           // the change answering it: show that change rather than an empty
-          // "Uncommitted" pane. Only ever a fallback — an explicit rev, and
+          // Uncommitted diff. Only ever a fallback — an explicit rev, and
           // anything you pick later, wins.
           if (next === WORKING_REV && !data.working.hasChanges) {
             const thread = data.github.threads.find((t) => t.id === landedOn);
@@ -870,9 +870,9 @@ export default function Page() {
       setFocusedThreadId(id);
       setColumnTab("comments");
       const thread = threads.find((t) => t.id === id) ?? null;
-      // null means leave the change column alone — the two panes are separate
-      // axes, and an unlinked comment has nothing to say about which change
-      // you should be looking at.
+      // null means leave the diff column alone — comments and changes are
+      // separate axes, and an unlinked comment has nothing to say about which
+      // change you should be looking at.
       const linked = openingChangeFor(thread);
       if (linked) setRev(linked);
       window.scrollTo({ top: 0 });
