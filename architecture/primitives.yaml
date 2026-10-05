@@ -1,6 +1,7 @@
 # The capabilities differ already has, for new work to build from.
 # Build from these. If none fits, extend one. Ask before adding a new one.
 # `block` names a block in language.yaml; code in no block leaves it out.
+# The idea of naming primitives comes from https://kcd-slides-event-mega-its-time.pages.dev
 
 primitives:
   - name: run git
