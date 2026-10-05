@@ -385,3 +385,23 @@ test("a local model is only replaced by a redraft, which keeps the old one", asy
   assert.equal(readFileSync(file, "utf8"), second);
   assert.equal(readFileSync(`${file}.bak`, "utf8"), first);
 });
+
+test("a redraft sent while a refused draft is still being checked still runs", async () => {
+  const repo = gitRepo();
+  await draft(repo.dir, [CLEAN]);
+  const file = await localModelFile(repo.dir);
+
+  const renamed = structuredClone(CLEAN);
+  renamed.system.name = "Shop, redrafted";
+  const { runner, prompts } = recorded([renamed]);
+  const [stale, redraft] = await Promise.all([
+    startDraft(repo.dir, { runner, available }),
+    startDraft(repo.dir, { runner, available, redraft: true }),
+  ]);
+  assert.deepEqual(stale, { status: "refused", reason: "exists" });
+  assert.equal(redraft.status, "running");
+  await draftSettled(repo.dir);
+  assert.equal((await draftStatus(repo.dir)).status, "done");
+  assert.equal(prompts.length, 1);
+  assert.match(readFileSync(file, "utf8"), /"Shop, redrafted"/);
+});

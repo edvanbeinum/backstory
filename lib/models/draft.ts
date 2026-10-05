@@ -213,6 +213,7 @@ export async function draftModel(opts: {
 interface Job {
   status: DraftStatus;
   settled: Promise<void>;
+  checking?: Promise<void>;
 }
 
 const g = globalThis as { __differModels?: Map<string, Job> };
@@ -266,7 +267,15 @@ export async function startDraft(
 ): Promise<DraftStatus | DraftRefusal> {
   const dir = await localModelDir(root);
   const previous = jobs.get(dir);
-  if (previous?.status.status === "running") return previous.status;
+  if (previous?.status.status === "running") {
+    // Wait out a claim that is still being checked, since it may yet be
+    // refused: a Redraft must not return a draft that never runs.
+    if (previous.checking) {
+      await previous.checking;
+      return startDraft(root, opts);
+    }
+    return previous.status;
+  }
   // Claim the repo before the checks below, which wait: a second click
   // meanwhile sees this job rather than starting another.
   const running = {
@@ -274,21 +283,37 @@ export async function startDraft(
     phase: "Starting",
     startedAt: Date.now(),
   };
-  const job: Job = { status: running, settled: Promise.resolve() };
+  let checked = () => {};
+  const job: Job = {
+    status: running,
+    settled: Promise.resolve(),
+    checking: new Promise((resolve) => (checked = resolve)),
+  };
   jobs.set(dir, job);
-  const refuse = (reason: DraftRefusal["reason"]): DraftRefusal => {
+  const release = () => {
     if (previous) jobs.set(dir, previous);
     else jobs.delete(dir);
-    return { status: "refused", reason };
   };
 
-  if ((await showFile(root, "HEAD", MODEL_DSL)) !== null)
-    return refuse("committed");
-  if (!opts.redraft && (await exists(path.join(dir, "workspace.dsl"))))
-    return refuse("exists");
-  if (!(await (opts.available ?? claudeAvailable)())) {
-    job.status = { status: "unavailable", reason: "no-claude" };
-    return job.status;
+  try {
+    if ((await showFile(root, "HEAD", MODEL_DSL)) !== null) {
+      release();
+      return { status: "refused", reason: "committed" };
+    }
+    if (!opts.redraft && (await exists(path.join(dir, "workspace.dsl")))) {
+      release();
+      return { status: "refused", reason: "exists" };
+    }
+    if (!(await (opts.available ?? claudeAvailable)())) {
+      job.status = { status: "unavailable", reason: "no-claude" };
+      return job.status;
+    }
+  } catch (err) {
+    release();
+    throw err;
+  } finally {
+    job.checking = undefined;
+    checked();
   }
 
   job.settled = (async () => {
