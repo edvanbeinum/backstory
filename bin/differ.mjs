@@ -6,8 +6,9 @@
  *   differ <path>       open a specific repo
  *   differ --no-open    make sure the server is running, don't open a window
  *   differ --port N     use a specific port (default 4460, env DIFFER_PORT)
- *                       (the installed app window is used on the default port;
- *                       env DIFFER_APP points at a different app)
+ *                       (the Mac app, or else the installed app window, is
+ *                       used on the default port; env DIFFER_APP points at a
+ *                       different app)
  *   differ review [path]
  *                       wait for you to review the uncommitted changes, then
  *                       print your notes to stdout and exit — for an agent
@@ -21,8 +22,8 @@
  *
  * One server serves every repo. If a differ is already running (the login
  * agent, the `brew services` one, or a terminal's), this reuses it: the repo
- * is handed to the running server and the app window/browser is focused on
- * it. When nothing is running, on macOS this installs a login agent that
+ * is handed to the running server and the Mac app (bin/macapp.mjs), app
+ * window or browser is focused on it. When nothing is running, on macOS this installs a login agent that
  * keeps a server running from then on (bin/launchd.mjs); elsewhere, or with
  * --foreground, it starts one tied to this terminal.
  */
@@ -40,6 +41,7 @@ import {
   stopHook,
 } from "./hook.mjs";
 import * as launchd from "./launchd.mjs";
+import { findMacApp, repoLink } from "./macapp.mjs";
 
 // First, before anything that could start, restart or wait on a server: the
 // hook runs on every turn of every session and must only ever ask.
@@ -83,7 +85,8 @@ function parseArgs(argv) {
           "       differ review [path] [--port N] [--no-open]\n" +
           "       differ install [--port N] | differ uninstall\n" +
           "       differ hook stop   (Claude Code Stop hook; see the README)\n" +
-          "Opens the repo (default: cwd) in the differ review app.\n" +
+          "Opens the repo (default: cwd) in the differ review app: the Mac\n" +
+          "app when it's in Applications, else the installed window.\n" +
           "`review` then waits for you to send notes on the uncommitted\n" +
           "changes, prints them to stdout, and exits.\n" +
           "On macOS the server runs as a login agent, installed on first use.",
@@ -150,11 +153,21 @@ function findApp(port) {
   );
 }
 
-function openWindow(url) {
+function openWindow(url, repo) {
   const inBrowser = () =>
     execFile("open", [url], (err) => {
       if (err) console.error(`couldn't open a browser — visit ${url}`);
     });
+
+  // By path, so the link reaches this copy of the app (launching it if it
+  // isn't running), whichever copy LaunchServices thinks owns differ://.
+  const macApp = args.port === DEFAULT_PORT ? findMacApp() : null;
+  if (macApp) {
+    execFile("open", ["-a", macApp, repoLink(repo)], (err) => {
+      if (err) inBrowser();
+    });
+    return;
+  }
 
   const app = findApp(args.port);
   if (!app) return inBrowser();
@@ -210,7 +223,7 @@ async function handOff() {
     return null;
   }
   recordPort(args.port);
-  if (args.open) openWindow(`${base}/`);
+  if (args.open) openWindow(`${base}/`, body.repo);
   return body.repo;
 }
 
