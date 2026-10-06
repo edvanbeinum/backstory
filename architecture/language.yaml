@@ -49,6 +49,11 @@ terms:
     means: "A C4 model kept on this machine for a repo that doesn't commit one, at `~/.differ/models/<repo>/workspace.dsl` (`localModelDir` in `lib/model.ts`). Claude can draft one (`lib/models/draft.ts`)."
     avoid:
       - draft alone, for the model (reply drafts are `lib/drafts.ts`)
+  - name: Mac app
+    means: "The native app in `mac/` that shows differ's UI in a web view, and opens repos from `differ://open?repo=` links."
+    avoid:
+      - shell (that's the command shell)
+      - wrapper
   - name: primitive
     means: A named capability differ exposes for reuse, listed in `architecture/primitives.yaml`.
     avoid:
@@ -130,9 +135,15 @@ blocks:
     code:
       - bin/differ.mjs
       - bin/launchd.mjs
+      - bin/macapp.mjs
       - packaging/
     summary: The `differ` command, the login agent that keeps the server running, and the Homebrew formula.
     read: 'README "Running it as an app"'
+  - name: Mac app
+    code:
+      - mac/
+    summary: A Swift app with one web view on the login agent's server, a native view while the server is down, and the `differ://` URL scheme.
+    read: "`mac/differ/differ/MainWindowController.swift`, the comment on `MainWindowController`"
 
 invariants:
   - rule: Every read-modify-write of a store file runs inside `withStore`, and a batch is one write, not a loop of single-key writes.

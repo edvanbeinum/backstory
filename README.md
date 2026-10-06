@@ -123,6 +123,28 @@ focus. One server handles all your checkouts (default port 4460).
 you use `brew services start differ` instead, the CLI sees Homebrew's agent
 and doesn't install its own.
 
+### The Mac app
+
+A native window instead of Chrome's or Safari's, with Xcode installed:
+
+```bash
+npm run mac:build
+```
+
+Drag `mac/build/differ.app` to Applications. From then on `differ` opens
+repos in it (with a `differ://open?repo=<path>` link), and File → Open Repo…
+or a folder dropped on its Dock icon does the same. The server is still the
+login agent's: while it isn't answering, the window says so instead of
+showing a dead page, and picks up again when it's back. The build runs on the
+Mac that built it; it isn't signed for anyone else's yet.
+
+`npm run mac:smoke` checks the built app against a stand-in server on a spare
+port. To point the app at a dev server, pass it the address:
+
+```bash
+open mac/build/differ.app --args -serverURL http://127.0.0.1:3000
+```
+
 ### When the server isn't running
 
 The installed window can outlive the server — before the login agent is
