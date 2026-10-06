@@ -9,6 +9,9 @@ const nextConfig: NextConfig = {
   // makes Next copy the whole package into the standalone trace instead of
   // trying (and failing) to statically bundle the per-language JSON.
   serverExternalPackages: ["shiki"],
+  // `lib/exec.ts` makes Next trace the whole project, which would copy the
+  // Mac app's sources and its Xcode build output into the server.
+  outputFileTracingExcludes: { "/*": ["./mac/**/*"] },
 };
 
 export default nextConfig;
