@@ -139,6 +139,12 @@ struct ServerStateTests {
         #expect(state.phase == .failed(.portInUse))
     }
 
+    @Test func anOddAnswerFromTheAppsOwnServerIsAFailedPoll() {
+        var state = showingOwned()
+        #expect(state.healthAnswered(.other, serverRunning: true) == ServerState.Effect(spawnAfter: 0))
+        #expect(state.phase == .restarting)
+    }
+
     @Test func aDifferAlreadyAnsweringIsShownAndItsGoingAwayStartsOne() {
         var state = ServerState(server: server, mode: .owned)
         #expect(state.healthAnswered(.differ, serverRunning: false) == ServerState.Effect(load: home))

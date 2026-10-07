@@ -60,6 +60,9 @@ struct ServerState {
     /// none is, the app starts one.
     mutating func healthAnswered(_ health: Health, serverRunning: Bool, at now: Date = Date()) -> Effect {
         if case .failed = phase { return .none }
+        // Treat an odd answer while the app's own server runs as no answer:
+        // that server holds the port, so it isn't another app's.
+        let health = health == .other && serverRunning ? .nothing : health
         switch (health, mode) {
         case (.differ, _):
             guard phase != .showing else { return .none }
