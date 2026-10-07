@@ -15,7 +15,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
-    "mac:build": "bash mac/build.sh",
+    "mac:build": "npm run build && bash mac/build.sh",
     "mac:smoke": "node mac/smoke.mjs",
     "test:mac": "if [ \"$(uname)\" = Darwin ]; then xcodebuild test -quiet -project mac/differ/differ.xcodeproj -scheme differ -destination platform=macOS -derivedDataPath mac/build/DerivedData -only-testing:differTests; fi",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
