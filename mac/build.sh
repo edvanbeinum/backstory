@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Builds mac/build/differ.app from the Xcode project, with differ's icon,
 # package.json's version, and the standalone server and a Node to run it in
-# the bundle. Run `npm run build` first; `npm run mac:build` does. It runs on
-# the machine that built it; it isn't signed for anyone else's.
+# the bundle. Run `npm run build` first; `npm run mac:build` does. It signs
+# with DIFFER_SIGN_IDENTITY, else a Developer ID Application certificate in
+# the keychain, else the identity Xcode used, which Gatekeeper rejects on any
+# other Mac.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,7 +35,19 @@ xcodebuild -quiet -project mac/differ/differ.xcodeproj -scheme differ \
 
 rm -rf "$app"
 ditto "$out/DerivedData/Build/Products/Release/differ.app" "$app"
-identity="$(codesign -dvv "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+identity="${DIFFER_SIGN_IDENTITY:-}"
+if [ -z "$identity" ]; then
+  identity="$(security find-identity -v -p codesigning |
+    sed -n 's/.*"\(Developer ID Application: .*\)"$/\1/p' | head -1)"
+fi
+if [ -z "$identity" ]; then
+  identity="$(codesign -dvv "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
+fi
+identity="${identity:--}"
+# Ask Apple's server for a secure timestamp, which notarization requires,
+# unless the build is ad hoc: that one never leaves this Mac.
+timestamp=--timestamp
+[ "$identity" = - ] && timestamp=--timestamp=none
 
 # Copy an allowlist, never the whole folder: `lib/exec.ts` makes Next trace
 # the project, so the standalone output also holds the sources, tests and
@@ -66,13 +80,16 @@ plist="$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string differ" "$plist"
 
 # Sign Node first, with the JIT entitlements V8 can't run without under the
-# hardened runtime, then the app, with the identity Xcode used (ad hoc when it
-# used none). The app's signature has to be last because adding the server,
-# Node and the icon broke Xcode's, and it must not re-sign Node (no --deep), or
-# Node loses its entitlements and the server crashes at once.
-codesign --force --options runtime --entitlements mac/node.entitlements \
-  --sign "${identity:--}" "$app/Contents/Helpers/node"
-codesign --force --options runtime --preserve-metadata=entitlements \
-  --sign "${identity:--}" "$app"
+# hardened runtime, then the app. The app's signature has to be last because
+# adding the server, Node and the icon broke Xcode's, and it must not re-sign
+# Node (no --deep), or Node loses its entitlements and the server crashes at
+# once. The app gets no entitlements: Xcode's carried get-task-allow, which
+# notarization refuses, and it needs no others.
+codesign --force --options runtime "$timestamp" \
+  --entitlements mac/node.entitlements \
+  --sign "$identity" "$app/Contents/Helpers/node"
+codesign --force --options runtime "$timestamp" --sign "$identity" "$app"
+codesign --verify --deep --strict "$app"
 
 echo "built $app ($version, $(du -sh "$app" | cut -f1))"
+echo "signed with $identity"
