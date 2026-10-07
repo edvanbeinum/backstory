@@ -1,41 +1,112 @@
 import Foundation
 
-/// Whether the window shows differ's page or the native waiting view, and the
-/// repo to open once the server answers.
+/// Decides what the window shows and when the app starts differ's server,
+/// from health answers and server exits, so the window is up only while a
+/// differ answers. Pure, so every transition is tested without a server.
 struct ServerState {
-    enum Phase: Equatable {
-        case waiting
-        case showing
+    /// Owned: the app starts the server from its bundle and restarts it.
+    /// Attached: it shows whatever answers at `server` and never starts one.
+    enum Mode {
+        case owned
+        case attached
     }
+
+    enum Phase: Equatable {
+        case starting
+        case showing
+        case restarting
+        case failed(Failure)
+        case attachedWaiting
+    }
+
+    enum Failure: Equatable {
+        case portInUse
+        case keepsStopping
+    }
+
+    /// What the window controller does after an event. A spawn replaces any
+    /// server the app is already running.
+    struct Effect: Equatable {
+        var spawnAfter: TimeInterval?
+        var stop = false
+        var load: URL?
+
+        static let none = Effect()
+    }
+
+    /// Restarts back off by death count inside `budgetWindow`; one more death
+    /// than there are delays gives up, so a server that can't start doesn't
+    /// spin forever.
+    static let restartDelays: [TimeInterval] = [0, 1, 2]
+    static let budgetWindow: TimeInterval = 60
 
     let server: URL
-    private(set) var phase = Phase.waiting
+    let mode: Mode
+    let log: String?
+    private(set) var phase: Phase
     private(set) var pending: URL?
+    private(set) var lastAddress: URL?
+    private var deaths: [Date] = []
 
-    init(server: URL) {
+    init(server: URL, mode: Mode, log: String? = nil) {
         self.server = server
+        self.mode = mode
+        self.log = log
+        phase = mode == .owned ? .starting : .attachedWaiting
     }
 
-    /// Applies a health poll's answer. Returns the address to load when the
-    /// answer brings the page up.
-    mutating func healthAnswered(isDiffer: Bool) -> URL? {
-        guard isDiffer else {
-            phase = .waiting
-            return nil
+    /// Applies a health poll's answer. `serverRunning` says whether a server
+    /// the app started is running or about to be; when nothing answers and
+    /// none is, the app starts one.
+    mutating func healthAnswered(_ health: Health, serverRunning: Bool, at now: Date = Date()) -> Effect {
+        if case .failed = phase { return .none }
+        switch (health, mode) {
+        case (.differ, _):
+            guard phase != .showing else { return .none }
+            phase = .showing
+            defer { pending = nil }
+            return Effect(load: pending ?? lastAddress ?? URL(string: "/", relativeTo: server)!.absoluteURL)
+        case (_, .attached):
+            phase = .attachedWaiting
+            return .none
+        case (.other, .owned):
+            phase = .failed(.portInUse)
+            return Effect(stop: true)
+        case (.nothing, .owned):
+            switch phase {
+            case .showing:
+                return died(at: now)
+            case .starting, .restarting:
+                return serverRunning ? .none : Effect(spawnAfter: 0)
+            default:
+                return .none
+            }
         }
-        guard phase == .waiting else { return nil }
-        phase = .showing
-        defer { pending = nil }
-        return pending ?? URL(string: "/", relativeTo: server)!.absoluteURL
     }
 
+    /// The server the app started has exited.
+    mutating func processExited(at now: Date = Date()) -> Effect {
+        guard mode == .owned else { return .none }
+        if case .failed = phase { return .none }
+        return died(at: now)
+    }
+
+    /// Puts the window back to waiting without starting anything; the next
+    /// health answer decides whether the server has really gone.
     mutating func navigationFailed() {
-        phase = .waiting
+        guard phase == .showing else { return }
+        phase = mode == .owned ? .starting : .attachedWaiting
+    }
+
+    mutating func retry() {
+        guard case .failed = phase else { return }
+        phase = .starting
+        deaths = []
     }
 
     /// Asks for a repo's address. Returns it to load now while the page is up;
-    /// while waiting it is kept for when the server answers, so a link that
-    /// launches the app isn't dropped.
+    /// otherwise keeps it for when a differ answers, so a link that launches
+    /// the app isn't dropped.
     mutating func open(_ address: URL) -> URL? {
         guard phase == .showing else {
             pending = address
@@ -43,6 +114,60 @@ struct ServerState {
         }
         return address
     }
+
+    /// Records where the page is, so a restart brings back the repo that was
+    /// open rather than the inbox.
+    mutating func pageMoved(to url: URL) {
+        guard phase == .showing, url.scheme == server.scheme, url.host == server.host,
+            url.port == server.port
+        else { return }
+        lastAddress = url
+    }
+
+    private mutating func died(at now: Date) -> Effect {
+        deaths = deaths.filter { now.timeIntervalSince($0) < Self.budgetWindow } + [now]
+        guard deaths.count <= Self.restartDelays.count else {
+            phase = .failed(.keepsStopping)
+            return Effect(stop: true)
+        }
+        phase = .restarting
+        return Effect(spawnAfter: Self.restartDelays[deaths.count - 1])
+    }
+
+    var message: WaitingMessage {
+        switch phase {
+        case .starting, .showing:
+            return WaitingMessage(title: "Starting differ…")
+        case .restarting:
+            return WaitingMessage(title: "Restarting differ…")
+        case .attachedWaiting:
+            return WaitingMessage(title: "Nothing is answering at \(server.absoluteString)")
+        case .failed(.portInUse):
+            return WaitingMessage(
+                title: "Port \(server.port.map(String.init) ?? "") is in use by another app",
+                detail: "Quit that app, then try again.",
+                retry: true
+            )
+        case .failed(.keepsStopping):
+            return WaitingMessage(
+                title: "differ's server keeps stopping",
+                detail: log.map { "Its log is at \($0)." },
+                retry: true
+            )
+        }
+    }
+}
+
+struct WaitingMessage: Equatable {
+    var title: String
+    var detail: String?
+    var retry = false
+}
+
+enum Health {
+    case differ
+    case other
+    case nothing
 }
 
 /// Asks the server's `/api/health` whether what answers on the port is differ.
@@ -52,7 +177,7 @@ enum HealthProbe {
         return body?["app"] as? String == "differ"
     }
 
-    static func check(_ server: URL) async -> Bool {
+    static func check(_ server: URL) async -> Health {
         let request = URLRequest(
             url: URL(string: "/api/health", relativeTo: server)!,
             cachePolicy: .reloadIgnoringLocalCacheData,
@@ -60,9 +185,32 @@ enum HealthProbe {
         )
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            return (response as? HTTPURLResponse)?.statusCode == 200 && isDiffer(data)
+            return (response as? HTTPURLResponse)?.statusCode == 200 && isDiffer(data) ? .differ : .other
         } catch {
-            return false
+            return .nothing
         }
+    }
+}
+
+/// The login agent `differ` used to install, which `KeepAlive` would keep
+/// holding the port against the app.
+enum LoginAgent {
+    static let label = "dev.differ.server"
+
+    static var plist: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents/\(label).plist")
+    }
+
+    static func port(fromPlist data: Data) -> Int? {
+        let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
+        let env = plist?["EnvironmentVariables"] as? [String: Any]
+        return (env?["PORT"] as? String).flatMap { Int($0) }
+    }
+
+    /// Only an agent serving the app's own port is in its way, so a smoke test
+    /// on a spare port leaves the user's agent alone.
+    static func shouldBootOut(mode: ServerState.Mode, appPort: Int, agentPort: Int?) -> Bool {
+        mode == .owned && agentPort == appPort
     }
 }

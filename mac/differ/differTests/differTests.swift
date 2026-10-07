@@ -65,60 +65,184 @@ struct RepoLinkTests {
     }
 }
 
+private let home = URL(string: "http://127.0.0.1:4460/")!
+
+/// An owned-mode state showing the server the app started.
+private func showingOwned() -> ServerState {
+    var state = ServerState(server: server, mode: .owned, log: "/tmp/differ/server.log")
+    _ = state.healthAnswered(.nothing, serverRunning: false)
+    _ = state.healthAnswered(.differ, serverRunning: true)
+    return state
+}
+
 @MainActor
 struct ServerStateTests {
     private var repo: URL { RepoLink.address(forRepo: "/Users/me/code/app", server: server) }
 
-    @Test func waitsUntilDifferAnswers() {
-        var state = ServerState(server: server)
-        #expect(state.phase == .waiting)
-        #expect(state.healthAnswered(isDiffer: true)?.absoluteString == "http://127.0.0.1:4460/")
+    @Test func aServerExitWhileShowingRestartsItAndBringsBackTheLastPage() {
+        var state = showingOwned()
+        state.pageMoved(to: repo)
+        #expect(state.processExited() == ServerState.Effect(spawnAfter: 0))
+        #expect(state.phase == .restarting)
+        #expect(state.healthAnswered(.differ, serverRunning: true) == ServerState.Effect(load: repo))
         #expect(state.phase == .showing)
     }
 
-    @Test func staysWaitingWhenSomethingElseAnswersOrNothingDoes() {
-        var state = ServerState(server: server)
-        #expect(state.healthAnswered(isDiffer: false) == nil)
-        #expect(state.phase == .waiting)
+    @Test func aFailedPollWhileShowingRestartsTheServer() {
+        var state = showingOwned()
+        #expect(state.healthAnswered(.nothing, serverRunning: true) == ServerState.Effect(spawnAfter: 0))
+        #expect(state.phase == .restarting)
     }
 
-    @Test func aFailedPollPutsTheWaitingViewBack() {
-        var state = ServerState(server: server)
-        _ = state.healthAnswered(isDiffer: true)
-        #expect(state.healthAnswered(isDiffer: false) == nil)
-        #expect(state.phase == .waiting)
+    @Test func ownedModeStartsTheServerWhenNothingAnswers() {
+        var state = ServerState(server: server, mode: .owned)
+        #expect(state.phase == .starting)
+        #expect(state.healthAnswered(.nothing, serverRunning: false) == ServerState.Effect(spawnAfter: 0))
+        #expect(state.healthAnswered(.nothing, serverRunning: true) == .none)
+        #expect(state.phase == .starting)
+        #expect(state.healthAnswered(.differ, serverRunning: true) == ServerState.Effect(load: home))
+        #expect(state.phase == .showing)
     }
 
-    @Test func aFailedNavigationPutsTheWaitingViewBack() {
-        var state = ServerState(server: server)
-        _ = state.healthAnswered(isDiffer: true)
+    @Test func threeDeathsInsideAMinuteRestartAndTheFourthGivesUp() {
+        var state = showingOwned()
+        let start = Date()
+        let delays = (0..<3).compactMap {
+            state.processExited(at: start.addingTimeInterval(Double($0) * 10)).spawnAfter
+        }
+        #expect(delays == ServerState.restartDelays)
+        #expect(state.processExited(at: start.addingTimeInterval(30)) == ServerState.Effect(stop: true))
+        #expect(state.phase == .failed(.keepsStopping))
+        #expect(state.healthAnswered(.nothing, serverRunning: false) == .none)
+    }
+
+    @Test func deathsOlderThanAMinuteDontCount() {
+        var state = showingOwned()
+        let start = Date()
+        for i in 0..<3 { _ = state.processExited(at: start.addingTimeInterval(Double(i))) }
+        #expect(state.processExited(at: start.addingTimeInterval(61)).spawnAfter != nil)
+        #expect(state.phase == .restarting)
+    }
+
+    @Test func retryFromFailedStartsAgainWithTheBudgetReset() {
+        var state = showingOwned()
+        for _ in 0..<4 { _ = state.processExited() }
+        state.retry()
+        #expect(state.phase == .starting)
+        #expect(state.healthAnswered(.nothing, serverRunning: false) == ServerState.Effect(spawnAfter: 0))
+        for _ in 0..<3 { #expect(state.processExited().spawnAfter != nil) }
+    }
+
+    @Test func somethingElseOnThePortWhileStartingFails() {
+        var state = ServerState(server: server, mode: .owned)
+        #expect(state.healthAnswered(.other, serverRunning: false) == ServerState.Effect(stop: true))
+        #expect(state.phase == .failed(.portInUse))
+    }
+
+    @Test func aDifferAlreadyAnsweringIsShownAndItsGoingAwayStartsOne() {
+        var state = ServerState(server: server, mode: .owned)
+        #expect(state.healthAnswered(.differ, serverRunning: false) == ServerState.Effect(load: home))
+        #expect(state.phase == .showing)
+        #expect(state.healthAnswered(.nothing, serverRunning: false).spawnAfter == 0)
+    }
+
+    @Test(arguments: [Health.differ, .other, .nothing])
+    func attachedModeNeverStartsAServer(_ first: Health) {
+        var state = ServerState(server: server, mode: .attached)
+        #expect(state.phase == .attachedWaiting)
+        for health in [first, .nothing, .differ, .other, .nothing] {
+            #expect(state.healthAnswered(health, serverRunning: false).spawnAfter == nil)
+        }
+        #expect(state.processExited().spawnAfter == nil)
+        #expect(state.phase == .attachedWaiting)
+    }
+
+    @Test func aFailedNavigationWaitsWithoutStartingAnything() {
+        var state = showingOwned()
         state.navigationFailed()
-        #expect(state.phase == .waiting)
+        #expect(state.phase == .starting)
+        #expect(state.healthAnswered(.nothing, serverRunning: true) == .none)
     }
 
     @Test func anotherPollWhileShowingLoadsNothing() {
-        var state = ServerState(server: server)
-        _ = state.healthAnswered(isDiffer: true)
-        #expect(state.healthAnswered(isDiffer: true) == nil)
+        var state = showingOwned()
+        #expect(state.healthAnswered(.differ, serverRunning: true) == .none)
         #expect(state.phase == .showing)
     }
 
-    @Test func aLinkWhileWaitingIsLoadedWhenTheServerAnswers() {
-        var state = ServerState(server: server)
+    @Test func aLinkWhileWaitingWinsOverTheLastPage() {
+        var state = showingOwned()
+        state.pageMoved(to: URL(string: "http://127.0.0.1:4460/?repo=/elsewhere")!)
+        _ = state.processExited()
         #expect(state.open(repo) == nil)
-        #expect(state.healthAnswered(isDiffer: true) == repo)
+        #expect(state.healthAnswered(.differ, serverRunning: true).load == repo)
         #expect(state.pending == nil)
     }
 
     @Test func aLinkWhileShowingLoadsAtOnce() {
-        var state = ServerState(server: server)
-        _ = state.healthAnswered(isDiffer: true)
+        var state = showingOwned()
         #expect(state.open(repo) == repo)
+    }
+
+    @Test func onlyPagesOnTheServerAreRemembered() {
+        var state = showingOwned()
+        state.pageMoved(to: URL(string: "https://github.com/x/y")!)
+        #expect(state.lastAddress == nil)
+    }
+
+    @Test func eachPhaseHasItsOwnMessage() {
+        var owned = ServerState(server: server, mode: .owned, log: "/tmp/differ/server.log")
+        #expect(owned.message == WaitingMessage(title: "Starting differ…"))
+        _ = owned.healthAnswered(.differ, serverRunning: false)
+        _ = owned.processExited()
+        #expect(owned.message == WaitingMessage(title: "Restarting differ…"))
+        for _ in 0..<3 { _ = owned.processExited() }
+        #expect(
+            owned.message
+                == WaitingMessage(
+                    title: "differ's server keeps stopping", detail: "Its log is at /tmp/differ/server.log.",
+                    retry: true))
+
+        var taken = ServerState(server: server, mode: .owned)
+        _ = taken.healthAnswered(.other, serverRunning: false)
+        #expect(taken.message.title == "Port 4460 is in use by another app")
+        #expect(taken.message.retry)
+
+        let attached = ServerState(server: URL(string: "http://127.0.0.1:3000")!, mode: .attached)
+        #expect(attached.message == WaitingMessage(title: "Nothing is answering at http://127.0.0.1:3000"))
     }
 
     @Test func healthMustSayDiffer() {
         #expect(HealthProbe.isDiffer(Data(#"{"app":"differ","build":"x"}"#.utf8)))
         #expect(!HealthProbe.isDiffer(Data(#"{"app":"vite"}"#.utf8)))
         #expect(!HealthProbe.isDiffer(Data("<html>".utf8)))
+    }
+}
+
+@MainActor
+struct LoginAgentTests {
+    private func plist(port: String) -> Data {
+        Data(
+            """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <plist version="1.0"><dict>
+            <key>Label</key><string>dev.differ.server</string>
+            <key>EnvironmentVariables</key><dict>
+            <key>PORT</key><string>\(port)</string>
+            <key>HOSTNAME</key><string>127.0.0.1</string>
+            </dict></dict></plist>
+            """.utf8)
+    }
+
+    @Test func readsThePortTheAgentServes() {
+        #expect(LoginAgent.port(fromPlist: plist(port: "4460")) == 4460)
+        #expect(LoginAgent.port(fromPlist: Data("not a plist".utf8)) == nil)
+    }
+
+    @Test func bootsOutOnlyAnAgentOnTheAppsPortInOwnedMode() {
+        #expect(LoginAgent.shouldBootOut(mode: .owned, appPort: 4460, agentPort: 4460))
+        #expect(!LoginAgent.shouldBootOut(mode: .owned, appPort: 4460, agentPort: nil))
+        #expect(!LoginAgent.shouldBootOut(mode: .owned, appPort: 4471, agentPort: 4460))
+        #expect(!LoginAgent.shouldBootOut(mode: .attached, appPort: 4460, agentPort: 4460))
     }
 }
