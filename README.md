@@ -105,8 +105,8 @@ npm run mac:build
 
 Drag `mac/build/differ.app` to Applications and open it. The app carries the
 server and the Node it runs on, so it needs no checkout or `node` once built.
-It runs on the Mac that built it; it isn't signed for anyone else's yet. The
-server logs to `~/.differ/server.log`, and **Open at Login** in the app menu
+`npm run mac:dmg` packs it into a disk image to share; `packaging/README.md`
+says how to sign and notarize it. The server logs to `~/.differ/server.log`, and **Open at Login** in the app menu
 starts differ with your Mac, for live updates with no window open.
 
 `npm link` puts `differ` on your PATH. From any checkout, `differ` opens that

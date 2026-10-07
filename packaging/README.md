@@ -3,6 +3,39 @@
 differ ships as a Mac app that runs its own server; the README's "Running it
 as an app" says how to build it.
 
+## Signing and notarization
+
+`npm run mac:build` signs the app with a Developer ID Application certificate
+when the keychain has one, so Gatekeeper accepts it on other Macs. Without
+one it falls back to the identity Xcode used, which only this Mac trusts; the
+build prints which it used. It bundles the `node` it runs with, which must be
+a standalone arm64 build (nvm's, not Homebrew's).
+
+`npm run mac:dmg` packs the built app into `mac/build/differ-<version>.dmg`,
+signs it, and with a notary profile set, notarizes and staples it and runs
+Gatekeeper's checks on it and on the app inside. That DMG is what a release
+attaches.
+
+Once, on the Mac that builds releases:
+
+1. Create a Developer ID Application certificate in your Apple Developer
+   account and install it in the login keychain.
+2. Store an App Store Connect API key as a notary profile:
+
+   ```bash
+   xcrun notarytool store-credentials backstory --key <path to .p8> --key-id <key id> --issuer <issuer id>
+   ```
+
+Then:
+
+```bash
+DIFFER_NOTARY_PROFILE=backstory npm run mac:dmg
+```
+
+`DIFFER_SIGN_IDENTITY` picks a signing identity by name when the keychain has
+more than one. Without `DIFFER_NOTARY_PROFILE`, `mac:dmg` still builds and
+signs the DMG but says it isn't notarized.
+
 ## The Homebrew formula
 
 `homebrew/differ.rb` is a skeleton from before the Mac app, and stale against
