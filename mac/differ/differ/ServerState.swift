@@ -40,6 +40,12 @@ struct ServerState {
     static let restartDelays: [TimeInterval] = [0, 1, 2]
     static let budgetWindow: TimeInterval = 60
 
+    /// A poll times out after two seconds, which a server busy with a big
+    /// diff can exceed; restarting it then would throw away the work in
+    /// flight. A server that has really gone misses every poll, so a few in a
+    /// row are proof enough, and its exit is reported at once anyway.
+    static let missedPollsBeforeRestart = 3
+
     let server: URL
     let mode: Mode
     let log: String?
@@ -47,6 +53,7 @@ struct ServerState {
     private(set) var pending: URL?
     private(set) var lastAddress: URL?
     private var deaths: [Date] = []
+    private var missedPolls = 0
 
     init(server: URL, mode: Mode, log: String? = nil) {
         self.server = server
@@ -65,6 +72,7 @@ struct ServerState {
         let health = health == .other && serverRunning ? .nothing : health
         switch (health, mode) {
         case (.differ, _):
+            missedPolls = 0
             guard phase != .showing else { return .none }
             phase = .showing
             defer { pending = nil }
@@ -78,6 +86,9 @@ struct ServerState {
         case (.nothing, .owned):
             switch phase {
             case .showing:
+                guard serverRunning else { return died(at: now) }
+                missedPolls += 1
+                guard missedPolls >= Self.missedPollsBeforeRestart else { return .none }
                 return died(at: now)
             case .starting, .restarting:
                 return serverRunning ? .none : Effect(spawnAfter: 0)
@@ -128,6 +139,7 @@ struct ServerState {
     }
 
     private mutating func died(at now: Date) -> Effect {
+        missedPolls = 0
         deaths = deaths.filter { now.timeIntervalSince($0) < Self.budgetWindow } + [now]
         guard deaths.count <= Self.restartDelays.count else {
             phase = .failed(.keepsStopping)

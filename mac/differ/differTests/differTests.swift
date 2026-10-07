@@ -89,10 +89,22 @@ struct ServerStateTests {
         #expect(state.phase == .showing)
     }
 
-    @Test func aFailedPollWhileShowingRestartsTheServer() {
+    @Test func aBusyServerMissesTwoPollsAndTheThirdRestartsIt() {
         var state = showingOwned()
+        for _ in 0..<2 {
+            #expect(state.healthAnswered(.nothing, serverRunning: true) == .none)
+            #expect(state.phase == .showing)
+        }
         #expect(state.healthAnswered(.nothing, serverRunning: true) == ServerState.Effect(spawnAfter: 0))
         #expect(state.phase == .restarting)
+    }
+
+    @Test func anAnswerBetweenMissedPollsStartsTheCountAgain() {
+        var state = showingOwned()
+        for _ in 0..<2 { _ = state.healthAnswered(.nothing, serverRunning: true) }
+        #expect(state.healthAnswered(.differ, serverRunning: true) == .none)
+        for _ in 0..<2 { #expect(state.healthAnswered(.nothing, serverRunning: true) == .none) }
+        #expect(state.phase == .showing)
     }
 
     @Test func ownedModeStartsTheServerWhenNothingAnswers() {
@@ -142,6 +154,7 @@ struct ServerStateTests {
 
     @Test func anOddAnswerFromTheAppsOwnServerIsAFailedPoll() {
         var state = showingOwned()
+        for _ in 0..<2 { #expect(state.healthAnswered(.other, serverRunning: true) == .none) }
         #expect(state.healthAnswered(.other, serverRunning: true) == ServerState.Effect(spawnAfter: 0))
         #expect(state.phase == .restarting)
     }
