@@ -4,9 +4,9 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 /**
- * When differ runs as a launchd service (`brew services start differ`) or is
- * launched from anything but a login shell, PATH is the bare system default —
- * no /opt/homebrew/bin, so no `gh`, and on some setups no usable `git`.
+ * When the Mac app runs the server, or anything but a login shell launches
+ * it, PATH is the bare system default — no /opt/homebrew/bin, so no `gh`, and
+ * on some setups no usable `git`.
  * Augment PATH once, at module load, with the places those tools actually
  * live. Appending (not prepending) means a user's own PATH still wins.
  */

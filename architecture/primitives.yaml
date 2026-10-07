@@ -17,7 +17,7 @@ primitives:
     file: lib/exec.ts
     symbols:
       - run
-    use: Every other child process. It passes argv and never a shell, and extends PATH so binaries resolve under launchd.
+    use: Every other child process. It passes argv and never a shell, and extends PATH so binaries resolve under the Mac app or launchd.
   - name: open a repo
     block: git reader
     file: lib/git.ts

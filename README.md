@@ -94,75 +94,40 @@ paths, never the absolute one differ needs.)
 
 ## Running it as an app
 
-differ can live in your dock and app switcher instead of the browser tab
-pile:
-
-```bash
-npm run build     # assembles the standalone server
-npm link          # puts `differ` on PATH
-differ            # from any checkout — starts the server, opens a window
-```
-
-On macOS the first `differ` installs a login agent
-(`~/Library/LaunchAgents/dev.differ.server.plist`), so from then on the server
-is simply running — at login, after a crash, with no terminal open. It logs
-to `~/.differ/server.log`. After a rebuild, the next `differ` restarts it onto
-the new build. `differ uninstall` removes the agent; `differ --foreground`
-runs a server tied to the terminal instead, as it does on other platforms.
-
-Then install the window: in Chrome ⋮ → _Cast, save and share_ → _Install
-page as app…_ (Safari: _File → Add to Dock_). From now on differ has its own
-dock icon and Cmd-Tab entry.
-
-The flow that makes this worth it: run `differ` in a terminal inside any
-repo, Cmd-Tab to the differ window, and it's already showing that repo — the
-CLI hands the repo to the running server and the window picks it up on
-focus. One server handles all your checkouts (default port 4460).
-
-`packaging/` has the Homebrew formula skeleton for `brew install differ`. If
-you use `brew services start differ` instead, the CLI sees Homebrew's agent
-and doesn't install its own.
-
-### The Mac app
-
-A native window instead of Chrome's or Safari's, with Xcode installed:
+differ's Mac app gives it its own Dock icon and Cmd-Tab entry, and runs the
+server itself: it starts the server when you open the app, restarts it if it
+stops, and stops it when you quit, so the window never shows a dead page.
+With Xcode installed:
 
 ```bash
 npm run mac:build
 ```
 
-Drag `mac/build/differ.app` to Applications. From then on `differ` opens
-repos in it (with a `differ://open?repo=<path>` link), and File → Open Repo…
-or a folder dropped on its Dock icon does the same. The server is still the
-login agent's: while it isn't answering, the window says so instead of
-showing a dead page, and picks up again when it's back. The build runs on the
-Mac that built it; it isn't signed for anyone else's yet.
+Drag `mac/build/differ.app` to Applications and open it. The app carries the
+server and the Node it runs on, so it needs no checkout or `node` once built.
+It runs on the Mac that built it; it isn't signed for anyone else's yet. The
+server logs to `~/.differ/server.log`, and **Open at Login** in the app menu
+starts differ with your Mac, for live updates with no window open.
 
-`npm run mac:smoke` checks the built app against a stand-in server on a spare
-port. To point the app at a dev server, pass it the address:
+`npm link` puts `differ` on your PATH. From any checkout, `differ` opens that
+repo in the app, launching it if it isn't running (with a
+`differ://open?repo=<path>` link). File → Open Repo…, or a folder dropped on
+the window or its Dock icon, does the same. One server handles all your
+checkouts (default port 4460).
+
+On its first start the app removes the login agent earlier versions of
+`differ` installed (`~/Library/LaunchAgents/dev.differ.server.plist`), which
+would otherwise hold the port.
+
+`npm run mac:smoke` checks the built app end to end on spare ports. To work on
+the app against a dev server, pass it the address; it shows that server
+instead of starting its own:
 
 ```bash
 open mac/build/differ.app --args -serverURL http://127.0.0.1:3000
 ```
 
-### When the server isn't running
-
-The installed window can outlive the server — before the login agent is
-installed, or when the agent can't start it (a node upgrade that moved it off
-the PATH the agent recorded) — and the browser's own "refused to connect" is
-all you'd get.
-So differ registers a small service worker (`public/sw.js`), which lives in
-the browser rather than on the server and catches that failed navigation to
-serve `public/offline.html` instead: what's wrong, the command that fixes it
-(matched to the port the window was opened on), and how to make it start on
-its own. The page polls `/api/health` and reloads itself the moment the
-server answers — onto the same URL, so you land back on the repo and comment
-you were reading.
-
-It only handles navigations, and only network failures; nothing else is
-cached, because everything else differ serves is git state that changes under
-it. The one gap is a browser that has never loaded differ successfully —
-there's no worker to install until the server has been up once.
+`differ --port 3000` opens a repo on a dev server in the browser.
 
 ## Reviewing an agent's work
 
@@ -255,7 +220,7 @@ GitHub API is consulted at most every 30s unless a push lands
 (refs/remotes moved) or you hit refresh, which both bypass the cache.
 
 The one thing that does reload the window is differ itself changing. After a
-rebuild or `brew upgrade`, a window left open would keep running the old code
+rebuild, a window left open would keep running the old code
 against the new server; it notices the server's build has changed when it
 reconnects or regains focus, and reloads.
 

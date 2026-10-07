@@ -50,10 +50,15 @@ terms:
     avoid:
       - draft alone, for the model (reply drafts are `lib/drafts.ts`)
   - name: Mac app
-    means: "The native app in `mac/` that shows differ's UI in a web view, and opens repos from `differ://open?repo=` links."
+    means: "The native app in `mac/` that owns the server: it starts differ's server from its bundle, shows the UI in a web view only while the server answers, and opens repos from `differ://open?repo=` links."
     avoid:
       - shell (that's the command shell)
       - wrapper
+  - name: attached
+    means: "The Mac app showing a server it didn't start, through `-serverURL` or a build with no server in its bundle; the dev loop."
+    avoid:
+      - dev mode
+      - override
   - name: primitive
     means: A named capability differ exposes for reuse, listed in `architecture/primitives.yaml`.
     avoid:
@@ -141,8 +146,8 @@ blocks:
   - name: Mac app
     code:
       - mac/
-    summary: A Swift app with one web view on the login agent's server, a native view while the server is down, and the `differ://` URL scheme.
-    read: "`mac/differ/differ/MainWindowController.swift`, the comment on `MainWindowController`"
+    summary: A Swift app that starts, restarts and stops the standalone server with the Node in its bundle, with one web view on it, a native view while it isn't answering, and the `differ://` URL scheme.
+    read: "`mac/differ/differ/ServerState.swift`, the comment on `ServerState`"
 
 invariants:
   - rule: Every read-modify-write of a store file runs inside `withStore`, and a batch is one write, not a loop of single-key writes.
