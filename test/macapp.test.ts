@@ -4,8 +4,66 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { BUNDLE_ID, findMacApp, repoLink } from "../bin/macapp.mjs";
+import { DEFAULT_PORT } from "../bin/hook.mjs";
+import {
+  BUNDLE_ID,
+  findMacApp,
+  launchPlan,
+  NOT_INSTALLED,
+  repoLink,
+} from "../bin/macapp.mjs";
 import { readText } from "./yaml";
+
+const repo = "/Users/me/my repo/c++ & co";
+const app = "/Applications/differ.app";
+
+test("differ launches the Mac app on the repo when nothing is running", () => {
+  assert.deepEqual(
+    launchPlan({ repo, port: DEFAULT_PORT, app, running: false }),
+    { open: ["-a", app, repoLink(repo)] },
+  );
+});
+
+test("differ hands the repo to the Mac app that is already running", () => {
+  assert.deepEqual(
+    launchPlan({ repo, port: DEFAULT_PORT, app, running: true }),
+    { open: ["-a", app, repoLink(repo)] },
+  );
+});
+
+test("differ opens the browser on a differ answering on another port", () => {
+  const plan = launchPlan({ repo, port: 3000, app, running: true });
+  assert.ok("open" in plan);
+  const url = new URL(plan.open[0]);
+  assert.equal(plan.open.length, 1);
+  assert.equal(url.origin, "http://127.0.0.1:3000");
+  assert.equal(url.pathname, "/");
+  assert.equal(url.searchParams.get("repo"), repo);
+});
+
+test("differ opens the browser on a default-port differ with no Mac app", () => {
+  const plan = launchPlan({
+    repo,
+    port: DEFAULT_PORT,
+    app: null,
+    running: true,
+  });
+  assert.ok("open" in plan);
+  assert.equal(new URL(plan.open[0]).searchParams.get("repo"), repo);
+});
+
+test("differ says how to install the Mac app when there is none", () => {
+  assert.deepEqual(
+    launchPlan({ repo, port: DEFAULT_PORT, app: null, running: false }),
+    { error: NOT_INSTALLED },
+  );
+});
+
+test("differ says nothing answers on another port it can't reach", () => {
+  const plan = launchPlan({ repo, port: 3000, app, running: false });
+  assert.ok("error" in plan);
+  assert.match(plan.error, /:3000/);
+});
 
 test("a repo link carries the exact path, however awkward", () => {
   const root = "/Users/me/my repo/c++ & co #2";

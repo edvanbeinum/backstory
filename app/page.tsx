@@ -425,44 +425,20 @@ export default function Page() {
     // nothing else.
   }, [ready, repoPath, ref, loadSession]);
 
-  // The `differ` CLI parks a repo path on the server when run from a
-  // checkout; the installed app window can't be deep-linked, so it collects
-  // the handoff here — on load and on every focus, which is exactly the
-  // Cmd-Tab-into-the-window moment.
+  // Catch up on focus, the Cmd-Tab-into-the-window moment, on anything that
+  // changed while the window was in the background.
   useEffect(() => {
     if (!ready) return;
 
-    let cancelled = false;
-    const collect = async () => {
-      // The handoff is taken once. A window reloading onto a new build would
-      // take it and then lose it in the reload, so leave it for the new page.
+    const catchUp = async () => {
       if (await checkBuild()) return;
-      try {
-        const response = await fetch("/api/open", { cache: "no-store" });
-        const data = (await response.json()) as { repo: string | null };
-        if (cancelled) return;
-        if (data.repo) {
-          window.localStorage.setItem(STORAGE_KEY, data.repo);
-          setRev(WORKING_REV);
-          setRepoPath(data.repo);
-        } else {
-          // No handoff waiting — still a Cmd-Tab back in, so catch up on
-          // anything that changed while the window was in the background.
-          setWorkingTick((t) => t + 1);
-          setReviewTick((t) => t + 1);
-          void loadSession(repoRef.current, { background: true });
-        }
-      } catch {
-        // server briefly unavailable — the next focus will retry
-      }
+      setWorkingTick((t) => t + 1);
+      setReviewTick((t) => t + 1);
+      void loadSession(repoRef.current, { background: true });
     };
 
-    void collect();
-    window.addEventListener("focus", collect);
-    return () => {
-      cancelled = true;
-      window.removeEventListener("focus", collect);
-    };
+    window.addEventListener("focus", catchUp);
+    return () => window.removeEventListener("focus", catchUp);
   }, [ready, loadSession, checkBuild]);
 
   // Live updates: one SSE stream per repo. The server watches the repo's

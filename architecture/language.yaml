@@ -131,14 +131,13 @@ blocks:
       - lib/recents.ts
     summary: The page, its side column and diff column, the panels and strips inside them, and the recent repos kept in the browser's localStorage.
     read: "`components/SideColumn.tsx`, the comment on `SideColumn`"
-  - name: CLI and launchd
+  - name: CLI
     code:
       - bin/differ.mjs
-      - bin/launchd.mjs
       - bin/macapp.mjs
       - packaging/
-    summary: The `differ` command, the login agent that keeps the server running, and the Homebrew formula.
-    read: 'README "Running it as an app"'
+    summary: The `differ` command, which opens a repo in the Mac app (launching it when it isn't running) or `differ review`'s wait for notes, and the Homebrew formula.
+    read: "`bin/macapp.mjs`, the comment on `launchPlan`"
   - name: Mac app
     code:
       - mac/

@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 /**
- * differ — open the current repo in the differ app.
+ * differ — open a repo in differ's Mac app.
  *
  *   differ              open the cwd's repo
  *   differ <path>       open a specific repo
- *   differ --no-open    make sure the server is running, don't open a window
- *   differ --port N     use a specific port (default 4460, env DIFFER_PORT)
- *                       (the Mac app, or else the installed app window, is
- *                       used on the default port; env DIFFER_APP points at a
- *                       different app)
+ *   differ --port N     use the differ on another port, a dev server say
+ *                       (default 4460, env DIFFER_PORT), in the browser
  *   differ review [path]
  *                       wait for you to review the uncommitted changes, then
  *                       print your notes to stdout and exit — for an agent
@@ -16,22 +13,13 @@
  *   differ hook stop    the Claude Code Stop hook: hand a finishing session
  *                       any notes queued for it (reads the hook's JSON on
  *                       stdin; silent when there are none or differ is down)
- *   differ install      (re)install the login agent and restart the server
- *   differ uninstall    stop the server and remove the login agent
- *   differ --foreground run the server in this terminal instead
  *
- * One server serves every repo. If a differ is already running (the login
- * agent, the `brew services` one, or a terminal's), this reuses it: the repo
- * is handed to the running server and the Mac app (bin/macapp.mjs), app
- * window or browser is focused on it. When nothing is running, on macOS this installs a login agent that
- * keeps a server running from then on (bin/launchd.mjs); elsewhere, or with
- * --foreground, it starts one tied to this terminal.
+ * The Mac app runs the server; this only ever asks it for things, launching
+ * the app when it isn't running (bin/macapp.mjs).
  */
-import { spawn, execFile } from "node:child_process";
-import { existsSync, mkdirSync, openSync, readFileSync } from "node:fs";
-import { homedir } from "node:os";
+import { execFile } from "node:child_process";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { promisify } from "node:util";
 
 import {
   DEFAULT_PORT,
@@ -40,10 +28,9 @@ import {
   recordPort,
   stopHook,
 } from "./hook.mjs";
-import * as launchd from "./launchd.mjs";
-import { findMacApp, repoLink } from "./macapp.mjs";
+import { findMacApp, launchPlan, NOT_INSTALLED } from "./macapp.mjs";
 
-// First, before anything that could start, restart or wait on a server: the
+// First, before anything that could launch the app or wait on a server: the
 // hook runs on every turn of every session and must only ever ask.
 if (process.argv[2] === "hook") {
   // A backstop for anything that hangs past the take's own timeout.
@@ -55,41 +42,26 @@ if (process.argv[2] === "hook") {
   }
   process.exit(0);
 }
-const HERE = path.dirname(fileURLToPath(import.meta.url));
-const APP_ROOT = path.resolve(HERE, "..");
 
 function parseArgs(argv) {
-  const args = {
-    repo: process.cwd(),
-    open: true,
-    port: null,
-    review: false,
-    command: null,
-    foreground: false,
-  };
+  const args = { repo: process.cwd(), port: null, review: false };
   if (argv[0] === "review") {
     args.review = true;
-    argv = argv.slice(1);
-  } else if (argv[0] === "install" || argv[0] === "uninstall") {
-    args.command = argv[0];
     argv = argv.slice(1);
   }
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
-    if (a === "--no-open") args.open = false;
-    else if (a === "--foreground") args.foreground = true;
-    else if (a === "--port") args.port = Number(argv[++i]);
+    if (a === "--port") args.port = Number(argv[++i]);
     else if (a === "--help" || a === "-h") {
       console.log(
-        "usage: differ [path] [--port N] [--no-open] [--foreground]\n" +
-          "       differ review [path] [--port N] [--no-open]\n" +
-          "       differ install [--port N] | differ uninstall\n" +
+        "usage: differ [path] [--port N]\n" +
+          "       differ review [path] [--port N]\n" +
           "       differ hook stop   (Claude Code Stop hook; see the README)\n" +
-          "Opens the repo (default: cwd) in the differ review app: the Mac\n" +
-          "app when it's in Applications, else the installed window.\n" +
+          "Opens the repo (default: cwd) in differ's Mac app, launching it\n" +
+          "if it isn't running. With --port, opens the differ on that port\n" +
+          "in the browser instead.\n" +
           "`review` then waits for you to send notes on the uncommitted\n" +
-          "changes, prints them to stdout, and exits.\n" +
-          "On macOS the server runs as a login agent, installed on first use.",
+          "changes, prints them to stdout, and exits.",
       );
       process.exit(0);
     } else if (!a.startsWith("-")) args.repo = path.resolve(a);
@@ -117,93 +89,19 @@ async function getJson(url, timeoutMs = 1500, method = "GET") {
   }
 }
 
-/**
- * The health of a *differ* answering on this port (vs some unrelated dev
- * server), or null.
- */
+/** Whether a *differ* answers on this port, rather than some other server. */
 async function differAt(port) {
   try {
     const { body } = await getJson(`http://127.0.0.1:${port}/api/health`);
-    return body?.app === "differ" ? body : null;
+    return body?.app === "differ";
   } catch {
-    return null;
+    return false;
   }
 }
 
-/**
- * The installed app window — Chrome's "Install page as app" or Safari's "Add
- * to Dock" — if there is one for this port. `open <url>` only ever reaches the
- * default browser, even with the app already running, so the app has to be
- * launched by name. It opens at its start_url and collects the repo from the
- * /api/open handoff, like any other launch.
- *
- * Only on the default port: the app is bound to the address it was installed
- * from, and launching it for another port would show a different server.
- * DIFFER_APP names an app explicitly.
- */
-function findApp(port) {
-  if (process.env.DIFFER_APP) return process.env.DIFFER_APP;
-  if (port !== DEFAULT_PORT) return null;
-  const apps = path.join(homedir(), "Applications");
-  return (
-    [
-      path.join(apps, "Chrome Apps.localized", "differ.app"),
-      path.join(apps, "differ.app"),
-    ].find((p) => existsSync(p)) ?? null
-  );
-}
-
-function openWindow(url, repo) {
-  const inBrowser = () =>
-    execFile("open", [url], (err) => {
-      if (err) console.error(`couldn't open a browser — visit ${url}`);
-    });
-
-  // By path, so the link reaches this copy of the app (launching it if it
-  // isn't running), whichever copy LaunchServices thinks owns differ://.
-  const macApp = args.port === DEFAULT_PORT ? findMacApp() : null;
-  if (macApp) {
-    execFile("open", ["-a", macApp, repoLink(repo)], (err) => {
-      if (err) inBrowser();
-    });
-    return;
-  }
-
-  const app = findApp(args.port);
-  if (!app) return inBrowser();
-  execFile("open", ["-a", app], (err) => {
-    if (err) inBrowser();
-  });
-}
-
-/** The standalone server.js to run, or null when there's no build. */
-function findServer() {
-  // Homebrew layout: bin/differ.mjs next to a standalone build.
-  const standalone = path.join(APP_ROOT, "standalone", "server.js");
-  if (existsSync(standalone)) return standalone;
-  // Repo checkout: the postbuild step assembles .next/standalone.
-  const local = path.join(APP_ROOT, ".next", "standalone", "server.js");
-  if (existsSync(local)) return local;
-  return null;
-}
-
-/** The build a fresh server would run — what /api/health reports as `build`. */
-function builtId(server) {
-  try {
-    return readFileSync(
-      path.join(path.dirname(server), ".next", "BUILD_ID"),
-      "utf8",
-    ).trim();
-  } catch {
-    return null;
-  }
-}
-
-/** Wait for a differ on `port`, optionally one running a particular build. */
-async function waitForHealth(port, build = null, tries = 60) {
+async function waitForHealth(port, tries = 120) {
   for (let i = 0; i < tries; i++) {
-    const health = await differAt(port);
-    if (health && (build === null || health.build === build)) return true;
+    if (await differAt(port)) return true;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   return false;
@@ -213,26 +111,40 @@ const args = parseArgs(process.argv.slice(2));
 const base = `http://127.0.0.1:${args.port}`;
 // In review mode stdout carries only the review — it's what the agent reads.
 const say = args.review ? console.error : console.log;
+const app = findMacApp();
 
-/** Park the repo for the app window, and bring the window up. */
-async function handOff() {
-  const enc = encodeURIComponent(args.repo);
-  const { status, body } = await getJson(`${base}/api/open?repo=${enc}`, 5000);
-  if (status !== 200) {
-    console.error(`differ: ${body?.error ?? "not a git repository"}`);
-    return null;
-  }
-  recordPort(args.port);
-  if (args.open) openWindow(`${base}/`, body.repo);
-  return body.repo;
+function fail(message) {
+  console.error(`differ: ${message}`);
+  process.exit(1);
 }
 
-function differHome() {
-  return process.env.DIFFER_HOME || path.join(homedir(), ".differ");
+/** The repo's top level, so a subdirectory opens the same repo as its root. */
+async function repoRoot(dir) {
+  try {
+    const { stdout } = await promisify(execFile)("git", [
+      "-C",
+      dir,
+      "rev-parse",
+      "--show-toplevel",
+    ]);
+    return stdout.trim();
+  } catch {
+    return fail(`not a git repository: ${dir}`);
+  }
+}
+
+async function openRepo(repo, running) {
+  const plan = launchPlan({ repo, port: args.port, app, running });
+  if (plan.error) fail(plan.error);
+  try {
+    await promisify(execFile)("open", plan.open);
+  } catch {
+    fail(`couldn't open ${plan.open.at(-1)}`);
+  }
 }
 
 /**
- * `differ review`: ask the running server for a review, then wait for it.
+ * `differ review`: ask the server for a review, then wait for it.
  *
  * The wait is a loop of long-polls rather than one request, so no timeout
  * anywhere between here and the server has to be longer than a review takes.
@@ -240,11 +152,22 @@ function differHome() {
  * captures stdout reads your notes and nothing else.
  */
 async function review() {
+  if (!(await differAt(args.port))) {
+    if (args.port !== DEFAULT_PORT) {
+      fail(`nothing is answering on :${args.port}.`);
+    }
+    if (!app) fail(NOT_INSTALLED);
+    say("differ: starting differ's Mac app…");
+    await promisify(execFile)("open", ["-a", app]);
+    if (!(await waitForHealth(args.port))) {
+      fail(`the Mac app's server didn't come up on :${args.port}.`);
+    }
+  }
+
   const enc = encodeURIComponent(args.repo);
   const opened = await getJson(`${base}/api/review?repo=${enc}`, 5000, "POST");
   if (opened.status !== 200) {
-    console.error(`differ: ${opened.body?.error ?? "not a git repository"}`);
-    process.exit(1);
+    fail(opened.body?.error ?? "not a git repository");
   }
   const { id } = opened.body;
 
@@ -261,7 +184,7 @@ async function review() {
     });
   }
 
-  if (!(await handOff())) process.exit(1);
+  await openRepo(opened.body.repo, true);
   console.error(
     `differ: waiting for your review of ${opened.body.repo} — ` +
       "leave notes on its changes and press Send to agent.",
@@ -274,20 +197,16 @@ async function review() {
       result = await getJson(`${base}/api/review?id=${id}`, 40_000);
       failures = 0;
     } catch {
-      // A blip, or the server restarting.
+      // A blip, or the app restarting its server.
       if (++failures > 12) {
-        console.error("differ: lost the server while waiting for the review.");
-        process.exit(1);
+        fail("lost the server while waiting for the review.");
       }
       await new Promise((resolve) => setTimeout(resolve, 5000));
       continue;
     }
 
     if (result.status === 404) {
-      console.error(
-        "differ: the review request expired (did differ restart?).",
-      );
-      process.exit(1);
+      fail("the review request expired (did differ restart?).");
     }
     switch (result.body?.state) {
       case "waiting":
@@ -301,182 +220,16 @@ async function review() {
         );
         process.exit(0);
       case "superseded":
-        console.error(
-          "differ: another `differ review` took over this checkout.",
-        );
-        process.exit(1);
+        fail("another `differ review` took over this checkout.");
       default:
-        console.error(`differ: ${result.body?.error ?? "unexpected response"}`);
-        process.exit(1);
+        fail(result.body?.error ?? "unexpected response");
     }
   }
-}
-
-const server = findServer();
-const serverLog = path.join(differHome(), "server.log");
-
-/** The login agent's plist, for this build on this port. */
-function agentSpec() {
-  return {
-    server,
-    port: args.port,
-    pathEnv: process.env.PATH ?? "",
-    log: serverLog,
-    differHome: process.env.DIFFER_HOME,
-  };
-}
-
-/**
- * Whether the login agent should own the server on this port. Not when
- * Homebrew's service does, and not for a port other than the one an installed
- * agent already serves — the window open on that port would lose its server.
- */
-function agentManaged() {
-  if (!launchd.supported() || args.foreground) return false;
-  if (launchd.brewServiceInstalled()) return false;
-  const port = launchd.installedPort();
-  return port === null || port === args.port;
-}
-
-function requireServer() {
-  if (server) return;
-  console.error(
-    "differ: no server build found. In a checkout, run `npm run build` first.",
-  );
-  process.exit(1);
-}
-
-if (args.command === "uninstall") {
-  const had = launchd.supported() && (await launchd.uninstallAgent());
-  console.log(
-    had
-      ? "differ: login agent removed, server stopped."
-      : "differ: no login agent installed.",
-  );
-  process.exit(0);
-}
-
-if (args.command === "install") {
-  if (!launchd.supported()) {
-    console.error("differ: the login agent is macOS only.");
-    process.exit(1);
-  }
-  requireServer();
-  // Reinstalling is also how to restart onto a rebuild.
-  if ((await launchd.ensureAgent(agentSpec())) === "started")
-    await launchd.restartAgent();
-  if (!(await waitForHealth(args.port, builtId(server)))) {
-    console.error(
-      `differ: server didn't come up on :${args.port} — see ${serverLog}`,
-    );
-    process.exit(1);
-  }
-  recordPort(args.port);
-  console.log(
-    `differ: login agent installed — serving ${base} (log: ${serverLog})`,
-  );
-  process.exit(0);
-}
-
-const running = await differAt(args.port);
-
-// A server that outlives every terminal also outlives rebuilds; without this
-// it would serve the old build until the next login.
-if (
-  running &&
-  server &&
-  launchd.installedPort() === args.port &&
-  agentManaged() &&
-  (await launchd.agentLoaded())
-) {
-  const build = builtId(server);
-  if (build && running.build !== build) {
-    say(`differ: restarting the server onto the new build…`);
-    if ((await launchd.ensureAgent(agentSpec())) === "started")
-      await launchd.restartAgent();
-    if (!(await waitForHealth(args.port, build))) {
-      console.error(
-        `differ: server didn't come back on :${args.port} — see ${serverLog}`,
-      );
-      process.exit(1);
-    }
-  }
-}
-
-if (running) {
-  if (args.review) await review();
-  const repo = await handOff();
-  if (!repo) process.exit(1);
-  say(`differ already running on :${args.port} — opening ${repo}`);
-  process.exit(0);
-}
-
-requireServer();
-
-if (agentManaged()) {
-  const result = await launchd.ensureAgent(agentSpec());
-  if (result === "installed") {
-    say(
-      "differ: installed a login agent, so the server now starts on its own — " +
-        "`differ uninstall` removes it.",
-    );
-  }
-  if (!(await waitForHealth(args.port))) {
-    console.error(
-      `differ: server didn't come up on :${args.port} — see ${serverLog}`,
-    );
-    process.exit(1);
-  }
-  if (args.review) await review();
-  const repo = await handOff();
-  if (!repo) process.exit(1);
-  say(`differ serving ${base} — ${repo}`);
-  process.exit(0);
-}
-
-const env = {
-  ...process.env,
-  PORT: String(args.port),
-  HOSTNAME: "127.0.0.1", // never expose a server that runs git on request
-};
-
-if (args.review) {
-  // Detached: `differ review` exits the moment you answer, and the window
-  // you're answering in mustn't die with it. The next `differ` reuses it.
-  mkdirSync(differHome(), { recursive: true });
-  const log = openSync(serverLog, "a");
-  const child = spawn("node", [server], {
-    env,
-    detached: true,
-    stdio: ["ignore", log, log],
-  });
-  child.unref();
-  if (!(await waitForHealth(args.port))) {
-    console.error(
-      `differ: server didn't come up on :${args.port} — see ${serverLog}`,
-    );
-    process.exit(1);
-  }
-  await review();
 }
 
 recordPort(args.port);
-const child = spawn("node", [server], {
-  env,
-  stdio: ["ignore", "inherit", "inherit"],
-});
+if (args.review) await review();
 
-child.on("exit", (code) => process.exit(code ?? 0));
-for (const sig of ["SIGINT", "SIGTERM"]) {
-  process.on(sig, () => child.kill(sig));
-}
-
-if (!(await waitForHealth(args.port))) {
-  console.error(`differ: server didn't come up on :${args.port}`);
-  child.kill("SIGTERM");
-  process.exit(1);
-}
-
-const repo = await handOff();
-if (repo) console.log(`differ serving ${base} — ${repo}`);
-else console.error("differ: (server still running)");
+const repo = await repoRoot(args.repo);
+await openRepo(repo, await differAt(args.port));
+say(`differ: opening ${repo}`);
