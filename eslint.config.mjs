@@ -20,10 +20,6 @@ export default defineConfig([
     languageOptions: { globals: globals.node },
   },
   {
-    files: ["public/sw.js"],
-    languageOptions: { globals: globals.serviceworker },
-  },
-  {
     rules: {
       "@typescript-eslint/no-unused-vars": [
         "error",
