@@ -7,7 +7,7 @@ import WebKit
 final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUIDelegate {
     private var state: ServerState
     private let serverProcess: ServerProcess?
-    private let webView: WKWebView
+    private let webView: DropWebView
     private var waitingView: WaitingView!
     private var polling: Task<Void, Never>?
     private var urlObservation: NSKeyValueObservation?
@@ -19,9 +19,13 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
             mode: serverProcess == nil ? .attached : .owned,
             log: serverProcess?.launch.log.path
         )
-        webView = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        webView = DropWebView(frame: .zero, configuration: WKWebViewConfiguration())
         super.init(window: window)
         waitingView = WaitingView { [weak self] in self?.retry() }
+        webView.onFolderDrop = { [weak self] folder in
+            guard let self else { return }
+            self.open(RepoLink.address(forRepo: folder.standardizedFileURL.path, server: self.state.server))
+        }
 
         webView.navigationDelegate = self
         webView.uiDelegate = self
