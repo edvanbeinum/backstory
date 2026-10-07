@@ -8,6 +8,8 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
     private var state: ServerState
     private let serverProcess: ServerProcess?
     private let webView: DropWebView
+    private let page: FindBarContainer
+    private let textFinder = NSTextFinder()
     private var waitingView: WaitingView!
     private var polling: Task<Void, Never>?
     private var urlObservation: NSKeyValueObservation?
@@ -20,7 +22,13 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
             log: serverProcess?.launch.log.path
         )
         webView = DropWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        page = FindBarContainer(content: webView)
         super.init(window: window)
+        textFinder.client = webView
+        textFinder.findBarContainer = page
+        textFinder.isIncrementalSearchingEnabled = true
+        textFinder.incrementalSearchingShouldDimContentView = true
+        webView.textFinder = textFinder
         waitingView = WaitingView { [weak self] in self?.retry() }
         webView.onFolderDrop = { [weak self] folder in
             guard let self else { return }
@@ -42,7 +50,7 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         }
 
         let content = NSView()
-        for view in [webView, waitingView!] as [NSView] {
+        for view in [page, waitingView!] as [NSView] {
             view.frame = content.bounds
             view.autoresizingMask = [.width, .height]
             content.addSubview(view)
@@ -102,7 +110,7 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
     }
 
     private func render() {
-        webView.isHidden = state.phase != .showing
+        page.isHidden = state.phase != .showing
         waitingView.isHidden = state.phase == .showing
         waitingView.show(state.message)
     }
@@ -153,6 +161,13 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         webView.pageZoom = 1
     }
 
+    /// Find while the page itself doesn't have focus; the web view takes it
+    /// when it does.
+    override func performTextFinderAction(_ sender: Any?) {
+        guard state.phase == .showing, let action = TextFinderAction.from(sender) else { return }
+        textFinder.performAction(action)
+    }
+
     // MARK: - WKNavigationDelegate
 
     func webView(
@@ -165,6 +180,10 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         else { return .allow }
         NSWorkspace.shared.open(url)
         return .cancel
+    }
+
+    func webView(_ webView: WKWebView, didCommit navigation: WKNavigation!) {
+        textFinder.noteClientStringWillChange()
     }
 
     func webView(

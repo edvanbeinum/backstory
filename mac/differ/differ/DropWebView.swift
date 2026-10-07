@@ -2,9 +2,11 @@ import AppKit
 import WebKit
 
 /// The page's web view, which opens a folder dropped on the window as a repo
-/// and passes any other drop to the page.
+/// and passes any other drop to the page, and hands Find to the window's
+/// find bar.
 final class DropWebView: WKWebView {
     var onFolderDrop: ((URL) -> Void)?
+    weak var textFinder: NSTextFinder?
 
     override init(frame: CGRect, configuration: WKWebViewConfiguration) {
         super.init(frame: frame, configuration: configuration)
@@ -41,5 +43,31 @@ final class DropWebView: WKWebView {
         guard let folder = folder(in: sender) else { return super.performDragOperation(sender) }
         onFolderDrop?(folder)
         return true
+    }
+
+    // Overridden because the web view answers Find itself, with a find bar
+    // that needs an enclosing scroll view this one doesn't have, so Cmd-F
+    // would otherwise do nothing.
+    override func performTextFinderAction(_ sender: Any?) {
+        guard let textFinder, let action = TextFinderAction.from(sender) else {
+            return super.performTextFinderAction(sender)
+        }
+        textFinder.performAction(action)
+    }
+
+    override func validateUserInterfaceItem(_ item: NSValidatedUserInterfaceItem) -> Bool {
+        if item.action == #selector(performTextFinderAction(_:)), let textFinder,
+            let action = TextFinderAction.from(item)
+        {
+            return textFinder.validateAction(action)
+        }
+        return super.validateUserInterfaceItem(item)
+    }
+}
+
+enum TextFinderAction {
+    /// The Find menu item's tag as a finder action.
+    static func from(_ sender: Any?) -> NSTextFinder.Action? {
+        (sender as? NSValidatedUserInterfaceItem).flatMap { NSTextFinder.Action(rawValue: $0.tag) }
     }
 }
