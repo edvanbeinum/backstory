@@ -1,7 +1,8 @@
 import Cocoa
+import ServiceManagement
 
 @main
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     @IBOutlet var window: NSWindow!
 
     private var windowController: MainWindowController!
@@ -107,5 +108,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         panel.prompt = "Open Repo"
         guard panel.runModal() == .OK, let folder = panel.url else { return }
         windowController.open(RepoLink.address(forRepo: folder.standardizedFileURL.path, server: server))
+    }
+
+    /// Starts the app at login, which keeps the server up for live updates
+    /// with no window open, as the old login agent did.
+    @IBAction func toggleOpenAtLogin(_ sender: Any?) {
+        let app = SMAppService.mainApp
+        do {
+            if app.status == .enabled { try app.unregister() } else { try app.register() }
+        } catch {
+            NSLog("differ: couldn't change Open at Login: \(error)")
+        }
+    }
+
+    func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
+        if menuItem.action == #selector(toggleOpenAtLogin(_:)) {
+            menuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
+        }
+        return true
     }
 }
