@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "next dev -H 127.0.0.1",
     "build": "next build",
-    "postbuild": "cp -R public .next/standalone/public && mkdir -p .next/standalone/.next && cp -R .next/static .next/standalone/.next/static",
+    "postbuild": "cp -R public .next/standalone/ && mkdir -p .next/standalone/.next && cp -R .next/static .next/standalone/.next/",
     "start": "next start -H 127.0.0.1",
     "test": "DIFFER_HOME=\"$(mktemp -d)\" tsx --test \"test/*.test.ts\"",
     "lint": "eslint .",
