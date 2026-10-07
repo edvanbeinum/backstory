@@ -45,8 +45,12 @@ final class ServerProcess {
     /// Stops any server the app is running and starts a fresh one after
     /// `delay` seconds.
     func start(after delay: TimeInterval) {
+        let old = current
         stop()
         scheduled = Task { [weak self] in
+            // Let the old server release the port before its replacement
+            // binds, or the replacement exits at once and counts as a death.
+            if let old { await Self.waitForExit(old, timeout: 2, thenKill: true) }
             if delay > 0 { try? await Task.sleep(for: .seconds(delay)) }
             guard !Task.isCancelled, let self else { return }
             self.scheduled = nil
@@ -73,8 +77,17 @@ final class ServerProcess {
         let process = current
         stop()
         guard let process else { return }
+        await Self.waitForExit(process, timeout: timeout, thenKill: false)
+    }
+
+    private static func waitForExit(_ process: Process, timeout: TimeInterval, thenKill: Bool) async {
         let until = Date().addingTimeInterval(timeout)
         while process.isRunning && Date() < until {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        guard thenKill, process.isRunning else { return }
+        kill(process.processIdentifier, SIGKILL)
+        while process.isRunning {
             try? await Task.sleep(for: .milliseconds(50))
         }
     }
