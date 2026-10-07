@@ -20,6 +20,12 @@ if ! lipo "$node" -verify_arch arm64 2>/dev/null; then
   echo "mac:build: $node isn't an arm64 Node" >&2
   exit 1
 fi
+# Refuse a Node built against a shared libnode, as Homebrew's is: only the
+# binary is copied, so the bundled server would die at launch.
+if otool -L "$node" | grep -q libnode; then
+  echo "mac:build: $node needs a shared libnode; put a standalone Node (nvm's) first on PATH" >&2
+  exit 1
+fi
 
 xcodebuild -quiet -project mac/differ/differ.xcodeproj -scheme differ \
   -configuration Release -derivedDataPath "$out/DerivedData" \
