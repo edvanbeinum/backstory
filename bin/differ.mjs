@@ -163,6 +163,7 @@ async function review() {
       fail(`the Mac app's server didn't come up on :${args.port}.`);
     }
   }
+  recordPort(args.port);
 
   const enc = encodeURIComponent(args.repo);
   const opened = await getJson(`${base}/api/review?repo=${enc}`, 5000, "POST");
@@ -227,9 +228,11 @@ async function review() {
   }
 }
 
-recordPort(args.port);
 if (args.review) await review();
 
 const repo = await repoRoot(args.repo);
 await openRepo(repo, await differAt(args.port));
+// Only once a differ is reachable there, so a `--port N` that found nothing
+// doesn't send the Stop hook's notes to the wrong port.
+recordPort(args.port);
 say(`differ: opening ${repo}`);
