@@ -27,7 +27,9 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         textFinder.client = webView
         textFinder.findBarContainer = page
         textFinder.isIncrementalSearchingEnabled = true
-        textFinder.incrementalSearchingShouldDimContentView = true
+        // Leave the page undimmed: when the bar fails to appear on a later Cmd-F,
+        // a dimmed page with no bar to dismiss it traps the window.
+        textFinder.incrementalSearchingShouldDimContentView = false
         webView.textFinder = textFinder
         waitingView = WaitingView { [weak self] in self?.retry() }
         webView.onFolderDrop = { [weak self] folder in
