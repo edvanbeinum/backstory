@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import Testing
 
@@ -250,5 +251,23 @@ struct LoginAgentTests {
         #expect(!LoginAgent.shouldBootOut(mode: .owned, appPort: 4460, agentPort: nil))
         #expect(!LoginAgent.shouldBootOut(mode: .owned, appPort: 4471, agentPort: 4460))
         #expect(!LoginAgent.shouldBootOut(mode: .attached, appPort: 4460, agentPort: 4460))
+    }
+}
+
+@MainActor
+struct FindBarContainerTests {
+    @Test func theBarKeepsItsHeightAcrossHideAndShow() {
+        let content = NSView()
+        let container = FindBarContainer(content: content)
+        container.frame = NSRect(x: 0, y: 0, width: 800, height: 600)
+        let bar = NSView(frame: NSRect(x: 0, y: 0, width: 0, height: 28))
+        container.findBarView = bar
+        for visible in [true, false, true] {
+            container.isFindBarVisible = visible
+            container.layout()
+            #expect(bar.frame.height == 28)
+            #expect(bar.isHidden == !visible)
+            #expect(content.frame.height == (visible ? 572 : 600))
+        }
     }
 }
