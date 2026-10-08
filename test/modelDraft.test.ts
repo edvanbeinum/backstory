@@ -394,11 +394,18 @@ test("a redraft sent while a refused draft is still being checked still runs", a
   const renamed = structuredClone(CLEAN);
   renamed.system.name = "Shop, redrafted";
   const { runner, prompts } = recorded([renamed]);
-  const [stale, redraft] = await Promise.all([
-    startDraft(repo.dir, { runner, available }),
-    startDraft(repo.dir, { runner, available, redraft: true }),
-  ]);
-  assert.deepEqual(stale, { status: "refused", reason: "exists" });
+  // Let the stale draft claim the repo before the redraft arrives: both
+  // resolve the model directory first, and that ordering isn't promised.
+  const stale = startDraft(repo.dir, { runner, available });
+  while ((await draftStatus(repo.dir)).status !== "running") {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  const redraft = await startDraft(repo.dir, {
+    runner,
+    available,
+    redraft: true,
+  });
+  assert.deepEqual(await stale, { status: "refused", reason: "exists" });
   assert.equal(redraft.status, "running");
   await draftSettled(repo.dir);
   assert.equal((await draftStatus(repo.dir)).status, "done");
