@@ -94,6 +94,18 @@ plist="$app/Contents/Info.plist"
 codesign --force --options runtime "$timestamp" \
   --entitlements mac/node.entitlements \
   --sign "$identity" "$app/Contents/Helpers/node"
+# Re-sign Sparkle's nested code, inside out, as its notarization guide says:
+# Xcode embeds it signed ad hoc or with its own identity and no timestamp,
+# which notarization refuses. The Downloader keeps its sandbox entitlements.
+sparkle="$app/Contents/Frameworks/Sparkle.framework/Versions/B"
+codesign --force --options runtime "$timestamp" --sign "$identity" \
+  "$sparkle/XPCServices/Installer.xpc"
+codesign --force --options runtime "$timestamp" --sign "$identity" \
+  --preserve-metadata=entitlements "$sparkle/XPCServices/Downloader.xpc"
+codesign --force --options runtime "$timestamp" --sign "$identity" "$sparkle/Autoupdate"
+codesign --force --options runtime "$timestamp" --sign "$identity" "$sparkle/Updater.app"
+codesign --force --options runtime "$timestamp" --sign "$identity" \
+  "$app/Contents/Frameworks/Sparkle.framework"
 codesign --force --options runtime "$timestamp" --sign "$identity" "$app"
 codesign --verify --deep --strict "$app"
 
