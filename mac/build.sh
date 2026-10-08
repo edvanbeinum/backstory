@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Builds mac/build/differ.app from the Xcode project, with differ's icon,
-# package.json's version, and the standalone server and a Node to run it in
-# the bundle. Run `npm run build` first; `npm run mac:build` does. It signs
-# with DIFFER_SIGN_IDENTITY, else a Developer ID Application certificate in
-# the keychain, else the identity Xcode used, which Gatekeeper rejects on any
-# other Mac.
+# package.json's version, and the standalone server and the Node pinned
+# below to run it in the bundle. Run `npm run build` first; `npm run
+# mac:build` does. It signs with DIFFER_SIGN_IDENTITY, else a Developer ID
+# Application certificate in the keychain, else the identity Xcode used,
+# which Gatekeeper rejects on any other Mac.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -12,21 +12,27 @@ out=mac/build
 app="$out/differ.app"
 standalone=.next/standalone
 version="$(node -p 'require("./package.json").version')"
-node="$(node -p 'process.execPath')"
+
+# Bundle this Node from nodejs.org rather than the one running the build, so
+# every build ships the same standalone binary: a Homebrew Node loads a
+# shared libnode the bundle doesn't carry, and dies at launch. To bump it,
+# take the new sum from https://nodejs.org/dist/v<version>/SHASUMS256.txt.
+node_version=22.23.3
+node_sha256=23b25245dcfb9af7262f8ff142e9e2e0af025368117329e7a7458a51e5922f53
+node_tar="node-v$node_version-darwin-arm64.tar.gz"
+node="$out/node-v$node_version"
 
 if [ ! -f "$standalone/server.js" ]; then
   echo "mac:build: no $standalone/server.js — run npm run build first" >&2
   exit 1
 fi
-if ! lipo "$node" -verify_arch arm64 2>/dev/null; then
-  echo "mac:build: $node isn't an arm64 Node" >&2
-  exit 1
-fi
-# Refuse a Node built against a shared libnode, as Homebrew's is: only the
-# binary is copied, so the bundled server would die at launch.
-if otool -L "$node" | grep -q libnode; then
-  echo "mac:build: $node needs a shared libnode; put a standalone Node (nvm's) first on PATH" >&2
-  exit 1
+if [ ! -x "$node" ]; then
+  mkdir -p "$out"
+  curl -fsSL "https://nodejs.org/dist/v$node_version/$node_tar" -o "$out/$node_tar"
+  echo "$node_sha256  $out/$node_tar" | shasum -a 256 -c --quiet
+  tar -xzf "$out/$node_tar" -C "$out" --strip-components 2 "${node_tar%.tar.gz}/bin/node"
+  mv "$out/node" "$node"
+  rm "$out/$node_tar"
 fi
 
 xcodebuild -quiet -project mac/differ/differ.xcodeproj -scheme differ \

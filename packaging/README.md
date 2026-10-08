@@ -8,8 +8,9 @@ as an app" says how to build it.
 `npm run mac:build` signs the app with a Developer ID Application certificate
 when the keychain has one, so Gatekeeper accepts it on other Macs. Without
 one it falls back to the identity Xcode used, which only this Mac trusts; the
-build prints which it used. It bundles the `node` it runs with, which must be
-a standalone arm64 build (nvm's, not Homebrew's).
+build prints which it used. The Node in the bundle is the version pinned in
+`mac/build.sh`, downloaded from nodejs.org on the first build and checked
+against its published checksum, whatever `node` ran the build.
 
 `npm run mac:dmg` packs the built app into `mac/build/differ-<version>.dmg`,
 signs it, and with a notary profile set, notarizes and staples it and runs
