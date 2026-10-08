@@ -37,7 +37,7 @@ fi
 
 xcodebuild -quiet -project mac/backstory/Backstory.xcodeproj -scheme Backstory \
   -configuration Release -derivedDataPath "$out/DerivedData" \
-  MARKETING_VERSION="$version" build
+  MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$version" build
 
 rm -rf "$app"
 ditto "$out/DerivedData/Build/Products/Release/Backstory.app" "$app"
