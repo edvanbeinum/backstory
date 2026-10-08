@@ -13,7 +13,7 @@ export interface RecentRepo {
   at: number;
 }
 
-const KEY = "differ.recentRepos";
+const KEY = "backstory.recentRepos";
 const MAX = 12;
 
 /** Most-recent-first, deduped by path, capped. */

@@ -148,7 +148,7 @@ export async function GET(request: Request) {
     }));
 
     // Attach your response to each comment. `done` is only ever what you set:
-    // differ used to guess which commit answered a comment, but a guess
+    // Backstory used to guess which commit answered a comment, but a guess
     // always found something, so no comment ever read as outstanding and the
     // list couldn't work as a checklist.
     // Oldest first — the order the reviewer left them, which is the order

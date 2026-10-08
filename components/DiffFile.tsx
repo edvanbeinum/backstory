@@ -211,8 +211,8 @@ export function DiffFile({
       setShowWhole(true);
       if (!whole && !wholeLoading) void loadWhole();
     };
-    window.addEventListener("differ:reveal", onReveal);
-    return () => window.removeEventListener("differ:reveal", onReveal);
+    window.addEventListener("backstory:reveal", onReveal);
+    return () => window.removeEventListener("backstory:reveal", onReveal);
   }, [
     file.newPath,
     file.oldPath,

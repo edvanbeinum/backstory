@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 /**
  * The tick, and the small machinery that makes it feel like one.
  *
- * differ is a TODO tracker, so this is the moment it earns itself: nothing
+ * Backstory is a TODO tracker, so this is the moment it earns itself: nothing
  * else marks a comment handled, and the whole loop is read a comment, check
  * the change, tick it, move on. A control that just flips a boolean would
  * work and would be forgettable.

@@ -9,7 +9,7 @@ const req = (headers: Record<string, string>) =>
     headers: { host: "127.0.0.1:4460", ...headers },
   });
 
-test("differ's own page and the CLI may POST; another site's page may not", () => {
+test("Backstory's own page and the CLI may POST; another site's page may not", () => {
   assert.equal(
     crossSite(
       req({ "sec-fetch-site": "same-origin", origin: "http://127.0.0.1:4460" }),

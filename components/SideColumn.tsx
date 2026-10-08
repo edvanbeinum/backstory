@@ -6,7 +6,7 @@ import { ChevronDownIcon, ChevronRightIcon, CommentIcon } from "./icons";
 
 export type ColumnTab = "flows" | "comments";
 
-const WIDTH_KEY = "differ.columnWidth";
+const WIDTH_KEY = "backstory.columnWidth";
 const DEFAULT_WIDTH = 44;
 const MIN_WIDTH = 28;
 const MAX_WIDTH = 64;

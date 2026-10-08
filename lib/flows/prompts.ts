@@ -1,9 +1,9 @@
 /**
  * What Claude is asked, and the shape it answers in. Ported from the prompt
- * test in differ's local/prototypes/flows/gen.py; the "before" prompt is that
+ * test in this repo's local/prototypes/flows/gen.py; the "before" prompt is that
  * script's edit prompt run backwards, from the head to the base.
  *
- * Claude returns compact steps; differ verifies them and wraps them in SARIF.
+ * Claude returns compact steps; Backstory verifies them and wraps them in SARIF.
  */
 
 export const MAX_FLOWS = 5;

@@ -15,9 +15,9 @@ import type { FlowSet } from "./types";
 
 const cache = ((
   globalThis as {
-    __differParticipantComponents?: Map<string, Map<string, string | null>>;
+    __backstoryParticipantComponents?: Map<string, Map<string, string | null>>;
   }
-).__differParticipantComponents ??= new Map());
+).__backstoryParticipantComponents ??= new Map());
 
 /** Bumped when the lookup changes, so a running server drops old answers. */
 const LOOKUP_VERSION = "3";

@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   // Expanded here so a hand-typed "~/code/thing" resolves, the same as
-  // every other path differ accepts.
+  // every other path Backstory accepts.
   const roots = searchParams.getAll("root").filter(Boolean).map(expandPath);
   const fresh = searchParams.get("fresh") === "1";
 

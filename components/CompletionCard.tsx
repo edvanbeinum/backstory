@@ -12,7 +12,7 @@ import { CopyButton } from "./ui";
  *
  * This is the one place the big effect is spent. A burst on every tick stops
  * being a reward by the third one; a burst that only ever fires here keeps
- * meaning something, and it happens to fire at the exact moment differ has
+ * meaning something, and it happens to fire at the exact moment Backstory has
  * done its whole job.
  *
  * The substance is still the substance: the count, every reply on the
@@ -42,7 +42,7 @@ export function CompletionCard({
       </p>
       <p className="mx-auto mt-1 max-w-[34ch] text-[12px] text-[var(--fg-muted)]">
         Nothing left{branch ? ` on ${branch}` : ""}. Paste the replies when
-        you&apos;re ready — differ still hasn&apos;t touched GitHub.
+        you&apos;re ready — Backstory still hasn&apos;t touched GitHub.
       </p>
 
       <div className="mt-3 flex flex-wrap items-center justify-center gap-2">

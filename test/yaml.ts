@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 
-// Read as text, not parsed: nothing else in differ needs a YAML dependency,
+// Read as text, not parsed: nothing else in Backstory needs a YAML dependency,
 // and these checks only rely on a few line shapes.
 export const root = path.join(__dirname, "..");
 

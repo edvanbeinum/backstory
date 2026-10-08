@@ -66,7 +66,7 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
               {row.pr.title}
             </span>
             {!row.worktree && (
-              // Reviewable all the same — differ reads any ref from any
+              // Reviewable all the same — Backstory reads any ref from any
               // worktree of the repo. Worth saying only so you know why
               // there's no uncommitted work to compare against.
               <span className="mt-0.5 block text-[11px] text-[var(--fg-subtle)]">

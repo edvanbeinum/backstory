@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * Which build of differ this server is running, for the window to compare
+ * Which build of Backstory this server is running, for the window to compare
  * against the build it was loaded from.
  *
  * `next build` writes the id to .next/BUILD_ID, and the standalone server runs

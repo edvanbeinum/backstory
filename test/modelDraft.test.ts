@@ -26,13 +26,13 @@ import { checkGlobs } from "../lib/models/globs";
 import type { DraftOutput, GlobFixOutput } from "../lib/models/prompts";
 
 const dirs: string[] = [];
-const previousHome = process.env.DIFFER_HOME;
-const home = mkdtempSync(path.join(os.tmpdir(), "differ-home-"));
+const previousHome = process.env.BACKSTORY_HOME;
+const home = mkdtempSync(path.join(os.tmpdir(), "backstory-home-"));
 dirs.push(home);
-process.env.DIFFER_HOME = home;
+process.env.BACKSTORY_HOME = home;
 after(() => {
-  if (previousHome === undefined) delete process.env.DIFFER_HOME;
-  else process.env.DIFFER_HOME = previousHome;
+  if (previousHome === undefined) delete process.env.BACKSTORY_HOME;
+  else process.env.BACKSTORY_HOME = previousHome;
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -46,7 +46,7 @@ const FILES: Record<string, string> = {
 };
 
 function gitRepo(extra: Record<string, string> = {}) {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "differ-draft-test-"));
+  const dir = mkdtempSync(path.join(os.tmpdir(), "backstory-draft-test-"));
   dirs.push(dir);
   const sh = (...args: string[]) =>
     execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" }).trim();
@@ -221,7 +221,7 @@ test("a draft reads back as it was written, whatever its strings and ids", () =>
   const ws = readDsl(text);
 
   assert.deepEqual(ws.properties, {
-    "differ.drafted": "2026-10-05",
+    "backstory.drafted": "2026-10-05",
     "code.tests": "test/**",
     "code.ignore": "**/*.md",
   });

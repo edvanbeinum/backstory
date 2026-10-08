@@ -93,7 +93,7 @@ export function changesFor(
  * An unlinked comment moves nothing. It used to fall back to the whole branch
  * diff, which threw away the commit you were reading the moment you stepped
  * to the next comment — precisely when you were most likely to want it still
- * on screen. differ has no idea which change answers an unhandled comment,
+ * on screen. Backstory has no idea which change answers an unhandled comment,
  * and behaving as though it might is worse than doing nothing.
  */
 export function openingChangeFor(thread: ReviewThread | null): string | null {
@@ -166,7 +166,7 @@ export function DiffColumn({
 
   /**
    * Any commit on the branch, so the diff column isn't limited to the three
-   * chips. Reading your own commits before pushing is what differ was built
+   * chips. Reading your own commits before pushing is what Backstory was built
    * for; it just no longer needs a list of its own to do it.
    */
   const commitCandidates = useMemo(

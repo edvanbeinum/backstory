@@ -144,14 +144,14 @@ export interface ThreadResponse {
   /**
    * The tick, and the only thing that means handled. Nothing infers it:
    * not a linked commit, not a drafted reply, not a reply spotted on GitHub.
-   * differ used to guess which commit answered a comment, and a guess always
+   * Backstory used to guess which commit answered a comment, and a guess always
    * found *something*, so no comment ever read as outstanding and the list
    * couldn't work as a checklist.
    */
   done: boolean;
   /** ms epoch of the tick, for "handled 2 minutes ago". */
   doneAt: number | null;
-  /** The reply you're drafting. differ never posts it. */
+  /** The reply you're drafting. Backstory never posts it. */
   reply: string | null;
   /**
    * The changes you say answer the comment, in the order you linked them.

@@ -147,7 +147,9 @@ test("a quote holding backticks gets a fence that can't close early", () => {
 });
 
 test("notes persist per checkout, and edits keep their original time", async () => {
-  process.env.DIFFER_HOME = mkdtempSync(path.join(tmpdir(), "differ-test-"));
+  process.env.BACKSTORY_HOME = mkdtempSync(
+    path.join(tmpdir(), "backstory-test-"),
+  );
 
   const first = note({ id: "one", createdAt: 100 });
   await changeNotes("/repo/a", { op: "save", note: first });
@@ -167,7 +169,10 @@ test("notes persist per checkout, and edits keep their original time", async () 
   assert.equal((await getNotes("/repo/b")).length, 1);
 
   const raw = JSON.parse(
-    await fs.readFile(path.join(process.env.DIFFER_HOME, "notes.json"), "utf8"),
+    await fs.readFile(
+      path.join(process.env.BACKSTORY_HOME, "notes.json"),
+      "utf8",
+    ),
   );
   assert.deepEqual(Object.keys(raw), ["/repo/b"]);
 
@@ -192,7 +197,9 @@ test("a note on a file with no uncommitted changes says so", () => {
 });
 
 test("sending makes a round; only sent notes tick; only drafts edit", async () => {
-  process.env.DIFFER_HOME = mkdtempSync(path.join(tmpdir(), "differ-test-"));
+  process.env.BACKSTORY_HOME = mkdtempSync(
+    path.join(tmpdir(), "backstory-test-"),
+  );
   const root = "/repo/rounds";
 
   await changeNotes(root, { op: "save", note: note({ id: "a" }) });
@@ -236,7 +243,9 @@ test("sending makes a round; only sent notes tick; only drafts edit", async () =
 });
 
 test("a withdrawn round's notes are drafts again, and editable", async () => {
-  process.env.DIFFER_HOME = mkdtempSync(path.join(tmpdir(), "differ-test-"));
+  process.env.BACKSTORY_HOME = mkdtempSync(
+    path.join(tmpdir(), "backstory-test-"),
+  );
   const root = "/repo/unsend";
 
   await changeNotes(root, { op: "save", note: note({ id: "a" }) });
@@ -252,8 +261,8 @@ test("a withdrawn round's notes are drafts again, and editable", async () => {
 });
 
 test("notes saved before rounds existed read as drafts", async () => {
-  const home = mkdtempSync(path.join(tmpdir(), "differ-test-"));
-  process.env.DIFFER_HOME = home;
+  const home = mkdtempSync(path.join(tmpdir(), "backstory-test-"));
+  process.env.BACKSTORY_HOME = home;
   const legacy = note({ id: "old" }) as Partial<Note>;
   delete legacy.rev;
   delete legacy.sentAt;
@@ -325,7 +334,7 @@ test("a note on a commit names it, and says whether it's pushed — not how to f
       commits: [
         { sha: OLD, subject: "Start it", pushed: true },
         { sha: NEW, subject: "Finish it", pushed: false },
-        // Differ can't tell, so the message doesn't claim either way.
+        // Backstory can't tell, so the message doesn't claim either way.
         { sha: GONE.replace(/c/g, "d"), subject: "Unknown", pushed: null },
       ],
     },

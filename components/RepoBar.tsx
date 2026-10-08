@@ -96,7 +96,7 @@ export function RepoBar({
         ) : (
           <div className="flex items-center gap-2 text-[15px] font-semibold">
             <FileDiffIcon className="text-[var(--fg-muted)]" />
-            <span>differ</span>
+            <span>Backstory</span>
           </div>
         )}
 

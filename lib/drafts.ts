@@ -3,7 +3,7 @@ import type { SessionResponse } from "./types";
 /**
  * Drafts that have been typed but not yet acknowledged by the store.
  *
- * A reply is the one thing in differ you can't reconstruct — a tick is one
+ * A reply is the one thing in Backstory you can't reconstruct — a tick is one
  * click to redo and a link is one pick, but nobody can retype what they wrote
  * from memory. So the window, not the disk, is the first place a draft lands,
  * and it stays here until a write comes back successful.

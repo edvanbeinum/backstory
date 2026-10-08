@@ -17,7 +17,7 @@ import { TickButton } from "./Tick";
  * commit that answers it.
  *
  * The three are independent on purpose. Linking a commit doesn't tick, and
- * neither does writing a reply — differ used to treat both as "handled",
+ * neither does writing a reply — Backstory used to treat both as "handled",
  * which meant the checklist was recording bookkeeping rather than your
  * judgement. Here the tick is yours alone, and it's the widest control in the
  * column so it reads that way.

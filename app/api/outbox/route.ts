@@ -7,9 +7,9 @@ import { resolveRepo } from "@/lib/git";
 import { changeNotes } from "@/lib/notes";
 import {
   ack,
+  BACKSTORY_REVIEW,
   cancel,
   CLIPBOARD,
-  DIFFER_REVIEW,
   formatTaken,
   getOutbox,
   isSessionId,
@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     return bad('`via` can only be "clipboard".');
 
   try {
-    // An agent waiting in `differ review` gets it now, as it always has — but
+    // An agent waiting in `backstory review` gets it now, as it always has — but
     // only once the round and its notes are both written, so it never reads a
     // review the window then reports as failed.
     const waiting = via ? null : waitingReview(root);
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
       noteIds: noteIds as string[],
       message,
       at,
-      deliveredTo: via ?? (waiting ? DIFFER_REVIEW : undefined),
+      deliveredTo: via ?? (waiting ? BACKSTORY_REVIEW : undefined),
     });
     const notes = await undoIfFails(
       changeNotes(root, { op: "send", ids: round.noteIds, at }),

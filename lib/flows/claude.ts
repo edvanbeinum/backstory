@@ -2,7 +2,7 @@ import { run } from "../exec";
 
 /**
  * Every call to Claude Code goes through here, so a change in its CLI is a
- * change in one file. differ depends on `-p`, `--json-schema` and the
+ * change in one file. Backstory depends on `-p`, `--json-schema` and the
  * `structured_output` field of the JSON result.
  */
 
@@ -14,12 +14,12 @@ export interface ClaudeResult<T> {
 }
 
 /**
- * Which model traces flows: DIFFER_FLOWS_MODEL, an alias ("sonnet",
+ * Which model traces flows: BACKSTORY_FLOWS_MODEL, an alias ("sonnet",
  * "opus") or a full model id. Sonnet by default: compared with Opus on the
  * same views it cost about a third, took under half the time and verified
  * every step, tracing coarser flows that still told the same story.
  */
-export const flowsModel = () => process.env.DIFFER_FLOWS_MODEL || "sonnet";
+export const flowsModel = () => process.env.BACKSTORY_FLOWS_MODEL || "sonnet";
 
 /** A stand-in for Claude in tests: same contract, recorded answers. */
 export type Runner = <T>(

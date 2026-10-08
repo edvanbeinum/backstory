@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { promises as fs } from "node:fs";
-import { homedir } from "node:os";
 import path from "node:path";
 
 import { gitLine } from "../exec";
+import { homeDir } from "../store";
 import { claudeAvailable } from "./claude";
 import { attachComponents } from "./components";
 import { generateFlows, traceHunk } from "./generate";
@@ -14,7 +14,7 @@ import type { FlowSet, FlowsStatus } from "./types";
 /**
  * Cached flows and the runs that make them.
  *
- * One file per view, `~/.differ/flows/<repo>/<base>..<head>.sarif.json`. Not
+ * One file per view, `~/.backstory/flows/<repo>/<base>..<head>.sarif.json`. Not
  * in `lib/store.ts`: that's a few KB of click-driven JSON read and written
  * whole; these are ~15 KB each, one per view. After a prompt change, delete
  * the folder.
@@ -45,8 +45,8 @@ interface Registry {
   events: EventEmitter;
 }
 
-const g = globalThis as { __differFlows?: Registry };
-const registry: Registry = (g.__differFlows ??= {
+const g = globalThis as { __backstoryFlows?: Registry };
+const registry: Registry = (g.__backstoryFlows ??= {
   jobs: new Map(),
   tracing: new Map(),
   failures: new Map(),
@@ -54,10 +54,6 @@ const registry: Registry = (g.__differFlows ??= {
   claude: null,
   events: new EventEmitter().setMaxListeners(0),
 });
-
-function home(): string {
-  return process.env.DIFFER_HOME || path.join(homedir(), ".differ");
-}
 
 /** Worktrees of one repo share their flows: the key is the common git dir. */
 async function repoDir(root: string): Promise<string> {
@@ -71,7 +67,7 @@ async function repoDir(root: string): Promise<string> {
     .basename(path.dirname(common))
     .replace(/[^A-Za-z0-9._-]/g, "_");
   const hash = createHash("sha1").update(common).digest("hex").slice(0, 8);
-  return path.join(home(), "flows", `${name}-${hash}`);
+  return path.join(homeDir(), "flows", `${name}-${hash}`);
 }
 
 const fileName = (view: View) =>

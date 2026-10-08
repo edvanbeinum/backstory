@@ -6,7 +6,7 @@ import type {
 } from "./model";
 
 /**
- * A reader for the part of the Structurizr DSL that differ's models use:
+ * A reader for the part of the Structurizr DSL that Backstory's models use:
  * people, software systems, containers and components, their properties, and
  * the arrows between them. Anything that could hold elements it doesn't read
  * (`group`, `!include`, `deploymentEnvironment`, …) fails the parse rather
@@ -415,7 +415,7 @@ export function readDsl(text: string): Workspace {
   }));
 
   // List people before software systems, as Structurizr's JSON export did,
-  // so flows cached while differ read that export keep their keys.
+  // so flows cached while Backstory read that export keep their keys.
   return {
     properties,
     elements: [

@@ -3,7 +3,7 @@ import type { Flow, FlowParticipant, FlowSet, FlowStep } from "./types";
 /**
  * The cache is SARIF 2.1.0: one informational result per flow, its steps as
  * `codeFlows` thread flows ("after" at the head, "before" at the base).
- * Whatever SARIF has no field for goes in `differ.*` properties.
+ * Whatever SARIF has no field for goes in `backstory.*` properties.
  */
 
 interface SarifLocation {
@@ -48,6 +48,22 @@ interface SarifLog {
   }[];
 }
 
+const NS = "backstory";
+
+function props(values: Record<string, unknown>): Record<string, unknown> {
+  return Object.fromEntries(
+    Object.entries(values).map(([key, value]) => [`${NS}.${key}`, value]),
+  );
+}
+
+/**
+ * A property by its short name. Falls back to the `differ.*` name that flows
+ * cached under the old name carry, so they read back rather than cost
+ * another trace.
+ */
+const prop = (bag: Record<string, unknown>, key: string): unknown =>
+  `${NS}.${key}` in bag ? bag[`${NS}.${key}`] : bag[`differ.${key}`];
+
 const toLocation = (s: FlowStep, i: number): SarifLocation => ({
   location: {
     physicalLocation: {
@@ -60,41 +76,45 @@ const toLocation = (s: FlowStep, i: number): SarifLocation => ({
   kinds: ["call"],
   executionOrder: i + 1,
   nestingLevel: s.nesting,
-  properties: Object.fromEntries(
-    Object.entries({
-      "differ.stepId": s.id,
-      "differ.from": s.from,
-      "differ.to": s.to,
-      "differ.symbol": s.symbol,
-      "differ.returns": s.returns,
-      "differ.repeat": s.repeat,
-      "differ.sameAs": s.sameAs,
-      "differ.verified": s.verified,
-    }).filter(([, v]) => v !== undefined && v !== ""),
+  properties: props(
+    Object.fromEntries(
+      Object.entries({
+        stepId: s.id,
+        from: s.from,
+        to: s.to,
+        symbol: s.symbol,
+        returns: s.returns,
+        repeat: s.repeat,
+        sameAs: s.sameAs,
+        verified: s.verified,
+      }).filter(([, v]) => v !== undefined && v !== ""),
+    ),
   ),
 });
 
 const fromLocation = (l: SarifLocation): FlowStep => {
   const p = l.properties;
-  const str = (key: string) =>
-    typeof p[key] === "string" ? (p[key] as string) : undefined;
+  const str = (key: string) => {
+    const value = prop(p, key);
+    return typeof value === "string" ? value : undefined;
+  };
   const optional = Object.fromEntries(
     (["returns", "repeat", "sameAs"] as const)
-      .map((k) => [k, str(`differ.${k}`)])
+      .map((k) => [k, str(k)])
       .filter(([, v]) => v !== undefined),
   );
   return {
     ...optional,
-    id: str("differ.stepId") ?? `step-${l.executionOrder}`,
-    from: str("differ.from") ?? "",
-    to: str("differ.to") ?? "",
+    id: str("stepId") ?? `step-${l.executionOrder}`,
+    from: str("from") ?? "",
+    to: str("to") ?? "",
     file: l.location.physicalLocation.artifactLocation.uri,
     line: l.location.physicalLocation.region.startLine,
     caller: l.location.logicalLocations[0]?.fullyQualifiedName ?? "",
     label: l.location.message.text,
-    symbol: str("differ.symbol") ?? "",
+    symbol: str("symbol") ?? "",
     nesting: l.nestingLevel,
-    verified: p["differ.verified"] === true,
+    verified: prop(p, "verified") === true,
   };
 };
 
@@ -110,9 +130,9 @@ export function toSarif(set: FlowSet, repoUri: string): SarifLog {
       {
         tool: {
           driver: {
-            name: "differ",
+            name: NS,
             version: "0.1.0",
-            rules: [{ id: "differ.flow" }],
+            rules: [{ id: `${NS}.flow` }],
           },
         },
         versionControlProvenance: [
@@ -122,21 +142,21 @@ export function toSarif(set: FlowSet, repoUri: string): SarifLog {
           name: p.label,
           fullyQualifiedName: p.name,
           kind: "type",
-          properties: {
-            "differ.external": p.external,
-            "differ.component": p.component ?? null,
-          },
+          properties: props({
+            external: p.external,
+            component: p.component ?? null,
+          }),
         })),
         results: set.flows.map((f) => ({
-          ruleId: "differ.flow",
+          ruleId: `${NS}.flow`,
           kind: "informational",
           message: { text: f.name },
-          properties: {
-            "differ.flowId": f.id,
-            "differ.trigger": f.trigger,
-            "differ.isNew": f.isNew,
-            "differ.participants": f.participants.map((p) => p.name),
-          },
+          properties: props({
+            flowId: f.id,
+            trigger: f.trigger,
+            isNew: f.isNew,
+            participants: f.participants.map((p) => p.name),
+          }),
           codeFlows: [
             {
               threadFlows: [
@@ -148,16 +168,16 @@ export function toSarif(set: FlowSet, repoUri: string): SarifLog {
             },
           ],
         })),
-        properties: {
-          "differ.base": set.base,
-          "differ.head": set.head,
-          "differ.generatedAt": set.generatedAt,
-          "differ.hunks": set.hunks,
-          "differ.appFiles": set.appFiles,
-          "differ.costUsd": set.costUsd,
-          "differ.durationMs": set.durationMs,
-          "differ.model": set.model ?? null,
-        },
+        properties: props({
+          base: set.base,
+          head: set.head,
+          generatedAt: set.generatedAt,
+          hunks: set.hunks,
+          appFiles: set.appFiles,
+          costUsd: set.costUsd,
+          durationMs: set.durationMs,
+          model: set.model ?? null,
+        }),
       },
     ],
   };
@@ -172,8 +192,8 @@ export function fromSarif(log: SarifLog): FlowSet {
       {
         name: l.fullyQualifiedName,
         label: l.name,
-        external: l.properties["differ.external"] === true,
-        component: (l.properties["differ.component"] as string | null) ?? null,
+        external: prop(l.properties, "external") === true,
+        component: (prop(l.properties, "component") as string | null) ?? null,
       },
     ]),
   );
@@ -185,12 +205,12 @@ export function fromSarif(log: SarifLog): FlowSet {
       threads.find((t) => t.id === "before")?.locations.map(fromLocation) ??
       null;
     const names =
-      (r.properties["differ.participants"] as string[] | undefined) ?? [];
+      (prop(r.properties, "participants") as string[] | undefined) ?? [];
     return {
-      id: r.properties["differ.flowId"] as string,
+      id: prop(r.properties, "flowId") as string,
       name: r.message.text,
-      trigger: (r.properties["differ.trigger"] as string) ?? "",
-      isNew: r.properties["differ.isNew"] === true,
+      trigger: (prop(r.properties, "trigger") as string) ?? "",
+      isNew: prop(r.properties, "isNew") === true,
       participants: names.map(
         (n) =>
           participants.get(n) ?? {
@@ -205,15 +225,15 @@ export function fromSarif(log: SarifLog): FlowSet {
     };
   });
   return {
-    base: (p["differ.base"] as string | null) ?? null,
-    head: p["differ.head"] as string,
-    generatedAt: (p["differ.generatedAt"] as number) ?? 0,
+    base: (prop(p, "base") as string | null) ?? null,
+    head: prop(p, "head") as string,
+    generatedAt: (prop(p, "generatedAt") as number) ?? 0,
     flows,
-    hunks: (p["differ.hunks"] as FlowSet["hunks"]) ?? [],
-    appFiles: (p["differ.appFiles"] as string[]) ?? [],
-    costUsd: (p["differ.costUsd"] as number) ?? 0,
-    durationMs: (p["differ.durationMs"] as number) ?? 0,
-    model: (p["differ.model"] as string | null) ?? null,
+    hunks: (prop(p, "hunks") as FlowSet["hunks"]) ?? [],
+    appFiles: (prop(p, "appFiles") as string[]) ?? [],
+    costUsd: (prop(p, "costUsd") as number) ?? 0,
+    durationMs: (prop(p, "durationMs") as number) ?? 0,
+    model: (prop(p, "model") as string | null) ?? null,
   };
 }
 

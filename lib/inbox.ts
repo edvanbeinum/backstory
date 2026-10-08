@@ -38,7 +38,7 @@ export interface InboxRow {
   /** The worktree holding it, when one does. */
   worktree: { path: string; name: string; missing: boolean } | null;
   /**
-   * The worktree differ reviews it from. Its own when checked out, otherwise
+   * The worktree Backstory reviews it from. Its own when checked out, otherwise
    * the repo's main checkout — git reads any ref from any worktree, so a
    * branch needs no checkout of its own to be reviewed.
    */

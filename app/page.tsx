@@ -69,7 +69,7 @@ const WORKING_COMMIT: CommitSummary = {
 };
 
 /** This viewer's layout: "diagrams" (the default) or "code". */
-const LAYOUT_KEY = "differ.layout";
+const LAYOUT_KEY = "backstory.layout";
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
@@ -1019,8 +1019,8 @@ export default function Page() {
   );
 
   // Coming back to the window is the moment to retry anything the store never
-  // confirmed — differ's own server may simply have been restarting when you
-  // typed it.
+  // confirmed — Backstory's own server may simply have been restarting when
+  // you typed it.
   useEffect(() => {
     window.addEventListener("focus", flushDrafts);
     return () => window.removeEventListener("focus", flushDrafts);
@@ -1089,7 +1089,7 @@ export default function Page() {
       // A pasted sha can simply not exist. Saying so beats a click that looks
       // like it worked and leaves the row unchanged.
       if (!ok) {
-        setLinkNotice(error ?? "That didn't reach differ — try again.");
+        setLinkNotice(error ?? "That didn't reach Backstory — try again.");
         return;
       }
       setLinkNotice(null);
@@ -1330,9 +1330,9 @@ export default function Page() {
                     className="mt-0.5 shrink-0 text-[var(--attention)]"
                   />
                   <span className="flex-1">
-                    A draft reply hasn&apos;t reached differ — it&apos;s still
-                    here and still being retried, but copy it somewhere safe
-                    before closing this window.
+                    A draft reply hasn&apos;t reached Backstory — it&apos;s
+                    still here and still being retried, but copy it somewhere
+                    safe before closing this window.
                   </span>
                 </p>
               )}

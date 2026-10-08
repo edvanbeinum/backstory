@@ -13,7 +13,7 @@ export interface OutboxApi {
   /** When each remembered session last stopped here */
   seen: Record<string, number>;
   /**
-   * Hand a round over: to a waiting `differ review`, else into the queue —
+   * Hand a round over: to a waiting `backstory review`, else into the queue —
    * or, with `via: "clipboard"`, record that it was copied. Resolves the
    * filed round, or null (with `error` set) if it didn't land.
    */

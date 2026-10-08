@@ -3,7 +3,7 @@ import type { DataResponse } from "./data/types";
 import type { FlowSet, FlowStep } from "./flows/types";
 
 /**
- * Notes on the shape of a change, worked out from what differ already
+ * Notes on the shape of a change, worked out from what Backstory already
  * holds: the view's flows and its data model change. Each states a fact
  * worth a look, with the evidence, and says where it belongs on the
  * diagrams. They don't judge: whether a pattern is a problem is the

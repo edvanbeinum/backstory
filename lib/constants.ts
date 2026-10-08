@@ -13,11 +13,11 @@ export const NOTES_API = "/api/notes";
 export const REVIEW_API = "/api/review";
 export const OUTBOX_API = "/api/outbox";
 
-export const STORAGE_KEY = "differ.repoPath";
+export const STORAGE_KEY = "backstory.repoPath";
 
 /**
- * Canonical repo roots the inbox scans. Separate from `differ.recentRepos`,
+ * Canonical repo roots the inbox scans. Separate from `backstory.recentRepos`,
  * which holds worktree paths and is capped — with twenty worktrees it would
  * fill with one repo and evict the other.
  */
-export const INBOX_ROOTS_KEY = "differ.inboxRepos";
+export const INBOX_ROOTS_KEY = "backstory.inboxRepos";

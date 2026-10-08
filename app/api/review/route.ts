@@ -26,7 +26,7 @@ const bad = (error: string, status = 400) =>
   NextResponse.json<ApiError>({ error }, { status });
 
 /**
- * The `differ review` ↔ window handoff.
+ * The `backstory review` ↔ window handoff.
  *
  *   GET  ?repo=<root>       — the window: is an agent waiting on this checkout?
  *   GET  ?id=<id>           — the CLI: long-poll until the request settles

@@ -190,7 +190,7 @@ export function serializeModel(
   for (const arrow of arrows) lines.push(`${pad(2)}${arrow}`);
   lines.push(`${pad(1)}}`, "");
 
-  // Only so Structurizr can open the file: differ skips `views`.
+  // Only so Structurizr can open the file: Backstory skips `views`.
   const view = (kind: string, of: string) =>
     lines.push(
       `${pad(2)}${kind} ${of} {`,

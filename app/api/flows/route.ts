@@ -55,7 +55,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  // Tracing costs money and sends code to Claude: only differ's own page asks.
+  // Tracing costs money and sends code to Claude: only Backstory's own page asks.
   const refused = crossSite(request);
   if (refused) return refused;
   try {

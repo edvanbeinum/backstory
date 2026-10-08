@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "differ — review before you push",
+  title: "Backstory — review before you push",
   description:
     "Local pre-push review: unpushed commits and their PR review comments, side by side.",
   // Safari takes its icon from apple-touch-icon instead of these. The SVG is
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "differ",
+    title: "Backstory",
     statusBarStyle: "black-translucent",
   },
 };

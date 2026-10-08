@@ -137,7 +137,7 @@ export function resolveRev(
   hasBranchDiff = false,
   /**
    * Shas chosen by hand this session — pasted into the commit picker rather
-   * than picked from the offered list. differ can render any commit in the
+   * than picked from the offered list. Backstory can render any commit in the
    * repo, but it only *lists* the branch's recent ones, so without this a
    * pasted sha would be bounced back by the next background refresh a second
    * after you chose it. A rev from a URL still falls back, which is what

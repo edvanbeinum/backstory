@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import { GET } from "../app/api/health/route";
 import { readVersion } from "../lib/build";
 import { readText, root } from "./yaml";
 
@@ -15,17 +16,22 @@ test("health reports package.json's version from a checkout", () => {
 });
 
 test("health reports the version from the standalone layout's directory", () => {
-  const server = mkdtempSync(path.join(tmpdir(), "differ-standalone-"));
+  const server = mkdtempSync(path.join(tmpdir(), "backstory-standalone-"));
   writeFileSync(
     path.join(server, "package.json"),
-    JSON.stringify({ name: "differ", version }),
+    JSON.stringify({ name: "backstory", version }),
   );
   assert.equal(readVersion(server), version);
 });
 
 test("a server with no package.json reports an unknown version", () => {
   assert.equal(
-    readVersion(mkdtempSync(path.join(tmpdir(), "differ-"))),
+    readVersion(mkdtempSync(path.join(tmpdir(), "backstory-"))),
     "unknown",
   );
+});
+
+test("health says it's Backstory, which the CLI and the Mac app check for", async () => {
+  const body = (await (await GET()).json()) as { app: string };
+  assert.equal(body.app, "backstory");
 });
