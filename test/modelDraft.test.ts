@@ -396,8 +396,13 @@ test("a redraft sent while a refused draft is still being checked still runs", a
   const { runner, prompts } = recorded([renamed]);
   // Let the stale draft claim the repo before the redraft arrives: both
   // resolve the model directory first, and that ordering isn't promised.
+  // Stop waiting once the stale draft has settled too, since its claim can
+  // come and go between two polls and would otherwise leave this spinning.
   const stale = startDraft(repo.dir, { runner, available });
-  while ((await draftStatus(repo.dir)).status !== "running") {
+  let settled = false;
+  const markSettled = () => (settled = true);
+  stale.then(markSettled, markSettled);
+  while (!settled && (await draftStatus(repo.dir)).status !== "running") {
     await new Promise((resolve) => setTimeout(resolve, 5));
   }
   const redraft = await startDraft(repo.dir, {
