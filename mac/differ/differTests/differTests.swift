@@ -20,8 +20,8 @@ private func repoParam(_ address: URL) -> String? {
 
 @MainActor
 struct RepoLinkTests {
-    @Test func differOpenLinkLoadsTheRepoOnTheServer() {
-        let link = URL(string: "differ://open?repo=/Users/me/code/app")!
+    @Test func openLinkLoadsTheRepoOnTheServer() {
+        let link = URL(string: "backstory://open?repo=/Users/me/code/app")!
         #expect(
             RepoLink.address(for: link, server: server)?.absoluteString
                 == "http://127.0.0.1:4460/?repo=/Users/me/code/app")
@@ -37,7 +37,7 @@ struct RepoLinkTests {
     @Test func linkFromTheCliRoundTrips() {
         let repo = "/Users/me/my repo/c++ & co"
         let encoded = repo.addingPercentEncoding(withAllowedCharacters: .alphanumerics)!
-        let link = URL(string: "differ://open?repo=\(encoded)")!
+        let link = URL(string: "backstory://open?repo=\(encoded)")!
         #expect(repoParam(RepoLink.address(for: link, server: server)!) == repo)
     }
 
@@ -45,15 +45,16 @@ struct RepoLinkTests {
         let folder = URL(fileURLWithPath: "/Users/me/code/app", isDirectory: true)
         #expect(
             RepoLink.address(for: folder, server: server)
-                == RepoLink.address(for: URL(string: "differ://open?repo=/Users/me/code/app")!, server: server))
+                == RepoLink.address(for: URL(string: "backstory://open?repo=/Users/me/code/app")!, server: server))
     }
 
     @Test(arguments: [
         "https://open?repo=/Users/me/code/app",
-        "differ://close?repo=/Users/me/code/app",
-        "differ://open",
-        "differ://open?path=/Users/me/code/app",
-        "differ://open?repo=code/app",
+        "backstory://close?repo=/Users/me/code/app",
+        "backstory://open",
+        "backstory://open?path=/Users/me/code/app",
+        "backstory://open?repo=code/app",
+        "differ://open?repo=/Users/me/code/app",
     ])
     func ignoresAnythingElse(_ link: String) {
         #expect(RepoLink.address(for: URL(string: link)!, server: server) == nil)

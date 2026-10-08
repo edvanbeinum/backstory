@@ -1,38 +1,53 @@
 /**
- * `differ hook stop` — the Claude Code Stop hook that delivers queued notes.
+ * `backstory hook stop` — the Claude Code Stop hook that delivers queued notes.
  *
  * Runs every time any session finishes a turn, so its first duty is to stay
- * out of the way: differ down, unreachable, slow or erroring, a directory
+ * out of the way: Backstory down, unreachable, slow or erroring, a directory
  * that isn't a checkout, input it can't read — every one of those prints
  * nothing and lets the agent stop. It never waits for a person; hooks are
  * killed at their timeout.
  *
- * When differ does have notes for this session, it prints
+ * When Backstory does have notes for this session, it prints
  * `{"decision": "block", "reason": <notes>}`, which keeps the agent going
- * with the notes as its instructions, then tells differ it did. Only that
+ * with the notes as its instructions, then tells Backstory it did. Only that
  * marks them delivered: a hook that gave up before the answer came leaves
  * them to be taken again, never lost. Once delivered, the agent's next stop
  * finds nothing and it stops normally — no loop.
  */
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
 export const DEFAULT_PORT = 4460;
 
-const portFile = (env) =>
-  path.join(env.DIFFER_HOME || path.join(homedir(), ".differ"), "port");
+const home = (env) => env.BACKSTORY_HOME || path.join(homedir(), ".backstory");
+
+const portFile = (env) => path.join(home(env), "port");
 
 /**
  * Note the port a server was last reached on. A hook runs in the agent's
- * environment, not the one `differ --port N` ran in, so it can't be told.
+ * environment, not the one `backstory --port N` ran in, so it can't be told.
+ *
+ * Moves a `.differ` beside the home directory into place before creating it,
+ * as `homeDir` in `lib/store.ts` does: `backstory` records the port before
+ * the app it just launched has started, and an empty directory made here
+ * would stop the app moving the old one.
  *
  * @param {number} port
  * @param {Record<string, string | undefined>} env
  */
 export function recordPort(port, env = process.env) {
   try {
-    mkdirSync(path.dirname(portFile(env)), { recursive: true });
+    const dir = home(env);
+    const old = path.join(path.dirname(dir), ".differ");
+    if (!existsSync(dir) && existsSync(old)) renameSync(old, dir);
+    mkdirSync(dir, { recursive: true });
     writeFileSync(portFile(env), `${port}\n`);
   } catch {
     // The hook falls back to the default port; nothing worse.
@@ -40,12 +55,12 @@ export function recordPort(port, env = process.env) {
 }
 
 /**
- * Where the hook finds differ: DIFFER_PORT, else the last one recorded.
+ * Where the hook finds Backstory: BACKSTORY_PORT, else the last one recorded.
  *
  * @param {Record<string, string | undefined>} env
  */
 export function hookPort(env = process.env) {
-  if (Number(env.DIFFER_PORT)) return Number(env.DIFFER_PORT);
+  if (Number(env.BACKSTORY_PORT)) return Number(env.BACKSTORY_PORT);
   try {
     return Number(readFileSync(portFile(env), "utf8").trim()) || DEFAULT_PORT;
   } catch {
@@ -108,7 +123,7 @@ export async function stopHook(
   return out;
 }
 
-/** POST to differ and read the JSON answer; throws on anything but a 2xx. */
+/** POST to Backstory and read the JSON answer; throws on anything but a 2xx. */
 async function post(url, body, timeoutMs) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -122,7 +137,7 @@ async function post(url, body, timeoutMs) {
         body: JSON.stringify(body),
       }),
     });
-    if (!response.ok) throw new Error(`differ answered ${response.status}`);
+    if (!response.ok) throw new Error(`Backstory answered ${response.status}`);
     return await response.json();
   } finally {
     clearTimeout(timer);

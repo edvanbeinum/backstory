@@ -1,11 +1,11 @@
 import Foundation
 
-/// Turns what the app is asked to open (a `differ://open?repo=<path>` link, or
+/// Turns what the app is asked to open (a `backstory://open?repo=<path>` link, or
 /// a folder from the Dock or Open Repo…) into the address the web view loads:
 /// `/?repo=<path>`, which the page reads on load.
 enum RepoLink {
     /// The address that opens `url`'s repo on `server`, or nil for anything
-    /// that isn't a `differ://open` link with an absolute repo, or a file URL.
+    /// that isn't a `backstory://open` link with an absolute repo, or a file URL.
     static func address(for url: URL, server: URL) -> URL? {
         guard let repo = repoPath(from: url) else { return nil }
         return address(forRepo: repo, server: server)
@@ -13,7 +13,7 @@ enum RepoLink {
 
     static func repoPath(from url: URL) -> String? {
         if url.isFileURL { return url.standardizedFileURL.path }
-        guard url.scheme?.lowercased() == "differ",
+        guard url.scheme?.lowercased() == "backstory",
             url.host?.lowercased() == "open",
             let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
             let repo = components.queryItems?.first(where: { $0.name == "repo" })?.value,

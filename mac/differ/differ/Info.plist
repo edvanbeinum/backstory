@@ -23,10 +23,10 @@
 			<key>CFBundleTypeRole</key>
 			<string>Editor</string>
 			<key>CFBundleURLName</key>
-			<string>dev.differ.app</string>
+			<string>dev.backstory.app</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>differ</string>
+				<string>backstory</string>
 			</array>
 		</dict>
 	</array>

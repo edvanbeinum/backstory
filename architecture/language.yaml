@@ -138,7 +138,7 @@ blocks:
     read: "`components/SideColumn.tsx`, the comment on `SideColumn`"
   - name: CLI
     code:
-      - bin/differ.mjs
+      - bin/backstory.mjs
       - bin/macapp.mjs
       - packaging/
     summary: The `differ` command, which opens a repo in the Mac app (launching it when it isn't running) or `differ review`'s wait for notes, and the Homebrew formula.

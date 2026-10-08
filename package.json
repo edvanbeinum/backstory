@@ -1,9 +1,9 @@
 {
-  "name": "differ",
+  "name": "backstory",
   "version": "0.1.0",
   "private": true,
   "bin": {
-    "differ": "bin/differ.mjs"
+    "backstory": "bin/backstory.mjs"
   },
   "scripts": {
     "dev": "next dev -H 127.0.0.1",

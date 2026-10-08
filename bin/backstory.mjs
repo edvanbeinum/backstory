@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 /**
- * differ — open a repo in differ's Mac app.
+ * backstory — open a repo in Backstory's Mac app.
  *
- *   differ              open the cwd's repo
- *   differ <path>       open a specific repo
- *   differ --port N     use the differ on another port, a dev server say
- *                       (default 4460, env DIFFER_PORT), in the browser
- *   differ review [path]
- *                       wait for you to review the uncommitted changes, then
- *                       print your notes to stdout and exit — for an agent
- *                       session to run and read
- *   differ hook stop    the Claude Code Stop hook: hand a finishing session
- *                       any notes queued for it (reads the hook's JSON on
- *                       stdin; silent when there are none or differ is down)
+ *   backstory              open the cwd's repo
+ *   backstory <path>       open a specific repo
+ *   backstory --port N     use the Backstory on another port, a dev server say
+ *                          (default 4460, env BACKSTORY_PORT), in the browser
+ *   backstory review [path]
+ *                          wait for you to review the uncommitted changes,
+ *                          then print your notes to stdout and exit — for an
+ *                          agent session to run and read
+ *   backstory hook stop    the Claude Code Stop hook: hand a finishing session
+ *                          any notes queued for it (reads the hook's JSON on
+ *                          stdin; silent when there are none or Backstory is
+ *                          down)
  *
  * The Mac app runs the server; this only ever asks it for things, launching
  * the app when it isn't running (bin/macapp.mjs).
@@ -54,11 +55,11 @@ function parseArgs(argv) {
     if (a === "--port") args.port = Number(argv[++i]);
     else if (a === "--help" || a === "-h") {
       console.log(
-        "usage: differ [path] [--port N]\n" +
-          "       differ review [path] [--port N]\n" +
-          "       differ hook stop   (Claude Code Stop hook; see the README)\n" +
-          "Opens the repo (default: cwd) in differ's Mac app, launching it\n" +
-          "if it isn't running. With --port, opens the differ on that port\n" +
+        "usage: backstory [path] [--port N]\n" +
+          "       backstory review [path] [--port N]\n" +
+          "       backstory hook stop   (Claude Code Stop hook; see the README)\n" +
+          "Opens the repo (default: cwd) in Backstory's Mac app, launching it\n" +
+          "if it isn't running. With --port, opens the Backstory on that port\n" +
           "in the browser instead.\n" +
           "`review` then waits for you to send notes on the uncommitted\n" +
           "changes, prints them to stdout, and exits.",
@@ -70,7 +71,7 @@ function parseArgs(argv) {
       process.exit(2);
     }
   }
-  args.port ??= Number(process.env.DIFFER_PORT) || DEFAULT_PORT;
+  args.port ??= Number(process.env.BACKSTORY_PORT) || DEFAULT_PORT;
   return args;
 }
 
@@ -89,11 +90,11 @@ async function getJson(url, timeoutMs = 1500, method = "GET") {
   }
 }
 
-/** Whether a *differ* answers on this port, rather than some other server. */
-async function differAt(port) {
+/** Whether a *Backstory* answers on this port, rather than some other server. */
+async function backstoryAt(port) {
   try {
     const { body } = await getJson(`http://127.0.0.1:${port}/api/health`);
-    return body?.app === "differ";
+    return body?.app === "backstory";
   } catch {
     return false;
   }
@@ -101,7 +102,7 @@ async function differAt(port) {
 
 async function waitForHealth(port, tries = 120) {
   for (let i = 0; i < tries; i++) {
-    if (await differAt(port)) return true;
+    if (await backstoryAt(port)) return true;
     await new Promise((resolve) => setTimeout(resolve, 250));
   }
   return false;
@@ -114,7 +115,7 @@ const say = args.review ? console.error : console.log;
 const app = findMacApp();
 
 function fail(message) {
-  console.error(`differ: ${message}`);
+  console.error(`backstory: ${message}`);
   process.exit(1);
 }
 
@@ -144,7 +145,7 @@ async function openRepo(repo, running) {
 }
 
 /**
- * `differ review`: ask the server for a review, then wait for it.
+ * `backstory review`: ask the server for a review, then wait for it.
  *
  * The wait is a loop of long-polls rather than one request, so no timeout
  * anywhere between here and the server has to be longer than a review takes.
@@ -152,12 +153,12 @@ async function openRepo(repo, running) {
  * captures stdout reads your notes and nothing else.
  */
 async function review() {
-  if (!(await differAt(args.port))) {
+  if (!(await backstoryAt(args.port))) {
     if (args.port !== DEFAULT_PORT) {
       fail(`nothing is answering on :${args.port}.`);
     }
     if (!app) fail(NOT_INSTALLED);
-    say("differ: starting differ's Mac app…");
+    say("backstory: starting Backstory's Mac app…");
     await promisify(execFile)("open", ["-a", app]);
     if (!(await waitForHealth(args.port))) {
       fail(`the Mac app's server didn't come up on :${args.port}.`);
@@ -187,7 +188,7 @@ async function review() {
 
   await openRepo(opened.body.repo, true);
   console.error(
-    `differ: waiting for your review of ${opened.body.repo} — ` +
+    `backstory: waiting for your review of ${opened.body.repo} — ` +
       "leave notes on its changes and press Send to agent.",
   );
 
@@ -207,7 +208,7 @@ async function review() {
     }
 
     if (result.status === 404) {
-      fail("the review request expired (did differ restart?).");
+      fail("the review request expired (did Backstory restart?).");
     }
     switch (result.body?.state) {
       case "waiting":
@@ -221,7 +222,7 @@ async function review() {
         );
         process.exit(0);
       case "superseded":
-        fail("another `differ review` took over this checkout.");
+        fail("another `backstory review` took over this checkout.");
       default:
         fail(result.body?.error ?? "unexpected response");
     }
@@ -231,8 +232,8 @@ async function review() {
 if (args.review) await review();
 
 const repo = await repoRoot(args.repo);
-await openRepo(repo, await differAt(args.port));
-// Only once a differ is reachable there, so a `--port N` that found nothing
-// doesn't send the Stop hook's notes to the wrong port.
+await openRepo(repo, await backstoryAt(args.port));
+// Only once a Backstory is reachable there, so a `--port N` that found
+// nothing doesn't send the Stop hook's notes to the wrong port.
 recordPort(args.port);
-say(`differ: opening ${repo}`);
+say(`backstory: opening ${repo}`);
