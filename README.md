@@ -114,6 +114,7 @@ server and the Node it runs on, so it needs no checkout or `node` once built.
 `npm run mac:dmg` packs it into a disk image to share; `packaging/README.md`
 says how to sign and notarize it. The server logs to `~/.backstory/server.log`, and **Open at Login** in the app menu
 starts Backstory with your Mac, for live updates with no window open.
+**Check for Updates…** in the same menu offers the latest GitHub release.
 
 `npm link` puts `backstory` on your PATH. From any checkout, `backstory` opens
 that repo in the app, launching it if it isn't running (with a

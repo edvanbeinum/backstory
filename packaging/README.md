@@ -37,6 +37,62 @@ BACKSTORY_NOTARY_PROFILE=backstory npm run mac:dmg
 has more than one. Without `BACKSTORY_NOTARY_PROFILE`, `mac:dmg` still builds
 and signs the DMG but says it isn't notarized.
 
+## Releasing
+
+A release is a version tag. `.github/workflows/release.yml` runs on any `v*`
+tag on a macOS runner: `npm run verify`, `mac:build`, `mac:dmg` with the
+`backstory` notary profile, `mac:appcast`, `mac:smoke`, then a GitHub release
+marked latest with `Backstory-<version>.dmg` and `appcast.xml`. The app's
+**Check for Updates…** reads
+`https://github.com/edvanbeinum/backstory/releases/latest/download/appcast.xml`,
+so each release offers itself to every installed copy. That address answers
+only once the repository is public.
+
+`npm run mac:appcast` writes `mac/build/appcast.xml` for the DMG `mac:dmg`
+made, with one item signed by the Sparkle key. It fetches Sparkle's
+`generate_appcast` and `sign_update`, pinned in `mac/appcast.sh` to the
+version the app links, and takes the key from `SPARKLE_PRIVATE_KEY_FILE`, else
+the login keychain.
+
+Once:
+
+1. Make the Sparkle key pair with `generate_keys` from Sparkle's tools
+   (`mac/build/sparkle-2.10.0/bin/` after a `mac:appcast`). It keeps the
+   private key in the login keychain and prints the public key, which goes in
+   `SUPublicEDKey` in `mac/backstory/Backstory/Info.plist`. A lost private key
+   means installed copies can't take another update, so keep a copy:
+
+   ```bash
+   mac/build/sparkle-2.10.0/bin/generate_keys -x sparkle-private-key
+   ```
+
+2. Add these repository secrets on GitHub:
+   - `MAC_CERT_P12`: the Developer ID Application certificate and its key,
+     exported from Keychain Access as a `.p12`, then `base64 -i cert.p12`
+   - `MAC_CERT_PASSWORD`: the password the `.p12` was exported with
+   - `NOTARY_KEY`: the contents of the App Store Connect API key's `.p8`
+   - `NOTARY_KEY_ID` and `NOTARY_ISSUER`: that key's ID and issuer ID
+   - `SPARKLE_PRIVATE_KEY`: the contents of `sparkle-private-key`
+
+Then, for each release:
+
+```bash
+npm version minor
+```
+
+```bash
+git push --follow-tags
+```
+
+`npm version` commits the new version and tags it, with the version as the
+tag's message, which becomes the release notes. Write better ones with
+`git tag -f -a v<version>` before pushing, or edit the release afterwards.
+The workflow stops if the tag doesn't match `package.json`'s version.
+
+When notarization fails, the `mac:dmg` step prints `notarytool log` with
+Apple's reasons. A failed run publishes nothing, so fix it, delete the tag
+locally and on GitHub, and tag again.
+
 ## Ports
 
 Default is **4460** (`BACKSTORY_PORT` or `--port` to override). The app and the
