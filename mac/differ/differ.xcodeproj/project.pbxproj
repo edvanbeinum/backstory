@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		64CF3A8D30773D3E00EE9443 /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 64CF3A8C30773D3E00EE9443 /* Sparkle */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		64CF3A4F30759BE000EE9443 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -65,6 +69,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				64CF3A8D30773D3E00EE9443 /* Sparkle in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -125,6 +130,7 @@
 			);
 			name = differ;
 			packageProductDependencies = (
+				64CF3A8C30773D3E00EE9443 /* Sparkle */,
 			);
 			productName = differ;
 			productReference = 64CF3A4030759BDF00EE9443 /* differ.app */;
@@ -208,6 +214,9 @@
 			);
 			mainGroup = 64CF3A3730759BDF00EE9443;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				64CF3A8B30773D3E00EE9443 /* XCRemoteSwiftPackageReference "Sparkle" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 64CF3A4130759BDF00EE9443 /* Products */;
 			projectDirPath = "";
@@ -590,6 +599,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		64CF3A8B30773D3E00EE9443 /* XCRemoteSwiftPackageReference "Sparkle" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sparkle-project/Sparkle";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.10.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		64CF3A8C30773D3E00EE9443 /* Sparkle */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 64CF3A8B30773D3E00EE9443 /* XCRemoteSwiftPackageReference "Sparkle" */;
+			productName = Sparkle;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = 64CF3A3830759BDF00EE9443 /* Project object */;
 }
