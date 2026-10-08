@@ -18,6 +18,7 @@
     "mac:build": "npm run build && bash mac/build.sh",
     "mac:smoke": "node mac/smoke.mjs",
     "mac:dmg": "bash mac/dmg.sh",
+    "mac:appcast": "bash mac/appcast.sh",
     "test:mac": "if [ \"$(uname)\" = Darwin ]; then xcodebuild test -quiet -project mac/backstory/Backstory.xcodeproj -scheme Backstory -destination platform=macOS -derivedDataPath mac/build/DerivedData -only-testing:BackstoryTests; fi",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
     "verify": "npm run check && npm run build && npm run test:mac"
