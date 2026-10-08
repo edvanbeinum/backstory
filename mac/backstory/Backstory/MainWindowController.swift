@@ -216,4 +216,18 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         }
         return nil
     }
+
+    /// Shows `window.confirm` as a sheet; without this a web view answers
+    /// false silently, and the page's Redraft button does nothing.
+    func webView(
+        _ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+        initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void
+    ) {
+        let alert = NSAlert()
+        alert.messageText = message
+        alert.addButton(withTitle: "OK")
+        alert.addButton(withTitle: "Cancel")
+        guard let window else { return completionHandler(alert.runModal() == .alertFirstButtonReturn) }
+        alert.beginSheetModal(for: window) { completionHandler($0 == .alertFirstButtonReturn) }
+    }
 }
