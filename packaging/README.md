@@ -1,6 +1,6 @@
-# Packaging differ
+# Packaging Backstory
 
-differ ships as a Mac app that runs its own server; the README's "Running it
+Backstory ships as a Mac app that runs its own server; the README's "Running it
 as an app" says how to build it.
 
 ## Signing and notarization
@@ -12,7 +12,7 @@ build prints which it used. The Node in the bundle is the version pinned in
 `mac/build.sh`, downloaded from nodejs.org on the first build and checked
 against its published checksum, whatever `node` ran the build.
 
-`npm run mac:dmg` packs the built app into `mac/build/differ-<version>.dmg`,
+`npm run mac:dmg` packs the built app into `mac/build/Backstory-<version>.dmg`,
 signs it, and with a notary profile set, notarizes and staples it and runs
 Gatekeeper's checks on it and on the app inside. That DMG is what a release
 attaches.
@@ -30,30 +30,22 @@ Once, on the Mac that builds releases:
 Then:
 
 ```bash
-DIFFER_NOTARY_PROFILE=backstory npm run mac:dmg
+BACKSTORY_NOTARY_PROFILE=backstory npm run mac:dmg
 ```
 
-`DIFFER_SIGN_IDENTITY` picks a signing identity by name when the keychain has
-more than one. Without `DIFFER_NOTARY_PROFILE`, `mac:dmg` still builds and
-signs the DMG but says it isn't notarized.
-
-## The Homebrew formula
-
-`homebrew/differ.rb` is a skeleton from before the Mac app, and stale against
-the CLI: it installs `bin/` beside a standalone build and runs the server as a
-`brew services` agent. A formula or cask channel is a later issue. Short
-version of publishing one: tag a release, attach a tarball, fill in `url` +
-`sha256`, and push the formula to a `homebrew-differ` tap repo.
+`BACKSTORY_SIGN_IDENTITY` picks a signing identity by name when the keychain
+has more than one. Without `BACKSTORY_NOTARY_PROFILE`, `mac:dmg` still builds
+and signs the DMG but says it isn't notarized.
 
 ## Ports
 
-Default is **4460** (`DIFFER_PORT` or `--port` to override). The app and the
+Default is **4460** (`BACKSTORY_PORT` or `--port` to override). The app and the
 CLI probe `/api/health` before using a port, so an unrelated server on 4460
 is detected rather than hijacked; the health endpoint identifies the app.
 
 ## Security posture
 
-The server binds `127.0.0.1` in every mode — the Mac app and the formula set
+The server binds `127.0.0.1` in every mode — the Mac app sets
 `HOSTNAME=127.0.0.1`, and `npm run dev` and `npm start` pass `-H 127.0.0.1`.
 It executes `git` against arbitrary local paths on request, so it must never
 be reachable from the network.

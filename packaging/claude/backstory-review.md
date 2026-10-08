@@ -1,13 +1,13 @@
 ---
-description: Have me review your changes in differ — commits or uncommitted work — then act on my notes
-allowed-tools: Bash(differ review:*)
+description: Have me review your changes in Backstory — commits or uncommitted work — then act on my notes
+allowed-tools: Bash(backstory review:*)
 ---
 
 I want to review the changes you've made — commits and uncommitted work — before
 you go further.
 
-Run `differ review` with the Bash tool **in the background** (`run_in_background: true`).
-It opens the changes in differ and waits — possibly for a long time — until I
+Run `backstory review` with the Bash tool **in the background** (`run_in_background: true`).
+It opens the changes in Backstory and waits — possibly for a long time — until I
 send my notes, then prints them to stdout and exits. Don't poll it or sleep on
 it; you'll be woken when it finishes. Until then, stop and wait for me.
 

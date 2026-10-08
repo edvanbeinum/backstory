@@ -141,7 +141,7 @@ blocks:
       - bin/backstory.mjs
       - bin/macapp.mjs
       - packaging/
-    summary: The `differ` command, which opens a repo in the Mac app (launching it when it isn't running) or `differ review`'s wait for notes, and the Homebrew formula.
+    summary: The `backstory` command, which opens a repo in the Mac app (launching it when it isn't running) or `backstory review`'s wait for notes, and the Claude Code command that runs it.
     read: "`bin/macapp.mjs`, the comment on `launchPlan`"
   - name: Mac app
     code:

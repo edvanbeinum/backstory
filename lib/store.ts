@@ -7,8 +7,8 @@ import path from "node:path";
  *
  * Deliberately not a database: the whole thing is a few KB of click-driven
  * writes with no queries. Keeping it as plain JSON means no dependency, no
- * native build to complicate the standalone bundle and Homebrew formula, and
- * a file you can `cat`, hand-edit or `rm` — which is a real feature in a
+ * native build to complicate the standalone bundle in the Mac app, and a
+ * file you can `cat`, hand-edit or `rm` — which is a real feature in a
  * local dev tool.
  *
  * Everything goes through this module so that if the data ever does outgrow
