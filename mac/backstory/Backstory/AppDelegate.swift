@@ -9,7 +9,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     // AppKit reads launch arguments as defaults, so `--args -serverURL
     // http://127.0.0.1:3000` attaches the app to a dev server, and `-port` and
-    // `-differHome` keep the smoke test off the user's port and store.
+    // `-home` keep the smoke test off the user's port and store.
     private let defaults = UserDefaults.standard
 
     private lazy var port: Int = {
@@ -17,16 +17,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return port > 0 ? port : 4460
     }()
 
-    private lazy var differHome: URL = {
-        if let home = defaults.string(forKey: "differHome") { return URL(fileURLWithPath: home) }
-        return FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".differ")
+    private lazy var home: URL = {
+        let home =
+            defaults.string(forKey: "home").map { URL(fileURLWithPath: $0) }
+            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".backstory")
+        ServerProcess.Launch.moveOldHome(to: home)
+        return home
     }()
 
     private lazy var attachedURL: URL? = defaults.string(forKey: "serverURL").flatMap { URL(string: $0) }
 
     private lazy var serverProcess: ServerProcess? = {
         guard attachedURL == nil,
-            let launch = ServerProcess.Launch.inBundle(.main, port: port, differHome: differHome)
+            let launch = ServerProcess.Launch.inBundle(.main, port: port, home: home)
         else { return nil }
         return ServerProcess(launch)
     }()
@@ -78,9 +81,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return true
     }
 
-    /// Removes the login agent `differ` used to install, when it serves the
-    /// app's port: its `KeepAlive` would hold the port against the app, and
-    /// nothing else removes it any more.
+    /// Removes the login agent the old `differ` command used to install, when
+    /// it serves the app's port: its `KeepAlive` would hold the port against
+    /// the app, and nothing else removes it any more.
     private func bootOutLoginAgent() async {
         let plist = LoginAgent.plist
         let agentPort = (try? Data(contentsOf: plist)).flatMap(LoginAgent.port(fromPlist:))
@@ -98,7 +101,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             do { try launchctl.run() } catch { done.resume() }
         }
         try? FileManager.default.removeItem(at: plist)
-        NSLog("differ: removed the login agent \(LoginAgent.label); the app runs the server now")
+        NSLog("Backstory: removed the login agent \(LoginAgent.label); the app runs the server now")
     }
 
     @IBAction func openRepo(_ sender: Any?) {
@@ -117,7 +120,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         do {
             if app.status == .enabled { try app.unregister() } else { try app.register() }
         } catch {
-            NSLog("differ: couldn't change Open at Login: \(error)")
+            NSLog("Backstory: couldn't change Open at Login: \(error)")
         }
     }
 

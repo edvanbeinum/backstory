@@ -1,6 +1,6 @@
 import AppKit
 
-/// Native rather than a page, so it can't be mistaken for differ's own UI
+/// Native rather than a page, so it can't be mistaken for Backstory's own UI
 /// while the server is starting, restarting or failing.
 final class WaitingView: NSView {
     private let title = NSTextField(labelWithString: "")

@@ -1,13 +1,6 @@
-//
-//  differUITests.swift
-//  differUITests
-//
-//  Created by Ed van Beinum on 10/6/26.
-//
-
 import XCTest
 
-final class differUITests: XCTestCase {
+final class BackstoryUITests: XCTestCase {
 
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.

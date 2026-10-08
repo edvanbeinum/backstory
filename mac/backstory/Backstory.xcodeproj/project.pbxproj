@@ -16,50 +16,50 @@
 			containerPortal = 64CF3A3830759BDF00EE9443 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 64CF3A3F30759BDF00EE9443;
-			remoteInfo = differ;
+			remoteInfo = Backstory;
 		};
 		64CF3A5930759BE000EE9443 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 64CF3A3830759BDF00EE9443 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = 64CF3A3F30759BDF00EE9443;
-			remoteInfo = differ;
+			remoteInfo = Backstory;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		64CF3A4030759BDF00EE9443 /* differ.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = differ.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		64CF3A4E30759BE000EE9443 /* differTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = differTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		64CF3A5830759BE000EE9443 /* differUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = differUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		64CF3A4030759BDF00EE9443 /* Backstory.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Backstory.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		64CF3A4E30759BE000EE9443 /* BackstoryTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackstoryTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		64CF3A5830759BE000EE9443 /* BackstoryUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BackstoryUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		64CF3A6C30759CD100EE9443 /* Exceptions for "differ" folder in "differ" target */ = {
+		64CF3A6C30759CD100EE9443 /* Exceptions for "Backstory" folder in "Backstory" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Info.plist,
 			);
-			target = 64CF3A3F30759BDF00EE9443 /* differ */;
+			target = 64CF3A3F30759BDF00EE9443 /* Backstory */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		64CF3A4230759BDF00EE9443 /* differ */ = {
+		64CF3A4230759BDF00EE9443 /* Backstory */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				64CF3A6C30759CD100EE9443 /* Exceptions for "differ" folder in "differ" target */,
+				64CF3A6C30759CD100EE9443 /* Exceptions for "Backstory" folder in "Backstory" target */,
 			);
-			path = differ;
+			path = Backstory;
 			sourceTree = "<group>";
 		};
-		64CF3A5130759BE000EE9443 /* differTests */ = {
+		64CF3A5130759BE000EE9443 /* BackstoryTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = differTests;
+			path = BackstoryTests;
 			sourceTree = "<group>";
 		};
-		64CF3A5B30759BE000EE9443 /* differUITests */ = {
+		64CF3A5B30759BE000EE9443 /* BackstoryUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = differUITests;
+			path = BackstoryUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -93,9 +93,9 @@
 		64CF3A3730759BDF00EE9443 = {
 			isa = PBXGroup;
 			children = (
-				64CF3A4230759BDF00EE9443 /* differ */,
-				64CF3A5130759BE000EE9443 /* differTests */,
-				64CF3A5B30759BE000EE9443 /* differUITests */,
+				64CF3A4230759BDF00EE9443 /* Backstory */,
+				64CF3A5130759BE000EE9443 /* BackstoryTests */,
+				64CF3A5B30759BE000EE9443 /* BackstoryUITests */,
 				64CF3A4130759BDF00EE9443 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -103,9 +103,9 @@
 		64CF3A4130759BDF00EE9443 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				64CF3A4030759BDF00EE9443 /* differ.app */,
-				64CF3A4E30759BE000EE9443 /* differTests.xctest */,
-				64CF3A5830759BE000EE9443 /* differUITests.xctest */,
+				64CF3A4030759BDF00EE9443 /* Backstory.app */,
+				64CF3A4E30759BE000EE9443 /* BackstoryTests.xctest */,
+				64CF3A5830759BE000EE9443 /* BackstoryUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -113,9 +113,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		64CF3A3F30759BDF00EE9443 /* differ */ = {
+		64CF3A3F30759BDF00EE9443 /* Backstory */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 64CF3A6230759BE000EE9443 /* Build configuration list for PBXNativeTarget "differ" */;
+			buildConfigurationList = 64CF3A6230759BE000EE9443 /* Build configuration list for PBXNativeTarget "Backstory" */;
 			buildPhases = (
 				64CF3A3C30759BDF00EE9443 /* Sources */,
 				64CF3A3D30759BDF00EE9443 /* Frameworks */,
@@ -126,19 +126,19 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				64CF3A4230759BDF00EE9443 /* differ */,
+				64CF3A4230759BDF00EE9443 /* Backstory */,
 			);
-			name = differ;
+			name = Backstory;
 			packageProductDependencies = (
 				64CF3A8C30773D3E00EE9443 /* Sparkle */,
 			);
-			productName = differ;
-			productReference = 64CF3A4030759BDF00EE9443 /* differ.app */;
+			productName = Backstory;
+			productReference = 64CF3A4030759BDF00EE9443 /* Backstory.app */;
 			productType = "com.apple.product-type.application";
 		};
-		64CF3A4D30759BE000EE9443 /* differTests */ = {
+		64CF3A4D30759BE000EE9443 /* BackstoryTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 64CF3A6530759BE000EE9443 /* Build configuration list for PBXNativeTarget "differTests" */;
+			buildConfigurationList = 64CF3A6530759BE000EE9443 /* Build configuration list for PBXNativeTarget "BackstoryTests" */;
 			buildPhases = (
 				64CF3A4A30759BE000EE9443 /* Sources */,
 				64CF3A4B30759BE000EE9443 /* Frameworks */,
@@ -150,18 +150,18 @@
 				64CF3A5030759BE000EE9443 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				64CF3A5130759BE000EE9443 /* differTests */,
+				64CF3A5130759BE000EE9443 /* BackstoryTests */,
 			);
-			name = differTests;
+			name = BackstoryTests;
 			packageProductDependencies = (
 			);
-			productName = differTests;
-			productReference = 64CF3A4E30759BE000EE9443 /* differTests.xctest */;
+			productName = BackstoryTests;
+			productReference = 64CF3A4E30759BE000EE9443 /* BackstoryTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		64CF3A5730759BE000EE9443 /* differUITests */ = {
+		64CF3A5730759BE000EE9443 /* BackstoryUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = 64CF3A6830759BE000EE9443 /* Build configuration list for PBXNativeTarget "differUITests" */;
+			buildConfigurationList = 64CF3A6830759BE000EE9443 /* Build configuration list for PBXNativeTarget "BackstoryUITests" */;
 			buildPhases = (
 				64CF3A5430759BE000EE9443 /* Sources */,
 				64CF3A5530759BE000EE9443 /* Frameworks */,
@@ -173,13 +173,13 @@
 				64CF3A5A30759BE000EE9443 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				64CF3A5B30759BE000EE9443 /* differUITests */,
+				64CF3A5B30759BE000EE9443 /* BackstoryUITests */,
 			);
-			name = differUITests;
+			name = BackstoryUITests;
 			packageProductDependencies = (
 			);
-			productName = differUITests;
-			productReference = 64CF3A5830759BE000EE9443 /* differUITests.xctest */;
+			productName = BackstoryUITests;
+			productReference = 64CF3A5830759BE000EE9443 /* BackstoryUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -205,7 +205,7 @@
 					};
 				};
 			};
-			buildConfigurationList = 64CF3A3B30759BDF00EE9443 /* Build configuration list for PBXProject "differ" */;
+			buildConfigurationList = 64CF3A3B30759BDF00EE9443 /* Build configuration list for PBXProject "Backstory" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -222,9 +222,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				64CF3A3F30759BDF00EE9443 /* differ */,
-				64CF3A4D30759BE000EE9443 /* differTests */,
-				64CF3A5730759BE000EE9443 /* differUITests */,
+				64CF3A3F30759BDF00EE9443 /* Backstory */,
+				64CF3A4D30759BE000EE9443 /* BackstoryTests */,
+				64CF3A5730759BE000EE9443 /* BackstoryUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -280,12 +280,12 @@
 /* Begin PBXTargetDependency section */
 		64CF3A5030759BE000EE9443 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 64CF3A3F30759BDF00EE9443 /* differ */;
+			target = 64CF3A3F30759BDF00EE9443 /* Backstory */;
 			targetProxy = 64CF3A4F30759BE000EE9443 /* PBXContainerItemProxy */;
 		};
 		64CF3A5A30759BE000EE9443 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = 64CF3A3F30759BDF00EE9443 /* differ */;
+			target = 64CF3A3F30759BDF00EE9443 /* Backstory */;
 			targetProxy = 64CF3A5930759BE000EE9443 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -423,7 +423,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = differ/Info.plist;
+				INFOPLIST_FILE = Backstory/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainNibFile = MainMenu;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -457,7 +457,7 @@
 				ENABLE_APP_SANDBOX = NO;
 				ENABLE_HARDENED_RUNTIME = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_FILE = differ/Info.plist;
+				INFOPLIST_FILE = Backstory/Info.plist;
 				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				INFOPLIST_KEY_NSMainNibFile = MainMenu;
 				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
@@ -489,14 +489,14 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.7;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.differ.differTests;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.backstory.BackstoryTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/differ.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/differ";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Backstory.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Backstory";
 			};
 			name = Debug;
 		};
@@ -510,14 +510,14 @@
 				GENERATE_INFOPLIST_FILE = YES;
 				MACOSX_DEPLOYMENT_TARGET = 15.7;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.differ.differTests;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.backstory.BackstoryTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/differ.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/differ";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Backstory.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Backstory";
 			};
 			name = Release;
 		};
@@ -529,14 +529,14 @@
 				DEVELOPMENT_TEAM = V7K3B22NN9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.differ.differUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.backstory.BackstoryUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = differ;
+				TEST_TARGET_NAME = Backstory;
 			};
 			name = Debug;
 		};
@@ -548,21 +548,21 @@
 				DEVELOPMENT_TEAM = V7K3B22NN9;
 				GENERATE_INFOPLIST_FILE = YES;
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = dev.differ.differUITests;
+				PRODUCT_BUNDLE_IDENTIFIER = dev.backstory.BackstoryUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_EMIT_LOC_STRINGS = NO;
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
-				TEST_TARGET_NAME = differ;
+				TEST_TARGET_NAME = Backstory;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		64CF3A3B30759BDF00EE9443 /* Build configuration list for PBXProject "differ" */ = {
+		64CF3A3B30759BDF00EE9443 /* Build configuration list for PBXProject "Backstory" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				64CF3A6030759BE000EE9443 /* Debug */,
@@ -571,7 +571,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		64CF3A6230759BE000EE9443 /* Build configuration list for PBXNativeTarget "differ" */ = {
+		64CF3A6230759BE000EE9443 /* Build configuration list for PBXNativeTarget "Backstory" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				64CF3A6330759BE000EE9443 /* Debug */,
@@ -580,7 +580,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		64CF3A6530759BE000EE9443 /* Build configuration list for PBXNativeTarget "differTests" */ = {
+		64CF3A6530759BE000EE9443 /* Build configuration list for PBXNativeTarget "BackstoryTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				64CF3A6630759BE000EE9443 /* Debug */,
@@ -589,7 +589,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		64CF3A6830759BE000EE9443 /* Build configuration list for PBXNativeTarget "differUITests" */ = {
+		64CF3A6830759BE000EE9443 /* Build configuration list for PBXNativeTarget "BackstoryUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				64CF3A6930759BE000EE9443 /* Debug */,

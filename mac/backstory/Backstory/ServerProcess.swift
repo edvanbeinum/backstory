@@ -1,6 +1,6 @@
 import Foundation
 
-/// Runs differ's standalone server with the Node the app carries, and reports
+/// Runs Backstory's standalone server with the Node the app carries, and reports
 /// when it exits. Only the latest server's exit is reported: one the app
 /// stopped or replaced itself is not news.
 final class ServerProcess {
@@ -9,20 +9,31 @@ final class ServerProcess {
         let serverDirectory: URL
         let exitWithParent: URL
         let port: Int
-        let differHome: URL
+        let home: URL
 
-        var log: URL { differHome.appendingPathComponent("server.log") }
+        var log: URL { home.appendingPathComponent("server.log") }
+
+        /// Moves a `.differ` beside `home` into place when `home` isn't there
+        /// yet, as `homeDir` in `lib/store.ts` does. Runs before the app
+        /// creates `home` for its log, which would otherwise leave the
+        /// server's move nothing to do and the old data behind.
+        static func moveOldHome(to home: URL) {
+            let manager = FileManager.default
+            let old = home.deletingLastPathComponent().appendingPathComponent(".differ")
+            guard !manager.fileExists(atPath: home.path), manager.fileExists(atPath: old.path) else { return }
+            try? manager.moveItem(at: old, to: home)
+        }
 
         /// What the server needs from the app's bundle, or nil when this build
         /// carries no server, as `xcodebuild test` and Xcode's Run produce.
-        static func inBundle(_ bundle: Bundle, port: Int, differHome: URL) -> Launch? {
+        static func inBundle(_ bundle: Bundle, port: Int, home: URL) -> Launch? {
             guard let resources = bundle.resourceURL else { return nil }
             let launch = Launch(
                 node: bundle.bundleURL.appendingPathComponent("Contents/Helpers/node"),
                 serverDirectory: resources.appendingPathComponent("server"),
                 exitWithParent: resources.appendingPathComponent("server-exit-with-parent.cjs"),
                 port: port,
-                differHome: differHome
+                home: home
             )
             let files = [launch.node, launch.serverDirectory.appendingPathComponent("server.js"), launch.exitWithParent]
             return files.allSatisfy { FileManager.default.fileExists(atPath: $0.path) } ? launch : nil
@@ -58,7 +69,7 @@ final class ServerProcess {
         }
     }
 
-    /// Drops a start that hasn't happened yet, when a differ the app didn't
+    /// Drops a start that hasn't happened yet, when a Backstory the app didn't
     /// start already answers on the port.
     func cancelScheduled() {
         scheduled?.cancel()
@@ -105,7 +116,7 @@ final class ServerProcess {
         process.environment = [
             "PORT": String(launch.port),
             "HOSTNAME": "127.0.0.1",
-            "DIFFER_HOME": launch.differHome.path,
+            "BACKSTORY_HOME": launch.home.path,
             "HOME": NSHomeDirectory(),
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
         ]
@@ -121,7 +132,7 @@ final class ServerProcess {
             try process.run()
             current = process
         } catch {
-            NSLog("differ: couldn't start the server: \(error)")
+            NSLog("Backstory: couldn't start the server: \(error)")
             Task { @MainActor in self.onExit?() }
         }
     }
@@ -134,7 +145,7 @@ final class ServerProcess {
 
     private func openLog() -> FileHandle? {
         let manager = FileManager.default
-        try? manager.createDirectory(at: launch.differHome, withIntermediateDirectories: true)
+        try? manager.createDirectory(at: launch.home, withIntermediateDirectories: true)
         if !manager.fileExists(atPath: launch.log.path) {
             manager.createFile(atPath: launch.log.path, contents: nil)
         }

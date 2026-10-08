@@ -1,7 +1,7 @@
 import AppKit
 import WebKit
 
-/// The one window: differ's page in a web view while a differ answers, the
+/// The one window: Backstory's page in a web view while a Backstory answers, the
 /// waiting view while it doesn't. In owned mode it also starts the server and
 /// restarts it, as `ServerState` decides.
 final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUIDelegate {
@@ -58,10 +58,10 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
             content.addSubview(view)
         }
         window.contentView = content
-        window.title = "differ"
+        window.title = "Backstory"
         window.setContentSize(NSSize(width: 1280, height: 820))
         window.center()
-        window.setFrameAutosaveName("differ")
+        window.setFrameAutosaveName("Backstory")
         render()
     }
 
@@ -103,7 +103,7 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         if effect.stop { serverProcess?.stop() }
         if let delay = effect.spawnAfter { serverProcess?.start(after: delay) }
         if let load = effect.load {
-            // A differ answering before a scheduled restart means one the app
+            // A Backstory answering before a scheduled restart means one the app
             // didn't start has the port, and a second would only fail to bind.
             serverProcess?.cancelScheduled()
             webView.load(URLRequest(url: load))

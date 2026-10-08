@@ -1,13 +1,6 @@
-//
-//  differUITestsLaunchTests.swift
-//  differUITests
-//
-//  Created by Ed van Beinum on 10/6/26.
-//
-
 import XCTest
 
-final class differUITestsLaunchTests: XCTestCase {
+final class BackstoryUITestsLaunchTests: XCTestCase {
 
     override class var runsForEachTargetApplicationUIConfiguration: Bool {
         true

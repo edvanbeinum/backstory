@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Packs mac/build/differ.app into mac/build/differ-<version>.dmg with an
+# Packs mac/build/Backstory.app into mac/build/Backstory-<version>.dmg with an
 # Applications link to drag it to, signed with the app's own identity. With
-# DIFFER_NOTARY_PROFILE set to a `notarytool store-credentials` profile, it
+# BACKSTORY_NOTARY_PROFILE set to a `notarytool store-credentials` profile, it
 # notarizes and staples the DMG, then runs Gatekeeper's checks on it and on
 # the app inside, which stand in for opening it on a clean Mac. Run
 # `npm run mac:build` first; this doesn't rebuild.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-app=mac/build/differ.app
+app=mac/build/Backstory.app
 version="$(node -p 'require("./package.json").version')"
-dmg="mac/build/differ-$version.dmg"
-profile="${DIFFER_NOTARY_PROFILE:-}"
+dmg="mac/build/Backstory-$version.dmg"
+profile="${BACKSTORY_NOTARY_PROFILE:-}"
 
 if [ ! -d "$app" ]; then
   echo "mac:dmg: no $app — run npm run mac:build first" >&2
@@ -32,16 +32,16 @@ cleanup() {
 trap cleanup EXIT
 
 mkdir "$work/stage"
-ditto "$app" "$work/stage/differ.app"
+ditto "$app" "$work/stage/Backstory.app"
 ln -s /Applications "$work/stage/Applications"
 rm -f "$dmg"
-hdiutil create -quiet -volname differ -srcfolder "$work/stage" -format UDZO "$dmg"
+hdiutil create -quiet -volname Backstory -srcfolder "$work/stage" -format UDZO "$dmg"
 codesign --force "$timestamp" --sign "$identity" "$dmg"
 codesign --verify --deep --strict "$dmg"
 echo "signed $dmg with $identity"
 
 if [ -z "$profile" ]; then
-  echo "mac:dmg: not notarized: set DIFFER_NOTARY_PROFILE"
+  echo "mac:dmg: not notarized: set BACKSTORY_NOTARY_PROFILE"
   exit 0
 fi
 
@@ -62,7 +62,7 @@ spctl --assess --type open --context context:primary-signature -v "$dmg"
 
 mkdir "$mountpoint"
 hdiutil attach -quiet -readonly -nobrowse -mountpoint "$mountpoint" "$dmg"
-spctl --assess --type execute -v "$mountpoint/differ.app"
-codesign --verify --deep --strict "$mountpoint/differ.app"
+spctl --assess --type execute -v "$mountpoint/Backstory.app"
+codesign --verify --deep --strict "$mountpoint/Backstory.app"
 
 echo "built $dmg: notarized, stapled and accepted by Gatekeeper"

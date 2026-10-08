@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# Builds mac/build/differ.app from the Xcode project, with differ's icon,
-# package.json's version, and the standalone server and the Node pinned
+# Builds mac/build/Backstory.app from the Xcode project, with Backstory's
+# icon, package.json's version, and the standalone server and the Node pinned
 # below to run it in the bundle. Run `npm run build` first; `npm run
-# mac:build` does. It signs with DIFFER_SIGN_IDENTITY, else a Developer ID
+# mac:build` does. It signs with BACKSTORY_SIGN_IDENTITY, else a Developer ID
 # Application certificate in the keychain, else the identity Xcode used,
 # which Gatekeeper rejects on any other Mac.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
 out=mac/build
-app="$out/differ.app"
+app="$out/Backstory.app"
 standalone=.next/standalone
 version="$(node -p 'require("./package.json").version')"
 
@@ -35,13 +35,13 @@ if [ ! -x "$node" ]; then
   rm "$out/$node_tar"
 fi
 
-xcodebuild -quiet -project mac/differ/differ.xcodeproj -scheme differ \
+xcodebuild -quiet -project mac/backstory/Backstory.xcodeproj -scheme Backstory \
   -configuration Release -derivedDataPath "$out/DerivedData" \
   MARKETING_VERSION="$version" build
 
 rm -rf "$app"
-ditto "$out/DerivedData/Build/Products/Release/differ.app" "$app"
-identity="${DIFFER_SIGN_IDENTITY:-}"
+ditto "$out/DerivedData/Build/Products/Release/Backstory.app" "$app"
+identity="${BACKSTORY_SIGN_IDENTITY:-}"
 if [ -z "$identity" ]; then
   identity="$(security find-identity -v -p codesigning |
     sed -n 's/.*"\(Developer ID Application: .*\)"$/\1/p' | head -1)"
@@ -70,7 +70,7 @@ cp mac/server-exit-with-parent.cjs "$app/Contents/Resources/"
 mkdir -p "$app/Contents/Helpers"
 cp "$node" "$app/Contents/Helpers/node"
 
-iconset="$out/differ.iconset"
+iconset="$out/Backstory.iconset"
 rm -rf "$iconset"
 mkdir -p "$iconset"
 for size in 16 32 128 256 512; do
@@ -79,11 +79,11 @@ for size in 16 32 128 256 512; do
     sips -z $((size * 2)) $((size * 2)) public/icon-512.png --out "$iconset/icon_${size}x${size}@2x.png" >/dev/null
   fi
 done
-iconutil -c icns "$iconset" -o "$app/Contents/Resources/differ.icns"
+iconutil -c icns "$iconset" -o "$app/Contents/Resources/Backstory.icns"
 
 plist="$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Delete :CFBundleIconName" "$plist" 2>/dev/null || true
-/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string differ" "$plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string Backstory" "$plist"
 
 # Sign Node first, with the JIT entitlements V8 can't run without under the
 # hardened runtime, then the app. The app's signature has to be last because

@@ -106,12 +106,12 @@ test("findMacApp is null when no candidate is the Mac app", () => {
 
 test("the Mac app declares the scheme and bundle id the CLI relies on", () => {
   assert.equal(BUNDLE_ID, "dev.backstory.app");
-  const plist = readText("mac/differ/differ/Info.plist");
+  const plist = readText("mac/backstory/Backstory/Info.plist");
   assert.match(
     plist,
     /<key>CFBundleURLSchemes<\/key>\s*<array>\s*<string>backstory<\/string>/,
   );
-  const project = readText("mac/differ/differ.xcodeproj/project.pbxproj");
+  const project = readText("mac/backstory/Backstory.xcodeproj/project.pbxproj");
   const ids = [...project.matchAll(/PRODUCT_BUNDLE_IDENTIFIER = ([^;]+);/g)]
     .map((m) => m[1])
     .filter((id) => !/Tests$/.test(id));

@@ -2,7 +2,7 @@ import AppKit
 import Foundation
 import Testing
 
-@testable import differ
+@testable import Backstory
 
 private let server = URL(string: "http://127.0.0.1:4460")!
 
@@ -71,9 +71,9 @@ private let home = URL(string: "http://127.0.0.1:4460/")!
 
 /// An owned-mode state showing the server the app started.
 private func showingOwned() -> ServerState {
-    var state = ServerState(server: server, mode: .owned, log: "/tmp/differ/server.log")
+    var state = ServerState(server: server, mode: .owned, log: "/tmp/backstory/server.log")
     _ = state.healthAnswered(.nothing, serverRunning: false)
-    _ = state.healthAnswered(.differ, serverRunning: true)
+    _ = state.healthAnswered(.backstory, serverRunning: true)
     return state
 }
 
@@ -86,7 +86,7 @@ struct ServerStateTests {
         state.pageMoved(to: repo)
         #expect(state.processExited() == ServerState.Effect(spawnAfter: 0))
         #expect(state.phase == .restarting)
-        #expect(state.healthAnswered(.differ, serverRunning: true) == ServerState.Effect(load: repo))
+        #expect(state.healthAnswered(.backstory, serverRunning: true) == ServerState.Effect(load: repo))
         #expect(state.phase == .showing)
     }
 
@@ -103,7 +103,7 @@ struct ServerStateTests {
     @Test func anAnswerBetweenMissedPollsStartsTheCountAgain() {
         var state = showingOwned()
         for _ in 0..<2 { _ = state.healthAnswered(.nothing, serverRunning: true) }
-        #expect(state.healthAnswered(.differ, serverRunning: true) == .none)
+        #expect(state.healthAnswered(.backstory, serverRunning: true) == .none)
         for _ in 0..<2 { #expect(state.healthAnswered(.nothing, serverRunning: true) == .none) }
         #expect(state.phase == .showing)
     }
@@ -114,7 +114,7 @@ struct ServerStateTests {
         #expect(state.healthAnswered(.nothing, serverRunning: false) == ServerState.Effect(spawnAfter: 0))
         #expect(state.healthAnswered(.nothing, serverRunning: true) == .none)
         #expect(state.phase == .starting)
-        #expect(state.healthAnswered(.differ, serverRunning: true) == ServerState.Effect(load: home))
+        #expect(state.healthAnswered(.backstory, serverRunning: true) == ServerState.Effect(load: home))
         #expect(state.phase == .showing)
     }
 
@@ -160,18 +160,18 @@ struct ServerStateTests {
         #expect(state.phase == .restarting)
     }
 
-    @Test func aDifferAlreadyAnsweringIsShownAndItsGoingAwayStartsOne() {
+    @Test func aBackstoryAlreadyAnsweringIsShownAndItsGoingAwayStartsOne() {
         var state = ServerState(server: server, mode: .owned)
-        #expect(state.healthAnswered(.differ, serverRunning: false) == ServerState.Effect(load: home))
+        #expect(state.healthAnswered(.backstory, serverRunning: false) == ServerState.Effect(load: home))
         #expect(state.phase == .showing)
         #expect(state.healthAnswered(.nothing, serverRunning: false).spawnAfter == 0)
     }
 
-    @Test(arguments: [Health.differ, .other, .nothing])
+    @Test(arguments: [Health.backstory, .other, .nothing])
     func attachedModeNeverStartsAServer(_ first: Health) {
         var state = ServerState(server: server, mode: .attached)
         #expect(state.phase == .attachedWaiting)
-        for health in [first, .nothing, .differ, .other, .nothing] {
+        for health in [first, .nothing, .backstory, .other, .nothing] {
             #expect(state.healthAnswered(health, serverRunning: false).spawnAfter == nil)
         }
         #expect(state.processExited().spawnAfter == nil)
@@ -187,7 +187,7 @@ struct ServerStateTests {
 
     @Test func anotherPollWhileShowingLoadsNothing() {
         var state = showingOwned()
-        #expect(state.healthAnswered(.differ, serverRunning: true) == .none)
+        #expect(state.healthAnswered(.backstory, serverRunning: true) == .none)
         #expect(state.phase == .showing)
     }
 
@@ -196,7 +196,7 @@ struct ServerStateTests {
         state.pageMoved(to: URL(string: "http://127.0.0.1:4460/?repo=/elsewhere")!)
         _ = state.processExited()
         #expect(state.open(repo) == nil)
-        #expect(state.healthAnswered(.differ, serverRunning: true).load == repo)
+        #expect(state.healthAnswered(.backstory, serverRunning: true).load == repo)
         #expect(state.pending == nil)
     }
 
@@ -212,16 +212,16 @@ struct ServerStateTests {
     }
 
     @Test func eachPhaseHasItsOwnMessage() {
-        var owned = ServerState(server: server, mode: .owned, log: "/tmp/differ/server.log")
-        #expect(owned.message == WaitingMessage(title: "Starting differ…"))
-        _ = owned.healthAnswered(.differ, serverRunning: false)
+        var owned = ServerState(server: server, mode: .owned, log: "/tmp/backstory/server.log")
+        #expect(owned.message == WaitingMessage(title: "Starting Backstory…"))
+        _ = owned.healthAnswered(.backstory, serverRunning: false)
         _ = owned.processExited()
-        #expect(owned.message == WaitingMessage(title: "Restarting differ…"))
+        #expect(owned.message == WaitingMessage(title: "Restarting Backstory…"))
         for _ in 0..<3 { _ = owned.processExited() }
         #expect(
             owned.message
                 == WaitingMessage(
-                    title: "differ's server keeps stopping", detail: "Its log is at /tmp/differ/server.log.",
+                    title: "Backstory's server keeps stopping", detail: "Its log is at /tmp/backstory/server.log.",
                     retry: true))
 
         var taken = ServerState(server: server, mode: .owned)
@@ -233,10 +233,42 @@ struct ServerStateTests {
         #expect(attached.message == WaitingMessage(title: "Nothing is answering at http://127.0.0.1:3000"))
     }
 
-    @Test func healthMustSayDiffer() {
-        #expect(HealthProbe.isDiffer(Data(#"{"app":"differ","build":"x"}"#.utf8)))
-        #expect(!HealthProbe.isDiffer(Data(#"{"app":"vite"}"#.utf8)))
-        #expect(!HealthProbe.isDiffer(Data("<html>".utf8)))
+    @Test func healthMustSayBackstory() {
+        #expect(HealthProbe.isBackstory(Data(#"{"app":"backstory","build":"x"}"#.utf8)))
+        #expect(!HealthProbe.isBackstory(Data(#"{"app":"differ","build":"x"}"#.utf8)))
+        #expect(!HealthProbe.isBackstory(Data(#"{"app":"vite"}"#.utf8)))
+        #expect(!HealthProbe.isBackstory(Data("<html>".utf8)))
+    }
+}
+
+/// Each case works beside a fresh temp directory, never the real home.
+struct MoveOldHomeTests {
+    private func beside() throws -> (old: URL, home: URL) {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("backstory-home-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return (dir.appendingPathComponent(".differ"), dir.appendingPathComponent(".backstory"))
+    }
+
+    @Test func theOldDirectoryMovesWhenTheNewOneIsntThere() throws {
+        let (old, home) = try beside()
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: old.appendingPathComponent("notes.json"))
+
+        ServerProcess.Launch.moveOldHome(to: home)
+        #expect(FileManager.default.fileExists(atPath: home.appendingPathComponent("notes.json").path))
+        #expect(!FileManager.default.fileExists(atPath: old.path))
+    }
+
+    @Test func theOldDirectoryStaysWhenTheNewOneIsThere() throws {
+        let (old, home) = try beside()
+        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: old.appendingPathComponent("notes.json"))
+        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
+
+        ServerProcess.Launch.moveOldHome(to: home)
+        #expect(FileManager.default.fileExists(atPath: old.appendingPathComponent("notes.json").path))
+        #expect(!FileManager.default.fileExists(atPath: home.appendingPathComponent("notes.json").path))
     }
 }
 

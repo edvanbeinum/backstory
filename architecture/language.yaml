@@ -147,7 +147,7 @@ blocks:
     code:
       - mac/
     summary: A Swift app that starts, restarts and stops the standalone server with the Node in its bundle, with one web view on it, a native view while it isn't answering, and the `differ://` URL scheme. `mac/dmg.sh` packs it into a notarized disk image.
-    read: "`mac/differ/differ/ServerState.swift`, the comment on `ServerState`"
+    read: "`mac/backstory/Backstory/ServerState.swift`, the comment on `ServerState`"
 
 invariants:
   - rule: Every read-modify-write of a store file runs inside `withStore`, and a batch is one write, not a loop of single-key writes.

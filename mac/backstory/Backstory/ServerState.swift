@@ -1,8 +1,8 @@
 import Foundation
 
-/// Decides what the window shows and when the app starts differ's server,
+/// Decides what the window shows and when the app starts Backstory's server,
 /// from health answers and server exits, so the window is up only while a
-/// differ answers. Pure, so every transition is tested without a server.
+/// Backstory answers. Pure, so every transition is tested without a server.
 struct ServerState {
     /// Owned: the app starts the server from its bundle and restarts it.
     /// Attached: it shows whatever answers at `server` and never starts one.
@@ -71,7 +71,7 @@ struct ServerState {
         // that server holds the port, so it isn't another app's.
         let health = health == .other && serverRunning ? .nothing : health
         switch (health, mode) {
-        case (.differ, _):
+        case (.backstory, _):
             missedPolls = 0
             guard phase != .showing else { return .none }
             phase = .showing
@@ -119,7 +119,7 @@ struct ServerState {
     }
 
     /// Asks for a repo's address. Returns it to load now while the page is up;
-    /// otherwise keeps it for when a differ answers, so a link that launches
+    /// otherwise keeps it for when a Backstory answers, so a link that launches
     /// the app isn't dropped.
     mutating func open(_ address: URL) -> URL? {
         guard phase == .showing else {
@@ -152,9 +152,9 @@ struct ServerState {
     var message: WaitingMessage {
         switch phase {
         case .starting, .showing:
-            return WaitingMessage(title: "Starting differ…")
+            return WaitingMessage(title: "Starting Backstory…")
         case .restarting:
-            return WaitingMessage(title: "Restarting differ…")
+            return WaitingMessage(title: "Restarting Backstory…")
         case .attachedWaiting:
             return WaitingMessage(title: "Nothing is answering at \(server.absoluteString)")
         case .failed(.portInUse):
@@ -165,7 +165,7 @@ struct ServerState {
             )
         case .failed(.keepsStopping):
             return WaitingMessage(
-                title: "differ's server keeps stopping",
+                title: "Backstory's server keeps stopping",
                 detail: log.map { "Its log is at \($0)." },
                 retry: true
             )
@@ -180,16 +180,16 @@ struct WaitingMessage: Equatable {
 }
 
 enum Health {
-    case differ
+    case backstory
     case other
     case nothing
 }
 
-/// Asks the server's `/api/health` whether what answers on the port is differ.
+/// Asks the server's `/api/health` whether what answers on the port is Backstory.
 enum HealthProbe {
-    static func isDiffer(_ data: Data) -> Bool {
+    static func isBackstory(_ data: Data) -> Bool {
         let body = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
-        return body?["app"] as? String == "differ"
+        return body?["app"] as? String == "backstory"
     }
 
     static func check(_ server: URL) async -> Health {
@@ -200,15 +200,15 @@ enum HealthProbe {
         )
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
-            return (response as? HTTPURLResponse)?.statusCode == 200 && isDiffer(data) ? .differ : .other
+            return (response as? HTTPURLResponse)?.statusCode == 200 && isBackstory(data) ? .backstory : .other
         } catch {
             return .nothing
         }
     }
 }
 
-/// The login agent `differ` used to install, which `KeepAlive` would keep
-/// holding the port against the app.
+/// The login agent the old `differ` command used to install, which
+/// `KeepAlive` would keep holding the port against the app.
 enum LoginAgent {
     static let label = "dev.differ.server"
 
