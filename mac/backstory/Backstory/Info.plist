@@ -30,6 +30,10 @@
 			</array>
 		</dict>
 	</array>
+	<key>SUFeedURL</key>
+	<string>https://github.com/edvanbeinum/backstory/releases/latest/download/appcast.xml</string>
+	<key>SUPublicEDKey</key>
+	<string>GuKvuqXYAXHNYbGKn2K/2tfFuTBIJxyJcNRbzVC81qc=</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsLocalNetworking</key>

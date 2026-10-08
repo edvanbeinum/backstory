@@ -1,5 +1,6 @@
 import Cocoa
 import ServiceManagement
+import Sparkle
 
 @main
 class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
@@ -8,8 +9,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     private var windowController: MainWindowController!
 
     // AppKit reads launch arguments as defaults, so `--args -serverURL
-    // http://127.0.0.1:3000` attaches the app to a dev server, and `-port` and
-    // `-home` keep the smoke test off the user's port and store.
+    // http://127.0.0.1:3000` attaches the app to a dev server, `-port` and
+    // `-home` keep the smoke test off the user's port and store, and
+    // `-feedURL` with `-checkForUpdates` points it at a local appcast.
     private let defaults = UserDefaults.standard
 
     private lazy var port: Int = {
@@ -36,6 +38,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     private lazy var server: URL = attachedURL ?? URL(string: "http://127.0.0.1:\(port)")!
 
+    private lazy var updaterController = SPUStandardUpdaterController(
+        startingUpdater: false, updaterDelegate: self, userDriverDelegate: nil)
+
+    private lazy var probingForUpdate = defaults.bool(forKey: "checkForUpdates")
+
     // Set up here rather than in didFinishLaunching: a link that launches the
     // app arrives through application(_:open:) before that.
     func applicationWillFinishLaunching(_ notification: Notification) {
@@ -48,6 +55,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        updaterController.startUpdater()
+        if probingForUpdate {
+            updaterController.updater.checkForUpdateInformation()
+            return
+        }
         windowController.showWindow(nil)
         Task {
             await bootOutLoginAgent()
@@ -124,10 +136,48 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         }
     }
 
+    @IBAction func checkForUpdates(_ sender: Any?) {
+        updaterController.checkForUpdates(sender)
+    }
+
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(toggleOpenAtLogin(_:)) {
             menuItem.state = SMAppService.mainApp.status == .enabled ? .on : .off
         }
+        if menuItem.action == #selector(checkForUpdates(_:)) {
+            return updaterController.updater.canCheckForUpdates
+        }
         return true
+    }
+}
+
+/// Answers `-checkForUpdates` with one line the smoke test reads, then quits,
+/// so the feed, the key and the delegate are proven with no download and no
+/// dialog.
+extension AppDelegate: SPUUpdaterDelegate {
+    func feedURLString(for updater: SPUUpdater) -> String? {
+        defaults.string(forKey: "feedURL")
+    }
+
+    func updaterShouldPromptForPermissionToCheck(forUpdates updater: SPUUpdater) -> Bool {
+        !probingForUpdate
+    }
+
+    func updater(_ updater: SPUUpdater, didFindValidUpdate item: SUAppcastItem) {
+        if probingForUpdate { NSLog("Backstory: update \(item.displayVersionString) available") }
+    }
+
+    func updaterDidNotFindUpdate(_ updater: SPUUpdater, error: any Error) {
+        if probingForUpdate { NSLog("Backstory: no update") }
+    }
+
+    func updater(
+        _ updater: SPUUpdater, didFinishUpdateCycleFor updateCheck: SPUUpdateCheck, error: (any Error)?
+    ) {
+        guard probingForUpdate else { return }
+        if let error = error as NSError?, error.code != Int(SUError.noUpdateError.rawValue) {
+            NSLog("Backstory: update check failed: \(error)")
+        }
+        NSApp.terminate(nil)
     }
 }

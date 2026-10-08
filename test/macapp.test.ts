@@ -118,3 +118,20 @@ test("the Mac app declares the scheme and bundle id the CLI relies on", () => {
   assert.ok(ids.length > 0, "the app target has no bundle id");
   for (const id of ids) assert.equal(id, BUNDLE_ID);
 });
+
+test("the Mac app asks this repo's latest release for updates, signed by a real key", () => {
+  const plist = readText("mac/backstory/Backstory/Info.plist");
+  assert.match(
+    plist,
+    /<key>SUFeedURL<\/key>\s*<string>https:\/\/github\.com\/edvanbeinum\/backstory\/releases\/latest\/download\/appcast\.xml<\/string>/,
+  );
+  const key = plist.match(
+    /<key>SUPublicEDKey<\/key>\s*<string>([^<]*)<\/string>/,
+  )?.[1];
+  assert.ok(key, "Info.plist has no SUPublicEDKey");
+  assert.equal(
+    Buffer.from(key, "base64").length,
+    32,
+    "SUPublicEDKey isn't an Ed25519 public key",
+  );
+});
