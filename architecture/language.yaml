@@ -1,6 +1,10 @@
-# The words, building blocks and rules agents plan differ's changes with.
+# The words, building blocks and rules agents plan Backstory's changes with.
 
 terms:
+  - name: Backstory
+    means: "The product: the Mac app, the server it runs, the page and the `backstory` command. It was called differ; that name stays only where it names the old thing: the `dev.differ.server` login agent the app removes, the `~/.differ` folder `homeDir` moves, and keys cached under it that are still read."
+    avoid:
+      - differ, for anything current
   - name: flow
     means: "What the code does for one user action a change touches: the data, the Flows tab and the feature."
     drawing: sequence
@@ -38,19 +42,19 @@ terms:
     avoid:
       - rail, for any layout
   - name: store
-    means: "`lib/store.ts`: the small click-driven JSON files in `~/.differ`, each read and written whole."
+    means: "`lib/store.ts`: the small click-driven JSON files in `~/.backstory` (`homeDir`), each read and written whole."
     avoid:
       - store, for the flow cache
   - name: flow cache
-    means: "`lib/flows/cache.ts`: one cached SARIF file per view in `~/.differ/flows/`, plus the queue of runs that make them."
+    means: "`lib/flows/cache.ts`: one cached SARIF file per view in `~/.backstory/flows/`, plus the queue of runs that make them."
     avoid:
       - store
   - name: local model
-    means: "A C4 model kept on this machine for a repo that doesn't commit one, at `~/.differ/models/<repo>/workspace.dsl` (`localModelDir` in `lib/model.ts`). Claude can draft one (`lib/models/draft.ts`)."
+    means: "A C4 model kept on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo>/workspace.dsl` (`localModelDir` in `lib/model.ts`). Claude can draft one (`lib/models/draft.ts`)."
     avoid:
       - draft alone, for the model (reply drafts are `lib/drafts.ts`)
   - name: Mac app
-    means: "The native app in `mac/` that owns the server: it starts differ's server from its bundle, shows the UI in a web view only while the server answers, and opens repos from `differ://open?repo=` links."
+    means: "The native app in `mac/` that owns the server: it starts Backstory's server from its bundle, shows the UI in a web view only while the server answers, and opens repos from `backstory://open?repo=` links."
     avoid:
       - shell (that's the command shell)
       - wrapper
@@ -60,7 +64,7 @@ terms:
       - dev mode
       - override
   - name: primitive
-    means: A named capability differ exposes for reuse, listed in `architecture/primitives.yaml`.
+    means: A named capability Backstory exposes for reuse, listed in `architecture/primitives.yaml`.
     avoid:
       - helper or utility, for a primitive (a helper is private to one file)
 
@@ -95,7 +99,7 @@ blocks:
       - lib/drafts.ts
       - lib/notes.ts
       - lib/outbox.ts
-    summary: The JSON files in `~/.differ` and the modules that keep their records.
+    summary: The JSON files in `~/.backstory` and the modules that keep their records.
     read: "`lib/store.ts` header"
   - name: flow engine
     code:
@@ -121,7 +125,7 @@ blocks:
       - lib/feedback.ts
       - lib/outbox.ts
       - bin/hook.mjs
-    summary: Notes on an agent's work, sent to a waiting `differ review` or queued for the agent's Stop hook.
+    summary: Notes on an agent's work, sent to a waiting `backstory review` or queued for the agent's Stop hook.
     read: 'README "Reviewing an agent''s work"'
   - name: live updates
     code:
@@ -146,7 +150,7 @@ blocks:
   - name: Mac app
     code:
       - mac/
-    summary: A Swift app that starts, restarts and stops the standalone server with the Node in its bundle, with one web view on it, a native view while it isn't answering, and the `differ://` URL scheme. `mac/dmg.sh` packs it into a notarized disk image.
+    summary: A Swift app that starts, restarts and stops the standalone server with the Node in its bundle, with one web view on it, a native view while it isn't answering, and the `backstory://` URL scheme. `mac/dmg.sh` packs it into a notarized disk image.
     read: "`mac/backstory/Backstory/ServerState.swift`, the comment on `ServerState`"
 
 invariants:
