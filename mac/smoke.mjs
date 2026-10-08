@@ -1,13 +1,15 @@
 /**
- * Checks the built Mac app end to end, in both modes. Attached: against a
- * stand-in server, a `backstory://open` link loads `/?repo=<path>`, and the
- * app survives the server going away. Owned: the app starts the server in its
- * bundle, and the server goes when the app quits or is killed. Needs a login
+ * Checks the built Mac app end to end. Attached: against a stand-in server, a
+ * `backstory://open` link loads `/?repo=<path>`, and the app survives the
+ * server going away. Owned: the app starts the server in its bundle, and the
+ * server goes when the app quits or is killed. Update: Sparkle, given a local
+ * appcast signed with the release key, offers a newer version and not its
+ * own; run `npm run mac:appcast` first for `sign_update`. Needs a login
  * session, so it isn't part of verify. Runs on spare ports with a temporary
  * home, so it touches neither `~/.backstory`, port 4460, nor the login agent.
  */
 import { execFile, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import { tmpdir } from "node:os";
@@ -148,10 +150,106 @@ async function owned() {
   }
 }
 
+const signUpdate = path.join(
+  here,
+  "build",
+  "sparkle-2.10.0",
+  "bin",
+  "sign_update",
+);
+
+async function checkForUpdates(feed, advertised) {
+  const dir = mkdtempSync(path.join(tmpdir(), "backstory-smoke-update-"));
+  const archive = path.join(dir, `Backstory-${advertised}.dmg`);
+  writeFileSync(archive, "not a real update");
+  const { stdout: signature } = await promisify(execFile)(signUpdate, [
+    archive,
+  ]);
+  const appcast = `<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle">
+  <channel>
+    <title>Backstory</title>
+    <item>
+      <title>${advertised}</title>
+      <sparkle:version>${advertised}</sparkle:version>
+      <sparkle:shortVersionString>${advertised}</sparkle:shortVersionString>
+      <enclosure url="${feed.base}/${path.basename(archive)}" type="application/octet-stream" ${signature.trim()}/>
+    </item>
+  </channel>
+</rss>`;
+  feed.appcast = appcast;
+
+  // Attach to the feed server, so the app starts no server of its own and
+  // never touches a home.
+  const child = spawn(
+    executable,
+    [
+      "-serverURL",
+      feed.base,
+      "-feedURL",
+      `${feed.base}/appcast.xml`,
+      "-checkForUpdates",
+      "YES",
+    ],
+    { stdio: ["ignore", "ignore", "pipe"] },
+  );
+  let log = "";
+  child.stderr.on("data", (chunk) => (log += chunk));
+  const exited = new Promise((resolve) => child.on("exit", resolve));
+  try {
+    await Promise.race([
+      exited,
+      new Promise((_, reject) =>
+        setTimeout(
+          () => reject(new Error("timed out waiting for the app to quit")),
+          30_000,
+        ),
+      ),
+    ]);
+  } catch (err) {
+    throw new Error(`${err.message}; it logged:\n${log}`);
+  } finally {
+    child.kill("SIGKILL");
+  }
+  return log;
+}
+
+async function update() {
+  if (!existsSync(signUpdate)) {
+    throw new Error(`no ${signUpdate} — run npm run mac:appcast first`);
+  }
+  const feed = { appcast: "" };
+  const server = http.createServer((req, res) => {
+    if (req.url === "/appcast.xml") {
+      res.setHeader("content-type", "application/rss+xml");
+      res.end(feed.appcast);
+    } else {
+      res.statusCode = 404;
+      res.end();
+    }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  feed.base = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const newer = await checkForUpdates(feed, "99.0.0");
+    if (!newer.includes("Backstory: update 99.0.0 available")) {
+      throw new Error(`no update offered from 99.0.0; it logged:\n${newer}`);
+    }
+    const same = await checkForUpdates(feed, version);
+    if (!same.includes("Backstory: no update")) {
+      throw new Error(`an update offered from ${version}; it logged:\n${same}`);
+    }
+  } finally {
+    server.closeAllConnections();
+    server.close();
+  }
+}
+
 let failed = false;
 for (const [name, check] of [
   ["attached", attached],
   ["owned", owned],
+  ["update", update],
 ]) {
   try {
     await check();
