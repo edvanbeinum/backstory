@@ -4,7 +4,8 @@
  * server going away. Owned: the app starts the server in its bundle, and the
  * server goes when the app quits or is killed. Update: Sparkle, given a local
  * appcast signed with the release key, offers a newer version and not its
- * own; run `npm run mac:appcast` first for `sign_update`. Needs a login
+ * own; run `npm run mac:appcast` first for `sign_update`, which takes the key
+ * from SPARKLE_PRIVATE_KEY_FILE as `mac:appcast` does. Needs a login
  * session, so it isn't part of verify. Runs on spare ports with a temporary
  * home, so it touches neither `~/.backstory`, port 4460, nor the login agent.
  */
@@ -162,7 +163,9 @@ async function checkForUpdates(feed, advertised) {
   const dir = mkdtempSync(path.join(tmpdir(), "backstory-smoke-update-"));
   const archive = path.join(dir, `Backstory-${advertised}.dmg`);
   writeFileSync(archive, "not a real update");
+  const keyFile = process.env.SPARKLE_PRIVATE_KEY_FILE;
   const { stdout: signature } = await promisify(execFile)(signUpdate, [
+    ...(keyFile ? ["--ed-key-file", keyFile] : []),
     archive,
   ]);
   const appcast = `<?xml version="1.0" encoding="utf-8"?>
