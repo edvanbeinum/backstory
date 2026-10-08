@@ -24,7 +24,7 @@ export function errorResponse(err: unknown) {
 }
 
 /**
- * Refuse a request another website's page sent. differ listens on a fixed
+ * Refuse a request another website's page sent. Backstory listens on a fixed
  * local port, so any page the user visits can POST to it; a browser marks
  * such a request with Sec-Fetch-Site and Origin. Requests without them (the
  * CLI, curl) are the user's own.

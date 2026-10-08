@@ -1,81 +1,107 @@
-# Packaging differ
+# Packaging Backstory
 
-The goal: differ lives in the dock and app switcher like any other app, with
-a server that's always up, and a `differ` command that opens whatever repo
-you're standing in.
+Backstory ships as a Mac app that runs its own server; the README's "Running it
+as an app" says how to build it.
 
-## The three pieces
+## Signing and notarization
 
-1. **The installed app window.** differ serves a web app manifest, so the
-   running site can be installed as a standalone window:
-   - Chrome: ⋮ → *Cast, save and share* → *Install page as app…*
-   - Safari (Sonoma+): *File → Add to Dock*
+`npm run mac:build` signs the app with a Developer ID Application certificate
+when the keychain has one, so Gatekeeper accepts it on other Macs. Without
+one it falls back to the identity Xcode used, which only this Mac trusts; the
+build prints which it used. The Node in the bundle is the version pinned in
+`mac/build.sh`, downloaded from nodejs.org on the first build and checked
+against its published checksum, whatever `node` ran the build.
 
-   The installed window gets its own dock icon and Cmd-Tab entry. It always
-   opens at `/`; repo selection reaches it through the handoff below.
+`npm run mac:dmg` packs the built app into `mac/build/Backstory-<version>.dmg`,
+signs it, and with a notary profile set, notarizes and staples it and runs
+Gatekeeper's checks on it and on the app inside. That DMG is what a release
+attaches.
 
-2. **The always-on server.** The first `differ` that finds no server running
-   installs a launchd agent (`dev.differ.server`, see `bin/launchd.mjs`)
-   running the standalone build on `127.0.0.1:4460`, kept alive across
-   logins. It records the PATH of the shell it was installed from, so it
-   finds the same `node`, `git` and `gh`; whenever that or the build moves,
-   the next `differ` rewrites it. `brew services start differ` does the same
-   job under Homebrew's label, and the CLI defers to it when it's installed.
-   `--foreground` (and non-macOS) keeps the old behaviour: a server tied to
-   the terminal.
+Once, on the Mac that builds releases:
 
-   Because the window can outlive the server either way, a service worker
-   (`public/sw.js`) catches the failed navigation and serves
-   `public/offline.html`: it names the port, gives the command to start the
-   server, points at `brew services` for the permanent fix, and reloads
-   itself once `/api/health` answers. Editing that page means bumping the
-   `CACHE` constant in `sw.js`, or installed browsers keep the old copy.
+1. Create a Developer ID Application certificate in your Apple Developer
+   account and install it in the login keychain.
+2. Store an App Store Connect API key as a notary profile:
 
-3. **The `differ` CLI.** From any checkout, `differ` hands the repo to the
-   running server (`/api/open`) and raises a window. The app window collects
-   the handoff on load and on every focus — so the flow is: `differ` in a
-   terminal, Cmd-Tab to the differ window, and it's showing that repo.
+   ```bash
+   xcrun notarytool store-credentials backstory --key <path to .p8> --key-id <key id> --issuer <issuer id>
+   ```
 
-## Local (unpackaged) equivalent
-
-From a checkout of this repo:
+Then:
 
 ```bash
-npm ci && npm run build      # assembles .next/standalone via postbuild
-npm link                     # puts `differ` on PATH
-differ                       # from any repo
+BACKSTORY_NOTARY_PROFILE=backstory npm run mac:dmg
 ```
 
-Then install the window from the browser as above. This is the full
-experience, launchd included — the agent points at this checkout's
-`.next/standalone`, and the next `differ` after an `npm run build` restarts it
-onto the new build.
+`BACKSTORY_SIGN_IDENTITY` picks a signing identity by name when the keychain
+has more than one. Without `BACKSTORY_NOTARY_PROFILE`, `mac:dmg` still builds
+and signs the DMG but says it isn't notarized.
 
-## Publishing the Homebrew formula
+## Releasing
 
-See the comment block in `homebrew/differ.rb`. Short version: tag a release,
-attach a tarball containing `standalone/` and `bin/differ.mjs`, fill in
-`url` + `sha256`, and push the formula to a `homebrew-differ` tap repo.
+A release is a version tag. `.github/workflows/release.yml` runs on any `v*`
+tag on a macOS runner: `npm run verify`, `mac:build`, `mac:dmg` with the
+`backstory` notary profile, `mac:appcast`, `mac:smoke`, then a GitHub release
+marked latest with `Backstory-<version>.dmg` and `appcast.xml`. The app's
+**Check for Updates…** reads
+`https://github.com/edvanbeinum/backstory/releases/latest/download/appcast.xml`,
+so each release offers itself to every installed copy. That address answers
+only once the repository is public.
 
-## PATH and launchd
+`npm run mac:appcast` writes `mac/build/appcast.xml` for the DMG `mac:dmg`
+made, with one item signed by the Sparkle key. It fetches Sparkle's
+`generate_appcast` and `sign_update`, pinned in `mac/appcast.sh` to the
+version the app links, and takes the key from `SPARKLE_PRIVATE_KEY_FILE`, else
+the login keychain.
 
-launchd services don't inherit a login shell's PATH, so a service-started
-differ would not find `gh` in `/opt/homebrew/bin`. Two layers handle this:
+Once:
 
-- the formula's `service` block sets PATH explicitly, and
-- the server itself appends `/opt/homebrew/bin` and `/usr/local/bin` to PATH
-  at startup (`lib/exec.ts`) if they exist and are missing.
+1. Make the Sparkle key pair with `generate_keys` from Sparkle's tools
+   (`mac/build/sparkle-2.10.0/bin/` after a `mac:appcast`). It keeps the
+   private key in the login keychain and prints the public key, which goes in
+   `SUPublicEDKey` in `mac/backstory/Backstory/Info.plist`. A lost private key
+   means installed copies can't take another update, so keep a copy:
 
-So even a bare `node standalone/server.js` under launchd finds git and gh.
+   ```bash
+   mac/build/sparkle-2.10.0/bin/generate_keys -x sparkle-private-key
+   ```
+
+2. Add these repository secrets on GitHub:
+   - `MAC_CERT_P12`: the Developer ID Application certificate and its key,
+     exported from Keychain Access as a `.p12`, then `base64 -i cert.p12`
+   - `MAC_CERT_PASSWORD`: the password the `.p12` was exported with
+   - `NOTARY_KEY`: the contents of the App Store Connect API key's `.p8`
+   - `NOTARY_KEY_ID` and `NOTARY_ISSUER`: that key's ID and issuer ID
+   - `SPARKLE_PRIVATE_KEY`: the contents of `sparkle-private-key`
+
+Then, for each release:
+
+```bash
+npm version minor
+```
+
+```bash
+git push --follow-tags
+```
+
+`npm version` commits the new version and tags it, with the version as the
+tag's message, which becomes the release notes. Write better ones with
+`git tag -f -a v<version>` before pushing, or edit the release afterwards.
+The workflow stops if the tag doesn't match `package.json`'s version.
+
+When notarization fails, the `mac:dmg` step prints `notarytool log` with
+Apple's reasons. A failed run publishes nothing, so fix it, delete the tag
+locally and on GitHub, and tag again.
 
 ## Ports
 
-Default is **4460** (`DIFFER_PORT` or `--port` to override). The CLI probes
-`/api/health` before reusing a port, so an unrelated server on 4460 is
-detected rather than hijacked; the health endpoint identifies the app.
+Default is **4460** (`BACKSTORY_PORT` or `--port` to override). The app and the
+CLI probe `/api/health` before using a port, so an unrelated server on 4460
+is detected rather than hijacked; the health endpoint identifies the app.
 
 ## Security posture
 
-The server binds `127.0.0.1` in every mode — CLI, service, and formula all
-set `HOSTNAME=127.0.0.1`. It executes `git` against arbitrary local paths on
-request, so it must never be reachable from the network.
+The server binds `127.0.0.1` in every mode — the Mac app sets
+`HOSTNAME=127.0.0.1`, and `npm run dev` and `npm start` pass `-H 127.0.0.1`.
+It executes `git` against arbitrary local paths on request, so it must never
+be reachable from the network.

@@ -1,6 +1,6 @@
 /**
  * What Claude is asked when it drafts a C4 model, and the shape it answers
- * in. Claude returns structured output, never DSL text: differ writes the
+ * in. Claude returns structured output, never DSL text: Backstory writes the
  * DSL itself (`dsl.ts`), so a draft can't fail to parse.
  */
 

@@ -11,7 +11,7 @@ import {
 /**
  * Everything you've done about one review comment, in one record.
  *
- * differ is a TODO tracker built from review comments and a drafting tool for
+ * Backstory is a TODO tracker built from review comments and a drafting tool for
  * the replies, so a comment has exactly one thing attached to it: your
  * response. That used to be three separate ideas — an "ack", a commit link,
  * and a draft — spread across two files, with two of them doubling as the
@@ -43,7 +43,7 @@ export interface ResponseRecord {
   done: boolean;
   /** ms epoch, for "handled 2 minutes ago" and undo wording. */
   doneAt: number | null;
-  /** Draft reply text. differ never posts it; it leaves via the clipboard. */
+  /** Draft reply text. Backstory never posts it; it leaves via the clipboard. */
   reply: string | null;
   /**
    * The changes you say answer the comment, in the order you linked them.
@@ -51,7 +51,7 @@ export interface ResponseRecord {
    * A list rather than one, because a long comment often makes several points
    * and gets answered by several commits. With a single slot the second one
    * was invisible: the reverse lookup said it answered nothing, and a rebase
-   * only healed the link differ knew about.
+   * only healed the link Backstory knew about.
    *
    * Never implies `done`.
    */

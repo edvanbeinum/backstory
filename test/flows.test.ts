@@ -57,7 +57,7 @@ test("zero-context hunks map lines in both directions", () => {
 });
 
 // A throwaway repo: Loader fetched twice; the change fetches once.
-const repo = mkdtempSync(path.join(os.tmpdir(), "differ-flows-test-"));
+const repo = mkdtempSync(path.join(os.tmpdir(), "backstory-flows-test-"));
 after(() => rmSync(repo, { recursive: true, force: true }));
 
 const sh = (...args: string[]) =>
@@ -187,7 +187,7 @@ const BASE_ANSWER = {
           symbol: "fetchAll()",
           nesting: 0,
         },
-        // Claude gets the carried step's line wrong; differ keeps the proven one.
+        // Claude gets the carried step's line wrong; Backstory keeps the proven one.
         {
           id: "load.render",
           from: "Loader",
@@ -263,6 +263,19 @@ test("flows are traced at the head, then walked back to the base", async () => {
   );
   assert.deepEqual(roundTrip.flows, set.flows);
   assert.deepEqual(roundTrip.hunks, set.hunks);
+
+  // Flows cached under the old name read back the same, app files included.
+  const old = fromSarif(
+    JSON.parse(
+      JSON.stringify(toSarif(set, `file://${repo}`)).replaceAll(
+        '"backstory.',
+        '"differ.',
+      ),
+    ),
+  );
+  assert.deepEqual(old, fromSarif(toSarif(set, `file://${repo}`)));
+  assert.deepEqual(old.appFiles, set.appFiles);
+  assert.ok(old.appFiles.length > 0);
 });
 
 test("a new flow needs one run and has no before side", async () => {

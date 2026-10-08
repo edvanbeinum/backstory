@@ -92,7 +92,7 @@ function fence(text: string): string {
 export interface NoteCommit {
   sha: string;
   subject: string;
-  /** Null when differ can't tell — then the message doesn't say */
+  /** Null when Backstory can't tell — then the message doesn't say */
   pushed: boolean | null;
 }
 
@@ -111,7 +111,7 @@ export interface FeedbackContext {
 /**
  * Where a note's change sits, as a fact rather than advice: which commit, and
  * whether it's been pushed. How to fix it — a fixup, a new commit — depends on
- * how you and the agent are working, which differ can't see.
+ * how you and the agent are working, which Backstory can't see.
  */
 function whereQualifier(
   note: Note,

@@ -290,7 +290,7 @@ test("model files with non-ASCII text read whole, and so do the ones after them"
     await import("node:fs");
   const os = await import("node:os");
   const path = await import("node:path");
-  const repo = mkdtempSync(path.join(os.tmpdir(), "differ-unicode-"));
+  const repo = mkdtempSync(path.join(os.tmpdir(), "backstory-unicode-"));
   const git = (...a: string[]) =>
     execFileSync("git", ["-C", repo, ...a], { encoding: "utf8" }).trim();
   const write = (f: string, t: string) => {

@@ -1,14 +1,13 @@
 import type { Metadata } from "next";
 
-import { ServiceWorker } from "@/components/ServiceWorker";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "differ — review before you push",
+  title: "Backstory — review before you push",
   description:
     "Local pre-push review: unpushed commits and their PR review comments, side by side.",
-  // Safari's "Add to Dock" takes its icon from apple-touch-icon, not the
-  // manifest. The SVG is listed first for browsers that take it — it stays
+  // Safari takes its icon from apple-touch-icon instead of these. The SVG is
+  // listed first for browsers that take it — it stays
   // sharp at any tab size — with the PNGs behind it for those that don't, and
   // app/favicon.ico (16/32/64) as the last resort.
   icons: {
@@ -21,7 +20,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    title: "differ",
+    title: "Backstory",
     statusBarStyle: "black-translucent",
   },
 };
@@ -33,10 +32,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full antialiased">
-      <body className="min-h-full">
-        {children}
-        <ServiceWorker />
-      </body>
+      <body className="min-h-full">{children}</body>
     </html>
   );
 }

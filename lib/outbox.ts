@@ -6,9 +6,9 @@ import { KEY, readNamespaced, withStore, writeNamespaced } from "./store";
 /**
  * Sent rounds on their way to an agent, per checkout.
  *
- * `differ review` only reaches an agent that's sitting waiting on stdout, and
+ * `backstory review` only reaches an agent that's sitting waiting on stdout, and
  * that wait lives in memory. This is the other road: Send files the round
- * here, on disk, and the agent's Claude Code Stop hook (`differ hook stop`)
+ * here, on disk, and the agent's Claude Code Stop hook (`backstory hook stop`)
  * collects it the next time that session finishes a turn. So Send works while
  * the agent is busy, and survives a restart of either side.
  *
@@ -33,14 +33,14 @@ export const MAX_MESSAGE = 200_000;
 const KEEP_DELIVERED_MS = 30 * 24 * 60 * 60 * 1000;
 /**
  * How long a taken round waits for its hook to say the agent has it before
- * it can be taken again. Longer than a hook can run: differ's exits by 5s.
+ * it can be taken again. Longer than a hook can run: Backstory's exits by 5s.
  */
 export const CLAIM_MS = 30_000;
 /** Sessions remembered per checkout; only the latest is ever aimed at. */
 const KEEP_SESSIONS = 10;
 
 export const CLIPBOARD = "clipboard";
-export const DIFFER_REVIEW = "differ review";
+export const BACKSTORY_REVIEW = "backstory review";
 
 export interface OutboxRound {
   id: string;
@@ -53,7 +53,7 @@ export interface OutboxRound {
   /** The session it's for; null for whichever stops here first. */
   forSession: string | null;
   deliveredAt: number | null;
-  /** A session id, CLIPBOARD or DIFFER_REVIEW. */
+  /** A session id, CLIPBOARD or BACKSTORY_REVIEW. */
   deliveredTo: string | null;
   /**
    * Handed to a Stop hook that hasn't yet confirmed printing it. Delivered
@@ -138,7 +138,11 @@ function parse(root: string, entries: Record<string, Stored>): ForRoot {
         queuedAt: value.queuedAt,
         forSession: value.forSession,
         deliveredAt: value.deliveredAt,
-        deliveredTo: value.deliveredTo,
+        // Rounds a review took under the old name still say so in the window.
+        deliveredTo:
+          value.deliveredTo === "differ review"
+            ? BACKSTORY_REVIEW
+            : value.deliveredTo,
         claim: value.claim ?? null,
       });
     }
@@ -188,8 +192,8 @@ export async function getOutbox(root: string): Promise<OutboxState> {
  * module once per route bundle, and the route that writes must reach the
  * watch stream's listener.
  */
-const g = globalThis as { __differOutbox?: EventEmitter };
-const events: EventEmitter = (g.__differOutbox ??=
+const g = globalThis as { __backstoryOutbox?: EventEmitter };
+const events: EventEmitter = (g.__backstoryOutbox ??=
   new EventEmitter().setMaxListeners(0));
 
 /** Be told when a checkout's rounds change: queued, taken, re-aimed, withdrawn. */
@@ -235,7 +239,7 @@ export interface NewRound {
   noteIds: string[];
   message: string;
   at: number;
-  /** Set when it's already been handed over: CLIPBOARD or DIFFER_REVIEW. */
+  /** Set when it's already been handed over: CLIPBOARD or BACKSTORY_REVIEW. */
   deliveredTo?: string;
 }
 
@@ -401,12 +405,12 @@ export function requeue(root: string, id: string): Promise<OutboxRound | null> {
 /**
  * What the Stop hook hands the agent: the rounds it took, in the order they
  * were sent, under enough of a preamble to read them cold — this agent may
- * never have been told about differ.
+ * never have been told about Backstory.
  */
 export function formatTaken(rounds: OutboxRound[]): string {
   return (
     [
-      "I reviewed your work in differ and sent these notes while you were busy. " +
+      "I reviewed your work in Backstory and sent these notes while you were busy. " +
         "Address every note, then summarise what you changed for each. " +
         "Find a line by its quoted text if the number has drifted. " +
         "For a note on a commit, tell me how you mean to fix it (a fixup, a new " +

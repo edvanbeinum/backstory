@@ -44,8 +44,8 @@ test("round-trips awkward repo paths", () => {
 
 test("slashes stay readable, real separators stay encoded", () => {
   assert.equal(
-    buildUrl({ repo: "/Users/ed/code/differ", rev: null }),
-    "/?repo=/Users/ed/code/differ",
+    buildUrl({ repo: "/Users/ed/code/backstory", rev: null }),
+    "/?repo=/Users/ed/code/backstory",
   );
   // & would otherwise split the query into a bogus second parameter
   assert.match(buildUrl({ repo: "/a&b", rev: null }), /%26/);
@@ -192,7 +192,7 @@ test("an empty repo with a clean tree still resolves to something", () => {
 });
 
 test("a hand-picked sha survives, an unknown one from a URL still falls back", () => {
-  // differ can render any commit in the repo but only lists the branch's
+  // Backstory can render any commit in the repo but only lists the branch's
   // recent ones, so a pasted sha must not be bounced by the next refresh.
   assert.deepEqual(resolveRev("fc6ff8f", COMMITS, false, false, ["fc6ff8f"]), {
     rev: "fc6ff8f",

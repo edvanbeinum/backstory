@@ -30,8 +30,8 @@ import type { OutboxRound } from "@/lib/outbox";
  *
  * Notes go on any change — a commit, the branch as a whole, uncommitted work
  * — so a stack of an agent's commits can be reviewed one at a time and sent
- * in one go. Drafts leave by Send — straight to an agent waiting on `differ
- * review`, or else queued for the agent's Stop hook to collect — or by the
+ * in one go. Drafts leave by Send — straight to an agent waiting on
+ * `backstory review`, or else queued for the agent's Stop hook to collect — or by the
  * clipboard ("Copy for agent"). Either way they become a round: fixed, since
  * that's what the agent read, and each with a tick that only you set once
  * you've seen it handled.
@@ -114,7 +114,7 @@ export function FeedbackBar({
   };
 
   /**
-   * The server decides where it goes — a waiting `differ review` if there is
+   * The server decides where it goes — a waiting `backstory review` if there is
    * one, the queue otherwise — so the two can't race. It also moves the notes
    * into their round.
    */
@@ -457,7 +457,7 @@ function queueTarget(lastSeen: OutboxApi["lastSeen"]): string {
 }
 
 /**
- * How a round left, if differ recorded it — rounds from before it did aren't.
+ * How a round left, if Backstory recorded it — rounds from before it did aren't.
  * Matched on time as well as notes: a record whose notes were already sent by
  * another one never got its own round.
  */
@@ -489,7 +489,7 @@ function roundStatus(
   }
   const when = sinceLabel(sent.deliveredAt);
   if (sent.deliveredTo === "clipboard") return `Copied ${when}`;
-  if (sent.deliveredTo === "differ review")
+  if (sent.deliveredTo === "backstory review")
     return `Sent to the waiting agent ${when}`;
   return `Delivered ${when} to session ${shortSession(sent.deliveredTo ?? "")}`;
 }

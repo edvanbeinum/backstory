@@ -671,8 +671,8 @@ function DraftProgress({ draft }: { draft: DraftApi }) {
         >
           Claude Code
         </a>
-        : differ couldn&apos;t find <code className="mono">claude</code> on its
-        PATH.
+        : Backstory couldn&apos;t find <code className="mono">claude</code> on
+        its PATH.
       </span>
     );
   if (draft.finished)

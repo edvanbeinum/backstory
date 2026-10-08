@@ -39,7 +39,7 @@ export interface FlowSelection {
 /** Ask the diff to show a line that's outside the hunks on screen. */
 export function revealLine(path: string, side: "old" | "new", line: number) {
   window.dispatchEvent(
-    new CustomEvent("differ:reveal", { detail: { path, side, line } }),
+    new CustomEvent("backstory:reveal", { detail: { path, side, line } }),
   );
 }
 
@@ -125,10 +125,10 @@ export function FlowPanel({
       </Notice>
     ) : (
       <Notice tone="attention">
-        Flows need Claude Code: differ runs{" "}
+        Flows need Claude Code: Backstory runs{" "}
         <code className="mono">claude -p</code> with your login, and
         couldn&apos;t find <code className="mono">claude</code> on its PATH. The
-        rest of differ works without it.{" "}
+        rest of Backstory works without it.{" "}
         <button
           type="button"
           className="text-[var(--accent)]"

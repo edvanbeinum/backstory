@@ -433,7 +433,7 @@ tr.note-row td {
 /* --- The tick ---------------------------------------------------------- */
 
 /*
- * differ is a checklist, so checking a comment off is the moment it earns
+ * Backstory is a checklist, so checking a comment off is the moment it earns
  * itself. All of this is one spring easing and a couple of keyframes — no
  * animation library, and every rule below is skipped under reduced motion,
  * where the state change still lands, just instantly.

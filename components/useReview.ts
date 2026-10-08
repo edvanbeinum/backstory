@@ -6,7 +6,7 @@ import { REVIEW_API } from "@/lib/constants";
 import type { ApiError } from "@/lib/types";
 
 export interface ReviewApi {
-  /** Set while an agent is waiting on `differ review` for this checkout */
+  /** Set while an agent is waiting on `backstory review` for this checkout */
   waiting: { id: string; createdAt: number } | null;
   /** Hand the notes over. Resolves false (with `error` set) if it didn't land. */
   send: (answer: string) => Promise<boolean>;

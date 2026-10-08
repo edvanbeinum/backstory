@@ -13,14 +13,11 @@ export default defineConfig([
     "build/**",
     "next-env.d.ts",
     "local/**",
+    "mac/build/**",
   ]),
   {
-    files: ["bin/**/*.mjs"],
+    files: ["bin/**/*.mjs", "mac/*.mjs"],
     languageOptions: { globals: globals.node },
-  },
-  {
-    files: ["public/sw.js"],
-    languageOptions: { globals: globals.serviceworker },
   },
   {
     rules: {

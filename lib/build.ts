@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 
 /**
- * Which build of differ this server is running, for the window to compare
+ * Which build of Backstory this server is running, for the window to compare
  * against the build it was loaded from.
  *
  * `next build` writes the id to .next/BUILD_ID, and the standalone server runs
@@ -22,3 +22,21 @@ function readBuildId(): string {
 }
 
 export const BUILD_ID = readBuildId();
+
+/**
+ * `package.json`'s version, the one the Mac app's About box shows too. Next
+ * copies `package.json` into the standalone output, so like `BUILD_ID` it's
+ * found from the working directory in a checkout and in the Mac app's bundle.
+ */
+export function readVersion(dir = process.cwd()): string {
+  try {
+    const pkg = JSON.parse(
+      readFileSync(path.join(dir, "package.json"), "utf8"),
+    ) as { version?: unknown };
+    return typeof pkg.version === "string" ? pkg.version : "unknown";
+  } catch {
+    return "unknown";
+  }
+}
+
+export const VERSION = readVersion();

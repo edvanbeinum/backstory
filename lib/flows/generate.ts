@@ -98,7 +98,7 @@ async function prepare(
 /** The commit's files in a temp dir. Nothing in the repo is touched. */
 async function snapshot(root: string, rev: string): Promise<string> {
   const dir = await fs.mkdtemp(
-    path.join(os.tmpdir(), `differ-flows-${rev.slice(0, 7)}-`),
+    path.join(os.tmpdir(), `backstory-flows-${rev.slice(0, 7)}-`),
   );
   try {
     // pipefail: a failed archive (a blobless clone, say) would otherwise

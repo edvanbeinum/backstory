@@ -80,7 +80,7 @@ function templateText(
 
 /**
  * Drafts an "Addressed in <commit>" reply and hands it over via the
- * clipboard. differ never posts to GitHub — you paste this into the thread
+ * clipboard. Backstory never posts to GitHub — you paste this into the thread
  * yourself, which keeps the last word on wording (and on whether to reply at
  * all) with you.
  *
@@ -110,7 +110,7 @@ export function ReplyComposer({
 }) {
   // Always your own words by default. The wordings are one click away and
   // the box is seeded from the linked commit, so nothing is lost — but a
-  // template selected *for* you is differ deciding what you think, and the
+  // template selected *for* you is Backstory deciding what you think, and the
   // one it used to fall back to was "Noted — no change needed here", which
   // is a position on a comment you haven't read yet.
   const [template, setTemplate] = useState<Template>("custom");
@@ -223,7 +223,7 @@ export function ReplyComposer({
 
   // Unlinking a commit while an "Addressed in <sha>" template is selected
   // would otherwise leave an empty box that looks broken. Back to your own
-  // words, not to a stance differ picked.
+  // words, not to a stance Backstory picked.
   if (
     commitTemplatesDisabled &&
     (template === "url" || template === "sha" || template === "thumbsUp")

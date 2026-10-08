@@ -1,15 +1,15 @@
 import assert from "node:assert/strict";
-import { mkdtempSync } from "node:fs";
+import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
 import {
   ack,
+  BACKSTORY_REVIEW,
   cancel,
   CLAIM_MS,
   CLIPBOARD,
-  DIFFER_REVIEW,
   formatTaken,
   getOutbox,
   onOutboxChange,
@@ -20,9 +20,11 @@ import {
   take,
 } from "../lib/outbox";
 
-/** The store resolves DIFFER_HOME per call; never touch the real ~/.differ. */
+/** The store resolves BACKSTORY_HOME per call; never touch the real home. */
 function useTempHome(): void {
-  process.env.DIFFER_HOME = mkdtempSync(path.join(tmpdir(), "differ-outbox-"));
+  process.env.BACKSTORY_HOME = mkdtempSync(
+    path.join(tmpdir(), "backstory-outbox-"),
+  );
 }
 
 const ROOT = "/repos/app";
@@ -152,12 +154,33 @@ test("requeue turns a round filed as answered back into a queued one", async () 
   await take(ROOT, "s-1");
   const answered = await queueRound(ROOT, {
     ...round(["n1"]),
-    deliveredTo: DIFFER_REVIEW,
+    deliveredTo: BACKSTORY_REVIEW,
   });
   const queued = await requeue(ROOT, answered.id);
   assert.equal(queued?.deliveredAt, null);
   assert.equal(queued?.forSession, "s-1");
   assert.equal((await take(ROOT, "s-1")).length, 1);
+});
+
+test("a round a review took under the old name still reads as taken by a review", async () => {
+  useTempHome();
+  writeFileSync(
+    path.join(process.env.BACKSTORY_HOME!, "outbox.json"),
+    JSON.stringify({
+      [ROOT]: {
+        r1: {
+          noteIds: ["n1"],
+          message: "fix it",
+          queuedAt: 1,
+          forSession: null,
+          deliveredAt: 2,
+          deliveredTo: "differ review",
+        },
+      },
+    }),
+  );
+  const [old] = (await getOutbox(ROOT)).rounds;
+  assert.equal(old.deliveredTo, BACKSTORY_REVIEW);
 });
 
 test("a copied round is recorded as delivered and never taken", async () => {

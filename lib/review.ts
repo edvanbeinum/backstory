@@ -2,7 +2,7 @@ import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
 
 /**
- * Review requests: an agent (via `differ review`) waiting for your notes.
+ * Review requests: an agent (via `backstory review`) waiting for your notes.
  *
  * The CLI opens a request and long-polls it; the window sees one is waiting
  * and offers "Send to agent"; sending answers it, and the CLI prints the
@@ -34,8 +34,8 @@ interface Registry {
   events: EventEmitter;
 }
 
-const g = globalThis as { __differReviews?: Registry };
-const registry: Registry = (g.__differReviews ??= {
+const g = globalThis as { __backstoryReviews?: Registry };
+const registry: Registry = (g.__backstoryReviews ??= {
   requests: new Map(),
   events: new EventEmitter().setMaxListeners(0),
 });

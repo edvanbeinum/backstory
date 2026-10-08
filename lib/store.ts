@@ -1,4 +1,4 @@
-import { promises as fs } from "node:fs";
+import { existsSync, promises as fs, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -7,8 +7,8 @@ import path from "node:path";
  *
  * Deliberately not a database: the whole thing is a few KB of click-driven
  * writes with no queries. Keeping it as plain JSON means no dependency, no
- * native build to complicate the standalone bundle and Homebrew formula, and
- * a file you can `cat`, hand-edit or `rm` — which is a real feature in a
+ * native build to complicate the standalone bundle in the Mac app, and a
+ * file you can `cat`, hand-edit or `rm` — which is a real feature in a
  * local dev tool.
  *
  * Everything goes through this module so that if the data ever does outgrow
@@ -16,17 +16,39 @@ import path from "node:path";
  * swapping in SQLite is a change here and nowhere else.
  */
 
+const moved = new Set<string>();
+
 /**
- * Resolved per call, not once at import, so a test can point the store at a
- * temp directory. Without that, testing the migration would mean writing to
- * the real `~/.differ` — which holds the only copy of your drafts.
+ * The directory everything on this machine lives in: BACKSTORY_HOME, else
+ * `~/.backstory`. Resolved per call, not once at import, so a test can point
+ * the store at a temp directory. Without that, testing the migration would
+ * mean writing to the real `~/.backstory` — which holds the only copy of your
+ * drafts.
+ *
+ * Moves a `.differ` beside it into place the first time it's resolved, when
+ * there's nothing there yet: that's where the old name kept it. A rename, so
+ * it's instant whatever `flows/` and `models/` hold, and never a merge: once
+ * the directory exists, `.differ` is left alone. The Mac app applies the
+ * same rule before it creates the directory for its log.
  */
-function dir(): string {
-  return process.env.DIFFER_HOME || path.join(homedir(), ".differ");
+export function homeDir(): string {
+  const home = process.env.BACKSTORY_HOME || path.join(homedir(), ".backstory");
+  if (!moved.has(home)) {
+    moved.add(home);
+    const old = path.join(path.dirname(home), ".differ");
+    if (!existsSync(home) && existsSync(old)) {
+      try {
+        renameSync(old, home);
+      } catch {
+        // Another volume or a race: start afresh rather than refuse to run.
+      }
+    }
+  }
+  return home;
 }
 
 export function storePath(name: string): string {
-  return path.join(dir(), `${name}.json`);
+  return path.join(homeDir(), `${name}.json`);
 }
 
 /**
@@ -95,7 +117,7 @@ export async function writeNamespaced<T>(
   name: string,
   data: Record<string, Record<string, T>>,
 ): Promise<void> {
-  await fs.mkdir(dir(), { recursive: true });
+  await fs.mkdir(homeDir(), { recursive: true });
   // Write-then-rename, so a crash mid-write can't truncate what's there.
   // The counter matters: with only the pid in the name, two overlapping
   // writes to one store share a temp path, and the loser can be renamed into

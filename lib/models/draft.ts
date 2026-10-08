@@ -9,7 +9,7 @@ import {
   type Runner,
 } from "../flows/claude";
 import { withSnapshot } from "../flows/generate";
-import { localModelDir, MODEL_DSL, showFile } from "../model";
+import { DRAFTED_PROPERTY, localModelDir, MODEL_DSL, showFile } from "../model";
 import { assignIds, serializeModel, type DraftIds } from "./dsl";
 import { checkGlobs, type GlobCheck } from "./globs";
 import {
@@ -23,8 +23,9 @@ import {
 
 /**
  * Drafting a C4 model for a repo that has none: Claude reads the code at
- * HEAD and differ writes the result to the local model file the map already
- * reads, `~/.differ/models/<repo>/workspace.dsl`. Never into the repo.
+ * HEAD and Backstory writes the result to the local model file the map
+ * already reads, `~/.backstory/models/<repo>/workspace.dsl`. Never into the
+ * repo.
  *
  * One job per repo, in memory on globalThis, as `lib/flows/cache.ts` keeps
  * its runs: Next may load this module once per route bundle. A restart
@@ -192,9 +193,9 @@ export async function draftModel(opts: {
     // The cost is only here, not in the strip: Claude Code reports it at API
     // list prices even on a subscription, where a run isn't charged.
     const header = [
-      `Drafted by Claude for differ on ${day}, from commit ${short}, with ${model}.`,
+      `Drafted by Claude for Backstory on ${day}, from commit ${short}, with ${model}.`,
       "It's a draft, meant to be corrected: rename, merge and split components, and fix their globs.",
-      `Delete the "differ.drafted" property once it's right, and the map stops calling it a draft.`,
+      `Delete the "${DRAFTED_PROPERTY}" property once it's right, and the map stops calling it a draft.`,
       `The run took ${formatDuration(durationMs)}; Claude Code put its cost at $${costUsd.toFixed(2)} at API list prices.`,
       "",
       ...leftOver(check, short),
@@ -216,8 +217,8 @@ interface Job {
   checking?: Promise<void>;
 }
 
-const g = globalThis as { __differModels?: Map<string, Job> };
-const jobs: Map<string, Job> = (g.__differModels ??= new Map());
+const g = globalThis as { __backstoryModels?: Map<string, Job> };
+const jobs: Map<string, Job> = (g.__backstoryModels ??= new Map());
 
 const exists = (file: string) =>
   fs.access(file).then(

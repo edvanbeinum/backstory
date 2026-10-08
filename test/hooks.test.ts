@@ -24,9 +24,9 @@ test("the committed pre-push hook is executable and runs the check", () => {
 });
 
 test("tests never see the real store", () => {
-  const home = process.env.DIFFER_HOME;
-  assert.ok(home, "npm test sets DIFFER_HOME");
-  assert.notEqual(path.resolve(home), path.join(os.homedir(), ".differ"));
+  const home = process.env.BACKSTORY_HOME;
+  assert.ok(home, "npm test sets BACKSTORY_HOME");
+  assert.notEqual(path.resolve(home), path.join(os.homedir(), ".backstory"));
   // macOS reaches its temp dir through the /var -> /private/var symlink.
   const tmp = realpathSync(os.tmpdir());
   assert.ok(

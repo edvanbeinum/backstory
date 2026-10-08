@@ -1,7 +1,7 @@
 import type { SessionResponse } from "./types";
 
 /**
- * Whether a commit on this branch has been pushed, or null when differ can't
+ * Whether a commit on this branch has been pushed, or null when Backstory can't
  * say.
  *
  * `commits` and `history` split the branch at the push boundary, but the

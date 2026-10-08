@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { test } from "node:test";
 
-import { mkdtempSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -16,8 +16,8 @@ const INPUT = JSON.stringify({
   stop_hook_active: false,
 });
 
-/** A stand-in differ answering the take with `status` and `body`. */
-async function differ(
+/** A stand-in Backstory answering the take with `status` and `body`. */
+async function backstory(
   status: number,
   body: unknown,
   seen: string[] = [],
@@ -35,7 +35,7 @@ async function differ(
 test("queued notes block the stop and become the agent's instructions", async () => {
   const seen: string[] = [];
   const printed: string[] = [];
-  const { base, server } = await differ(
+  const { base, server } = await backstory(
     200,
     { message: "## a.ts:3\nfix it\n", ids: ["r1"] },
     seen,
@@ -87,19 +87,32 @@ test("the notes are printed even when the confirmation fails", async () => {
   }
 });
 
-test("the hook finds the port differ was last started on", () => {
+test("the hook finds the port Backstory was last started on", () => {
   const env: Record<string, string> = {
-    DIFFER_HOME: mkdtempSync(path.join(tmpdir(), "differ-hook-")),
+    BACKSTORY_HOME: mkdtempSync(path.join(tmpdir(), "backstory-hook-")),
   };
   assert.equal(hookPort(env), DEFAULT_PORT);
   recordPort(4555, env);
   assert.equal(hookPort(env), 4555);
-  // The agent's own DIFFER_PORT still wins.
-  assert.equal(hookPort({ ...env, DIFFER_PORT: "4600" }), 4600);
+  // The agent's own BACKSTORY_PORT still wins.
+  assert.equal(hookPort({ ...env, BACKSTORY_PORT: "4600" }), 4600);
+});
+
+test("recording the port moves the old directory into place rather than starting an empty one", () => {
+  const dir = mkdtempSync(path.join(tmpdir(), "backstory-hook-"));
+  const old = path.join(dir, ".differ");
+  mkdirSync(old);
+  writeFileSync(path.join(old, "notes.json"), "{}");
+  const env = { BACKSTORY_HOME: path.join(dir, ".backstory") };
+
+  recordPort(4555, env);
+  assert.ok(existsSync(path.join(dir, ".backstory", "notes.json")));
+  assert.equal(existsSync(old), false);
+  assert.equal(hookPort(env), 4555);
 });
 
 test("nothing queued prints nothing", async () => {
-  const { base, server } = await differ(200, { message: null });
+  const { base, server } = await backstory(200, { message: null });
   try {
     assert.equal(await stopHook(INPUT, { base }), "");
   } finally {
@@ -107,8 +120,10 @@ test("nothing queued prints nothing", async () => {
   }
 });
 
-test("an error from differ — say, not a checkout — prints nothing", async () => {
-  const { base, server } = await differ(400, { error: "Not a git repository" });
+test("an error from Backstory — say, not a checkout — prints nothing", async () => {
+  const { base, server } = await backstory(400, {
+    error: "Not a git repository",
+  });
   try {
     assert.equal(await stopHook(INPUT, { base }), "");
   } finally {
@@ -116,14 +131,14 @@ test("an error from differ — say, not a checkout — prints nothing", async ()
   }
 });
 
-test("differ not running prints nothing", async () => {
+test("Backstory not running prints nothing", async () => {
   // Grab a port, then free it, so nothing is listening there.
-  const { base, server } = await differ(200, {});
+  const { base, server } = await backstory(200, {});
   await new Promise((resolve) => server.close(resolve));
   assert.equal(await stopHook(INPUT, { base }), "");
 });
 
-test("a differ that hangs is given up on at the timeout", async () => {
+test("a Backstory that hangs is given up on at the timeout", async () => {
   const server = createServer(() => {
     // never answers
   });

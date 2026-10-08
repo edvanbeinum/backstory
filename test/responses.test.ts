@@ -16,15 +16,15 @@ import {
  * Point the store at a temp directory and put the module back in its
  * just-started state.
  *
- * Both halves matter. The store resolves `~/.differ` per call so DIFFER_HOME
+ * Both halves matter. The store resolves `~/.backstory` per call so BACKSTORY_HOME
  * can redirect it — without that these tests would migrate the real file,
  * which holds the only copy of your drafts. And the migration is memoised per
  * process, so it has to be reset or every test after the first would find it
  * already done.
  */
 function useTempHome(): string {
-  const home = mkdtempSync(path.join(tmpdir(), "differ-test-"));
-  process.env.DIFFER_HOME = home;
+  const home = mkdtempSync(path.join(tmpdir(), "backstory-test-"));
+  process.env.BACKSTORY_HOME = home;
   resetMigrationForTests();
   return home;
 }

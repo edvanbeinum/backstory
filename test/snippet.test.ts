@@ -7,7 +7,7 @@ import { after, test } from "node:test";
 
 import { snippet } from "../lib/snippet";
 
-const repo = mkdtempSync(path.join(os.tmpdir(), "differ-snippet-test-"));
+const repo = mkdtempSync(path.join(os.tmpdir(), "backstory-snippet-test-"));
 after(() => rmSync(repo, { recursive: true, force: true }));
 
 const sh = (...args: string[]) =>

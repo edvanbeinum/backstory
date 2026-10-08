@@ -1,15 +1,15 @@
 import { promises as fs } from "node:fs";
-import { homedir } from "node:os";
 import path from "node:path";
 
 import picomatch from "picomatch";
 
 import { DslError, readDsl } from "./dsl";
 import { gitLine, gitTry } from "./exec";
+import { homeDir } from "./store";
 
 /**
  * The repo's C4 model: `architecture/workspace.dsl`, in Structurizr's DSL.
- * differ only reads it. Elements are keyed by their DSL identifier
+ * Backstory only reads it. Elements are keyed by their DSL identifier
  * (`ios.progress`), which survives elements being added.
  */
 
@@ -43,11 +43,11 @@ export interface Model {
   match: (path: string) => string[];
   isTest: (path: string) => boolean;
   isIgnored: (path: string) => boolean;
-  /** The workspace's own properties, such as `differ.drafted` */
+  /** The workspace's own properties, such as `backstory.drafted` */
   properties: Record<string, string>;
 }
 
-/** A model as the DSL reader finds it, before differ builds its matchers. */
+/** A model as the DSL reader finds it, before Backstory builds its matchers. */
 export interface Workspace {
   properties: Record<string, string>;
   elements: WorkspaceElement[];
@@ -154,7 +154,7 @@ export async function showFile(
 
 /**
  * A model kept on this machine for a repo that doesn't commit one:
- * `~/.differ/models/<repo>/workspace.dsl`, named after the main checkout's
+ * `~/.backstory/models/<repo>/workspace.dsl`, named after the main checkout's
  * folder so every worktree finds it. One model for every commit, so it can
  * say where a change landed but not what it added or removed.
  */
@@ -165,8 +165,7 @@ export async function localModelDir(root: string): Promise<string> {
       "--path-format=absolute",
       "--git-common-dir",
     ])) ?? path.join(root, ".git");
-  const home = process.env.DIFFER_HOME || path.join(homedir(), ".differ");
-  return path.join(home, "models", path.basename(path.dirname(common)));
+  return path.join(homeDir(), "models", path.basename(path.dirname(common)));
 }
 
 export const localModelFile = async (root: string) =>
@@ -177,7 +176,10 @@ export const localModelFile = async (root: string) =>
  * drafted. A property, not the header comment, because the reader skips
  * comments; removing it after correcting a draft drops the Draft chip.
  */
-export const DRAFTED_PROPERTY = "differ.drafted";
+export const DRAFTED_PROPERTY = "backstory.drafted";
+
+/** What models drafted under the old name carry, so they still read as drafts. */
+const OLD_DRAFTED_PROPERTY = "differ.drafted";
 
 export interface ModelRead {
   /** Null when the file is there but couldn't be read: see `error` */
@@ -197,7 +199,10 @@ function read(text: string, file: string | null): ModelRead {
       model,
       local,
       file,
-      drafted: model.properties[DRAFTED_PROPERTY] ?? null,
+      drafted:
+        model.properties[DRAFTED_PROPERTY] ??
+        model.properties[OLD_DRAFTED_PROPERTY] ??
+        null,
       error: null,
     };
   } catch (e) {

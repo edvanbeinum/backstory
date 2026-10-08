@@ -13,7 +13,7 @@ import { ChevronDownIcon } from "./icons";
  * grew a filter box and the other didn't, so "search for a commit" worked or
  * didn't depending on which dropdown you happened to open.
  *
- * Pasting matters more than it looks. differ offers the branch's recent
+ * Pasting matters more than it looks. Backstory offers the branch's recent
  * commits, and the one you want is often outside that window or on another
  * branch entirely — searching a list you know it isn't in is the wrong shape
  * of work. So an unrecognised sha is offered rather than refused, and
@@ -161,7 +161,7 @@ export function CommitPicker({
               <li className="px-2.5 py-2 text-[11px] text-[var(--fg-muted)]">
                 {trimmed
                   ? "Nothing matches. A full or short sha can be used even if it isn't listed."
-                  : "differ found no commits on this branch to offer."}
+                  : "Backstory found no commits on this branch to offer."}
               </li>
             )}
           </ul>

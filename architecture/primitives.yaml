@@ -1,4 +1,4 @@
-# The capabilities differ already has, for new work to build from.
+# The capabilities Backstory already has, for new work to build from.
 # Build from these. If none fits, extend one. Ask before adding a new one.
 # `block` names a block in language.yaml; code in no block leaves it out.
 # The idea of naming primitives comes from https://kcd-slides-event-mega-its-time.pages.dev
@@ -17,7 +17,7 @@ primitives:
     file: lib/exec.ts
     symbols:
       - run
-    use: Every other child process. It passes argv and never a shell, and extends PATH so binaries resolve under launchd.
+    use: Every other child process. It passes argv and never a shell, and extends PATH so binaries resolve under the Mac app or launchd.
   - name: open a repo
     block: git reader
     file: lib/git.ts
@@ -37,7 +37,7 @@ primitives:
       - getCommitPatch
       - getRangePatch
       - getWorkingPatch
-    use: The patch text differ parses everywhere, with flags that keep a user's difftool config out of it.
+    use: The patch text Backstory parses everywhere, with flags that keep a user's difftool config out of it.
   - name: not yet pushed
     block: git reader
     file: lib/pushed.ts
@@ -87,7 +87,8 @@ primitives:
       - withStore
       - readNamespaced
       - writeNamespaced
-    use: Every store file read and write. It keeps the store invariant, validates on read and writes atomically.
+      - homeDir
+    use: "Every store file read and write. It keeps the store invariant, validates on read and writes atomically. `homeDir` is the one directory everything on this machine lives in (the store, the flow cache, local models), and moves `~/.differ` into place the first time."
   - name: run Claude
     block: flow engine
     file: lib/flows/claude.ts
@@ -115,7 +116,7 @@ primitives:
     file: lib/api.ts
     symbols:
       - crossSite
-    use: Blocks a POST that another website sends to differ's local port.
+    use: Blocks a POST that another website sends to Backstory's local port.
   - name: URL state
     block: UI columns and panels
     file: lib/url.ts

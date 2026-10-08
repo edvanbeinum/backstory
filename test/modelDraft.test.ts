@@ -26,13 +26,13 @@ import { checkGlobs } from "../lib/models/globs";
 import type { DraftOutput, GlobFixOutput } from "../lib/models/prompts";
 
 const dirs: string[] = [];
-const previousHome = process.env.DIFFER_HOME;
-const home = mkdtempSync(path.join(os.tmpdir(), "differ-home-"));
+const previousHome = process.env.BACKSTORY_HOME;
+const home = mkdtempSync(path.join(os.tmpdir(), "backstory-home-"));
 dirs.push(home);
-process.env.DIFFER_HOME = home;
+process.env.BACKSTORY_HOME = home;
 after(() => {
-  if (previousHome === undefined) delete process.env.DIFFER_HOME;
-  else process.env.DIFFER_HOME = previousHome;
+  if (previousHome === undefined) delete process.env.BACKSTORY_HOME;
+  else process.env.BACKSTORY_HOME = previousHome;
   for (const dir of dirs) rmSync(dir, { recursive: true, force: true });
 });
 
@@ -46,7 +46,7 @@ const FILES: Record<string, string> = {
 };
 
 function gitRepo(extra: Record<string, string> = {}) {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "differ-draft-test-"));
+  const dir = mkdtempSync(path.join(os.tmpdir(), "backstory-draft-test-"));
   dirs.push(dir);
   const sh = (...args: string[]) =>
     execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" }).trim();
@@ -221,7 +221,7 @@ test("a draft reads back as it was written, whatever its strings and ids", () =>
   const ws = readDsl(text);
 
   assert.deepEqual(ws.properties, {
-    "differ.drafted": "2026-10-05",
+    "backstory.drafted": "2026-10-05",
     "code.tests": "test/**",
     "code.ignore": "**/*.md",
   });
@@ -394,11 +394,23 @@ test("a redraft sent while a refused draft is still being checked still runs", a
   const renamed = structuredClone(CLEAN);
   renamed.system.name = "Shop, redrafted";
   const { runner, prompts } = recorded([renamed]);
-  const [stale, redraft] = await Promise.all([
-    startDraft(repo.dir, { runner, available }),
-    startDraft(repo.dir, { runner, available, redraft: true }),
-  ]);
-  assert.deepEqual(stale, { status: "refused", reason: "exists" });
+  // Let the stale draft claim the repo before the redraft arrives: both
+  // resolve the model directory first, and that ordering isn't promised.
+  // Stop waiting once the stale draft has settled too, since its claim can
+  // come and go between two polls and would otherwise leave this spinning.
+  const stale = startDraft(repo.dir, { runner, available });
+  let settled = false;
+  const markSettled = () => (settled = true);
+  stale.then(markSettled, markSettled);
+  while (!settled && (await draftStatus(repo.dir)).status !== "running") {
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+  const redraft = await startDraft(repo.dir, {
+    runner,
+    available,
+    redraft: true,
+  });
+  assert.deepEqual(await stale, { status: "refused", reason: "exists" });
   assert.equal(redraft.status, "running");
   await draftSettled(repo.dir);
   assert.equal((await draftStatus(repo.dir)).status, "done");

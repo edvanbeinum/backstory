@@ -24,7 +24,7 @@ const write = (root: string, file: string, text: string) => {
 };
 
 function gitRepo() {
-  const dir = tempDir("differ-map-test-");
+  const dir = tempDir("backstory-map-test-");
   const sh = (...args: string[]) =>
     execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" }).trim();
   sh("init", "-q");
@@ -195,7 +195,7 @@ test("a base with no model adds nothing", async () => {
 
 test("a repo with no model uses a DSL kept locally, without a structural diff", async () => {
   const repo = gitRepo();
-  const home = tempDir("differ-home-");
+  const home = tempDir("backstory-home-");
   const base = repo.commit({ README: "x\n" }, "base");
   const head = repo.commit({ "src/a/one.ts": "1\n" }, "head");
   write(
@@ -204,8 +204,8 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
     dsl(BASE),
   );
 
-  const previousHome = process.env.DIFFER_HOME;
-  process.env.DIFFER_HOME = home;
+  const previousHome = process.env.BACKSTORY_HOME;
+  process.env.BACKSTORY_HOME = home;
   try {
     const map = await buildMap(repo.dir, base, head);
     assert.equal(map.status, "ok");
@@ -218,15 +218,15 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
     );
     assert.equal(map.drafted, null);
   } finally {
-    // Restore npm test's throwaway DIFFER_HOME so later tests can use it.
-    if (previousHome === undefined) delete process.env.DIFFER_HOME;
-    else process.env.DIFFER_HOME = previousHome;
+    // Restore npm test's throwaway BACKSTORY_HOME so later tests can use it.
+    if (previousHome === undefined) delete process.env.BACKSTORY_HOME;
+    else process.env.BACKSTORY_HOME = previousHome;
   }
 });
 
 test("a drafted local model says so and where it is; a committed one says neither", async () => {
   const repo = gitRepo();
-  const home = tempDir("differ-home-");
+  const home = tempDir("backstory-home-");
   const base = repo.commit({ README: "x\n" }, "base");
   const head = repo.commit({ "src/a/one.ts": "1\n" }, "head");
   const file = path.join(
@@ -235,17 +235,10 @@ test("a drafted local model says so and where it is; a committed one says neithe
     path.basename(repo.dir),
     "workspace.dsl",
   );
-  write(
-    path.dirname(file),
-    "workspace.dsl",
-    dsl(BASE).replace(
-      '"code.tests" "test/**"',
-      '"code.tests" "test/**"\n        "differ.drafted" "2026-10-05"',
-    ),
-  );
+  write(path.dirname(file), "workspace.dsl", draftedDsl("backstory.drafted"));
 
-  const previousHome = process.env.DIFFER_HOME;
-  process.env.DIFFER_HOME = home;
+  const previousHome = process.env.BACKSTORY_HOME;
+  process.env.BACKSTORY_HOME = home;
   try {
     const map = await buildMap(repo.dir, base, head);
     assert.equal(map.drafted, "2026-10-05");
@@ -259,10 +252,39 @@ test("a drafted local model says so and where it is; a committed one says neithe
     assert.equal(committed.drafted, null);
     assert.equal(committed.modelFile, null);
   } finally {
-    if (previousHome === undefined) delete process.env.DIFFER_HOME;
-    else process.env.DIFFER_HOME = previousHome;
+    if (previousHome === undefined) delete process.env.BACKSTORY_HOME;
+    else process.env.BACKSTORY_HOME = previousHome;
   }
 });
+
+test("a local model drafted under the old name still says it's a draft", async () => {
+  const repo = gitRepo();
+  const home = tempDir("backstory-home-");
+  const base = repo.commit({ README: "x\n" }, "base");
+  const head = repo.commit({ "src/a/one.ts": "1\n" }, "head");
+  write(
+    path.join(home, "models", path.basename(repo.dir)),
+    "workspace.dsl",
+    draftedDsl("differ.drafted"),
+  );
+
+  const previousHome = process.env.BACKSTORY_HOME;
+  process.env.BACKSTORY_HOME = home;
+  try {
+    const map = await buildMap(repo.dir, base, head);
+    assert.equal(map.drafted, "2026-10-05");
+  } finally {
+    if (previousHome === undefined) delete process.env.BACKSTORY_HOME;
+    else process.env.BACKSTORY_HOME = previousHome;
+  }
+});
+
+function draftedDsl(property: string): string {
+  return dsl(BASE).replace(
+    '"code.tests" "test/**"',
+    `"code.tests" "test/**"\n        "${property}" "2026-10-05"`,
+  );
+}
 
 test("a model that lists no tests or ignores keeps the built-in ones", async () => {
   const { parseDsl } = await import("../lib/model");
