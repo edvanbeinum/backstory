@@ -24,6 +24,7 @@ import {
 import { readRails, tableFor } from "../lib/data/rails";
 import { DATA_READERS } from "../lib/data/readers";
 import type { Constraint, DataModel, Entity } from "../lib/data/types";
+import { localModelFile } from "../lib/model";
 
 const repos: string[] = [];
 after(() => {
@@ -623,6 +624,112 @@ test("SQL in migrations or tests, or with no CREATE TABLE, isn't a schema", asyn
     data.readers,
     DATA_READERS.map((r) => r.label),
   );
+});
+
+/** A workspace that only sets properties, such as `data.files`. */
+const workspace = (properties: Record<string, string>) =>
+  `workspace {
+    properties {
+${Object.entries(properties)
+  .map(([k, v]) => `        "${k}" "${v}"`)
+  .join("\n")}
+    }
+    model {
+    }
+}
+`;
+
+test("data.files steers the readers to a Rails app in a folder, and SQL off its usual paths", async () => {
+  const repo = tempRepo();
+  repo.write("api/db/schema.rb", schema(""));
+  repo.write("api/app/models/item.rb", item(""));
+  repo.write("db/tables/keys.sql", keysTable(""));
+  const unsteered = repo.commit("monorepo");
+  assert.equal((await buildData(repo.root, null, unsteered)).status, "none");
+
+  repo.write(
+    "architecture/workspace.dsl",
+    workspace({ "data.files": "api/db/schema.rb api/app/models/**/*.rb" }),
+  );
+  const steered = repo.commit("steer Rails");
+  repo.write("api/db/schema.rb", schema(`    t.string "colour"`));
+  const rails = await buildData(repo.root, steered, repo.commit("colour"));
+  assert.equal(rails.source, "rails");
+  assert.deepEqual(
+    rails.entities.map((e) => [e.name, e.state, e.file]),
+    [
+      ["Item", "changed", "api/app/models/item.rb"],
+      ["Space", "same", null],
+    ],
+  );
+
+  repo.write(
+    "architecture/workspace.dsl",
+    workspace({ "data.files": "db/tables/*.sql" }),
+  );
+  const sql = await buildData(repo.root, null, repo.commit("steer SQL"));
+  assert.equal(sql.source, "sql");
+});
+
+test("data.files in the local model steers when the repo commits none", async () => {
+  const repo = tempRepo();
+  repo.write("db/tables/keys.sql", keysTable(""));
+  const head = repo.commit("tables");
+  assert.equal((await buildData(repo.root, null, head)).status, "none");
+  const file = await localModelFile(repo.root);
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, workspace({ "data.files": "db/tables/*.sql" }));
+  try {
+    assert.equal((await buildData(repo.root, null, head)).source, "sql");
+  } finally {
+    rmSync(file);
+  }
+});
+
+test("the head's steer reads both ends, so a commit that adds it shows only its own change", async () => {
+  const repo = tempRepo();
+  repo.write("db/tables/keys.sql", keysTable(""));
+  repo.write("db/schema.sql", "CREATE TABLE stray (id int);");
+  const base = repo.commit("tables");
+  repo.write("db/tables/keys.sql", keysTable("  `prefix` varchar(8),"));
+  repo.write(
+    "architecture/workspace.dsl",
+    workspace({ "data.files": "db/tables/*.sql" }),
+  );
+  const head = repo.commit("steer, and a column");
+  const data = await buildData(repo.root, base, head);
+  assert.equal(data.baseModel, true);
+  assert.deepEqual(
+    data.entities.map((e) => [e.name, e.state]),
+    [["Key", "changed"]],
+  );
+  assert.deepEqual(
+    data.entities[0].fields
+      .filter((f) => f.state !== "same")
+      .map((f) => [f.state, f.item.name]),
+    [["added", "prefix"]],
+  );
+});
+
+test("data.format picks the reader, and an unknown one names the formats Backstory reads", async () => {
+  const repo = tempRepo();
+  repo.write("db/schema.rb", schema(""));
+  repo.write("db/structure.sql", keysTable(""));
+  repo.write("architecture/workspace.dsl", workspace({ "data.format": "sql" }));
+  const sql = await buildData(repo.root, null, repo.commit("sql"));
+  assert.equal(sql.source, "sql");
+
+  repo.write(
+    "architecture/workspace.dsl",
+    workspace({ "data.format": "prisma" }),
+  );
+  const unknown = await buildData(repo.root, null, repo.commit("prisma"));
+  assert.equal(unknown.status, "none");
+  assert.equal(
+    unknown.error,
+    'data.format says "prisma"; Backstory reads rails, core data and sql',
+  );
+  assert.equal(unknown.draft, undefined);
 });
 
 test("a repo with both schema.rb and structure.sql reads Rails, the earlier reader", async () => {

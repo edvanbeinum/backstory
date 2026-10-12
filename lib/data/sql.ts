@@ -340,7 +340,9 @@ export const sqlReader: DataReader = {
   label: "SQL schema files",
   async read(at) {
     const paths = (await at.listing()).filter(
-      (p) => p.endsWith(".sql") && SCHEMA_PATHS(p) && !SKIPPED_FOLDER.test(p),
+      (p) =>
+        p.endsWith(".sql") &&
+        (at.steered || (SCHEMA_PATHS(p) && !SKIPPED_FOLDER.test(p))),
     );
     const files = new Map(
       [...(await readFiles(at, paths))].filter(([, text]) =>

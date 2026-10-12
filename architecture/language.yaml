@@ -44,6 +44,9 @@ terms:
   - name: data reader
     means: "One format a data model is read from: one entry in `DATA_READERS` (`lib/data/readers.ts`) and one file in `lib/data/`, such as `lib/data/rails.ts`."
     avoid: []
+  - name: data steering
+    means: "`data.files` and `data.format` in a workspace's properties: which files hold the data model, and which data reader reads them. Read at the head and used at both ends of a view."
+    avoid: []
   - name: drafted data model
     means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Read on a click and marked drafted wherever it's shown."
     avoid: []
@@ -137,7 +140,7 @@ blocks:
   - name: data model reader
     code:
       - lib/data/
-    summary: Reads the data model at both ends of a view and diffs it.
+    summary: Reads the data model at both ends of a view and diffs it, with the first data reader that finds one, or the drafted data model.
     read: '`lib/data/build.ts` header, then README "Diagrams: the map, the data model and flows"'
   - name: agent review loop
     code:

@@ -519,12 +519,14 @@ function useDataDraft(
           method,
           cache: "no-store",
         });
+        // A data response can carry `error` too, a steer's: only a failed
+        // response is a failed request.
         const body = (await response.json()) as
-          DataResponse | { error: string };
-        if (!response.ok || "error" in body) {
+          DataResponse | { error?: string };
+        if (!response.ok || !("readers" in body)) {
           setError({
             over: given,
-            message: "error" in body ? body.error : response.statusText,
+            message: body.error ?? response.statusText,
           });
           return;
         }
@@ -620,9 +622,15 @@ function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[12px] text-[var(--fg-muted)]">
-          · no data model found ({data.readers.join(", ")})
-        </span>
+        {data.error ? (
+          <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
+            <AlertIcon size={11} /> {data.error}
+          </span>
+        ) : (
+          <span className="text-[12px] text-[var(--fg-muted)]">
+            · no data model found ({data.readers.join(", ")})
+          </span>
+        )}
         {job && idle && (
           <Button size="sm" variant="primary" onClick={() => draft.start()}>
             Draft the data model

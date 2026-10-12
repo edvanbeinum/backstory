@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 import { crossSite, errorResponse } from "@/lib/api";
 import { buildData, noDataModel } from "@/lib/data/build";
 import { startDataRead } from "@/lib/data/cache";
-import { readDataModel } from "@/lib/data/readers";
+import { dataSteer, readDataModel, steerError } from "@/lib/data/readers";
 import { resolveRepo } from "@/lib/git";
+import { readModelAt } from "@/lib/model";
 import type { ApiError } from "@/lib/types";
 import { viewRange } from "@/lib/view";
 
@@ -57,7 +58,16 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     const view = { root: r.root, base: r.range.base, head: r.range.head };
-    if (await readDataModel(view.root, view.head))
+    const steer = dataSteer(
+      (await readModelAt(view.root, view.head))?.model?.properties,
+    );
+    const error = steerError(steer);
+    if (error)
+      return NextResponse.json<ApiError>(
+        { error, kind: "internal" },
+        { status: 409 },
+      );
+    if (await readDataModel(view.root, view.head, steer))
       return NextResponse.json<ApiError>(
         {
           error: "A data reader reads this repo, so there's nothing to draft.",

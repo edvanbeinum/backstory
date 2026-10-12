@@ -52,7 +52,10 @@ part of the DSL that describes elements and arrows:
 - `workspace`, `!identifiers hierarchical` (or the default `flat`), `model`,
   and `properties` at the top and inside elements. `code.globs` on an element
   says which files belong to it; `code.tests` and `code.ignore` on the
-  workspace say which files are tests or not code at all.
+  workspace say which files are tests or not code at all. `data.files` on
+  the workspace says which files hold the data model, for a Rails app in a
+  folder or SQL files off the usual paths, and `data.format` (`rails`,
+  `core data` or `sql`) says which reader reads them.
 - `person`, `softwareSystem`, `container` and `component`, nested, named
   (`id = container "…"`) or not, with `tags`, `technology`, `url`,
   `description` and `perspectives` inside them.

@@ -1,13 +1,15 @@
-import { readModelAt } from "../model";
+import { readModelAt, type Model } from "../model";
 import { dataStatus, providerName, readDrafted } from "./cache";
 import { diffModels } from "./diff";
-import { DATA_READERS, readDataModel } from "./readers";
+import { DATA_READERS, dataSteer, readDataModel, steerError } from "./readers";
 import type { DataResponse, EntityDiff } from "./types";
 
 /**
  * Reads the data model at both ends of a view, with the first reader in
  * `DATA_READERS` that finds one at the head, and diffs it. When none does,
  * the AI provider's drafted model stands in, once a click has read it.
+ * `data.files` and `data.format` in the C4 model at the head steer both
+ * ends.
  */
 
 /** What a view with no data model answers */
@@ -19,12 +21,10 @@ export const noDataModel = (): DataResponse => ({
   entities: [],
 });
 
-async function withComponents(
-  root: string,
-  head: string,
+function withComponents(
+  c4: Model | null,
   entities: EntityDiff[],
-): Promise<EntityDiff[]> {
-  const c4 = (await readModelAt(root, head))?.model;
+): EntityDiff[] {
   for (const e of entities) {
     const ids = e.file && c4 ? c4.match(e.file) : [];
     e.component =
@@ -39,7 +39,11 @@ export async function buildData(
   base: string | null,
   head: string,
 ): Promise<DataResponse> {
-  const after = await readDataModel(root, head);
+  const c4 = (await readModelAt(root, head))?.model ?? null;
+  const steer = dataSteer(c4?.properties);
+  const error = steerError(steer);
+  if (error) return { ...noDataModel(), error };
+  const after = await readDataModel(root, head, steer);
   if (!after) {
     const view = { root, base, head };
     const draft = await dataStatus(view);
@@ -55,23 +59,18 @@ export async function buildData(
       },
       draft,
       baseModel: drafted.base !== null,
-      entities: await withComponents(
-        root,
-        head,
-        diffModels(drafted.base, drafted.head),
-      ),
+      entities: withComponents(c4, diffModels(drafted.base, drafted.head)),
     };
   }
-  const before = base ? await readDataModel(root, base) : null;
+  const before = base ? await readDataModel(root, base, steer) : null;
   return {
     ...noDataModel(),
     status: "ok",
     source: after.model.source,
     label: after.reader.label,
     baseModel: before !== null,
-    entities: await withComponents(
-      root,
-      head,
+    entities: withComponents(
+      c4,
       diffModels(before?.model ?? null, after.model),
     ),
   };

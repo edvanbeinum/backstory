@@ -95,6 +95,8 @@ export interface DataResponse {
   drafted: { provider: string; model: string | null } | null;
   /** When no reader found a model: the AI provider's read, for this view */
   draft?: DataDraftStatus;
+  /** Why no reader was tried: a `data.format` Backstory doesn't read */
+  error?: string;
 }
 
 /** A drafted data model's read for one view, as the data strip shows it */

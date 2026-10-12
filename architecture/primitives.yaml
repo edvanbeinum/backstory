@@ -114,7 +114,7 @@ primitives:
     symbols:
       - DATA_READERS
       - readDataModel
-    use: "The formats a data model is read from, in order; the first that finds one at a commit wins. A new format is one file in `lib/data/` with a `DataReader`, and one line in `DATA_READERS`."
+    use: "The formats a data model is read from, in order; the first that finds one at a commit wins. A new format is one file in `lib/data/` with a `DataReader`, and one line in `DATA_READERS`. Steered by `data.files` and `data.format`."
   - name: draft the data model
     block: data model reader
     file: lib/data/cache.ts

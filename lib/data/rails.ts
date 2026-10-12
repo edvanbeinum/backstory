@@ -318,10 +318,18 @@ export const railsReader: DataReader = {
   source: "rails",
   label: "db/schema.rb and the models",
   async read(at) {
-    const schema = await at.show("db/schema.rb");
+    const listing = await at.listing();
+    // Steered, as for a Rails app under `api/`, the schema and the models
+    // are wherever `data.files` says.
+    const schemaPath = at.steered
+      ? listing.find((p) => p === "schema.rb" || p.endsWith("/schema.rb"))
+      : "db/schema.rb";
+    const schema = schemaPath ? await at.show(schemaPath) : null;
     if (!schema) return null;
-    const paths = (await at.listing()).filter(
-      (p) => p.startsWith("app/models/") && p.endsWith(".rb"),
+    const paths = listing.filter(
+      (p) =>
+        p.endsWith(".rb") &&
+        (at.steered ? p !== schemaPath : p.startsWith("app/models/")),
     );
     return readRails({ schema, models: await readFiles(at, paths) });
   },
