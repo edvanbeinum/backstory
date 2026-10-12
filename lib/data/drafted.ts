@@ -112,16 +112,27 @@ const RULES = `- An entity is a kind of record that is stored and read back. Lea
 - file is the path of the file that declares the entity's type.
 - Name each entity after the record it stores, in PascalCase: the table, collection or record type, never the variable or constant that declares it. A table declared as \`incidentTable\` for the table "incident" is Incident, not IncidentTable.`;
 
+const steering = (files: string[] | null) =>
+  files
+    ? `\nThe data model is declared in the files matching these globs: ${files.join(" ")}. Read those; leave out records declared anywhere else.\n`
+    : "";
+
 export const headPrompt = (files: string[] | null = null) =>
   `You are reading the code of one commit of a repository, in the current directory. Nothing may be run.
 
 Write down this program's data model: the records it persists, the things a reader would draw as an entity-relationship diagram. Whatever the storage is: a database, an ORM, JSON files, a key-value store, browser storage. In storage, say in one short sentence where and how it keeps them.
-${files ? `\nThe data model is declared in the files matching these globs: ${files.join(" ")}. Read those; leave out records declared anywhere else.\n` : ""}
+${steering(files)}
 ${RULES}
 
 Be precise and complete for the records that are stored; leave out everything else.`;
 
-export const deltaPrompt = (head: DraftedHead, patch: string) =>
+// Steer the delta as the head was steered: unsteered, it can report a removed
+// record from outside the files, and the base gains an entity the head never had.
+export const deltaPrompt = (
+  head: DraftedHead,
+  patch: string,
+  files: string[] | null = null,
+) =>
   `You are reading the code of one commit of a repository, in the current directory. Nothing may be run.
 
 Below is the data model of the commit that comes after this one, and the patch between the two. Work out how THIS commit's data model differs from it, by undoing what the patch changed in stored records. Return only the difference:
@@ -130,7 +141,7 @@ Below is the data model of the commit that comes after this one, and the patch b
 - absent: the names of entities in the model below that the patch added, so they don't exist here.
 
 An entity the patch does not touch goes in neither list. If the patch changes no stored records, both lists are empty. Check the code here when the patch is unclear.
-
+${steering(files)}
 ${RULES}
 
 Data model after the patch:
@@ -184,8 +195,9 @@ export function readDelta(
   head: DraftedHead,
   patch: string,
   runner: Runner,
+  files: string[] | null,
 ): Promise<AiResult<DraftedDelta>> {
   return withSnapshot(root, base, (dir) =>
-    runner<DraftedDelta>(deltaPrompt(head, patch), deltaSchema(), dir),
+    runner<DraftedDelta>(deltaPrompt(head, patch, files), deltaSchema(), dir),
   );
 }

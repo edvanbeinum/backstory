@@ -1052,10 +1052,12 @@ test("data.files tells the drafted read where the model is, and a changed steer 
     const ai = recorder();
     await read({ ...repo.view, files: ["lib/**/*.ts"] }, { runner: ai.runner });
     assert.deepEqual(ai.calls, ["head", "delta"]);
-    assert.match(
-      ai.prompts[0],
-      /declared in the files matching these globs: lib\/\*\*\/\*\.ts\./,
-    );
+    assert.equal(ai.prompts.length, 2);
+    for (const prompt of ai.prompts)
+      assert.match(
+        prompt,
+        /declared in the files matching these globs: lib\/\*\*\/\*\.ts\./,
+      );
     const drafted = await buildData(repo.root, repo.base, repo.head);
     assert.equal(drafted.source, "drafted");
 

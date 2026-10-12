@@ -272,7 +272,14 @@ export async function startDataRead(
         const read =
           patch === ""
             ? null
-            : await readDelta(view.root, view.base, head, patch, runner);
+            : await readDelta(
+                view.root,
+                view.base,
+                head,
+                patch,
+                runner,
+                view.files ?? null,
+              );
         costUsd += read?.costUsd ?? 0;
         writes.push([
           files.delta,
