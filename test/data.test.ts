@@ -4,6 +4,7 @@ import { test } from "node:test";
 import { readCoreData } from "../lib/data/coredata";
 import { diffModels } from "../lib/data/diff";
 import { readRails, tableFor } from "../lib/data/rails";
+import type { Constraint, DataModel } from "../lib/data/types";
 
 const schema = (itemColumns: string) => `
 ActiveRecord::Schema[8.1].define(version: 1) do
@@ -459,4 +460,39 @@ end
   )!;
   assert.equal(constrained.state, "changed");
   assert.equal(constrained.summary, "+1 rule");
+});
+
+test("a unique rule's column order is no change; a foreign key's still is", () => {
+  const model = (constraints: Constraint[]): DataModel => ({
+    source: "rails",
+    entities: new Map([
+      [
+        "Role",
+        {
+          name: "Role",
+          file: null,
+          fields: [],
+          relationships: [],
+          constraints,
+        },
+      ],
+    ]),
+  });
+  const states = (before: Constraint, after: Constraint) =>
+    diffModels(model([before]), model([after])).map((e) => e.state);
+
+  assert.deepEqual(
+    states(
+      { kind: "unique", fields: ["name", "workspace_id"] },
+      { kind: "unique", fields: ["workspace_id", "name"] },
+    ),
+    [],
+  );
+  assert.deepEqual(
+    states(
+      { kind: "foreign key", fields: ["a", "b"], target: "T" },
+      { kind: "foreign key", fields: ["b", "a"], target: "T" },
+    ),
+    ["changed"],
+  );
 });
