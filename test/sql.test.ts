@@ -272,6 +272,28 @@ CREATE TABLE audit.events (status audit.status);
   ]);
 });
 
+test("ClickHouse indexes and projections inside a table aren't columns", () => {
+  const entities = read({
+    "pkg/clickhouse/schema/041_instance_usage_per_hour_v1.sql": `
+CREATE TABLE instance_usage_per_hour_v1 (
+  time DateTime,
+  app_id String,
+  instance_id String,
+  INDEX idx_app app_id TYPE bloom_filter(0.01) GRANULARITY 4,
+  INDEX idx_text lower(instance_id) TYPE ngrambf_v1(3, 32768, 2, 0) GRANULARITY 1,
+  PROJECTION by_app (SELECT * ORDER BY app_id)
+)
+ENGINE = ReplacingMergeTree(time)
+ORDER BY (app_id, time);
+`,
+  });
+  assert.deepEqual(fields(entities.get("InstanceUsagePerHourV1")), [
+    ["time", "datetime", false],
+    ["app_id", "string", false],
+    ["instance_id", "string", false],
+  ]);
+});
+
 test("a table declared twice is taken from the first file in path order", () => {
   const entities = read({
     "b/schema.sql": "CREATE TABLE items (b int);",

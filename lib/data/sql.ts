@@ -156,6 +156,16 @@ const INDEX = new RegExp(
   "i",
 );
 
+/**
+ * A ClickHouse data-skipping index (`INDEX idx expr TYPE bloom_filter
+ * GRANULARITY 4`) or projection, which has no column list to tell it from a
+ * column by: without this it reads as a column named INDEX.
+ */
+const CLICKHOUSE_ITEM = new RegExp(
+  String.raw`^(?:index\s+${NAME}\s+[\s\S]+?\stype\s|projection\s+${NAME}\s*\()`,
+  "i",
+);
+
 /** A table-level rule, or null when the item is a column. */
 function rule(item: string): Rule | null {
   const text = item.replace(new RegExp(`^constraint\\s+${NAME}\\s*`, "i"), "");
@@ -188,6 +198,7 @@ function rule(item: string): Rule | null {
   if (text !== item) return { kind: "skip" };
   if (
     INDEX.test(text) ||
+    CLICKHOUSE_ITEM.test(text) ||
     /^(?:primary\s+key|check\s*\(|exclude\s+(?:using\b|\()|period\s+for\b)/i.test(
       text,
     )
