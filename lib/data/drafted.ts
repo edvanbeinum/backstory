@@ -173,7 +173,7 @@ export async function deltaPatch(
 ): Promise<string> {
   const { stdout } = await git(
     root,
-    ["diff", "--no-color", "--no-ext-diff", base, head],
+    ["diff", "--no-color", "--no-ext-diff", "--no-textconv", base, head],
     { maxBuffer: 256 * 1024 * 1024 },
   );
   if (Buffer.byteLength(stdout) > MAX_PATCH_BYTES) throw new Error(TOO_LARGE);
