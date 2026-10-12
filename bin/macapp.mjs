@@ -12,8 +12,10 @@ import { DEFAULT_PORT } from "./hook.mjs";
 export const BUNDLE_ID = "dev.backstory.app";
 
 export const NOT_INSTALLED =
-  "Backstory's Mac app isn't installed. Build it with `npm run mac:build` " +
-  "and drag `mac/build/Backstory.app` to Applications.";
+  "Backstory's Mac app isn't installed. Download it from " +
+  "https://github.com/edvanbeinum/backstory/releases/latest, or build it " +
+  "with `npm run mac:build` and drag `mac/build/Backstory.app` to " +
+  "Applications.";
 
 /** Where to look for the Mac app, in order. BACKSTORY_APP names one explicitly. */
 export function macAppCandidates(env = process.env) {
