@@ -97,10 +97,16 @@ function parenthesised(text: string, open: number) {
   return { inner: text.slice(open + 1), rest: "" };
 }
 
-/** Index columns: a name, or an expression such as `lower(email)` as written. */
+/**
+ * Index columns: a name, or an expression such as `lower(email)` as written.
+ * A name may carry MySQL's prefix length, `email(191)`; any other parenthesis
+ * makes it a function call.
+ */
 const columns = (list: string) =>
   splitTop(list).map((c) => {
-    const name = c.match(new RegExp(`^(${NAME})(?:\\s|\\(|$)`))?.[1];
+    const name = c.match(
+      new RegExp(`^(${NAME})(?:\\s*\\(\\s*\\d+\\s*\\))?(?:\\s|$)`),
+    )?.[1];
     return name ? bare(name) : c.toLowerCase();
   });
 

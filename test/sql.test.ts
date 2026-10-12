@@ -179,6 +179,19 @@ CREATE TABLE api_keys (
   ]);
 });
 
+test("an index on an expression keeps the expression; a prefix length keeps the column", () => {
+  const entities = read({
+    "db/schema.sql": `
+CREATE TABLE users (email text, username text, handle varchar(500), UNIQUE KEY (handle(191)));
+CREATE UNIQUE INDEX users_lower_email ON users (lower(email), username DESC);
+`,
+  });
+  assert.deepEqual(rules(entities.get("User")), [
+    ["unique", "handle", null],
+    ["unique", "lower(email),username", null],
+  ]);
+});
+
 test("a table-level primary key makes its fields required, wherever it's declared", () => {
   const entities = read({
     "db/schema.sql": `
