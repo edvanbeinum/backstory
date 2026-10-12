@@ -211,6 +211,30 @@ ALTER TABLE ONLY labels ADD CONSTRAINT labels_pkey PRIMARY KEY (id);
   assert.deepEqual(rules(entities.get("Pair")), []);
 });
 
+test("same-named tables in two schemas are two entities, each keeping its own rules", () => {
+  const entities = read({
+    "db/structure.sql": `
+CREATE TABLE public.users (id bigint NOT NULL, email text);
+CREATE TABLE audit.users (id bigint NOT NULL, actor_id bigint);
+CREATE TABLE notes (id bigint, user_id bigint REFERENCES users(id));
+ALTER TABLE ONLY audit.users ADD CONSTRAINT audit_actor FOREIGN KEY (actor_id) REFERENCES public.users(id);
+ALTER TABLE ONLY public.users ADD CONSTRAINT users_email UNIQUE (email);
+`,
+  });
+  assert.deepEqual([...entities.keys()], ["User", "AuditUser", "Note"]);
+  assert.deepEqual(rules(entities.get("User")), [["unique", "email", null]]);
+  assert.deepEqual(rules(entities.get("AuditUser")), [
+    ["foreign key", "actor_id", "User"],
+  ]);
+  assert.deepEqual(fields(entities.get("AuditUser")), [
+    ["id", "bigint", true],
+    ["actor_id", "bigint", false],
+  ]);
+  assert.deepEqual(links(entities.get("Note")), [
+    ["user", "belongs to", "User", "user_id"],
+  ]);
+});
+
 test("a table declared twice is taken from the first file in path order", () => {
   const entities = read({
     "b/schema.sql": "CREATE TABLE items (b int);",

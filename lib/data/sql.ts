@@ -14,11 +14,18 @@ import type { Constraint, DataModel, Entity, Field } from "./types";
 const NAME = String.raw`(?:"[^"]+"|\x60[^\x60]+\x60|\[[^\]]+\]|[\w$]+)`;
 const QUALIFIED = String.raw`${NAME}(?:\s*\.\s*${NAME})*`;
 
+/** The parts of `schema.name`, without their quotes. */
+const parts = (name: string) =>
+  (name.match(new RegExp(NAME, "g")) ?? [name]).map((p) =>
+    p.replace(/^["`[]|["`\]]$/g, ""),
+  );
+
 /** The last part of `schema.name`, without its quotes. */
-function bare(name: string): string {
-  const parts = name.match(new RegExp(NAME, "g")) ?? [name];
-  return parts[parts.length - 1].replace(/^["`[]|["`\]]$/g, "");
-}
+const bare = (name: string) => parts(name).at(-1) ?? name;
+
+/** `schema.name` without its quotes or spaces: a table's key. */
+const qualified = (name: string) => parts(name).join(".");
+const unqualified = (key: string) => key.slice(key.lastIndexOf(".") + 1);
 
 /** The text's statements, split on `;` outside quotes, with comments gone. */
 export function statements(text: string): string[] {
@@ -116,6 +123,7 @@ const strings = (text: string) =>
   );
 
 interface Table {
+  /** As qualified as it was declared: `audit.users` and `public.users` are two tables */
   name: string;
   file: string;
   fields: Field[];
@@ -161,7 +169,7 @@ function rule(item: string): Rule | null {
     const { inner, rest } = parenthesised(text, foreign[0].length - 1);
     const to = rest.match(new RegExp(`^\\s*references\\s+(${QUALIFIED})`, "i"));
     return to
-      ? { kind: "foreign key", fields: columns(inner), table: bare(to[1]) }
+      ? { kind: "foreign key", fields: columns(inner), table: qualified(to[1]) }
       : { kind: "skip" };
   }
   const primary = text.match(/^primary\s+key\s*\(/i);
@@ -221,7 +229,7 @@ function column(
 
   if (/\bunique\b/i.test(options)) table.unique.push([name]);
   const to = options.match(new RegExp(`\\breferences\\s+(${QUALIFIED})`, "i"));
-  if (to) table.foreignKeys.push({ fields: [name], table: bare(to[1]) });
+  if (to) table.foreignKeys.push({ fields: [name], table: qualified(to[1]) });
 }
 
 function apply(table: Table, r: Rule) {
@@ -272,7 +280,7 @@ export function readSql(files: Map<string, string>): DataModel {
     for (const s of list) {
       const create = s.match(CREATE_TABLE);
       if (create) {
-        const name = bare(create[1]);
+        const name = qualified(create[1]);
         if (tables.has(name)) continue;
         const table: Table = {
           name,
@@ -298,7 +306,7 @@ export function readSql(files: Map<string, string>): DataModel {
         for (const action of splitTop(alter[2])) {
           const add = action.match(/^add\s+(?!column\b)/i);
           const r = add ? rule(action.slice(add[0].length)) : null;
-          if (r) later.push({ table: bare(alter[1]), rule: r });
+          if (r) later.push({ table: qualified(alter[1]), rule: r });
         }
         continue;
       }
@@ -306,26 +314,45 @@ export function readSql(files: Map<string, string>): DataModel {
       if (index) {
         const { inner } = parenthesised(s, index[0].length - 1);
         later.push({
-          table: bare(index[1]),
+          table: qualified(index[1]),
           rule: { kind: "unique", fields: columns(inner) },
         });
       }
     }
   }
+  // Match a reference by its qualified name, else by its bare one: pg_dump
+  // qualifies every name, but a hand-written file may qualify only some.
+  const resolve = (ref: string) =>
+    tables.get(ref) ??
+    [...tables.values()].find((t) => unqualified(t.name) === unqualified(ref));
   for (const { table, rule: r } of later) {
-    const t = tables.get(table);
+    const t = resolve(table);
     if (t) apply(t, r);
   }
 
-  const entities = new Map<string, Entity>();
+  // Name an entity after its bare table, and a later table whose bare name
+  // is taken after its schema too: `audit.users` beside `public.users` is AuditUser.
+  const names = new Map<Table, string>();
+  const taken = new Set<string>();
   for (const t of tables.values()) {
-    const name = entityName(t.name);
+    let name = entityName(unqualified(t.name));
+    if (taken.has(name)) name = entityName(t.name.replace(/\./g, "_"));
+    names.set(t, name);
+    taken.add(name);
+  }
+  const target = (ref: string) => {
+    const t = resolve(ref);
+    return (t && names.get(t)) ?? entityName(unqualified(ref));
+  };
+
+  const entities = new Map<string, Entity>();
+  for (const [t, name] of names) {
     const constraints: Constraint[] = [
       ...t.unique.map((fields) => ({ kind: "unique" as const, fields })),
       ...t.foreignKeys.map((fk) => ({
         kind: "foreign key" as const,
         fields: fk.fields,
-        target: entityName(fk.table),
+        target: target(fk.table),
       })),
     ];
     entities.set(name, {
@@ -335,7 +362,7 @@ export function readSql(files: Map<string, string>): DataModel {
       relationships: t.foreignKeys.map((fk) => ({
         name: fk.fields[0].replace(/(?:_id|(?<=[a-z])Id)$/, ""),
         kind: "belongs to" as const,
-        target: entityName(fk.table),
+        target: target(fk.table),
         polymorphic: false,
         fields: fk.fields,
       })),
