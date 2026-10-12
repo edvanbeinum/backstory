@@ -55,8 +55,8 @@ export interface Entity {
 export type DataSource = "rails" | "core data";
 
 export interface DataModel {
-  /** Which reader produced it */
-  source: DataSource;
+  /** Which reader produced it, or "drafted" for the AI provider's reading */
+  source: DataSource | "drafted";
   entities: Map<string, Entity>;
 }
 
@@ -91,4 +91,17 @@ export interface DataResponse {
   baseModel: boolean;
   /** Entities the change touched, then their unchanged neighbours */
   entities: EntityDiff[];
+  /** Who drafted the model, when no reader found one and the AI provider read it */
+  drafted: { provider: string; model: string | null } | null;
+  /** When no reader found a model: the AI provider's read, for this view */
+  draft?: DataDraftStatus;
 }
+
+/** A drafted data model's read for one view, as the data strip shows it */
+export type DataDraftStatus =
+  | { status: "idle" }
+  | { status: "running"; phase: string; startedAt: number }
+  | { status: "done"; costUsd: number; durationMs: number }
+  | { status: "failed"; error: string }
+  /** The provider isn't ready: its name and what to do about it */
+  | { status: "unavailable"; provider: string; setup: string };

@@ -44,10 +44,17 @@ terms:
   - name: data reader
     means: "One format a data model is read from: one entry in `DATA_READERS` (`lib/data/readers.ts`) and one file in `lib/data/`, such as `lib/data/rails.ts`."
     avoid: []
+  - name: drafted data model
+    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Read on a click and marked drafted wherever it's shown."
+    avoid: []
+  - name: data cache
+    means: "`lib/data/cache.ts`: the drafted data models in `~/.backstory/data/`, one file per head tree and one per base..head delta, plus the queue of reads that make them."
+    avoid:
+      - store
   - name: store
     means: "`lib/store.ts`: the small click-driven JSON files in `~/.backstory` (`homeDir`), each read and written whole."
     avoid:
-      - store, for the flow cache
+      - store, for the flow cache or the data cache
   - name: flow cache
     means: "`lib/flows/cache.ts`: one cached SARIF file per view in `~/.backstory/flows/`, plus the queue of runs that make them."
     avoid:

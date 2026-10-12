@@ -88,7 +88,7 @@ primitives:
       - readNamespaced
       - writeNamespaced
       - homeDir
-    use: "Every store file read and write. It keeps the store invariant, validates on read and writes atomically. `homeDir` is the one directory everything on this machine lives in (the store, the flow cache, local models), and moves `~/.differ` into place the first time."
+    use: "Every store file read and write. It keeps the store invariant, validates on read and writes atomically. `homeDir` is the one directory everything on this machine lives in (the store, the flow cache, the data cache, local models), and moves `~/.differ` into place the first time."
   - name: run the AI provider
     block: AI provider
     file: lib/ai/provider.ts
@@ -115,6 +115,13 @@ primitives:
       - DATA_READERS
       - readDataModel
     use: "The formats a data model is read from, in order; the first that finds one at a commit wins. A new format is one file in `lib/data/` with a `DataReader`, and one line in `DATA_READERS`."
+  - name: draft the data model
+    block: data model reader
+    file: lib/data/cache.ts
+    symbols:
+      - dataStatus
+      - startDataRead
+    use: "The AI provider's reading of a data model no reader finds: the head in full, the base as a delta from it, cached by tree under `~/.backstory/data/`, one read at a time and only on a click. `buildData` falls back to it."
   - name: route errors
     file: lib/api.ts
     symbols:

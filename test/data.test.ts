@@ -5,12 +5,25 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
+import type { Runner } from "../lib/ai/provider";
 import { buildData } from "../lib/data/build";
+import {
+  dataReadSettled,
+  dataStatus,
+  startDataRead,
+  type DataView,
+} from "../lib/data/cache";
 import { readCoreData } from "../lib/data/coredata";
 import { diffModels } from "../lib/data/diff";
+import {
+  mergeDelta,
+  TOO_LARGE,
+  type DraftedDelta,
+  type DraftedHead,
+} from "../lib/data/drafted";
 import { readRails, tableFor } from "../lib/data/rails";
 import { DATA_READERS } from "../lib/data/readers";
-import type { Constraint, DataModel } from "../lib/data/types";
+import type { Constraint, DataModel, Entity } from "../lib/data/types";
 
 const repos: string[] = [];
 after(() => {
@@ -582,5 +595,258 @@ test("Core Data reads through the reader list", async () => {
       .filter((f) => f.state !== "same")
       .map((f) => [f.state, f.item.name]),
     [["added", "reps"]],
+  );
+});
+
+const field = (name: string) => ({ name, type: "string", required: true });
+const entity = (name: string, fields: string[]): Entity => ({
+  name,
+  file: "lib/notes.ts",
+  fields: fields.map(field),
+  relationships: [],
+  constraints: [],
+});
+const noteHead: DraftedHead = {
+  storage: "JSON files in the home directory",
+  entities: [entity("Note", ["id", "body", "rev"])],
+};
+const noteDelta: DraftedDelta = {
+  changed: [entity("Note", ["id", "body"])],
+  absent: [],
+};
+
+/**
+ * A stand-in for the AI provider: the recorded head model and delta, after
+ * failing `failures` times. `calls` says which reads it was asked for.
+ */
+function recorder(
+  opts: { head?: DraftedHead; delta?: DraftedDelta; failures?: number } = {},
+) {
+  const calls: ("head" | "delta")[] = [];
+  let failures = opts.failures ?? 0;
+  const runner: Runner = async <T>(prompt: string) => {
+    const kind = prompt.includes("The patch:") ? "delta" : "head";
+    calls.push(kind);
+    if (failures-- > 0) throw new Error("Claude Code failed: blocked");
+    const output =
+      kind === "head" ? (opts.head ?? noteHead) : (opts.delta ?? noteDelta);
+    return { output: output as T, costUsd: 0.1, model: "test-model" };
+  };
+  return { runner, calls };
+}
+
+const ready = async () => true;
+
+/** A TypeScript repo whose stored Note gains a field in its second commit. */
+function notesRepo() {
+  const repo = tempRepo();
+  repo.write(
+    "lib/notes.ts",
+    "export interface Note {\n  id: string;\n  body: string;\n}\n",
+  );
+  const base = repo.commit("Add notes");
+  repo.write(
+    "lib/notes.ts",
+    "export interface Note {\n  id: string;\n  body: string;\n  rev: string;\n}\n",
+  );
+  const head = repo.commit("Leave notes on commits");
+  const view: DataView = { root: repo.root, base, head };
+  return { ...repo, base, head, view };
+}
+
+async function read(view: DataView, opts: Parameters<typeof startDataRead>[1]) {
+  const started = await startDataRead(view, { available: ready, ...opts });
+  await dataReadSettled(view);
+  return started;
+}
+
+test("a repo no reader knows shows its data model change once the AI provider drafts it", async () => {
+  const repo = notesRepo();
+  const before = await buildData(repo.root, repo.base, repo.head);
+  assert.equal(before.status, "none");
+  assert.deepEqual(
+    before.readers,
+    DATA_READERS.map((r) => r.label),
+  );
+  assert.deepEqual(before.draft, { status: "idle" });
+
+  const ai = recorder();
+  const started = await read(repo.view, { runner: ai.runner });
+  assert.equal(started.status, "running");
+  assert.deepEqual(ai.calls, ["head", "delta"]);
+  const status = await dataStatus(repo.view);
+  assert.equal(status.status, "done");
+
+  const data = await buildData(repo.root, repo.base, repo.head);
+  assert.equal(data.status, "ok");
+  assert.equal(data.source, "drafted");
+  assert.deepEqual(data.drafted, {
+    provider: "Claude Code",
+    model: "test-model",
+  });
+  assert.equal(data.baseModel, true);
+  assert.deepEqual(
+    data.entities.map((e) => [e.name, e.state]),
+    [["Note", "changed"]],
+  );
+  assert.deepEqual(
+    data.entities[0].fields
+      .filter((f) => f.state !== "same")
+      .map((f) => [f.state, f.item.name]),
+    [["added", "rev"]],
+  );
+});
+
+test("a delta merges onto the head: changed replaces, absent removes, new ones join", () => {
+  const head = [
+    entity("Note", ["id", "rev"]),
+    entity("Round", ["id"]),
+    entity("Recent", ["path"]),
+  ];
+  const merged = mergeDelta(head, {
+    changed: [entity("Note", ["id"]), entity("Outbox", ["id"])],
+    absent: ["Round"],
+  });
+  assert.deepEqual(
+    merged.map((e) => [e.name, e.fields.map((f) => f.name)]),
+    [
+      ["Note", ["id"]],
+      ["Recent", ["path"]],
+      ["Outbox", ["id"]],
+    ],
+  );
+  assert.equal(merged[1], head[2]);
+});
+
+test("the drafted model is cached by tree, so a reworded head reads nothing again", async () => {
+  const repo = notesRepo();
+  await read(repo.view, { runner: recorder().runner });
+  repo.git("commit", "--amend", "-qm", "Reworded");
+  const head = repo.git("rev-parse", "HEAD");
+  assert.notEqual(head, repo.head);
+
+  const again = recorder();
+  await read({ ...repo.view, head }, { runner: again.runner });
+  assert.deepEqual(again.calls, []);
+  const data = await buildData(repo.root, repo.base, head);
+  assert.equal(data.source, "drafted");
+});
+
+test("a view whose head is cached reads only the delta", async () => {
+  const repo = notesRepo();
+  repo.write("README.md", "notes\n");
+  const tip = repo.commit("Say what notes are");
+  await read(
+    { root: repo.root, base: repo.head, head: tip },
+    { runner: recorder({ delta: { changed: [], absent: [] } }).runner },
+  );
+
+  const ai = recorder();
+  await read(
+    { root: repo.root, base: repo.base, head: tip },
+    { runner: ai.runner },
+  );
+  assert.deepEqual(ai.calls, ["delta"]);
+});
+
+test("a failed run is retried once, then fails with the provider's message and caches nothing", async () => {
+  const repo = notesRepo();
+  const failing = recorder({ failures: Infinity });
+  await read(repo.view, { runner: failing.runner });
+  assert.deepEqual(failing.calls, ["head", "head"]);
+  assert.deepEqual(await dataStatus(repo.view), {
+    status: "failed",
+    error: "Claude Code failed: blocked",
+  });
+  assert.equal(
+    (await buildData(repo.root, repo.base, repo.head)).status,
+    "none",
+  );
+
+  const next = recorder();
+  await read(repo.view, { runner: next.runner });
+  assert.deepEqual(next.calls, ["head", "delta"]);
+});
+
+test("a run that fails once succeeds on the retry", async () => {
+  const repo = notesRepo();
+  const flaky = recorder({ failures: 1 });
+  await read(repo.view, { runner: flaky.runner });
+  assert.deepEqual(flaky.calls, ["head", "head", "delta"]);
+  assert.equal((await dataStatus(repo.view)).status, "done");
+});
+
+test("a provider that isn't ready says which, and what to do", async () => {
+  const repo = notesRepo();
+  const ai = recorder();
+  const status = await startDataRead(repo.view, {
+    runner: ai.runner,
+    available: async () => false,
+  });
+  assert.deepEqual(status, {
+    status: "unavailable",
+    provider: "Claude Code",
+    setup: "Install Claude Code and sign in",
+  });
+  assert.deepEqual(ai.calls, []);
+  assert.deepEqual(await dataStatus(repo.view), status);
+});
+
+test("a patch past the cap fails as too large and reads nothing", async () => {
+  const repo = notesRepo();
+  repo.write("big.txt", `${"x".repeat(99)}\n`.repeat(5000));
+  const head = repo.commit("Add a big file");
+  const view = { root: repo.root, base: repo.head, head };
+  const ai = recorder();
+  await read(view, { runner: ai.runner });
+  assert.deepEqual(ai.calls, []);
+  assert.deepEqual(await dataStatus(view), {
+    status: "failed",
+    error: TOO_LARGE,
+  });
+});
+
+test("a root commit reads only the head, with no base model", async () => {
+  const repo = notesRepo();
+  const root = repo.git("rev-list", "--max-parents=0", "HEAD");
+  const view = { root: repo.root, base: null, head: root };
+  const ai = recorder();
+  await read(view, { runner: ai.runner });
+  assert.deepEqual(ai.calls, ["head"]);
+  const data = await buildData(repo.root, null, root);
+  assert.equal(data.status, "ok");
+  assert.equal(data.baseModel, false);
+});
+
+test("redraft reads again and replaces the files, and a failed redraft keeps them", async () => {
+  const repo = notesRepo();
+  await read(repo.view, { runner: recorder().runner });
+
+  const failing = recorder({ failures: Infinity });
+  await read(repo.view, { runner: failing.runner, redraft: true });
+  assert.deepEqual(failing.calls, ["head", "head"]);
+  assert.equal((await dataStatus(repo.view)).status, "failed");
+  const kept = await buildData(repo.root, repo.base, repo.head);
+  assert.deepEqual(
+    kept.entities[0].fields
+      .filter((f) => f.state !== "same")
+      .map((f) => f.item.name),
+    ["rev"],
+  );
+
+  const again = recorder({
+    head: {
+      ...noteHead,
+      entities: [entity("Note", ["id", "body", "rev", "author"])],
+    },
+  });
+  await read(repo.view, { runner: again.runner, redraft: true });
+  assert.deepEqual(again.calls, ["head", "delta"]);
+  const redrafted = await buildData(repo.root, repo.base, repo.head);
+  assert.deepEqual(
+    redrafted.entities[0].fields
+      .filter((f) => f.state !== "same")
+      .map((f) => f.item.name),
+    ["rev", "author"],
   );
 });

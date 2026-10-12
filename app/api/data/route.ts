@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { errorResponse } from "@/lib/api";
+import { crossSite, errorResponse } from "@/lib/api";
 import { buildData, noDataModel } from "@/lib/data/build";
+import { startDataRead } from "@/lib/data/cache";
+import { readDataModel } from "@/lib/data/readers";
 import { resolveRepo } from "@/lib/git";
 import type { ApiError } from "@/lib/types";
 import { viewRange } from "@/lib/view";
@@ -9,27 +11,66 @@ import { viewRange } from "@/lib/view";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** The data model's change for a view: entities, fields, relationships, constraints. */
-export async function GET(request: Request) {
+async function resolve(request: Request) {
   const { searchParams } = new URL(request.url);
   const repoPath = searchParams.get("repo");
   const rev = searchParams.get("rev");
   if (!repoPath || !rev) {
-    return NextResponse.json<ApiError>(
-      { error: "Both `repo` and `rev` are required.", kind: "missing-path" },
-      { status: 400 },
-    );
+    return {
+      error: NextResponse.json<ApiError>(
+        { error: "Both `repo` and `rev` are required.", kind: "missing-path" },
+        { status: 400 },
+      ),
+    };
   }
+  const repo = await resolveRepo(repoPath);
+  const range = await viewRange(repo, rev);
+  return { root: repo.root, range, searchParams };
+}
+
+/** The data model's change for a view: entities, fields, relationships, constraints. */
+export async function GET(request: Request) {
   try {
-    const repo = await resolveRepo(repoPath);
-    const range = await viewRange(repo, rev);
-    if (!range) return NextResponse.json(noDataModel());
+    const r = await resolve(request);
+    if ("error" in r) return r.error;
+    if (!r.range) return NextResponse.json(noDataModel());
     return NextResponse.json(
-      await buildData(repo.root, range.base, range.head),
-      {
-        headers: { "Cache-Control": "no-store" },
-      },
+      await buildData(r.root, r.range.base, r.range.head),
+      { headers: { "Cache-Control": "no-store" } },
     );
+  } catch (err) {
+    return errorResponse(err);
+  }
+}
+
+/** Starts the AI provider's read of the view's data model; `redraft=1` reads it again. */
+export async function POST(request: Request) {
+  // A read costs money and sends code to the AI provider: only Backstory's own page asks.
+  const refused = crossSite(request);
+  if (refused) return refused;
+  try {
+    const r = await resolve(request);
+    if ("error" in r) return r.error;
+    if (!r.range)
+      return NextResponse.json<ApiError>(
+        { error: "There's no commit here to read.", kind: "internal" },
+        { status: 409 },
+      );
+    const view = { root: r.root, base: r.range.base, head: r.range.head };
+    if (await readDataModel(view.root, view.head))
+      return NextResponse.json<ApiError>(
+        {
+          error: "A data reader reads this repo, so there's nothing to draft.",
+          kind: "internal",
+        },
+        { status: 409 },
+      );
+    await startDataRead(view, {
+      redraft: r.searchParams.get("redraft") === "1",
+    });
+    return NextResponse.json(await buildData(view.root, view.base, view.head), {
+      headers: { "Cache-Control": "no-store" },
+    });
   } catch (err) {
     return errorResponse(err);
   }
