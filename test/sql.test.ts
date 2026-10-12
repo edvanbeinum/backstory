@@ -244,7 +244,9 @@ CREATE TABLE public.users (id bigint);
   });
   assert.deepEqual([...both.keys()].sort(), ["AuditUser", "User"]);
   assert.deepEqual(fields(both.get("User")), [["id", "bigint", false]]);
-  const alone = read({ "db/structure.sql": "CREATE TABLE audit.users (id int);" });
+  const alone = read({
+    "db/structure.sql": "CREATE TABLE audit.users (id int);",
+  });
   assert.deepEqual([...alone.keys()], ["AuditUser"]);
 });
 
