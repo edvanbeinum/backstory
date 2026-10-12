@@ -23,8 +23,15 @@ const parts = (name: string) =>
 /** The last part of `schema.name`, without its quotes. */
 const bare = (name: string) => parts(name).at(-1) ?? name;
 
-/** `schema.name` without its quotes or spaces: a table's key. */
-const qualified = (name: string) => parts(name).join(".");
+/**
+ * `schema.name` without its quotes or spaces: a table's key. Drops the
+ * default schema, since `public.users` and `users` are the same table.
+ */
+const qualified = (name: string) => {
+  const p = parts(name);
+  if (p.length === 2 && /^(?:public|dbo)$/i.test(p[0])) p.shift();
+  return p.join(".");
+};
 const unqualified = (key: string) => key.slice(key.lastIndexOf(".") + 1);
 
 /** The text's statements, split on `;` outside quotes, with comments gone. */
@@ -123,7 +130,7 @@ const strings = (text: string) =>
   );
 
 interface Table {
-  /** As qualified as it was declared: `audit.users` and `public.users` are two tables */
+  /** Qualified unless in the default schema: `audit.users` and `users` are two tables */
   name: string;
   file: string;
   fields: Field[];
@@ -330,16 +337,12 @@ export function readSql(files: Map<string, string>): DataModel {
     if (t) apply(t, r);
   }
 
-  // Name an entity after its bare table, and a later table whose bare name
-  // is taken after its schema too: `audit.users` beside `public.users` is AuditUser.
+  // Name a table outside the default schema after its schema too, so
+  // `audit.users` is always AuditUser: a name that hung on which tables exist,
+  // or their order, would let the diff compare two different tables.
   const names = new Map<Table, string>();
-  const taken = new Set<string>();
-  for (const t of tables.values()) {
-    let name = entityName(unqualified(t.name));
-    if (taken.has(name)) name = entityName(t.name.replace(/\./g, "_"));
-    names.set(t, name);
-    taken.add(name);
-  }
+  for (const t of tables.values())
+    names.set(t, entityName(t.name.replace(/\./g, "_")));
   const target = (ref: string) => {
     const t = resolve(ref);
     return (t && names.get(t)) ?? entityName(unqualified(ref));

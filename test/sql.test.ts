@@ -235,6 +235,19 @@ ALTER TABLE ONLY public.users ADD CONSTRAINT users_email UNIQUE (email);
   ]);
 });
 
+test("a table's entity name holds whatever else is declared, and in whatever order", () => {
+  const both = read({
+    "db/structure.sql": `
+CREATE TABLE audit.users (id bigint);
+CREATE TABLE public.users (id bigint);
+`,
+  });
+  assert.deepEqual([...both.keys()].sort(), ["AuditUser", "User"]);
+  assert.deepEqual(fields(both.get("User")), [["id", "bigint", false]]);
+  const alone = read({ "db/structure.sql": "CREATE TABLE audit.users (id int);" });
+  assert.deepEqual([...alone.keys()], ["AuditUser"]);
+});
+
 test("a table declared twice is taken from the first file in path order", () => {
   const entities = read({
     "b/schema.sql": "CREATE TABLE items (b int);",
