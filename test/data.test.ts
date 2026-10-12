@@ -768,11 +768,11 @@ test("a view whose head is cached reads only the delta", async () => {
   assert.deepEqual(ai.calls, ["delta"]);
 });
 
-test("a failed run is retried once, then fails with the provider's message and caches nothing", async () => {
+test("a failed run isn't retried, fails with the provider's message and caches nothing", async () => {
   const repo = notesRepo();
   const failing = recorder({ failures: Infinity });
   await read(repo.view, { runner: failing.runner });
-  assert.deepEqual(failing.calls, ["head", "head"]);
+  assert.deepEqual(failing.calls, ["head"]);
   assert.deepEqual(await dataStatus(repo.view), {
     status: "failed",
     error: "Claude Code failed: blocked",
@@ -785,14 +785,6 @@ test("a failed run is retried once, then fails with the provider's message and c
   const next = recorder();
   await read(repo.view, { runner: next.runner });
   assert.deepEqual(next.calls, ["head", "delta"]);
-});
-
-test("a run that fails once succeeds on the retry", async () => {
-  const repo = notesRepo();
-  const flaky = recorder({ failures: 1 });
-  await read(repo.view, { runner: flaky.runner });
-  assert.deepEqual(flaky.calls, ["head", "head", "delta"]);
-  assert.equal((await dataStatus(repo.view)).status, "done");
 });
 
 test("a provider that isn't ready says which, and what to do", async () => {
@@ -843,7 +835,7 @@ test("redraft reads again and replaces the files, and a failed redraft keeps the
 
   const failing = recorder({ failures: Infinity });
   await read(repo.view, { runner: failing.runner, redraft: true });
-  assert.deepEqual(failing.calls, ["head", "head"]);
+  assert.deepEqual(failing.calls, ["head"]);
   assert.equal((await dataStatus(repo.view)).status, "failed");
   const kept = await buildData(repo.root, repo.base, repo.head);
   assert.deepEqual(

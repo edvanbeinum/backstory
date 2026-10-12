@@ -152,19 +152,6 @@ export function mergeDelta(head: Entity[], delta: DraftedDelta): Entity[] {
   ];
 }
 
-/**
- * Runs once more after a failure, then fails with the provider's message: a
- * run can fail for no reason in the code, such as a false-positive safety
- * block seen on one repo, that a second run gets past.
- */
-async function retryOnce<T>(fn: () => Promise<T>): Promise<T> {
-  try {
-    return await fn();
-  } catch {
-    return fn();
-  }
-}
-
 /** The base..head patch to undo, or a failure when it's past the cap. */
 export async function deltaPatch(
   root: string,
@@ -185,10 +172,8 @@ export function readHead(
   head: string,
   runner: Runner,
 ): Promise<AiResult<DraftedHead>> {
-  return retryOnce(() =>
-    withSnapshot(root, head, (dir) =>
-      runner<DraftedHead>(headPrompt(), headSchema(), dir),
-    ),
+  return withSnapshot(root, head, (dir) =>
+    runner<DraftedHead>(headPrompt(), headSchema(), dir),
   );
 }
 
@@ -199,9 +184,7 @@ export function readDelta(
   patch: string,
   runner: Runner,
 ): Promise<AiResult<DraftedDelta>> {
-  return retryOnce(() =>
-    withSnapshot(root, base, (dir) =>
-      runner<DraftedDelta>(deltaPrompt(head, patch), deltaSchema(), dir),
-    ),
+  return withSnapshot(root, base, (dir) =>
+    runner<DraftedDelta>(deltaPrompt(head, patch), deltaSchema(), dir),
   );
 }

@@ -242,8 +242,8 @@ export async function startDataRead(
           costUsd: read.costUsd,
           readAt: Date.now(),
         };
-        // A first read keeps the head even if the delta then fails, so a
-        // retry pays for the delta only.
+        // A first read keeps the head even if the delta then fails, so Try
+        // again pays for the delta only.
         if (opts.redraft) writes.push([files.head, head]);
         else await writeJson(files.head, head);
       }
