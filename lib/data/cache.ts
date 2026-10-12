@@ -33,6 +33,8 @@ export interface DataView {
   root: string;
   base: string | null;
   head: string;
+  /** `data.files` at the head: the files the head read is told hold the model */
+  files?: string[] | null;
 }
 
 interface Read {
@@ -43,7 +45,8 @@ interface Read {
   readAt: number;
 }
 
-type HeadFile = DraftedHead & Read;
+/** `files` is the `data.files` the head was read with; missing in files written before it, which read unsteered. */
+type HeadFile = DraftedHead & Read & { files?: string[] | null };
 /** `headReadAt` ties a delta to the head read it undid, so a redrafted head drops it. */
 type DeltaFile = DraftedDelta & Read & { headReadAt: number };
 
@@ -110,8 +113,20 @@ async function writeJson(file: string, value: unknown) {
   await fs.rename(temp, file);
 }
 
-async function cached(files: Files) {
+/**
+ * The head file, unless it was read with other `data.files` than the view
+ * has now. The key is the tree, and editing the local model's steer doesn't
+ * change the tree.
+ */
+async function headFile(files: Files, view: DataView) {
   const head = await readJson<HeadFile>(files.head);
+  const same =
+    JSON.stringify(head?.files ?? null) === JSON.stringify(view.files ?? null);
+  return same ? head : null;
+}
+
+async function cached(files: Files, view: DataView) {
+  const head = await headFile(files, view);
   if (!head) return null;
   const delta = await readJson<DeltaFile>(files.delta);
   const complete = !files.delta || delta?.headReadAt === head.readAt;
@@ -133,7 +148,7 @@ export async function readDrafted(view: DataView): Promise<{
   provider: string;
   model: string | null;
 } | null> {
-  const hit = await cached(await filesFor(view));
+  const hit = await cached(await filesFor(view), view);
   if (!hit?.complete) return null;
   return {
     base: hit.delta ? toModel(mergeDelta(hit.head.entities, hit.delta)) : null,
@@ -151,7 +166,8 @@ export async function dataStatus(view: DataView): Promise<DataDraftStatus> {
   const idle = { status: "idle", provider: aiProvider().name } as const;
   const ended = registry.ended.get(files.key);
   // A done read whose files were deleted since is a view to read again.
-  if (ended?.status === "done" && !(await cached(files))?.complete) return idle;
+  if (ended?.status === "done" && !(await cached(files, view))?.complete)
+    return idle;
   return ended ?? idle;
 }
 
@@ -198,7 +214,7 @@ export async function startDataRead(
   };
 
   try {
-    const hit = await cached(files);
+    const hit = await cached(files, view);
     if (!opts.redraft && hit?.complete) {
       release();
       return dataStatus(view);
@@ -228,15 +244,17 @@ export async function startDataRead(
       const patch = view.base
         ? await deltaPatch(view.root, view.base, view.head)
         : null;
-      let head = opts.redraft ? null : await readJson<HeadFile>(files.head);
+      let head = opts.redraft ? null : await headFile(files, view);
       const writes: [string, unknown][] = [];
       if (!head) {
         job.phase = "Reading the head";
-        const read = await readHead(view.root, view.head, runner);
+        const steer = view.files ?? null;
+        const read = await readHead(view.root, view.head, runner, steer);
         costUsd += read.costUsd;
         head = {
           storage: read.output.storage,
           entities: read.output.entities,
+          files: steer,
           provider: provider.id,
           model: read.model ?? provider.model(),
           costUsd: read.costUsd,

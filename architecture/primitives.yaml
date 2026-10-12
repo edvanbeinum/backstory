@@ -121,7 +121,7 @@ primitives:
     symbols:
       - dataStatus
       - startDataRead
-    use: "The AI provider's reading of a data model no reader finds: the head in full, the base as a delta from it, cached by tree under `~/.backstory/data/`, one read at a time and only on a click. `buildData` falls back to it."
+    use: "The AI provider's reading of a data model no reader finds: the head in full, the base as a delta from it, cached by tree under `~/.backstory/data/`, one read at a time and only on a click. Told which files hold the model when `data.files` is set. `buildData` falls back to it."
   - name: route errors
     file: lib/api.ts
     symbols:

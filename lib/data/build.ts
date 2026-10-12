@@ -45,7 +45,7 @@ export async function buildData(
   if (error) return { ...noDataModel(), error };
   const after = await readDataModel(root, head, steer);
   if (!after) {
-    const view = { root, base, head };
+    const view = { root, base, head, files: steer.files };
     const draft = await dataStatus(view);
     const drafted = await readDrafted(view);
     if (!drafted) return { ...noDataModel(), draft };

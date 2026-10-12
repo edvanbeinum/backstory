@@ -800,16 +800,18 @@ function recorder(
   opts: { head?: DraftedHead; delta?: DraftedDelta; failures?: number } = {},
 ) {
   const calls: ("head" | "delta")[] = [];
+  const prompts: string[] = [];
   let failures = opts.failures ?? 0;
   const runner: Runner = async <T>(prompt: string) => {
     const kind = prompt.includes("The patch:") ? "delta" : "head";
     calls.push(kind);
+    prompts.push(prompt);
     if (failures-- > 0) throw new Error("Claude Code failed: blocked");
     const output =
       kind === "head" ? (opts.head ?? noteHead) : (opts.delta ?? noteDelta);
     return { output: output as T, costUsd: 0.1, model: "test-model" };
   };
-  return { runner, calls };
+  return { runner, calls, prompts };
 }
 
 const ready = async () => true;
@@ -1037,4 +1039,42 @@ test("redraft reads again and replaces the files, and a failed redraft keeps the
       .map((f) => f.item.name),
     ["rev", "author"],
   );
+});
+
+test("data.files tells the drafted read where the model is, and a changed steer reads the head again", async () => {
+  const repo = notesRepo();
+  const file = await localModelFile(repo.root);
+  mkdirSync(path.dirname(file), { recursive: true });
+  const steer = (files: string) =>
+    writeFileSync(file, workspace({ "data.files": files }));
+  try {
+    steer("lib/**/*.ts");
+    const ai = recorder();
+    await read({ ...repo.view, files: ["lib/**/*.ts"] }, { runner: ai.runner });
+    assert.deepEqual(ai.calls, ["head", "delta"]);
+    assert.match(
+      ai.prompts[0],
+      /declared in the files matching these globs: lib\/\*\*\/\*\.ts\./,
+    );
+    const drafted = await buildData(repo.root, repo.base, repo.head);
+    assert.equal(drafted.source, "drafted");
+
+    steer("lib/notes.ts");
+    const stale = await buildData(repo.root, repo.base, repo.head);
+    assert.equal(stale.status, "none");
+    assert.deepEqual(stale.draft, { status: "idle", provider: "Claude Code" });
+
+    const again = recorder();
+    await read(
+      { ...repo.view, files: ["lib/notes.ts"] },
+      { runner: again.runner },
+    );
+    assert.deepEqual(again.calls, ["head", "delta"]);
+    assert.equal(
+      (await buildData(repo.root, repo.base, repo.head)).source,
+      "drafted",
+    );
+  } finally {
+    rmSync(file);
+  }
 });

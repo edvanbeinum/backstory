@@ -75,9 +75,12 @@ export async function POST(request: Request) {
         },
         { status: 409 },
       );
-    await startDataRead(view, {
-      redraft: r.searchParams.get("redraft") === "1",
-    });
+    await startDataRead(
+      { ...view, files: steer.files },
+      {
+        redraft: r.searchParams.get("redraft") === "1",
+      },
+    );
     return NextResponse.json(await buildData(view.root, view.base, view.head), {
       headers: { "Cache-Control": "no-store" },
     });

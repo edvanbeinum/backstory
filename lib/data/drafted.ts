@@ -112,11 +112,11 @@ const RULES = `- An entity is a kind of record that is stored and read back. Lea
 - file is the path of the file that declares the entity's type.
 - Name each entity after the record it stores, in PascalCase: the table, collection or record type, never the variable or constant that declares it. A table declared as \`incidentTable\` for the table "incident" is Incident, not IncidentTable.`;
 
-export const headPrompt = () =>
+export const headPrompt = (files: string[] | null = null) =>
   `You are reading the code of one commit of a repository, in the current directory. Nothing may be run.
 
 Write down this program's data model: the records it persists, the things a reader would draw as an entity-relationship diagram. Whatever the storage is: a database, an ORM, JSON files, a key-value store, browser storage. In storage, say in one short sentence where and how it keeps them.
-
+${files ? `\nThe data model is declared in the files matching these globs: ${files.join(" ")}. Read those; leave out records declared anywhere else.\n` : ""}
 ${RULES}
 
 Be precise and complete for the records that are stored; leave out everything else.`;
@@ -171,9 +171,10 @@ export function readHead(
   root: string,
   head: string,
   runner: Runner,
+  files: string[] | null,
 ): Promise<AiResult<DraftedHead>> {
   return withSnapshot(root, head, (dir) =>
-    runner<DraftedHead>(headPrompt(), headSchema(), dir),
+    runner<DraftedHead>(headPrompt(files), headSchema(), dir),
   );
 }
 
