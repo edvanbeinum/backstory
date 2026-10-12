@@ -204,6 +204,20 @@ const TYPE = new RegExp(
   "i",
 );
 
+/**
+ * The values of the enum a column's type names, keyed like a table. An
+ * unqualified type falls back to the one enum of that bare name, since a
+ * hand-written file may qualify the type but not its uses; with two, which
+ * one the database picks depends on its search path, so none is guessed.
+ */
+function enumValues(enums: Map<string, string[]>, type: string) {
+  const key = qualified(type);
+  const exact = enums.get(key);
+  if (exact || key.includes(".")) return exact;
+  const named = [...enums].filter(([k]) => unqualified(k) === key);
+  return named.length === 1 ? named[0][1] : undefined;
+}
+
 function column(
   item: string,
   table: Table,
@@ -229,7 +243,7 @@ function column(
     field.type = "enum";
     field.values = strings(written);
   } else {
-    const values = enums.get(bare(type));
+    const values = enumValues(enums, type);
     if (values) field.values = values;
   }
   table.fields.push(field);
@@ -278,7 +292,7 @@ export function readSql(files: Map<string, string>): DataModel {
   for (const { statements: list } of parsed)
     for (const s of list) {
       const en = s.match(ENUM_TYPE);
-      if (en) enums.set(bare(en[1]).toLowerCase(), strings(en[2]));
+      if (en) enums.set(qualified(en[1]).toLowerCase(), strings(en[2]));
     }
 
   const tables = new Map<string, Table>();

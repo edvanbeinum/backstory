@@ -248,6 +248,28 @@ CREATE TABLE public.users (id bigint);
   assert.deepEqual([...alone.keys()], ["AuditUser"]);
 });
 
+test("same-named enums in two schemas each give their own columns their values", () => {
+  const entities = read({
+    "db/structure.sql": `
+CREATE TYPE public.status AS ENUM ('draft', 'live');
+CREATE TYPE audit.status AS ENUM ('seen', 'flagged');
+CREATE TYPE app.kind AS ENUM ('a', 'b');
+CREATE TABLE public.posts (status public.status, plain status, kind kind);
+CREATE TABLE audit.events (status audit.status);
+`,
+  });
+  const values = (e: Entity | undefined) =>
+    e?.fields.map((f) => [f.name, f.values ?? null]);
+  assert.deepEqual(values(entities.get("Post")), [
+    ["status", ["draft", "live"]],
+    ["plain", ["draft", "live"]],
+    ["kind", ["a", "b"]],
+  ]);
+  assert.deepEqual(values(entities.get("AuditEvent")), [
+    ["status", ["seen", "flagged"]],
+  ]);
+});
+
 test("a table declared twice is taken from the first file in path order", () => {
   const entities = read({
     "b/schema.sql": "CREATE TABLE items (b int);",
