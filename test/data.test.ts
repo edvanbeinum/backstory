@@ -713,10 +713,7 @@ test("an empty change reads only the head, and its base is the head", async () =
   const data = await buildData(repo.root, view.base, view.head);
   assert.equal(data.status, "ok");
   assert.equal(data.baseModel, true);
-  assert.deepEqual(
-    data.entities.map((e) => e.state),
-    ["same"],
-  );
+  assert.deepEqual(data.entities, []);
 });
 
 test("a delta merges onto the head: changed replaces, absent removes, new ones join", () => {
