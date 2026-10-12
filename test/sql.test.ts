@@ -179,6 +179,25 @@ CREATE TABLE api_keys (
   ]);
 });
 
+test("a table-level primary key makes its fields required, wherever it's declared", () => {
+  const entities = read({
+    "db/schema.sql": `
+CREATE TABLE pairs (PRIMARY KEY (a, b), a integer, b integer, note text);
+CREATE TABLE tags (id integer, CONSTRAINT tags_pkey PRIMARY KEY (id));
+CREATE TABLE labels (id integer);
+ALTER TABLE ONLY labels ADD CONSTRAINT labels_pkey PRIMARY KEY (id);
+`,
+  });
+  assert.deepEqual(fields(entities.get("Pair")), [
+    ["a", "integer", true],
+    ["b", "integer", true],
+    ["note", "text", false],
+  ]);
+  assert.deepEqual(fields(entities.get("Tag")), [["id", "integer", true]]);
+  assert.deepEqual(fields(entities.get("Label")), [["id", "integer", true]]);
+  assert.deepEqual(rules(entities.get("Pair")), []);
+});
+
 test("a table declared twice is taken from the first file in path order", () => {
   const entities = read({
     "b/schema.sql": "CREATE TABLE items (b int);",

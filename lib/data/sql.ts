@@ -121,7 +121,9 @@ interface Table {
 type Rule =
   | { kind: "unique"; fields: string[] }
   | { kind: "foreign key"; fields: string[]; table: string }
-  /** A primary key, a plain index, a check: nothing the data view shows */
+  /** Not shown as a rule, but its fields can't be null */
+  | { kind: "primary key"; fields: string[] }
+  /** A plain index, a check: nothing the data view shows */
   | { kind: "skip" };
 
 /**
@@ -156,7 +158,12 @@ function rule(item: string): Rule | null {
       ? { kind: "foreign key", fields: columns(inner), table: bare(to[1]) }
       : { kind: "skip" };
   }
-  // A named constraint that is neither, such as a primary key or a check.
+  const primary = text.match(/^primary\s+key\s*\(/i);
+  if (primary) {
+    const { inner } = parenthesised(text, primary[0].length - 1);
+    return { kind: "primary key", fields: columns(inner) };
+  }
+  // A named constraint that is none of these, such as a check.
   if (text !== item) return { kind: "skip" };
   if (
     INDEX.test(text) ||
@@ -212,6 +219,9 @@ function column(
 }
 
 function apply(table: Table, r: Rule) {
+  if (r.kind === "primary key")
+    for (const f of table.fields)
+      if (r.fields.includes(f.name)) f.required = true;
   if (r.kind === "unique") table.unique.push(r.fields);
   if (r.kind === "foreign key")
     table.foreignKeys.push({ fields: r.fields, table: r.table });
@@ -266,11 +276,14 @@ export function readSql(files: Map<string, string>): DataModel {
           unique: [],
         };
         const { inner } = parenthesised(s, create[0].length - 1);
+        // Apply rules after the columns: a primary key may come before the fields it requires.
+        const rules: Rule[] = [];
         for (const item of splitTop(inner)) {
           const r = rule(item);
-          if (r) apply(table, r);
+          if (r) rules.push(r);
           else column(item, table, enums);
         }
+        for (const r of rules) apply(table, r);
         tables.set(name, table);
         continue;
       }
