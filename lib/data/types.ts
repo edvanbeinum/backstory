@@ -1,6 +1,6 @@
 /**
  * A repo's data model in one shape, whatever wrote it down: Rails's
- * schema.rb and models, a Core Data model, and later others. The data view
+ * schema.rb and models, a Core Data model, SQL schema files. The data view
  * draws and compares this, never the source format.
  */
 
@@ -52,7 +52,7 @@ export interface Entity {
 }
 
 /** A data reader's format */
-export type DataSource = "rails" | "core data";
+export type DataSource = "rails" | "core data" | "sql";
 
 export interface DataModel {
   /** Which reader produced it, or "drafted" for the AI provider's reading */

@@ -34,8 +34,10 @@ system, so you can see where it landed before reading its lines:
   in the map strip has Claude Code read the code at HEAD and write one
   there, never into the repo: a draft, marked as one, for you to correct.
 - **The data model** shows the entities the change touched: new fields,
-  relationships and rules. It reads `db/schema.rb` and the models (Rails) or
-  the `.xcdatamodeld` (Core Data). Nothing is run. Any other repo can have
+  relationships and rules. It reads `db/schema.rb` and the models (Rails),
+  the `.xcdatamodeld` (Core Data), or SQL schema files: the `CREATE TABLE`
+  statements in a `schema.sql`, a `structure.sql` or a `schema/` folder,
+  outside migrations and tests. Nothing is run. Any other repo can have
   its data model drafted on demand: **Draft the data model** in the data strip
   has Claude Code read the code at the head, and work out the base from the
   change. The result is marked as a draft and kept in `~/.backstory/data/`,

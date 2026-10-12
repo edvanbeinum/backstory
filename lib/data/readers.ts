@@ -2,6 +2,7 @@ import { gitTry } from "../exec";
 import { showFile } from "../model";
 import { coreDataReader } from "./coredata";
 import { railsReader } from "./rails";
+import { sqlReader } from "./sql";
 import type { DataModel, DataSource } from "./types";
 
 /**
@@ -28,7 +29,11 @@ export interface DataReader {
   read(at: RevFiles): Promise<DataModel | null>;
 }
 
-export const DATA_READERS: DataReader[] = [railsReader, coreDataReader];
+export const DATA_READERS: DataReader[] = [
+  railsReader,
+  coreDataReader,
+  sqlReader,
+];
 
 export function revFiles(root: string, rev: string): RevFiles {
   let listed: Promise<string[]> | null = null;

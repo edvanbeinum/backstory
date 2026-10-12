@@ -134,14 +134,14 @@ const KINDS: Record<string, RelationshipKind> = {
   has_and_belongs_to_many: "many to many",
 };
 
-function classify(name: string) {
+export function classify(name: string) {
   return name
     .split("_")
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
     .join("");
 }
 
-function singular(name: string) {
+export function singular(name: string) {
   return lastWord(name, singularWord);
 }
 
@@ -294,11 +294,11 @@ export function readRails(src: RailsSources): DataModel {
 }
 
 /**
- * Every model file at a commit. Read one by one, a few at a time: git's
+ * The files at a commit, by path. Read one by one, a few at a time: git's
  * batch output gives sizes in bytes, and slicing decoded text by them
  * goes wrong at the first non-ASCII character.
  */
-async function readFiles(
+export async function readFiles(
   at: RevFiles,
   paths: string[],
 ): Promise<Map<string, string>> {

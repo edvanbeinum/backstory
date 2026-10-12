@@ -561,7 +561,77 @@ test("a repo with no data model lists every reader's label, in order", async () 
   assert.deepEqual(data.readers, [
     "db/schema.rb and the models",
     "a Core Data model",
+    "SQL schema files",
   ]);
+});
+
+const keysTable = (columns: string) => `CREATE TABLE \`keys\` (
+  \`id\` varchar(256) NOT NULL,
+${columns}
+  PRIMARY KEY (\`id\`)
+) ENGINE=InnoDB;
+`;
+
+test("a repo with only SQL schema files shows its data model change, with nothing drafted", async () => {
+  const repo = tempRepo();
+  repo.write("db/schema.sql", keysTable(""));
+  const base = repo.commit("keys");
+  repo.write("db/schema.sql", keysTable("  `prefix` varchar(8),"));
+  const head = repo.commit("store the prefix");
+  const data = await buildData(repo.root, base, head);
+  assert.equal(data.status, "ok");
+  assert.equal(data.source, "sql");
+  assert.equal(data.label, "SQL schema files");
+  assert.equal(data.drafted, null);
+  assert.equal(data.draft, undefined);
+  assert.equal(data.baseModel, true);
+  assert.deepEqual(
+    data.entities.map((e) => [e.name, e.state, e.file]),
+    [["Key", "changed", "db/schema.sql"]],
+  );
+  assert.deepEqual(
+    data.entities[0].fields
+      .filter((f) => f.state !== "same")
+      .map((f) => [f.state, f.item.name, f.item.type]),
+    [["added", "prefix", "varchar(8)"]],
+  );
+});
+
+test("a widened SQL column reads as a changed field", async () => {
+  const repo = tempRepo();
+  repo.write("db/schema.sql", keysTable("  `prefix` varchar(8),"));
+  const base = repo.commit("narrow");
+  repo.write("db/schema.sql", keysTable("  `prefix` varchar(16),"));
+  const head = repo.commit("wide");
+  const data = await buildData(repo.root, base, head);
+  const prefix = data.entities[0].fields.find((f) => f.item.name === "prefix");
+  assert.equal(prefix?.state, "changed");
+  assert.equal(prefix?.before?.type, "varchar(8)");
+  assert.equal(prefix?.item.type, "varchar(16)");
+});
+
+test("SQL in migrations or tests, or with no CREATE TABLE, isn't a schema", async () => {
+  const repo = tempRepo();
+  repo.write("db/migrations/001_keys.sql", keysTable(""));
+  repo.write("test/schema.sql", keysTable(""));
+  repo.write("spec/fixtures/schema/keys.sql", keysTable(""));
+  repo.write("db/schema.sql", "INSERT INTO keys (id) VALUES ('a');\n");
+  const head = repo.commit("no schema");
+  const data = await buildData(repo.root, null, head);
+  assert.equal(data.status, "none");
+  assert.deepEqual(
+    data.readers,
+    DATA_READERS.map((r) => r.label),
+  );
+});
+
+test("a repo with both schema.rb and structure.sql reads Rails, the earlier reader", async () => {
+  const repo = tempRepo();
+  repo.write("db/schema.rb", schema(""));
+  repo.write("db/structure.sql", "CREATE TABLE items (id bigint NOT NULL);");
+  const head = repo.commit("both");
+  const data = await buildData(repo.root, null, head);
+  assert.equal(data.source, "rails");
 });
 
 test("a repo with both Rails and Core Data reads Rails, the first reader", async () => {
