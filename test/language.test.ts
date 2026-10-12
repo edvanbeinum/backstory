@@ -41,6 +41,27 @@ test("every file a term names exists", () => {
   }
 });
 
+test("every README section a block's read: names exists", () => {
+  const headings = new Set(
+    readText("README.md")
+      .split("\n")
+      .flatMap((line) => line.match(/^#{2,3} (.+)$/)?.[1] ?? []),
+  );
+  let named = 0;
+  for (const block of entries("blocks")) {
+    // field() returns the raw YAML scalar: outer quotes kept, ' written as ''.
+    const read = (field(block, "read") ?? "").replaceAll("''", "'");
+    for (const [, heading] of read.matchAll(/README "(.+)"'?$/g)) {
+      named++;
+      assert.ok(
+        headings.has(heading),
+        `${field(block, "name")}: README has no section "${heading}"`,
+      );
+    }
+  }
+  assert.ok(named > 0, "no block's read: names a README section");
+});
+
 test("every invariant has a rule", () => {
   for (const inv of entries("invariants")) {
     assert.ok(field(inv, "rule"), `an invariant has no rule: ${inv[0]}`);
