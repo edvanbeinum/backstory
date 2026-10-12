@@ -108,6 +108,13 @@ primitives:
     symbols:
       - readModelAt
     use: One reader for the C4 model at a commit.
+  - name: data readers
+    block: data model reader
+    file: lib/data/readers.ts
+    symbols:
+      - DATA_READERS
+      - readDataModel
+    use: "The formats a data model is read from, in order; the first that finds one at a commit wins. A new format is one file in `lib/data/` with a `DataReader`, and one line in `DATA_READERS`."
   - name: route errors
     file: lib/api.ts
     symbols:

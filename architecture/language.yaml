@@ -37,10 +37,13 @@ terms:
     means: A one-line summary bar at the top of the side column that opens an overlay. The map strip and the data strip.
     avoid: []
   - name: Rails
-    means: Ruby on Rails, the framework the data model reader understands.
+    means: Ruby on Rails, one of the data readers.
     boundary: "`lib/data/` only"
     avoid:
       - rail, for any layout
+  - name: data reader
+    means: "One format a data model is read from: one entry in `DATA_READERS` (`lib/data/readers.ts`) and one file in `lib/data/`, such as `lib/data/rails.ts`."
+    avoid: []
   - name: store
     means: "`lib/store.ts`: the small click-driven JSON files in `~/.backstory` (`homeDir`), each read and written whole."
     avoid:
@@ -127,7 +130,7 @@ blocks:
   - name: data model reader
     code:
       - lib/data/
-    summary: Reads the data model (Rails schema and models, or Core Data) at both ends of a view and diffs it.
+    summary: Reads the data model at both ends of a view and diffs it.
     read: '`lib/data/build.ts` header, then README "Diagrams: the map, the data model and flows"'
   - name: agent review loop
     code:

@@ -51,9 +51,12 @@ export interface Entity {
   constraints: Constraint[];
 }
 
+/** A data reader's format */
+export type DataSource = "rails" | "core data";
+
 export interface DataModel {
   /** Which reader produced it */
-  source: "rails" | "core data";
+  source: DataSource;
   entities: Map<string, Entity>;
 }
 
@@ -80,6 +83,10 @@ export interface EntityDiff {
 export interface DataResponse {
   status: "ok" | "none";
   source?: DataModel["source"];
+  /** Where the model was read from, the reader's label, for the overlay's footnote */
+  label?: string;
+  /** Every reader's label, in order, for the empty state */
+  readers: string[];
   /** False when the base has no data model: everything reads as added */
   baseModel: boolean;
   /** Entities the change touched, then their unchanged neighbours */

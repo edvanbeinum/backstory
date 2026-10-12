@@ -527,7 +527,7 @@ export function DataStrip({
         <span className="text-[12px] text-[var(--fg-muted)]">
           ·{" "}
           {data.status === "none"
-            ? "no data model found (db/schema.rb, or a Core Data model)"
+            ? `no data model found (${data.readers.join(", ")})`
             : data.baseModel
               ? "no data model change"
               : "no data model at base to compare with"}
@@ -572,13 +572,9 @@ export function DataStrip({
             <DataGraph shown={shown} width={width} notes={notes} />
           </div>
           <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
-            From{" "}
-            {data.source === "rails"
-              ? "db/schema.rb and the models"
-              : "the Core Data model"}
-            , at the base and the head. Click an entity for its fields. Arrows
-            point from the entity holding a link to the one it links to; grey
-            boxes are unchanged entities a changed one links to.
+            From {data.label}, at the base and the head. Click an entity for its
+            fields. Arrows point from the entity holding a link to the one it
+            links to; grey boxes are unchanged entities a changed one links to.
           </p>
         </div>
       )}

@@ -1,10 +1,42 @@
 import assert from "node:assert/strict";
-import { test } from "node:test";
+import { execFileSync } from "node:child_process";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { after, test } from "node:test";
 
+import { buildData } from "../lib/data/build";
 import { readCoreData } from "../lib/data/coredata";
 import { diffModels } from "../lib/data/diff";
 import { readRails, tableFor } from "../lib/data/rails";
+import { DATA_READERS } from "../lib/data/readers";
 import type { Constraint, DataModel } from "../lib/data/types";
+
+const repos: string[] = [];
+after(() => {
+  for (const r of repos) rmSync(r, { recursive: true, force: true });
+});
+
+/** A temp git repo, removed after the file's tests. */
+function tempRepo() {
+  const root = mkdtempSync(path.join(os.tmpdir(), "backstory-data-"));
+  repos.push(root);
+  const git = (...a: string[]) =>
+    execFileSync("git", ["-C", root, ...a], { encoding: "utf8" }).trim();
+  git("init", "-q");
+  git("config", "user.email", "t@example.com");
+  git("config", "user.name", "T");
+  const write = (file: string, text: string) => {
+    mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
+    writeFileSync(path.join(root, file), text);
+  };
+  const commit = (message: string) => {
+    git("add", "-A");
+    git("commit", "-qm", message);
+    return git("rev-parse", "HEAD");
+  };
+  return { root, git, write, commit };
+}
 
 const schema = (itemColumns: string) => `
 ActiveRecord::Schema[8.1].define(version: 1) do
@@ -494,5 +526,61 @@ test("a unique rule's column order is no change; a foreign key's still is", () =
       { kind: "foreign key", fields: ["b", "a"], target: "T" },
     ),
     ["changed"],
+  );
+});
+
+const coreData = `<model>
+    <entity name="Movement">
+        <attribute name="name" optional="YES" attributeType="String"/>
+    </entity>
+</model>`;
+
+test("a repo with no data model lists every reader's label, in order", async () => {
+  const repo = tempRepo();
+  repo.write("README.md", "hello\n");
+  const head = repo.commit("first");
+  const data = await buildData(repo.root, null, head);
+  assert.equal(data.status, "none");
+  assert.deepEqual(
+    data.readers,
+    DATA_READERS.map((r) => r.label),
+  );
+  assert.deepEqual(data.readers, [
+    "db/schema.rb and the models",
+    "a Core Data model",
+  ]);
+});
+
+test("a repo with both Rails and Core Data reads Rails, the first reader", async () => {
+  const repo = tempRepo();
+  repo.write("db/schema.rb", schema(""));
+  repo.write("app/models/item.rb", item(""));
+  repo.write("App.xcdatamodeld/App.xcdatamodel/contents", coreData);
+  const head = repo.commit("both");
+  const data = await buildData(repo.root, null, head);
+  assert.equal(data.status, "ok");
+  assert.equal(data.source, "rails");
+  assert.equal(data.label, "db/schema.rb and the models");
+});
+
+test("Core Data reads through the reader list", async () => {
+  const repo = tempRepo();
+  repo.write("App.xcdatamodeld/App.xcdatamodel/contents", coreData);
+  const base = repo.commit("base");
+  repo.write(
+    "App.xcdatamodeld/App.xcdatamodel/contents",
+    coreData.replace(
+      "</entity>",
+      `    <attribute name="reps" attributeType="Integer 64"/>\n    </entity>`,
+    ),
+  );
+  const head = repo.commit("head");
+  const data = await buildData(repo.root, base, head);
+  assert.equal(data.source, "core data");
+  assert.deepEqual(
+    data.entities[0].fields
+      .filter((f) => f.state !== "same")
+      .map((f) => [f.state, f.item.name]),
+    [["added", "reps"]],
   );
 });

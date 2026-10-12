@@ -1,3 +1,4 @@
+import type { DataReader, RevFiles } from "./readers";
 import type {
   Constraint,
   DataModel,
@@ -291,3 +292,37 @@ export function readRails(src: RailsSources): DataModel {
   }
   return { source: "rails", entities };
 }
+
+/**
+ * Every model file at a commit. Read one by one, a few at a time: git's
+ * batch output gives sizes in bytes, and slicing decoded text by them
+ * goes wrong at the first non-ASCII character.
+ */
+async function readFiles(
+  at: RevFiles,
+  paths: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const queue = [...paths];
+  const worker = async () => {
+    for (let path = queue.shift(); path !== undefined; path = queue.shift()) {
+      const text = await at.show(path);
+      if (text !== null) out.set(path, text);
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, worker));
+  return out;
+}
+
+export const railsReader: DataReader = {
+  source: "rails",
+  label: "db/schema.rb and the models",
+  async read(at) {
+    const schema = await at.show("db/schema.rb");
+    if (!schema) return null;
+    const paths = (await at.listing()).filter(
+      (p) => p.startsWith("app/models/") && p.endsWith(".rb"),
+    );
+    return readRails({ schema, models: await readFiles(at, paths) });
+  },
+};

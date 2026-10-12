@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse } from "@/lib/api";
-import { buildData } from "@/lib/data/build";
+import { buildData, noDataModel } from "@/lib/data/build";
 import { resolveRepo } from "@/lib/git";
 import type { ApiError } from "@/lib/types";
 import { viewRange } from "@/lib/view";
@@ -23,12 +23,7 @@ export async function GET(request: Request) {
   try {
     const repo = await resolveRepo(repoPath);
     const range = await viewRange(repo, rev);
-    if (!range)
-      return NextResponse.json({
-        status: "none",
-        baseModel: false,
-        entities: [],
-      });
+    if (!range) return NextResponse.json(noDataModel());
     return NextResponse.json(
       await buildData(repo.root, range.base, range.head),
       {
