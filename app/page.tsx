@@ -141,7 +141,7 @@ export default function Page() {
   });
   const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
   const [map, setMap] = useState<MapResponse | null>(null);
-  /** Bumped when a model draft is written, so the map is read again */
+  /** Bumped when a model or data model draft is written, so both are read again */
   const [modelTick, setModelTick] = useState(0);
   const onModelChange = useCallback(() => setModelTick((t) => t + 1), []);
   const [dataModel, setDataModel] = useState<DataResponse | null>(null);
@@ -1409,7 +1409,13 @@ export default function Page() {
                             onOpenFile={openFile}
                             onModelChange={onModelChange}
                           />
-                          <DataStrip data={dataModel} notes={entityNotes} />
+                          <DataStrip
+                            data={dataModel}
+                            notes={entityNotes}
+                            repo={repoPath}
+                            rev={rev}
+                            onRead={onModelChange}
+                          />
                         </>
                       ) : null
                     }
@@ -1485,7 +1491,13 @@ export default function Page() {
                               onOpenFile={openFile}
                               onModelChange={onModelChange}
                             />
-                            <DataStrip data={dataModel} notes={entityNotes} />
+                            <DataStrip
+                              data={dataModel}
+                              notes={entityNotes}
+                              repo={repoPath}
+                              rev={rev}
+                              onRead={onModelChange}
+                            />
                           </>
                         ) : null
                       }

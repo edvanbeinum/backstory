@@ -148,11 +148,11 @@ export async function dataStatus(view: DataView): Promise<DataDraftStatus> {
   const job = registry.jobs.get(files.key);
   if (job)
     return { status: "running", phase: job.phase, startedAt: job.startedAt };
+  const idle = { status: "idle", provider: aiProvider().name } as const;
   const ended = registry.ended.get(files.key);
   // A done read whose files were deleted since is a view to read again.
-  if (ended?.status === "done" && !(await cached(files))?.complete)
-    return { status: "idle" };
-  return ended ?? { status: "idle" };
+  if (ended?.status === "done" && !(await cached(files))?.complete) return idle;
+  return ended ?? idle;
 }
 
 /** The current read's end, for tests: nothing waits on a read otherwise. */

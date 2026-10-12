@@ -99,7 +99,8 @@ export interface DataResponse {
 
 /** A drafted data model's read for one view, as the data strip shows it */
 export type DataDraftStatus =
-  | { status: "idle" }
+  /** Nothing read yet: the provider's name, for the offer's copy */
+  | { status: "idle"; provider: string }
   | { status: "running"; phase: string; startedAt: number }
   | { status: "done"; costUsd: number; durationMs: number }
   | { status: "failed"; error: string }

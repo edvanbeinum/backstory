@@ -19,7 +19,9 @@ import type {
   Relationship,
 } from "@/lib/data/types";
 import { edgePath, layeredLayout } from "./graph";
-import { ChevronDownIcon } from "./icons";
+import { AlertIcon, ChevronDownIcon } from "./icons";
+import { Elapsed } from "./MapStrip";
+import { Badge, Button, Spinner } from "./ui";
 
 /**
  * The data model's change: a one-line strip under the map, opening the
@@ -482,13 +484,204 @@ function DataGraph({
   );
 }
 
-export function DataStrip({
+type DraftApi = ReturnType<typeof useDataDraft>;
+
+/**
+ * The view's data, replaced by what a draft request answered until the page
+ * reads it again. Polls while a read runs rather than adding a watch event:
+ * reads are rare.
+ */
+function useDataDraft(
+  repo: string,
+  rev: string,
+  given: DataResponse | null,
+  onRead: () => void,
+) {
+  const [answer, setAnswer] = useState<{
+    over: DataResponse | null;
+    data: DataResponse;
+  } | null>(null);
+  const [error, setError] = useState<{
+    over: DataResponse | null;
+    message: string;
+  } | null>(null);
+  const onReadRef = useRef(onRead);
+  useEffect(() => {
+    onReadRef.current = onRead;
+  }, [onRead]);
+
+  const request = useCallback(
+    async (method: "GET" | "POST", redraft = false) => {
+      const params = new URLSearchParams({ repo, rev });
+      if (redraft) params.set("redraft", "1");
+      try {
+        const response = await fetch(`/api/data?${params}`, {
+          method,
+          cache: "no-store",
+        });
+        const body = (await response.json()) as
+          DataResponse | { error: string };
+        if (!response.ok || "error" in body) {
+          setError({
+            over: given,
+            message: "error" in body ? body.error : response.statusText,
+          });
+          return;
+        }
+        setError(null);
+        setAnswer({ over: given, data: body });
+        // The page reads the data again once a read ends, so everything
+        // that shows the data model sees the drafted one.
+        if (body.draft?.status !== "running") onReadRef.current();
+      } catch (err) {
+        setError({
+          over: given,
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    },
+    [repo, rev, given],
+  );
+
+  const data = answer?.over === given ? answer.data : given;
+  const running = data?.draft?.status === "running";
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(() => void request("GET"), 4000);
+    return () => clearInterval(timer);
+  }, [running, request]);
+
+  return {
+    data,
+    error: error?.over === given ? error.message : null,
+    start: (redraft = false) => void request("POST", redraft),
+  };
+}
+
+function DraftedBadge() {
+  return (
+    <Badge tone="draft" className="!py-0 !leading-4">
+      Draft
+    </Badge>
+  );
+}
+
+function DraftProgress({
   data,
+  draft,
+}: {
+  data: DataResponse;
+  draft: DraftApi;
+}) {
+  const job = data.draft;
+  if (draft.error)
+    return (
+      <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
+        <AlertIcon size={11} /> {draft.error}
+      </span>
+    );
+  if (job?.status === "running")
+    return (
+      <span className="flex items-center gap-1.5 text-[12px] text-[var(--fg-muted)]">
+        <Spinner className="!h-3 !w-3" />
+        {job.phase} · <Elapsed since={job.startedAt} />
+      </span>
+    );
+  if (job?.status === "failed")
+    return (
+      <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--attention)]">
+        <AlertIcon size={11} />
+        <span className="truncate" title={job.error}>
+          The read failed: {job.error}
+        </span>
+        <Button size="sm" onClick={() => draft.start(Boolean(data.drafted))}>
+          Try again
+        </Button>
+      </span>
+    );
+  if (job?.status === "unavailable")
+    return (
+      <span className="text-[12px] text-[var(--attention)]">
+        Drafting the data model needs {job.provider}. {job.setup}.
+      </span>
+    );
+  return null;
+}
+
+/** What a view with no data model shows: the formats looked for, and the offer to draft one. */
+function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
+  const job = data.draft;
+  const idle =
+    !job ||
+    job.status === "idle" ||
+    job.status === "unavailable" ||
+    job.status === "done";
+  const provider = job?.status === "idle" ? job.provider : null;
+  return (
+    <div className="flex min-w-0 flex-1 flex-col gap-1">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[12px] text-[var(--fg-muted)]">
+          · no data model found ({data.readers.join(", ")})
+        </span>
+        {job && idle && (
+          <Button size="sm" variant="primary" onClick={() => draft.start()}>
+            Draft the data model
+          </Button>
+        )}
+        <DraftProgress data={data} draft={draft} />
+      </div>
+      {provider && (
+        <span className="text-[11px] text-[var(--fg-subtle)]">
+          {provider} reads the code at the head, read-only, and works out the
+          base from the change. It can take a few minutes and uses your{" "}
+          {provider} account. The result is kept on this machine.
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Redraft({ data, draft }: { data: DataResponse; draft: DraftApi }) {
+  const running = data.draft?.status === "running";
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      {!running && (
+        <Button
+          size="sm"
+          variant="invisible"
+          onClick={() => {
+            if (
+              window.confirm(
+                `Redraft the data model? ${data.drafted?.provider ?? "The AI provider"} reads the code again, which can take a few minutes on your account. The current reading is kept if it fails.`,
+              )
+            )
+              draft.start(true);
+          }}
+        >
+          Redraft
+        </Button>
+      )}
+      <DraftProgress data={data} draft={draft} />
+    </span>
+  );
+}
+
+export function DataStrip({
+  data: given,
   notes,
+  repo,
+  rev,
+  onRead,
 }: {
   data: DataResponse | null;
   notes?: Map<string, string[]>;
+  repo: string;
+  rev: string;
+  /** A drafted data model was read: read the data again */
+  onRead: () => void;
 }) {
+  const draft = useDataDraft(repo, rev, given, onRead);
+  const data = draft.data;
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(600);
@@ -520,18 +713,26 @@ export function DataStrip({
   const shown = useMemo(() => present(data?.entities ?? []), [data]);
   if (!data) return null;
   const changed = shown.filter((p) => p.state !== "same");
-  if (data.status === "none" || changed.length === 0) {
+  if (data.status === "none") {
     return (
-      <div className="map-strip quiet">
+      <div className="map-strip quiet flex-wrap">
         <span className="text-[13px] font-semibold">Data</span>
+        <DraftOffer data={data} draft={draft} />
+      </div>
+    );
+  }
+  if (changed.length === 0) {
+    return (
+      <div className="map-strip quiet flex-wrap">
+        <span className="text-[13px] font-semibold">Data</span>
+        {data.drafted && <DraftedBadge />}
         <span className="text-[12px] text-[var(--fg-muted)]">
           ·{" "}
-          {data.status === "none"
-            ? `no data model found (${data.readers.join(", ")})`
-            : data.baseModel
-              ? "no data model change"
-              : "no data model at base to compare with"}
+          {data.baseModel
+            ? "no data model change"
+            : "no data model at base to compare with"}
         </span>
+        {data.drafted && <Redraft data={data} draft={draft} />}
       </div>
     );
   }
@@ -552,7 +753,10 @@ export function DataStrip({
         </svg>
       </div>
       <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-semibold">Data</div>
+        <div className="flex items-center gap-1.5 text-[14px] font-semibold">
+          Data
+          {data.drafted && <DraftedBadge />}
+        </div>
         <div className="truncate text-[12px] text-[var(--fg-muted)]">
           {summary(shown)}
         </div>
@@ -572,10 +776,18 @@ export function DataStrip({
             <DataGraph shown={shown} width={width} notes={notes} />
           </div>
           <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
-            From {data.label}, at the base and the head. Click an entity for its
-            fields. Arrows point from the entity holding a link to the one it
-            links to; grey boxes are unchanged entities a changed one links to.
+            {data.drafted
+              ? `Drafted by ${data.drafted.provider} from the code at the head, with the base worked out from the change. It may be wrong.`
+              : `From ${data.label}, at the base and the head.`}{" "}
+            Click an entity for its fields. Arrows point from the entity holding
+            a link to the one it links to; grey boxes are unchanged entities a
+            changed one links to.
           </p>
+          {data.drafted && (
+            <div className="px-1">
+              <Redraft data={data} draft={draft} />
+            </div>
+          )}
         </div>
       )}
     </div>

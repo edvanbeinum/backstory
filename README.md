@@ -35,7 +35,12 @@ system, so you can see where it landed before reading its lines:
   there, never into the repo: a draft, marked as one, for you to correct.
 - **The data model** shows the entities the change touched: new fields,
   relationships and rules. It reads `db/schema.rb` and the models (Rails) or
-  the `.xcdatamodeld` (Core Data). Nothing is run.
+  the `.xcdatamodeld` (Core Data). Nothing is run. Any other repo can have
+  its data model drafted on demand: **Draft the data model** in the data strip
+  has Claude Code read the code at the head, and work out the base from the
+  change. The result is marked as a draft and kept in `~/.backstory/data/`,
+  so a view is read once. A head read costs about $0.15 on a small repo and
+  over $1 and a few minutes on a large one.
 - **Flows** are sequence diagrams of what the code does for each user action
   the change touches, before and after, beside the code they come from.
 

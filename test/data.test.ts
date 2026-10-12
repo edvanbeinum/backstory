@@ -668,7 +668,7 @@ test("a repo no reader knows shows its data model change once the AI provider dr
     before.readers,
     DATA_READERS.map((r) => r.label),
   );
-  assert.deepEqual(before.draft, { status: "idle" });
+  assert.deepEqual(before.draft, { status: "idle", provider: "Claude Code" });
 
   const ai = recorder();
   const started = await read(repo.view, { runner: ai.runner });
