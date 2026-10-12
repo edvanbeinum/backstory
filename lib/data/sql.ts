@@ -363,13 +363,10 @@ export const sqlReader: DataReader = {
         p.endsWith(".sql") &&
         (at.steered || (SCHEMA_PATHS(p) && !SKIPPED_FOLDER.test(p))),
     );
-    const files = new Map(
-      [...(await readFiles(at, paths))].filter(([, text]) =>
-        /\bcreate\s+(?:unlogged\s+)?table\b/i.test(text),
-      ),
-    );
-    if (files.size === 0) return null;
-    const model = readSql(files);
+    if (paths.length === 0) return null;
+    // Read every file, not just those with a CREATE TABLE: a schema folder
+    // can keep its indexes, foreign keys or enums apart from its tables.
+    const model = readSql(await readFiles(at, paths));
     return model.entities.size > 0 ? model : null;
   },
 };

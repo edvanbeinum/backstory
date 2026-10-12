@@ -626,6 +626,24 @@ test("SQL in migrations or tests, or with no CREATE TABLE, isn't a schema", asyn
   );
 });
 
+test("a schema folder's rules kept apart from its tables still change the data model", async () => {
+  const repo = tempRepo();
+  repo.write("db/schema/tables.sql", keysTable("  `prefix` varchar(8),"));
+  repo.write("db/schema/indexes.sql", "-- unique keys\n");
+  const base = repo.commit("keys");
+  repo.write(
+    "db/schema/indexes.sql",
+    "CREATE UNIQUE INDEX keys_prefix ON `keys` (`prefix`);\n",
+  );
+  const head = repo.commit("unique prefix");
+  const data = await buildData(repo.root, base, head);
+  assert.equal(data.source, "sql");
+  assert.deepEqual(
+    data.entities[0].constraints.map((c) => [c.state, c.item.fields.join()]),
+    [["added", "prefix"]],
+  );
+});
+
 /** A workspace that only sets properties, such as `data.files`. */
 const workspace = (properties: Record<string, string>) =>
   `workspace {
