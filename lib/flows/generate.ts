@@ -2,9 +2,9 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
+import { aiProvider, type Runner } from "../ai/provider";
 import { git, gitLine, run } from "../exec";
 import { isAppCode, readModelAt, type Model } from "../model";
-import { claudeRunner, type Runner } from "./claude";
 import { hunkText, mapNewToOld, parseZeroContext, type Hunk } from "./hunks";
 import {
   basePrompt,
@@ -335,7 +335,7 @@ async function traceBefore(
 
 export async function generateFlows(opts: GenerateOptions): Promise<FlowSet> {
   const started = Date.now();
-  const runner = opts.runner ?? claudeRunner;
+  const runner = opts.runner ?? aiProvider().run;
   const phase = opts.onPhase ?? (() => {});
   const ctx = await prepare(opts.root, opts.base, opts.head);
 
@@ -433,7 +433,7 @@ export async function traceHunk(
   opts: GenerateOptions & { set: FlowSet; hunkId: string },
 ): Promise<FlowSet> {
   const started = Date.now();
-  const runner = opts.runner ?? claudeRunner;
+  const runner = opts.runner ?? aiProvider().run;
   const ctx = await prepare(opts.root, opts.base, opts.head);
   // Ids are positions among the app-code hunks, and which hunks are app
   // code follows the model, which may have changed since the set was

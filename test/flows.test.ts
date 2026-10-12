@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
-import type { Runner } from "../lib/flows/claude";
+import type { Runner } from "../lib/ai/provider";
 import { generateFlows, traceHunk } from "../lib/flows/generate";
 import {
   isAddedLine,

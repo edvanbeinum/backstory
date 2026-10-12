@@ -12,8 +12,8 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
+import type { Runner } from "../lib/ai/provider";
 import { readDsl } from "../lib/dsl";
-import type { Runner } from "../lib/flows/claude";
 import { isAppCode, localModelFile, readModelAt } from "../lib/model";
 import {
   draftSettled,

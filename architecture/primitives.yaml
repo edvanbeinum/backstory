@@ -89,12 +89,13 @@ primitives:
       - writeNamespaced
       - homeDir
     use: "Every store file read and write. It keeps the store invariant, validates on read and writes atomically. `homeDir` is the one directory everything on this machine lives in (the store, the flow cache, local models), and moves `~/.differ` into place the first time."
-  - name: run Claude
-    block: flow engine
-    file: lib/flows/claude.ts
+  - name: run the AI provider
+    block: AI provider
+    file: lib/ai/provider.ts
     symbols:
-      - claudeRunner
-    use: "The only `claude -p` call site."
+      - aiProvider
+      - AI_PROVIDERS
+    use: "Every AI call: `aiProvider().run` reads a directory read-only and answers in a JSON schema, and `available`, `name` and `setup` say whether it's ready and what to do if not. Nothing outside `lib/ai/` imports a provider; `lib/ai/claude.ts` is the only `claude -p` call site."
   - name: a commit's files
     block: flow engine
     file: lib/flows/generate.ts

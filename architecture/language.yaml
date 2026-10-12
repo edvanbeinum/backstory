@@ -53,6 +53,11 @@ terms:
     means: "A C4 model kept on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo>/workspace.dsl` (`localModelDir` in `lib/model.ts`). Claude can draft one (`lib/models/draft.ts`)."
     avoid:
       - draft alone, for the model (reply drafts are `lib/drafts.ts`)
+  - name: AI provider
+    means: "The tool Backstory asks to read code and answer in a JSON schema; Claude Code for now (`lib/ai/provider.ts`)."
+    avoid:
+      - agent (that's the coding agent under review, as in the agent review loop)
+      - model, for the tool (that's the C4 or data model; the LLM is "the provider's model")
   - name: Mac app
     means: "The native app in `mac/` that owns the server: it starts Backstory's server from its bundle, shows the UI in a web view only while the server answers, and opens repos from `backstory://open?repo=` links."
     avoid:
@@ -104,8 +109,13 @@ blocks:
   - name: flow engine
     code:
       - lib/flows/
-    summary: Traces a view's flows with `claude -p`, checks each step against its line, and caches the result.
+    summary: Traces a view's flows with the AI provider, checks each step against its line, and caches the result.
     read: '`lib/flows/generate.ts` header, then README "Diagrams: the map, the data model and flows"'
+  - name: AI provider
+    code:
+      - lib/ai/
+    summary: "The one seam every AI call goes through: picks the provider (`BACKSTORY_AI`, Claude Code by default) and holds the contract a provider must meet, reading a directory read-only and answering in a JSON schema."
+    read: "`lib/ai/provider.ts` header"
   - name: model reader (the map)
     code:
       - lib/dsl.ts

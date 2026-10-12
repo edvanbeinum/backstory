@@ -3,9 +3,9 @@ import { EventEmitter } from "node:events";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { aiProvider } from "../ai/provider";
 import { gitLine } from "../exec";
 import { homeDir } from "../store";
-import { claudeAvailable } from "./claude";
 import { attachComponents } from "./components";
 import { generateFlows, traceHunk } from "./generate";
 import { fromSarif, toSarif, type SarifLog } from "./sarif";
@@ -121,7 +121,7 @@ function enqueue(fn: () => Promise<void>) {
 }
 
 async function haveClaude() {
-  registry.claude ??= await claudeAvailable();
+  registry.claude ??= await aiProvider().available();
   return registry.claude;
 }
 

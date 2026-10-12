@@ -1,4 +1,5 @@
 import { run } from "../exec";
+import type { AiProvider, Runner } from "./provider";
 
 /**
  * Every call to Claude Code goes through here, so a change in its CLI is a
@@ -6,32 +7,18 @@ import { run } from "../exec";
  * `structured_output` field of the JSON result.
  */
 
-export interface ClaudeResult<T> {
-  output: T;
-  costUsd: number;
-  /** The model that answered, as Claude Code reports it */
-  model: string | null;
-}
-
 /**
  * Which model traces flows: BACKSTORY_FLOWS_MODEL, an alias ("sonnet",
  * "opus") or a full model id. Sonnet by default: compared with Opus on the
  * same views it cost about a third, took under half the time and verified
  * every step, tracing coarser flows that still told the same story.
  */
-export const flowsModel = () => process.env.BACKSTORY_FLOWS_MODEL || "sonnet";
-
-/** A stand-in for Claude in tests: same contract, recorded answers. */
-export type Runner = <T>(
-  prompt: string,
-  schema: object,
-  cwd: string,
-) => Promise<ClaudeResult<T>>;
+const flowsModel = () => process.env.BACKSTORY_FLOWS_MODEL || "sonnet";
 
 /** Generation took 51–83 s in the prompt test; leave plenty of headroom. */
 const TIMEOUT_MS = 15 * 60_000;
 
-export const claudeRunner: Runner = async <T>(
+const claudeRunner: Runner = async <T>(
   prompt: string,
   schema: object,
   cwd: string,
@@ -106,7 +93,7 @@ function mainModel(usage: Record<string, unknown> | undefined): string | null {
   );
 }
 
-export async function claudeAvailable(): Promise<boolean> {
+async function claudeAvailable(): Promise<boolean> {
   try {
     await run("claude", ["--version"], { timeout: 15_000 });
     return true;
@@ -114,3 +101,12 @@ export async function claudeAvailable(): Promise<boolean> {
     return false;
   }
 }
+
+export const claudeCode: AiProvider = {
+  id: "claude",
+  name: "Claude Code",
+  setup: "Install Claude Code and sign in",
+  model: flowsModel,
+  available: claudeAvailable,
+  run: claudeRunner,
+};
