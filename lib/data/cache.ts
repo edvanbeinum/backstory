@@ -248,17 +248,22 @@ export async function startDataRead(
         else await writeJson(files.head, head);
       }
       if (view.base && files.delta && patch !== null) {
+        // Skip the read for an empty patch: the base's files are the head's,
+        // so the provider would be paid to say nothing changed.
         job.phase = "Reading what the change undid";
-        const read = await readDelta(view.root, view.base, head, patch, runner);
-        costUsd += read.costUsd;
+        const read =
+          patch === ""
+            ? null
+            : await readDelta(view.root, view.base, head, patch, runner);
+        costUsd += read?.costUsd ?? 0;
         writes.push([
           files.delta,
           {
-            changed: read.output.changed,
-            absent: read.output.absent,
+            changed: read?.output.changed ?? [],
+            absent: read?.output.absent ?? [],
             provider: provider.id,
-            model: read.model ?? provider.model(),
-            costUsd: read.costUsd,
+            model: read ? (read.model ?? provider.model()) : null,
+            costUsd: read?.costUsd ?? 0,
             readAt: Date.now(),
             headReadAt: head.readAt,
           } satisfies DeltaFile,

@@ -697,6 +697,28 @@ test("a repo no reader knows shows its data model change once the AI provider dr
   );
 });
 
+test("an empty change reads only the head, and its base is the head", async () => {
+  const repo = notesRepo();
+  repo.git("commit", "--allow-empty", "-qm", "Nothing");
+  const view: DataView = {
+    root: repo.root,
+    base: repo.head,
+    head: repo.git("rev-parse", "HEAD"),
+  };
+  const ai = recorder();
+  await read(view, { runner: ai.runner });
+  assert.deepEqual(ai.calls, ["head"]);
+  assert.equal((await dataStatus(view)).status, "done");
+
+  const data = await buildData(repo.root, view.base, view.head);
+  assert.equal(data.status, "ok");
+  assert.equal(data.baseModel, true);
+  assert.deepEqual(
+    data.entities.map((e) => e.state),
+    ["same"],
+  );
+});
+
 test("a delta merges onto the head: changed replaces, absent removes, new ones join", () => {
   const head = [
     entity("Note", ["id", "rev"]),
