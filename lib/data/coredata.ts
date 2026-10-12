@@ -1,3 +1,4 @@
+import type { DataReader } from "./readers";
 import type {
   Constraint,
   DataModel,
@@ -51,3 +52,34 @@ export function readCoreData(xml: string, file: string): DataModel {
   }
   return { source: "core data", entities };
 }
+
+export const coreDataReader: DataReader = {
+  source: "core data",
+  label: "a Core Data model",
+  async read(at) {
+    const listing = await at.listing();
+    const bundles = [
+      ...new Set(
+        listing
+          .map((p) => p.match(/^(.*\.xcdatamodeld)\//)?.[1])
+          .filter(Boolean),
+      ),
+    ] as string[];
+    for (const bundle of bundles) {
+      const current = await at.show(`${bundle}/.xccurrentversion`);
+      const version =
+        current?.match(
+          /<key>_XCCurrentVersionName<\/key>\s*<string>([^<]+)<\/string>/,
+        )?.[1] ??
+        listing
+          .find((p) => p.startsWith(`${bundle}/`) && p.endsWith("/contents"))
+          ?.split("/")
+          .at(-2);
+      if (!version) continue;
+      const path = `${bundle}/${version}/contents`;
+      const xml = await at.show(path);
+      if (xml) return readCoreData(xml, path);
+    }
+    return null;
+  },
+};

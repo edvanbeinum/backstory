@@ -37,14 +37,27 @@ terms:
     means: A one-line summary bar at the top of the side column that opens an overlay. The map strip and the data strip.
     avoid: []
   - name: Rails
-    means: Ruby on Rails, the framework the data model reader understands.
+    means: Ruby on Rails, one of the data readers.
     boundary: "`lib/data/` only"
     avoid:
       - rail, for any layout
+  - name: data reader
+    means: "One format a data model is read from: one entry in `DATA_READERS` (`lib/data/readers.ts`) and one file in `lib/data/`, such as `lib/data/rails.ts`."
+    avoid: []
+  - name: data steering
+    means: "`data.files` and `data.format` in a workspace's properties: which files hold the data model, and which data reader reads them. Read at the head and used at both ends of a view."
+    avoid: []
+  - name: drafted data model
+    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Read on a click and marked drafted wherever it's shown."
+    avoid: []
+  - name: data cache
+    means: "`lib/data/cache.ts`: the drafted data models in `~/.backstory/data/`, one file per head tree and one per base..head delta, plus the queue of reads that make them."
+    avoid:
+      - store
   - name: store
     means: "`lib/store.ts`: the small click-driven JSON files in `~/.backstory` (`homeDir`), each read and written whole."
     avoid:
-      - store, for the flow cache
+      - store, for the flow cache or the data cache
   - name: flow cache
     means: "`lib/flows/cache.ts`: one cached SARIF file per view in `~/.backstory/flows/`, plus the queue of runs that make them."
     avoid:
@@ -53,6 +66,11 @@ terms:
     means: "A C4 model kept on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo>/workspace.dsl` (`localModelDir` in `lib/model.ts`). Claude can draft one (`lib/models/draft.ts`)."
     avoid:
       - draft alone, for the model (reply drafts are `lib/drafts.ts`)
+  - name: AI provider
+    means: "The tool Backstory asks to read code and answer in a JSON schema; Claude Code for now (`lib/ai/provider.ts`)."
+    avoid:
+      - agent (that's the coding agent under review, as in the agent review loop)
+      - model, for the tool (that's the C4 or data model; the LLM is "the provider's model")
   - name: Mac app
     means: "The native app in `mac/` that owns the server: it starts Backstory's server from its bundle, shows the UI in a web view only while the server answers, and opens repos from `backstory://open?repo=` links."
     avoid:
@@ -104,8 +122,13 @@ blocks:
   - name: flow engine
     code:
       - lib/flows/
-    summary: Traces a view's flows with `claude -p`, checks each step against its line, and caches the result.
+    summary: Traces a view's flows with the AI provider, checks each step against its line, and caches the result.
     read: '`lib/flows/generate.ts` header, then README "Diagrams: the map, the data model and flows"'
+  - name: AI provider
+    code:
+      - lib/ai/
+    summary: "The one seam every AI call goes through: picks the provider (`BACKSTORY_AI`, Claude Code by default) and holds the contract a provider must meet, reading a directory read-only and answering in a JSON schema."
+    read: "`lib/ai/provider.ts` header"
   - name: model reader (the map)
     code:
       - lib/dsl.ts
@@ -117,7 +140,7 @@ blocks:
   - name: data model reader
     code:
       - lib/data/
-    summary: Reads the data model (Rails schema and models, or Core Data) at both ends of a view and diffs it.
+    summary: Reads the data model at both ends of a view and diffs it, with the first data reader that finds one, or the drafted data model.
     read: '`lib/data/build.ts` header, then README "Diagrams: the map, the data model and flows"'
   - name: agent review loop
     code:

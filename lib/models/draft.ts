@@ -1,13 +1,8 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { aiProvider, type Runner } from "../ai/provider";
 import { git, gitLine } from "../exec";
-import {
-  claudeAvailable,
-  claudeRunner,
-  flowsModel,
-  type Runner,
-} from "../flows/claude";
 import { withSnapshot } from "../flows/generate";
 import { DRAFTED_PROPERTY, localModelDir, MODEL_DSL, showFile } from "../model";
 import { assignIds, serializeModel, type DraftIds } from "./dsl";
@@ -132,7 +127,7 @@ export async function draftModel(opts: {
   onPhase?: (phase: string) => void;
 }): Promise<DraftResult> {
   const started = Date.now();
-  const runner = opts.runner ?? claudeRunner;
+  const runner = opts.runner ?? aiProvider().run;
   const phase = opts.onPhase ?? (() => {});
   const sha = await gitLine(opts.root, ["rev-parse", "--verify", "HEAD"]);
   if (!sha) throw new Error("The repo has no commits to draft a model from.");
@@ -188,7 +183,7 @@ export async function draftModel(opts: {
     }
 
     const durationMs = Date.now() - started;
-    const model = first.model ?? flowsModel();
+    const model = first.model ?? aiProvider().model();
     const day = new Date().toISOString().slice(0, 10);
     // The cost is only here, not in the strip: Claude Code reports it at API
     // list prices even on a subscription, where a run isn't charged.
@@ -305,7 +300,7 @@ export async function startDraft(
       release();
       return { status: "refused", reason: "exists" };
     }
-    if (!(await (opts.available ?? claudeAvailable)())) {
+    if (!(await (opts.available ?? aiProvider().available)())) {
       job.status = { status: "unavailable", reason: "no-claude" };
       return job.status;
     }

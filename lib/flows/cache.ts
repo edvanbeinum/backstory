@@ -3,9 +3,9 @@ import { EventEmitter } from "node:events";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
+import { aiProvider } from "../ai/provider";
 import { gitLine } from "../exec";
 import { homeDir } from "../store";
-import { claudeAvailable } from "./claude";
 import { attachComponents } from "./components";
 import { generateFlows, traceHunk } from "./generate";
 import { fromSarif, toSarif, type SarifLog } from "./sarif";
@@ -55,8 +55,11 @@ const registry: Registry = (g.__backstoryFlows ??= {
   events: new EventEmitter().setMaxListeners(0),
 });
 
-/** Worktrees of one repo share their flows: the key is the common git dir. */
-async function repoDir(root: string): Promise<string> {
+/**
+ * Worktrees of one repo share their flows and drafted data models: the key
+ * is the common git dir.
+ */
+export async function repoKey(root: string): Promise<string> {
   const common =
     (await gitLine(root, [
       "rev-parse",
@@ -67,7 +70,11 @@ async function repoDir(root: string): Promise<string> {
     .basename(path.dirname(common))
     .replace(/[^A-Za-z0-9._-]/g, "_");
   const hash = createHash("sha1").update(common).digest("hex").slice(0, 8);
-  return path.join(homeDir(), "flows", `${name}-${hash}`);
+  return `${name}-${hash}`;
+}
+
+async function repoDir(root: string): Promise<string> {
+  return path.join(homeDir(), "flows", await repoKey(root));
 }
 
 const fileName = (view: View) =>
@@ -121,7 +128,7 @@ function enqueue(fn: () => Promise<void>) {
 }
 
 async function haveClaude() {
-  registry.claude ??= await claudeAvailable();
+  registry.claude ??= await aiProvider().available();
   return registry.claude;
 }
 

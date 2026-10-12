@@ -1,6 +1,6 @@
 /**
  * A repo's data model in one shape, whatever wrote it down: Rails's
- * schema.rb and models, a Core Data model, and later others. The data view
+ * schema.rb and models, a Core Data model, SQL schema files. The data view
  * draws and compares this, never the source format.
  */
 
@@ -51,9 +51,12 @@ export interface Entity {
   constraints: Constraint[];
 }
 
+/** A data reader's format */
+export type DataSource = "rails" | "core data" | "sql";
+
 export interface DataModel {
-  /** Which reader produced it */
-  source: "rails" | "core data";
+  /** Which reader produced it, or "drafted" for the AI provider's reading */
+  source: DataSource | "drafted";
   entities: Map<string, Entity>;
 }
 
@@ -80,8 +83,28 @@ export interface EntityDiff {
 export interface DataResponse {
   status: "ok" | "none";
   source?: DataModel["source"];
+  /** Where the model was read from, the reader's label, for the overlay's footnote */
+  label?: string;
+  /** Every reader's label, in order, for the empty state */
+  readers: string[];
   /** False when the base has no data model: everything reads as added */
   baseModel: boolean;
   /** Entities the change touched, then their unchanged neighbours */
   entities: EntityDiff[];
+  /** Who drafted the model, when no reader found one and the AI provider read it */
+  drafted: { provider: string; model: string | null } | null;
+  /** When no reader found a model: the AI provider's read, for this view */
+  draft?: DataDraftStatus;
+  /** Why no reader was tried: a `data.format` Backstory doesn't read */
+  error?: string;
 }
+
+/** A drafted data model's read for one view, as the data strip shows it */
+export type DataDraftStatus =
+  /** Nothing read yet: the provider's name, for the offer's copy */
+  | { status: "idle"; provider: string }
+  | { status: "running"; phase: string; startedAt: number }
+  | { status: "done"; costUsd: number; durationMs: number }
+  | { status: "failed"; error: string }
+  /** The provider isn't ready: its name and what to do about it */
+  | { status: "unavailable"; provider: string; setup: string };

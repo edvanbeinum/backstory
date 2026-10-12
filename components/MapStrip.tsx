@@ -620,7 +620,7 @@ const formatSeconds = (ms: number) => {
   return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 };
 
-function Elapsed({ since }: { since: number }) {
+export function Elapsed({ since }: { since: number }) {
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
     const timer = setInterval(() => setNow(Date.now()), 1000);

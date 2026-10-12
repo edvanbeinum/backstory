@@ -141,10 +141,20 @@ export default function Page() {
   });
   const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
   const [map, setMap] = useState<MapResponse | null>(null);
-  /** Bumped when a model draft is written, so the map is read again */
+  /** Bumped when a model or data model draft is written, so both are read again */
   const [modelTick, setModelTick] = useState(0);
   const onModelChange = useCallback(() => setModelTick((t) => t + 1), []);
-  const [dataModel, setDataModel] = useState<DataResponse | null>(null);
+  /**
+   * Keeps the data with the view it was read for, and shows none while
+   * another view's read is on the way, so the data strip never offers a paid
+   * Redraft for one view beside the model of another.
+   */
+  const [dataRead, setDataRead] = useState<{
+    view: string;
+    data: DataResponse;
+  } | null>(null);
+  const dataView = `${repoPath}\n${rev}`;
+  const dataModel = dataRead?.view === dataView ? dataRead.data : null;
   /** The map component under the pointer: its files are outlined in the diff. */
   const [hoveredComponent, setHoveredComponent] = useState<string | null>(null);
   const revRef = useRef(rev);
@@ -544,7 +554,7 @@ export default function Page() {
     if (!repoPath || !haveSession || rev === WORKING_REV) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the map where there is none, else fetches it
       setMap(null);
-      setDataModel(null);
+      setDataRead(null);
       return;
     }
     let cancelled = false;
@@ -553,8 +563,11 @@ export default function Page() {
       .then((data) => !cancelled && setMap(data))
       .catch(() => !cancelled && setMap(null));
     getJson<DataResponse>(`/api/data?${query}`)
-      .then((data) => !cancelled && setDataModel(data))
-      .catch(() => !cancelled && setDataModel(null));
+      .then(
+        (data) =>
+          !cancelled && setDataRead({ view: `${repoPath}\n${rev}`, data }),
+      )
+      .catch(() => !cancelled && setDataRead(null));
     return () => {
       cancelled = true;
     };
@@ -1409,7 +1422,13 @@ export default function Page() {
                             onOpenFile={openFile}
                             onModelChange={onModelChange}
                           />
-                          <DataStrip data={dataModel} notes={entityNotes} />
+                          <DataStrip
+                            data={dataModel}
+                            notes={entityNotes}
+                            repo={repoPath}
+                            rev={rev}
+                            onRead={onModelChange}
+                          />
                         </>
                       ) : null
                     }
@@ -1485,7 +1504,13 @@ export default function Page() {
                               onOpenFile={openFile}
                               onModelChange={onModelChange}
                             />
-                            <DataStrip data={dataModel} notes={entityNotes} />
+                            <DataStrip
+                              data={dataModel}
+                              notes={entityNotes}
+                              repo={repoPath}
+                              rev={rev}
+                              onRead={onModelChange}
+                            />
                           </>
                         ) : null
                       }

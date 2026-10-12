@@ -1,3 +1,4 @@
+import type { DataReader, RevFiles } from "./readers";
 import type {
   Constraint,
   DataModel,
@@ -133,14 +134,14 @@ const KINDS: Record<string, RelationshipKind> = {
   has_and_belongs_to_many: "many to many",
 };
 
-function classify(name: string) {
+export function classify(name: string) {
   return name
     .split("_")
     .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
     .join("");
 }
 
-function singular(name: string) {
+export function singular(name: string) {
   return lastWord(name, singularWord);
 }
 
@@ -291,3 +292,45 @@ export function readRails(src: RailsSources): DataModel {
   }
   return { source: "rails", entities };
 }
+
+/**
+ * The files at a commit, by path. Read one by one, a few at a time: git's
+ * batch output gives sizes in bytes, and slicing decoded text by them
+ * goes wrong at the first non-ASCII character.
+ */
+export async function readFiles(
+  at: RevFiles,
+  paths: string[],
+): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  const queue = [...paths];
+  const worker = async () => {
+    for (let path = queue.shift(); path !== undefined; path = queue.shift()) {
+      const text = await at.show(path);
+      if (text !== null) out.set(path, text);
+    }
+  };
+  await Promise.all(Array.from({ length: 8 }, worker));
+  return out;
+}
+
+export const railsReader: DataReader = {
+  source: "rails",
+  label: "db/schema.rb and the models",
+  async read(at) {
+    const listing = await at.listing();
+    // Steered, as for a Rails app under `api/`, the schema and the models
+    // are wherever `data.files` says.
+    const schemaPath = at.steered
+      ? listing.find((p) => p === "schema.rb" || p.endsWith("/schema.rb"))
+      : "db/schema.rb";
+    const schema = schemaPath ? await at.show(schemaPath) : null;
+    if (!schema) return null;
+    const paths = listing.filter(
+      (p) =>
+        p.endsWith(".rb") &&
+        (at.steered ? p !== schemaPath : p.startsWith("app/models/")),
+    );
+    return readRails({ schema, models: await readFiles(at, paths) });
+  },
+};

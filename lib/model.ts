@@ -69,7 +69,7 @@ export interface WorkspaceRelationship {
   description: string;
 }
 
-const splitGlobs = (value: string | undefined) =>
+export const splitGlobs = (value: string | undefined) =>
   value?.split(/\s+/).filter(Boolean) ?? [];
 
 /**

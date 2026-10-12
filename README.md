@@ -34,8 +34,15 @@ system, so you can see where it landed before reading its lines:
   in the map strip has Claude Code read the code at HEAD and write one
   there, never into the repo: a draft, marked as one, for you to correct.
 - **The data model** shows the entities the change touched: new fields,
-  relationships and rules. It reads `db/schema.rb` and the models (Rails) or
-  the `.xcdatamodeld` (Core Data). Nothing is run.
+  relationships and rules. It reads `db/schema.rb` and the models (Rails),
+  the `.xcdatamodeld` (Core Data), or SQL schema files: the `CREATE TABLE`
+  statements in a `schema.sql`, a `structure.sql` or a `schema/` folder,
+  outside migrations and tests. Nothing is run. Any other repo can have
+  its data model drafted on demand: **Draft the data model** in the data strip
+  has Claude Code read the code at the head, and work out the base from the
+  change. The result is marked as a draft and kept in `~/.backstory/data/`,
+  so a view is read once. A head read costs about $0.15 on a small repo and
+  over $1 and a few minutes on a large one.
 - **Flows** are sequence diagrams of what the code does for each user action
   the change touches, before and after, beside the code they come from.
 
@@ -45,7 +52,10 @@ part of the DSL that describes elements and arrows:
 - `workspace`, `!identifiers hierarchical` (or the default `flat`), `model`,
   and `properties` at the top and inside elements. `code.globs` on an element
   says which files belong to it; `code.tests` and `code.ignore` on the
-  workspace say which files are tests or not code at all.
+  workspace say which files are tests or not code at all. `data.files` on
+  the workspace says which files hold the data model, for a Rails app in a
+  folder or SQL files off the usual paths, and `data.format` (`rails`,
+  `core data` or `sql`) says which reader reads them.
 - `person`, `softwareSystem`, `container` and `component`, nested, named
   (`id = container "…"`) or not, with `tags`, `technology`, `url`,
   `description` and `perspectives` inside them.

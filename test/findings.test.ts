@@ -64,6 +64,8 @@ const kinds = (f: ReturnType<typeof findings>) => f.map((x) => x.kind);
 test("a core entity gaining a vendor's fields is noted, on that entity", () => {
   const data: DataResponse = {
     status: "ok",
+    readers: [],
+    drafted: null,
     baseModel: true,
     entities: [
       {
