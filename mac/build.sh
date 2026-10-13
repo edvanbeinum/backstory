@@ -35,9 +35,13 @@ if [ ! -x "$node" ]; then
   rm "$out/$node_tar"
 fi
 
+# Build unsigned: the project's automatic signing wants a development
+# certificate, which a release runner doesn't have, and everything is signed
+# below anyway.
 xcodebuild -quiet -project mac/backstory/Backstory.xcodeproj -scheme Backstory \
   -configuration Release -derivedDataPath "$out/DerivedData" \
-  MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$version" build
+  MARKETING_VERSION="$version" CURRENT_PROJECT_VERSION="$version" \
+  CODE_SIGNING_ALLOWED=NO build
 
 rm -rf "$app"
 ditto "$out/DerivedData/Build/Products/Release/Backstory.app" "$app"
@@ -45,9 +49,6 @@ identity="${BACKSTORY_SIGN_IDENTITY:-}"
 if [ -z "$identity" ]; then
   identity="$(security find-identity -v -p codesigning |
     sed -n 's/.*"\(Developer ID Application: .*\)"$/\1/p' | head -1)"
-fi
-if [ -z "$identity" ]; then
-  identity="$(codesign -dvv "$app" 2>&1 | sed -n 's/^Authority=//p' | head -1)"
 fi
 identity="${identity:--}"
 # Ask Apple's server for a secure timestamp, which notarization requires,
@@ -94,11 +95,9 @@ plist="$app/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string Backstory" "$plist"
 
 # Sign Node first, with the JIT entitlements V8 can't run without under the
-# hardened runtime, then the app. The app's signature has to be last because
-# adding the server, Node and the icon broke Xcode's, and it must not re-sign
-# Node (no --deep), or Node loses its entitlements and the server crashes at
-# once. The app gets no entitlements: Xcode's carried get-task-allow, which
-# notarization refuses, and it needs no others.
+# hardened runtime, then the app. The app's signature has to be last, and it
+# must not re-sign Node (no --deep), or Node loses its entitlements and the
+# server crashes at once. The app needs no entitlements.
 codesign --force --options runtime "$timestamp" \
   --entitlements mac/node.entitlements \
   --sign "$identity" "$app/Contents/Helpers/node"
