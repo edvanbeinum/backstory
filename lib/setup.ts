@@ -1,0 +1,146 @@
+import { constants, promises as fs } from "node:fs";
+import { homedir } from "node:os";
+import path from "node:path";
+
+import { aiProvider } from "./ai/provider";
+import { refreshLoginShellDirs, run } from "./exec";
+import { gh } from "./github";
+
+/**
+ * The setup checklist's checks: what Backstory needs on this machine, and
+ * what each piece unlocks. Each one only looks, and changes nothing.
+ */
+
+export type SetupId = "git" | "github" | "claude" | "reviews";
+export type SetupState = "missing" | "logged-out" | "ready";
+
+export interface SetupRow {
+  id: SetupId;
+  state: SetupState;
+  /** What it unlocks, for the row's copy */
+  detail: string;
+}
+
+export const SETUP_DETAILS: Record<SetupId, string> = {
+  git: "Commits, diffs and the inbox",
+  github: "PR comments and review threads",
+  claude: "Flows and drafted maps",
+  reviews: "backstory review, and notes queued for the Stop hook",
+};
+
+/** On a Mac without the command line tools this is a shim, and running it opens Apple's install dialog. */
+const GIT_SHIM = "/usr/bin/git";
+const TIMEOUT_MS = 15_000;
+
+interface SetupOptions {
+  /** Where Claude Code keeps settings.json: `$CLAUDE_CONFIG_DIR`, or `~/.claude` */
+  claudeDir?: string;
+  /** Stands in for `/usr/bin/git`, for tests */
+  gitShim?: string;
+}
+
+export async function setupChecks(
+  opts: SetupOptions = {},
+): Promise<SetupRow[]> {
+  const claudeDir =
+    opts.claudeDir ??
+    process.env.CLAUDE_CONFIG_DIR ??
+    path.join(homedir(), ".claude");
+  const [git, github, claude, reviews] = await Promise.all([
+    gitState(opts.gitShim ?? GIT_SHIM),
+    githubState(),
+    aiProvider().status(),
+    reviewsState(claudeDir),
+  ]);
+  const states: Record<SetupId, SetupState> = { git, github, claude, reviews };
+  return (Object.keys(SETUP_DETAILS) as SetupId[]).map((id) => ({
+    id,
+    state: states[id],
+    detail: SETUP_DETAILS[id],
+  }));
+}
+
+/**
+ * Runs the checks, and when `gh` or `claude` is missing asks the login shell
+ * again and checks once more, so a tool installed since the server started
+ * (through nvm, say) is found without a restart.
+ */
+export async function setupChecksFresh(
+  opts: SetupOptions = {},
+): Promise<SetupRow[]> {
+  const rows = await setupChecks(opts);
+  const lacking = rows.some(
+    (row) =>
+      (row.id === "github" || row.id === "claude") && row.state === "missing",
+  );
+  if (!lacking) return rows;
+  await refreshLoginShellDirs();
+  return setupChecks(opts);
+}
+
+async function onPath(name: string): Promise<string | null> {
+  for (const dir of (process.env.PATH ?? "").split(path.delimiter)) {
+    if (!dir) continue;
+    const file = path.join(dir, name);
+    try {
+      await fs.access(file, constants.X_OK);
+      return file;
+    } catch {}
+  }
+  return null;
+}
+
+async function succeeds(file: string, args: string[]): Promise<boolean> {
+  try {
+    await run(file, args, { timeout: TIMEOUT_MS });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function gitState(shim: string): Promise<SetupState> {
+  const git = await onPath("git");
+  if (!git) return "missing";
+  if (git === shim && !(await succeeds("xcode-select", ["-p"])))
+    return "missing";
+  return (await succeeds(git, ["--version"])) ? "ready" : "missing";
+}
+
+async function githubState(): Promise<SetupState> {
+  try {
+    // Scoped to github.com: a bad token for another host fails the bare command
+    await gh(process.cwd(), ["auth", "status", "--hostname", "github.com"]);
+    return "ready";
+  } catch (err) {
+    return (err as { code?: unknown }).code === 127 ? "missing" : "logged-out";
+  }
+}
+
+interface HookEntry {
+  hooks?: { command?: unknown }[];
+}
+
+/** Looks for the `backstory hook stop` Stop hook; never writes the file. */
+async function reviewsState(claudeDir: string): Promise<SetupState> {
+  try {
+    const settings = JSON.parse(
+      await fs.readFile(path.join(claudeDir, "settings.json"), "utf8"),
+    ) as { hooks?: { Stop?: HookEntry[] } };
+    const stop = settings.hooks?.Stop;
+    const found =
+      Array.isArray(stop) &&
+      stop.some(
+        (entry) =>
+          Array.isArray(entry?.hooks) &&
+          entry.hooks.some(
+            (hook) =>
+              typeof hook?.command === "string" &&
+              /backstory hook stop\s*$/.test(hook.command),
+          ),
+      );
+    return found ? "ready" : "missing";
+  } catch {
+    return "missing";
+  }
+}

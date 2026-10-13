@@ -1,0 +1,125 @@
+import assert from "node:assert/strict";
+import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
+import { test } from "node:test";
+
+import { SETUP_DETAILS, setupChecks, type SetupId } from "../lib/setup";
+import { quietLoginShell, standIns } from "./standins";
+
+quietLoginShell();
+
+const GIT = 'echo "git version 2.50.0"';
+
+/** A `settings.json` folder standing in for `~/.claude`; none when `settings` is undefined. */
+function claudeDir(settings?: string): string {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "backstory-claude-"));
+  if (settings !== undefined)
+    writeFileSync(path.join(dir, "settings.json"), settings);
+  return dir;
+}
+
+async function checks(
+  scripts: Record<string, string>,
+  opts: { claudeDir?: string; gitShim?: (dir: string) => string } = {},
+) {
+  const dir = standIns(scripts);
+  const saved = process.env.PATH;
+  process.env.PATH = dir;
+  try {
+    const rows = await setupChecks({
+      claudeDir: opts.claudeDir ?? claudeDir(),
+      gitShim: opts.gitShim?.(dir),
+    });
+    return {
+      dir,
+      rows,
+      state: (id: SetupId) => rows.find((row) => row.id === id)?.state,
+    };
+  } finally {
+    process.env.PATH = saved;
+  }
+}
+
+test("with git but no gh and no Claude Code, the checklist says what each missing piece unlocks", async () => {
+  const { rows } = await checks({ git: GIT });
+  assert.deepEqual(rows, [
+    { id: "git", state: "ready", detail: SETUP_DETAILS.git },
+    { id: "github", state: "missing", detail: SETUP_DETAILS.github },
+    { id: "claude", state: "missing", detail: SETUP_DETAILS.claude },
+    { id: "reviews", state: "missing", detail: SETUP_DETAILS.reviews },
+  ]);
+  assert.match(SETUP_DETAILS.github, /PR comments/);
+  assert.match(SETUP_DETAILS.claude, /[Ff]lows/);
+  assert.match(SETUP_DETAILS.reviews, /backstory review/);
+});
+
+test("Claude Code's row tells not installed, logged out and ready apart", async () => {
+  const claude = (auth: string, code = 0) =>
+    `if [ "$1" = auth ]; then echo '${auth}'; exit ${code}; fi\necho "2.1.0 (Claude Code)"`;
+  assert.equal((await checks({ git: GIT })).state("claude"), "missing");
+  assert.equal(
+    (
+      await checks({ git: GIT, claude: claude('{"loggedIn": false}', 1) })
+    ).state("claude"),
+    "logged-out",
+  );
+  assert.equal(
+    (await checks({ git: GIT, claude: claude('{"loggedIn": true}') })).state(
+      "claude",
+    ),
+    "ready",
+  );
+});
+
+test("GitHub's row tells no gh, logged out and ready apart", async () => {
+  assert.equal((await checks({ git: GIT })).state("github"), "missing");
+  assert.equal(
+    (await checks({ git: GIT, gh: 'echo "not logged in" >&2; exit 1' })).state(
+      "github",
+    ),
+    "logged-out",
+  );
+  assert.equal(
+    (await checks({ git: GIT, gh: "exit 0" })).state("github"),
+    "ready",
+  );
+});
+
+test("a git that is only Apple's shim reads as missing without running it", async () => {
+  const { dir, state } = await checks(
+    { git: '/usr/bin/touch "${0%/*}/git-ran"', "xcode-select": "exit 2" },
+    { gitShim: (dir) => path.join(dir, "git") },
+  );
+  assert.equal(state("git"), "missing");
+  assert.equal(existsSync(path.join(dir, "git-ran")), false);
+});
+
+test("the shim's git runs once the command line tools are installed", async () => {
+  const { state } = await checks(
+    { git: GIT, "xcode-select": "echo /Library/Developer/CommandLineTools" },
+    { gitShim: (dir) => path.join(dir, "git") },
+  );
+  assert.equal(state("git"), "ready");
+});
+
+test("agent reviews are ready only once the backstory Stop hook is in Claude Code's settings", async () => {
+  const stop = (...commands: string[]) =>
+    JSON.stringify({
+      hooks: {
+        Stop: commands.map((command) => ({
+          hooks: [{ type: "command", command }],
+        })),
+      },
+    });
+  const reviews = async (dir: string) =>
+    (await checks({ git: GIT }, { claudeDir: dir })).state("reviews");
+
+  assert.equal(await reviews(claudeDir()), "missing");
+  assert.equal(await reviews(claudeDir("{ not json")), "missing");
+  assert.equal(await reviews(claudeDir(stop("other-tool stop"))), "missing");
+  assert.equal(
+    await reviews(claudeDir(stop("other-tool stop", "backstory hook stop"))),
+    "ready",
+  );
+});

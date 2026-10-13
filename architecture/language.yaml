@@ -148,6 +148,12 @@ blocks:
       - bin/hook.mjs
     summary: Notes on an agent's work, sent to a waiting `backstory review` or queued for the agent's Stop hook.
     read: 'README "Reviewing an agent''s work"'
+  - name: setup
+    code:
+      - lib/setup.ts
+      - app/api/setup/
+    summary: "Checks what Backstory needs on this machine (git, GitHub's `gh`, Claude Code and the agent review Stop hook), and only looks, never changes anything."
+    read: "`lib/setup.ts` header"
   - name: live updates
     code:
       - app/api/watch/
