@@ -56,7 +56,6 @@ function props(values: Record<string, unknown>): Record<string, unknown> {
   );
 }
 
-/** A property by its short name. */
 const prop = (bag: Record<string, unknown>, key: string): unknown =>
   bag[`${NS}.${key}`];
 
