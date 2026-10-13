@@ -57,7 +57,7 @@ export function hookPort(env = process.env) {
 /**
  * Whether a Stop hook's command is this one: it ends in `backstory hook stop`,
  * bare or as a path, quoted or not. `backstory setup claude` and the setup
- * checklist's Agent reviews row both use it, so a hook setup writes ticks
+ * checklist's Notes to your agent row both use it, so a hook setup writes ticks
  * the row.
  *
  * @param {unknown} command

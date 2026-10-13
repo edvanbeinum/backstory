@@ -1,6 +1,6 @@
 import AppKit
 
-/// The setup checklist's Agent reviews button: adds Backstory's Stop hook and
+/// The setup checklist's Notes to your agent button: adds Backstory's Stop hook and
 /// `/backstory-review` to Claude Code, or takes them out, by running
 /// `backstory setup claude` from the bundle once the user has seen what it
 /// changes. The merge itself is in `bin/claude-setup.mjs`.

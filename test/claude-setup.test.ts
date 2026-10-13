@@ -81,7 +81,7 @@ test("setup writes one Stop hook and /backstory-review, both naming the app's co
   );
 });
 
-test("the setup checklist's Agent reviews row ticks after setup and clears after undo", async () => {
+test("the setup checklist's Notes to your agent row ticks after setup and clears after undo", async () => {
   const dir = claudeDir();
   assert.equal(await reviewsRow(dir), "missing");
   applyClaudeSetup({ claudeDir: dir, script: SCRIPT });

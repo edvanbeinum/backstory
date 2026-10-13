@@ -65,8 +65,8 @@ The server logs to `~/.backstory/server.log`.
 
 ### Uninstalling
 
-1. If you set up agent reviews, choose **Backstory → Set Up Backstory…** and
-   press **Remove…** on the **Agent reviews** row. It takes the Stop hook and
+1. If you set up notes to your agent, choose **Backstory → Set Up Backstory…** and
+   press **Remove…** on the **Notes to your agent** row. It takes the Stop hook and
    `/backstory-review` out of `~/.claude`.
 2. Turn off **Open at Login**, quit Backstory, and delete `Backstory.app`.
 3. Delete Backstory's data: notes, ticks, the outbox, traced flows, drafted
@@ -165,7 +165,7 @@ The agent's side of a review goes through the `backstory` command:
 inside the app, which runs it with its own Node.
 
 To hand it to Claude Code, choose **Backstory → Set Up Backstory…**, then
-press **Set Up** on the **Agent reviews** row. It shows what it will change,
+press **Set Up** on the **Notes to your agent** row. It shows what it will change,
 then adds the Stop hook to `~/.claude/settings.json` and `/backstory-review`
 to `~/.claude/commands/`, both naming the command by its place in the app.
 Your other hooks and settings stay as they are. Set it up with Backstory in
@@ -207,7 +207,7 @@ for every session. It stays silent until a checkout has notes queued, and
 never gets in the agent's way: with Backstory not running, unreachable or
 erroring, or in a directory that isn't a checkout, it prints nothing within
 about two seconds and the agent stops as usual. **Set Up** on the setup
-checklist's Agent reviews row adds it (see [The `backstory`
+checklist's Notes to your agent row adds it (see [The `backstory`
 command](#the-backstory-command)).
 
 Or let the agent ask. `backstory review` opens the uncommitted changes and waits;
