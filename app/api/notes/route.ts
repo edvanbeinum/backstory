@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { NextResponse } from "next/server";
 
-import { errorResponse } from "@/lib/api";
+import { crossSite, errorResponse } from "@/lib/api";
 import { changeNotes, getNotes, parseChange } from "@/lib/notes";
 import type { ApiError } from "@/lib/types";
 
@@ -40,6 +40,8 @@ export async function GET(request: Request) {
 
 /** Body: one `NotesChange` — `{op: "save", note}`, `{op: "tick", id, done}`, … */
 export async function POST(request: Request) {
+  const refused = crossSite(request);
+  if (refused) return refused;
   const root = rootParam(request);
   if (!root) return noRoot();
 

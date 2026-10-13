@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { errorResponse } from "@/lib/api";
+import { crossSite, errorResponse } from "@/lib/api";
 import { getPatchId, resolveRepo, resolveRev } from "@/lib/git";
 import {
   getResponses,
@@ -62,6 +62,8 @@ export async function GET(request: Request) {
  * when linking a commit, to compute its patch-id.
  */
 export async function POST(request: Request) {
+  const refused = crossSite(request);
+  if (refused) return refused;
   const { searchParams } = new URL(request.url);
   const key = searchParams.get("key");
   if (badKey(key)) {

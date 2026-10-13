@@ -2,7 +2,7 @@ import path from "node:path";
 
 import { NextResponse } from "next/server";
 
-import { errorResponse } from "@/lib/api";
+import { crossSite, errorResponse } from "@/lib/api";
 import { resolveRepo } from "@/lib/git";
 import { changeNotes } from "@/lib/notes";
 import {
@@ -68,6 +68,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const refused = crossSite(request);
+  if (refused) return refused;
   const { searchParams } = new URL(request.url);
   if (searchParams.has("take")) return takeFor(searchParams);
   if (searchParams.has("ack")) return ackFor(searchParams, request);
@@ -204,6 +206,8 @@ async function ackFor(searchParams: URLSearchParams, request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const refused = crossSite(request);
+  if (refused) return refused;
   const { searchParams } = new URL(request.url);
   const root = rootParam(searchParams);
   const id = searchParams.get("id");
@@ -229,6 +233,8 @@ export async function PATCH(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const refused = crossSite(request);
+  if (refused) return refused;
   const { searchParams } = new URL(request.url);
   const root = rootParam(searchParams);
   const id = searchParams.get("id");
