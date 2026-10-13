@@ -17,7 +17,8 @@ primitives:
     file: lib/exec.ts
     symbols:
       - run
-    use: Every other child process. It passes argv and never a shell, and extends PATH so binaries resolve under the Mac app or launchd.
+      - refreshLoginShellDirs
+    use: "Every other child process. It passes argv and never a shell, and extends PATH so binaries resolve under the Mac app or launchd: the usual tool folders, plus the folders the user's login shell finds `gh` and `claude` in (nvm and the like), asked once per server before the first `gh` or `claude` call. `refreshLoginShellDirs` asks again."
   - name: open a repo
     block: git reader
     file: lib/git.ts
