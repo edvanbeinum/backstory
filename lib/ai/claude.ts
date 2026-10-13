@@ -1,5 +1,5 @@
 import { run } from "../exec";
-import type { AiProvider, Runner } from "./provider";
+import type { AiProvider, ProviderStatus, Runner } from "./provider";
 
 /**
  * Every call to Claude Code goes through here, so a change in its CLI is a
@@ -93,20 +93,36 @@ function mainModel(usage: Record<string, unknown> | undefined): string | null {
   );
 }
 
-async function claudeAvailable(): Promise<boolean> {
+/**
+ * Reads `claude auth status` for `"loggedIn": false`. Any other answer,
+ * including one with no JSON from an older or newer Claude Code, counts as
+ * ready: an odd version mustn't block a working setup, and a run still
+ * reports a real failure.
+ */
+async function claudeStatus(): Promise<ProviderStatus> {
   try {
     await run("claude", ["--version"], { timeout: 15_000 });
-    return true;
   } catch {
-    return false;
+    return "missing";
+  }
+  try {
+    const { stdout } = await run("claude", ["auth", "status"], {
+      timeout: 15_000,
+      allowExitCodes: [1],
+    });
+    const start = stdout.indexOf("{");
+    if (start === -1) return "ready";
+    const answer = JSON.parse(stdout.slice(start)) as { loggedIn?: unknown };
+    return answer.loggedIn === false ? "logged-out" : "ready";
+  } catch {
+    return "ready";
   }
 }
 
 export const claudeCode: AiProvider = {
   id: "claude",
   name: "Claude Code",
-  setup: "Install Claude Code and sign in",
   model: flowsModel,
-  available: claudeAvailable,
+  status: claudeStatus,
   run: claudeRunner,
 };

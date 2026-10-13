@@ -4,7 +4,9 @@ import WebKit
 /// The one window: Backstory's page in a web view while a Backstory answers, the
 /// waiting view while it doesn't. In owned mode it also starts the server and
 /// restarts it, as `ServerState` decides.
-final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUIDelegate {
+final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUIDelegate,
+    WKScriptMessageHandler
+{
     private var state: ServerState
     private let serverProcess: ServerProcess?
     private let webView: DropWebView
@@ -39,6 +41,9 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
 
         webView.navigationDelegate = self
         webView.uiDelegate = self
+        // The page posts "openRepo" here; its presence is also how the page
+        // knows it's in the Mac app and offers Open Repo….
+        webView.configuration.userContentController.add(self, name: "backstory")
         webView.allowsBackForwardNavigationGestures = true
         webView.isInspectable = inspectable
         urlObservation = webView.observe(\.url) { [weak self] webView, _ in
@@ -97,6 +102,16 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         showWindow(nil)
         NSApp.activate()
         if let now = state.open(address) { webView.load(URLRequest(url: now)) }
+    }
+
+    /// File → Open Repo…, and the empty inbox's Open Repo… button.
+    func chooseRepo() {
+        let panel = NSOpenPanel()
+        panel.canChooseDirectories = true
+        panel.canChooseFiles = false
+        panel.prompt = "Open Repo"
+        guard panel.runModal() == .OK, let folder = panel.url else { return }
+        open(RepoLink.address(forRepo: folder.standardizedFileURL.path, server: state.server))
     }
 
     private func apply(_ effect: ServerState.Effect) {
@@ -201,6 +216,18 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
 
     func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
         webView.reload()
+    }
+
+    // MARK: - WKScriptMessageHandler
+
+    func userContentController(
+        _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
+    ) {
+        guard message.frameInfo.isMainFrame,
+            let url = message.frameInfo.request.url, isServer(url),
+            message.body as? String == "openRepo"
+        else { return }
+        chooseRepo()
     }
 
     // MARK: - WKUIDelegate

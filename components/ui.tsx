@@ -33,6 +33,7 @@ export function Badge({
 export function Button({
   children,
   onClick,
+  href,
   variant = "default",
   size = "md",
   title,
@@ -42,6 +43,8 @@ export function Button({
 }: {
   children: React.ReactNode;
   onClick?: () => void;
+  /** Makes it a link that opens in a new window, styled as a button */
+  href?: string;
   variant?: "default" | "primary" | "invisible";
   size?: "sm" | "md";
   title?: string;
@@ -63,6 +66,18 @@ export function Button({
     invisible:
       "border border-transparent text-[var(--fg-muted)] hover:bg-[var(--canvas-subtle)] hover:text-[var(--fg)]",
   };
+  if (href)
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        title={title}
+        className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
+      >
+        {children}
+      </a>
+    );
   return (
     <button
       type={type}

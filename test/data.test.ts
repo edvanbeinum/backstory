@@ -832,7 +832,7 @@ function recorder(
   return { runner, calls, prompts };
 }
 
-const ready = async () => true;
+const ready = async () => "ready" as const;
 
 /** A TypeScript repo whose stored Note gains a field in its second commit. */
 function notesRepo() {
@@ -852,7 +852,7 @@ function notesRepo() {
 }
 
 async function read(view: DataView, opts: Parameters<typeof startDataRead>[1]) {
-  const started = await startDataRead(view, { available: ready, ...opts });
+  const started = await startDataRead(view, { status: ready, ...opts });
   await dataReadSettled(view);
   return started;
 }
@@ -984,20 +984,35 @@ test("a failed run isn't retried, fails with the provider's message and caches n
   assert.deepEqual(next.calls, ["head", "delta"]);
 });
 
-test("a provider that isn't ready says which, and what to do", async () => {
+test("a provider that isn't installed says which, and reads nothing", async () => {
   const repo = notesRepo();
   const ai = recorder();
   const status = await startDataRead(repo.view, {
     runner: ai.runner,
-    available: async () => false,
+    status: async () => "missing",
   });
   assert.deepEqual(status, {
     status: "unavailable",
     provider: "Claude Code",
-    setup: "Install Claude Code and sign in",
+    reason: "no-claude",
   });
   assert.deepEqual(ai.calls, []);
   assert.deepEqual(await dataStatus(repo.view), status);
+});
+
+test("a logged-out provider says so, and reads nothing", async () => {
+  const repo = notesRepo();
+  const ai = recorder();
+  const status = await startDataRead(repo.view, {
+    runner: ai.runner,
+    status: async () => "logged-out",
+  });
+  assert.deepEqual(status, {
+    status: "unavailable",
+    provider: "Claude Code",
+    reason: "logged-out",
+  });
+  assert.deepEqual(ai.calls, []);
 });
 
 test("a patch past the cap fails as too large and reads nothing", async () => {

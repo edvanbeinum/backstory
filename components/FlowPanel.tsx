@@ -10,6 +10,7 @@ import {
   type FlowRow,
 } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
+import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import {
   FlowSequence,
   type ComponentInfo,
@@ -125,17 +126,15 @@ export function FlowPanel({
       </Notice>
     ) : (
       <Notice tone="attention">
-        Flows need Claude Code: Backstory runs{" "}
-        <code className="mono">claude -p</code> with your login, and
-        couldn&apos;t find <code className="mono">claude</code> on its PATH. The
-        rest of Backstory works without it.{" "}
-        <button
-          type="button"
-          className="text-[var(--accent)]"
-          onClick={api.reload}
-        >
-          Look again
-        </button>
+        <ClaudeCodeNotice reason={status.reason} needs="Flows need">
+          <button
+            type="button"
+            className="text-[var(--accent)]"
+            onClick={api.reload}
+          >
+            Look again
+          </button>
+        </ClaudeCodeNotice>
       </Notice>
     );
   }

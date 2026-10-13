@@ -3,7 +3,7 @@ import { EventEmitter } from "node:events";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { aiProvider } from "../ai/provider";
+import { aiProvider, providerGap, type ProviderStatus } from "../ai/provider";
 import { gitLine } from "../exec";
 import { homeDir } from "../store";
 import { attachComponents } from "./components";
@@ -41,7 +41,7 @@ interface Registry {
   tracing: Map<string, Set<string>>;
   failures: Map<string, string>;
   queue: Promise<unknown>;
-  claude: boolean | null;
+  claude: ProviderStatus | null;
   events: EventEmitter;
 }
 
@@ -127,20 +127,33 @@ function enqueue(fn: () => Promise<void>) {
   registry.queue = next.catch(() => {});
 }
 
-async function haveClaude() {
-  registry.claude ??= await aiProvider().available();
-  return registry.claude;
+/**
+ * Caches only `ready`, so a provider installed or logged in to after the
+ * server started is found on the next click.
+ */
+async function providerStatus(
+  check: () => Promise<ProviderStatus> = () => aiProvider().status(),
+): Promise<ProviderStatus> {
+  if (registry.claude === "ready") return "ready";
+  const status = await check();
+  if (status === "ready") registry.claude = status;
+  return status;
+}
+
+interface StartOptions {
+  /** Stands in for the provider's own check, for tests */
+  status?: () => Promise<ProviderStatus>;
 }
 
 /** Start a run for the view unless one is going. Regenerate drops the cache. */
 export async function startFlows(
   view: View,
-  opts: { regenerate?: boolean } = {},
+  opts: StartOptions & { regenerate?: boolean } = {},
 ): Promise<FlowsStatus> {
-  if (!(await haveClaude())) {
-    registry.claude = null; // look again next time: it may have been installed
-    return { status: "unavailable", reason: "no-claude" };
-  }
+  const gap = providerGap(
+    await (opts.status ? opts.status() : providerStatus()),
+  );
+  if (gap) return { status: "unavailable", reason: gap };
   const key = jobKey(await repoDir(view.root), view);
   if (registry.jobs.has(key)) return flowsStatus(view);
   // Regenerating replaces the cached flows only when the new run succeeds:
@@ -178,9 +191,12 @@ export async function startFlows(
 export async function startTrace(
   view: View,
   hunkId: string,
+  opts: StartOptions = {},
 ): Promise<FlowsStatus> {
-  if (!(await haveClaude()))
-    return { status: "unavailable", reason: "no-claude" };
+  const gap = providerGap(
+    await (opts.status ? opts.status() : providerStatus()),
+  );
+  if (gap) return { status: "unavailable", reason: gap };
   const key = jobKey(await repoDir(view.root), view);
   const tracing = registry.tracing.get(key) ?? new Set<string>();
   if (tracing.has(hunkId)) return flowsStatus(view);

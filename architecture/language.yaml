@@ -79,6 +79,11 @@ terms:
     avoid:
       - dev mode
       - override
+  - name: setup checklist
+    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`."
+    avoid:
+      - onboarding
+      - wizard
   - name: primitive
     means: A named capability Backstory exposes for reuse, listed in `architecture/primitives.yaml`.
     avoid:
@@ -148,6 +153,12 @@ blocks:
       - bin/hook.mjs
     summary: Notes on an agent's work, sent to a waiting `backstory review` or queued for the agent's Stop hook.
     read: 'README "Reviewing an agent''s work"'
+  - name: setup
+    code:
+      - lib/setup.ts
+      - app/api/setup/
+    summary: "Checks what Backstory needs on this machine (git, GitHub's `gh`, Claude Code and the agent review Stop hook), and only looks, never changes anything."
+    read: "`lib/setup.ts` header"
   - name: live updates
     code:
       - app/api/watch/

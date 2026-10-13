@@ -34,4 +34,12 @@ enum RepoLink {
         components.percentEncodedQuery = "repo=\(encoded)"
         return components.url!
     }
+
+    /// The inbox with the setup checklist showing, for Set Up Backstory….
+    static func setupAddress(server: URL) -> URL {
+        var components = URLComponents(url: server, resolvingAgainstBaseURL: false)!
+        components.path = "/"
+        components.percentEncodedQuery = "setup=1"
+        return components.url!
+    }
 }

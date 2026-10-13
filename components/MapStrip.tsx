@@ -11,6 +11,7 @@ import {
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
 import type { DraftStatus, ModelSourceResponse } from "@/lib/models/draft";
+import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
 import { Badge, Button, CopyButton, Spinner } from "./ui";
@@ -527,8 +528,6 @@ function Ticked({ text }: { text: string }) {
   );
 }
 
-const CLAUDE_CODE_INSTALL = "https://code.claude.com/docs/en/setup";
-
 type Finished = Extract<DraftStatus, { status: "done" }>;
 type ModelAnswer = ModelSourceResponse | { error: string };
 type JobState = DraftStatus["status"];
@@ -662,17 +661,7 @@ function DraftProgress({ draft }: { draft: DraftApi }) {
   if (job?.status === "unavailable")
     return (
       <span className="text-[12px] text-[var(--attention)]">
-        Drafting a model needs{" "}
-        <a
-          className="text-[var(--accent)]"
-          href={CLAUDE_CODE_INSTALL}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Claude Code
-        </a>
-        : Backstory couldn&apos;t find <code className="mono">claude</code> on
-        its PATH.
+        <ClaudeCodeNotice reason={job.reason} needs="Drafting a model needs" />
       </span>
     );
   if (draft.finished)

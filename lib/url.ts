@@ -21,6 +21,8 @@ export interface UrlState {
   rev: string | null;
   /** Selected review thread id */
   comment: string | null;
+  /** The inbox shows the setup checklist, as the Mac app's Set Up Backstory… asks */
+  setup?: boolean;
 }
 
 /** Pure half of readUrlState, so it can be tested without a DOM. */
@@ -34,6 +36,7 @@ export function parseUrlState(search: string): UrlState {
     repo: repo ? repo : null,
     rev: rev ? rev : null,
     comment: comment ? comment : null,
+    ...(params.get("setup") === "1" && { setup: true }),
   };
 }
 
@@ -45,6 +48,7 @@ export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
   // URL short, and a missing rev falls back to it anyway.
   if (state.rev && state.rev !== WORKING_REV) params.set("rev", state.rev);
   if (state.comment) params.set("comment", state.comment);
+  if (state.setup) params.set("setup", "1");
 
   // URLSearchParams percent-encodes slashes, which turns every repo path into
   // an unreadable %2F soup. A slash is legal unencoded in a query string, and

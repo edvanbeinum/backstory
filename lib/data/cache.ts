@@ -1,7 +1,13 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { AI_PROVIDERS, aiProvider, type Runner } from "../ai/provider";
+import {
+  AI_PROVIDERS,
+  aiProvider,
+  providerGap,
+  type ProviderStatus,
+  type Runner,
+} from "../ai/provider";
 import { gitLine } from "../exec";
 import { repoKey } from "../flows/cache";
 import { homeDir } from "../store";
@@ -193,7 +199,7 @@ export async function startDataRead(
   opts: {
     redraft?: boolean;
     runner?: Runner;
-    available?: () => Promise<boolean>;
+    status?: () => Promise<ProviderStatus>;
   } = {},
 ): Promise<DataDraftStatus> {
   const provider = aiProvider();
@@ -219,12 +225,13 @@ export async function startDataRead(
       release();
       return dataStatus(view);
     }
-    if (!(await (opts.available ?? provider.available)())) {
+    const gap = providerGap(await (opts.status ?? provider.status)());
+    if (gap) {
       release();
       const status: DataDraftStatus = {
         status: "unavailable",
         provider: provider.name,
-        setup: provider.setup,
+        reason: gap,
       };
       registry.ended.set(files.key, status);
       return status;

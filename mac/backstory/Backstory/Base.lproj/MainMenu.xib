@@ -36,6 +36,12 @@
                                     <action selector="checkForUpdates:" target="-1" id="cfU-Up-dT2"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Set Up Backstory…" id="sUp-Bk-st1">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="showSetup:" target="-1" id="sUp-Bk-st2"/>
+                                </connections>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="VOq-y0-SEH"/>
                             <menuItem title="Open at Login" id="oaL-Lg-1tm">
                                 <modifierMask key="keyEquivalentModifierMask"/>

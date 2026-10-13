@@ -18,6 +18,7 @@ import type {
   Field,
   Relationship,
 } from "@/lib/data/types";
+import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
 import { Elapsed } from "./MapStrip";
@@ -604,7 +605,10 @@ function DraftProgress({
   if (job?.status === "unavailable")
     return (
       <span className="text-[12px] text-[var(--attention)]">
-        Drafting the data model needs {job.provider}. {job.setup}.
+        <ClaudeCodeNotice
+          reason={job.reason}
+          needs="Drafting the data model needs"
+        />
       </span>
     );
   return null;

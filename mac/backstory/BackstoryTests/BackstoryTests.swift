@@ -65,6 +65,10 @@ struct RepoLinkTests {
         #expect(
             RepoLink.address(forRepo: "/r", server: dev).absoluteString == "http://127.0.0.1:3000/?repo=/r")
     }
+
+    @Test func setUpBackstoryLoadsTheChecklistOnTheServer() {
+        #expect(RepoLink.setupAddress(server: server).absoluteString == "http://127.0.0.1:4460/?setup=1")
+    }
 }
 
 private let home = URL(string: "http://127.0.0.1:4460/")!

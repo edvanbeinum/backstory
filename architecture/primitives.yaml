@@ -17,7 +17,8 @@ primitives:
     file: lib/exec.ts
     symbols:
       - run
-    use: Every other child process. It passes argv and never a shell, and extends PATH so binaries resolve under the Mac app or launchd.
+      - refreshLoginShellDirs
+    use: "Every other child process. It passes argv and never a shell, and extends PATH so binaries resolve under the Mac app or launchd: the usual tool folders, plus the folders the user's login shell finds `gh` and `claude` in (nvm and the like), asked once per server before the first `gh` or `claude` call. `refreshLoginShellDirs` asks again."
   - name: open a repo
     block: git reader
     file: lib/git.ts
@@ -95,7 +96,8 @@ primitives:
     symbols:
       - aiProvider
       - AI_PROVIDERS
-    use: "Every AI call: `aiProvider().run` reads a directory read-only and answers in a JSON schema, and `available`, `name` and `setup` say whether it's ready and what to do if not. Nothing outside `lib/ai/` imports a provider; `lib/ai/claude.ts` is the only `claude -p` call site."
+      - providerGap
+    use: "Every AI call: `aiProvider().run` reads a directory read-only and answers in a JSON schema, and `status` says whether it's missing, logged out or ready. `providerGap` turns a status into the reason a run didn't start, which `ClaudeCodeNotice` shows. Nothing outside `lib/ai/` imports a provider; `lib/ai/claude.ts` is the only `claude -p` call site."
   - name: a commit's files
     block: flow engine
     file: lib/flows/generate.ts
@@ -146,7 +148,13 @@ primitives:
       - Button
       - CopyButton
       - copyToClipboard
-    use: The shared controls.
+    use: "The shared controls. A `Button` with `href` is a link that opens in a new window, which the Mac app hands to the browser."
+  - name: Claude Code notice
+    block: UI columns and panels
+    file: components/ClaudeCodeNotice.tsx
+    symbols:
+      - ClaudeCodeNotice
+    use: "The one message and button for Claude Code not installed (Get Claude Code) or logged out (Copy: claude). Flows, both strips' drafts and the setup checklist show it, so they never word it differently."
   - name: graph layout
     block: UI columns and panels
     file: components/graph.ts

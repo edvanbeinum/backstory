@@ -20,13 +20,90 @@ const EXTRA_PATH_DIRS = [
  * yet, so a `claude` installed after the server started is found on the next
  * spawn without a restart. A missing directory on PATH costs nothing.
  */
-export function withToolDirs(current: string): string {
+export function withToolDirs(
+  current: string,
+  extra: string[] = EXTRA_PATH_DIRS,
+): string {
   const dirs = current.split(path.delimiter);
-  const missing = EXTRA_PATH_DIRS.filter((dir) => !dirs.includes(dir));
+  const missing = extra.filter((dir) => !dirs.includes(dir));
   return [...dirs, ...missing].join(path.delimiter);
 }
 
 process.env.PATH = withToolDirs(process.env.PATH ?? "");
+
+/** The tools a user's shell config may put on PATH where no fixed folder would find them (nvm, asdf, mise). */
+const LOGIN_SHELL_TOOLS = ["gh", "claude"];
+const LOGIN_SHELL_TIMEOUT_MS = 5_000;
+
+/**
+ * Asks the user's login shell where `tools` live, the way their terminal
+ * would find them, and returns those folders. Only absolute paths to a named
+ * tool count, so aliases, functions and whatever `.zshrc` prints are ignored.
+ * A shell that fails, hangs or finds nothing yields [], which leaves PATH as
+ * it was.
+ */
+export async function loginShellDirs(
+  shell: string,
+  tools: string[],
+  timeoutMs: number,
+): Promise<string[]> {
+  let timer: NodeJS.Timeout | undefined;
+  // Race a timer as well as run's own timeout: killing the shell doesn't end
+  // a child it started that still holds stdout open.
+  const timedOut = new Promise<null>((resolve) => {
+    timer = setTimeout(() => resolve(null), timeoutMs);
+  });
+  try {
+    const result = await Promise.race([
+      run(shell, ["-lic", `command -v ${tools.join(" ")}`], {
+        timeout: timeoutMs,
+        // `command -v` exits 1 when any one tool is missing, but still prints the rest
+        allowExitCodes: [1],
+        // Close stdin, so a prompt in the user's shell config can't wait on it
+        input: "",
+      }),
+      timedOut,
+    ]);
+    return result ? toolDirsIn(result.stdout, tools) : [];
+  } catch {
+    return [];
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/** The folders of the absolute paths to `tools` in a login shell's output. */
+export function toolDirsIn(output: string, tools: string[]): string[] {
+  const dirs = output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(
+      (line) => path.isAbsolute(line) && tools.includes(path.basename(line)),
+    )
+    .map((line) => path.dirname(line));
+  return [...new Set(dirs)];
+}
+
+// Kept on globalThis because Next may load this module once per route bundle,
+// and each copy would otherwise start the user's shell again.
+const memo = globalThis as { __backstoryLoginDirs?: Promise<string[]> };
+
+function loginDirs(): Promise<string[]> {
+  return (memo.__backstoryLoginDirs ??= loginShellDirs(
+    process.env.SHELL || "/bin/zsh",
+    LOGIN_SHELL_TOOLS,
+    LOGIN_SHELL_TIMEOUT_MS,
+  ).then((dirs) => {
+    process.env.PATH = withToolDirs(process.env.PATH ?? "", dirs);
+    return dirs;
+  }));
+}
+
+/** Asks the login shell again, for a tool installed since the server started. */
+export function refreshLoginShellDirs(): Promise<string[]> {
+  memo.__backstoryLoginDirs = undefined;
+  return loginDirs();
+}
 
 export interface ExecResult {
   stdout: string;
@@ -65,7 +142,7 @@ interface RunOptions {
  * refs come from user input, and this app happily points at any directory on
  * the machine.
  */
-export function run(
+export async function run(
   file: string,
   args: string[],
   opts: RunOptions = {},
@@ -75,9 +152,15 @@ export function run(
     timeout = 30_000,
     maxBuffer = 64 * 1024 * 1024,
     input,
-    env,
     allowExitCodes = [],
   } = opts;
+  let { env } = opts;
+  // Only the tools the login shell is asked about wait on it: git and the
+  // shell pipelines around it run on every request and resolve from /usr/bin.
+  if (LOGIN_SHELL_TOOLS.includes(file)) {
+    const dirs = await loginDirs();
+    if (env) env = { ...env, PATH: withToolDirs(env.PATH ?? "", dirs) };
+  }
 
   return new Promise((resolve, reject) => {
     const child = execFile(
@@ -131,8 +214,12 @@ export function run(
       },
     );
 
-    if (input !== undefined) {
-      child.stdin?.end(input);
+    if (input !== undefined && child.stdin) {
+      // Swallow a failed write: a program that exits without reading its
+      // input makes it fail with EPIPE, which would otherwise crash the
+      // server, and its exit code already says what happened.
+      child.stdin.on("error", () => {});
+      child.stdin.end(input);
     }
   });
 }
