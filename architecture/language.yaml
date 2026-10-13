@@ -80,7 +80,7 @@ terms:
       - dev mode
       - override
   - name: setup checklist
-    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`."
+    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
     avoid:
       - onboarding
       - wizard

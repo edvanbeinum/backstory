@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
 import type { SetupId, SetupRow } from "@/lib/setup";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
@@ -16,8 +16,29 @@ const NAMES: Record<SetupId, string> = {
   reviews: "Notes to your agent",
 };
 
-const BACKSTORY_COMMAND =
-  "https://github.com/edvanbeinum/backstory#the-backstory-command";
+interface MacAppWindow {
+  webkit?: {
+    messageHandlers?: {
+      backstory?: { postMessage: (message: string) => Promise<unknown> };
+    };
+  };
+}
+
+/**
+ * The Mac app's message handler, absent in a browser. It takes "openRepo" and
+ * "claudeCode", and its promise settles once the panel or alerts are done.
+ */
+export const macApp = () =>
+  (window as MacAppWindow).webkit?.messageHandlers?.backstory ?? null;
+const noSubscription = () => () => {};
+
+export function useInMacApp(): boolean {
+  return useSyncExternalStore(
+    noSubscription,
+    () => macApp() !== null,
+    () => false,
+  );
+}
 
 /**
  * What Backstory needs on this machine, what each piece unlocks and the button
@@ -27,6 +48,7 @@ const BACKSTORY_COMMAND =
 export function SetupChecklist({ onSkip }: { onSkip: () => void }) {
   const [rows, setRows] = useState<SetupRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const inMacApp = useInMacApp();
 
   const load = useCallback(async () => {
     try {
@@ -106,9 +128,10 @@ export function SetupChecklist({ onSkip }: { onSkip: () => void }) {
                 <p className="text-[12px] text-[var(--fg-muted)]">
                   {row.detail}
                 </p>
-                {row.state !== "ready" && (
+                {(row.state !== "ready" ||
+                  (row.id === "reviews" && inMacApp)) && (
                   <div className="mt-1.5 text-[12px]">
-                    <Fix row={row} />
+                    <Fix row={row} inMacApp={inMacApp} onChanged={load} />
                   </div>
                 )}
               </div>
@@ -120,7 +143,15 @@ export function SetupChecklist({ onSkip }: { onSkip: () => void }) {
   );
 }
 
-function Fix({ row }: { row: SetupRow }) {
+function Fix({
+  row,
+  inMacApp,
+  onChanged,
+}: {
+  row: SetupRow;
+  inMacApp: boolean;
+  onChanged: () => Promise<void>;
+}) {
   switch (row.id) {
     case "git":
       return (
@@ -152,13 +183,46 @@ function Fix({ row }: { row: SetupRow }) {
         />
       );
     case "reviews":
-      return (
-        <span className="inline-flex flex-wrap items-center gap-2">
-          <span>A one-time setup in Terminal.</span>
-          <Button size="sm" href={BACKSTORY_COMMAND}>
-            Show me how
-          </Button>
-        </span>
+      return inMacApp ? (
+        <ClaudeCodeSetup ready={row.state === "ready"} onChanged={onChanged} />
+      ) : (
+        <span>Set it up from Backstory&apos;s Mac app.</span>
       );
   }
+}
+
+/** Asks the Mac app to add the Stop hook and `/backstory-review`, or take them out. */
+function ClaudeCodeSetup({
+  ready,
+  onChanged,
+}: {
+  ready: boolean;
+  onChanged: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const run = async () => {
+    setBusy(true);
+    try {
+      await macApp()?.postMessage("claudeCode");
+    } catch {
+      // The app's own alerts said what went wrong; the refetch shows the rest.
+    }
+    await onChanged();
+    setBusy(false);
+  };
+  return ready ? (
+    <Button size="sm" variant="invisible" disabled={busy} onClick={run}>
+      Remove…
+    </Button>
+  ) : (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <span>
+        Add Backstory&apos;s Stop hook and{" "}
+        <code className="mono">/backstory-review</code> to Claude Code.
+      </span>
+      <Button size="sm" disabled={busy} onClick={run}>
+        Set Up
+      </Button>
+    </span>
+  );
 }

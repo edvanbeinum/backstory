@@ -245,6 +245,20 @@ struct ServerStateTests {
     }
 }
 
+struct ClaudeSetupTests {
+    @Test(arguments: [
+        "/Volumes/Backstory/Backstory.app",
+        "/private/var/folders/xy/abc/T/AppTranslocation/1234-5678/d/Backstory.app",
+    ])
+    func aHookIsNeverWrittenFromWhereTheAppWontStay(_ path: String) {
+        #expect(!ClaudeSetup.isStableLocation(path))
+    }
+
+    @Test func applicationsIsAStableLocation() {
+        #expect(ClaudeSetup.isStableLocation("/Applications/Backstory.app"))
+    }
+}
+
 @MainActor
 struct FindBarContainerTests {
     @Test func theBarKeepsItsHeightAcrossHideAndShow() {

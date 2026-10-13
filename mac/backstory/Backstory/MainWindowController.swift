@@ -5,7 +5,7 @@ import WebKit
 /// waiting view while it doesn't. In owned mode it also starts the server and
 /// restarts it, as `ServerState` decides.
 final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUIDelegate,
-    WKScriptMessageHandler
+    WKScriptMessageHandlerWithReply
 {
     private var state: ServerState
     private let serverProcess: ServerProcess?
@@ -41,9 +41,11 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
 
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        // The page posts "openRepo" here; its presence is also how the page
-        // knows it's in the Mac app and offers Open Repo….
-        webView.configuration.userContentController.add(self, name: "backstory")
+        // The page posts "openRepo" and "claudeCode" here, and refreshes once
+        // the reply comes; the handler's presence is also how the page knows
+        // it's in the Mac app and offers those buttons.
+        webView.configuration.userContentController.addScriptMessageHandler(
+            self, contentWorld: .page, name: "backstory")
         webView.allowsBackForwardNavigationGestures = true
         webView.isInspectable = inspectable
         urlObservation = webView.observe(\.url) { [weak self] webView, _ in
@@ -218,16 +220,27 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         webView.reload()
     }
 
-    // MARK: - WKScriptMessageHandler
+    // MARK: - WKScriptMessageHandlerWithReply
 
     func userContentController(
-        _ userContentController: WKUserContentController, didReceive message: WKScriptMessage
+        _ userContentController: WKUserContentController, didReceive message: WKScriptMessage,
+        replyHandler: @escaping (Any?, String?) -> Void
     ) {
         guard message.frameInfo.isMainFrame,
-            let url = message.frameInfo.request.url, isServer(url),
-            message.body as? String == "openRepo"
-        else { return }
-        chooseRepo()
+            let url = message.frameInfo.request.url, isServer(url)
+        else { return replyHandler(nil, "not Backstory's page") }
+        switch message.body as? String {
+        case "openRepo":
+            chooseRepo()
+            replyHandler(nil, nil)
+        case "claudeCode":
+            Task {
+                await ClaudeSetup.run(from: window)
+                replyHandler(nil, nil)
+            }
+        default:
+            replyHandler(nil, "unknown message")
+        }
     }
 
     // MARK: - WKUIDelegate
