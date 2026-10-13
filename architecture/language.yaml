@@ -3,8 +3,6 @@
 terms:
   - name: Backstory
     means: "The product: the Mac app, the server it runs, the page and the `backstory` command."
-    avoid:
-      - differ, the old name
   - name: flow
     means: "What the code does for one user action a change touches: the data, the Flows tab and the feature."
     drawing: sequence
