@@ -22,10 +22,13 @@ export interface SetupRow {
 }
 
 export const SETUP_DETAILS: Record<SetupId, string> = {
-  git: "Commits, diffs and the inbox",
-  github: "PR comments and review threads",
-  claude: "Flows and drafted maps",
-  reviews: "backstory review, and notes queued for the Stop hook",
+  git: "See what changed on every branch, commit by commit.",
+  github:
+    "Bring your pull request's review comments in beside the code they're about.",
+  claude:
+    "Have a change explained: how it runs, step by step, and a map of the system and data it touches.",
+  reviews:
+    "Comment on what your coding agent wrote and send the notes straight to it, even while it's still working.",
 };
 
 /** On a Mac without the command line tools this is a shim, and running it opens Apple's install dialog. */

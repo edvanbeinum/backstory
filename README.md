@@ -39,7 +39,7 @@ server handles all your checkouts (default port 4460).
 ### Adding a repo
 
 The first time, the inbox opens with **Set up Backstory**: a row each for
-git, GitHub, Claude Code and agent reviews, saying what each one unlocks, with
+git, GitHub, Claude Code and notes to your agent, saying what each one adds, with
 a button for whatever is missing. It checks again when you come back to the
 window. **Backstory → Set Up Backstory…** brings it back.
 

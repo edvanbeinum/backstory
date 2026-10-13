@@ -6,7 +6,7 @@ import { setupChecksFresh } from "@/lib/setup";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** The setup checklist's rows: git, GitHub, Claude Code and agent reviews. */
+/** The setup checklist's rows: git, GitHub, Claude Code and notes to your agent. */
 export async function GET() {
   try {
     return NextResponse.json(

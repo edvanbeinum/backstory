@@ -49,9 +49,9 @@ test("with git but no gh and no Claude Code, the checklist says what each missin
     { id: "claude", state: "missing", detail: SETUP_DETAILS.claude },
     { id: "reviews", state: "missing", detail: SETUP_DETAILS.reviews },
   ]);
-  assert.match(SETUP_DETAILS.github, /PR comments/);
-  assert.match(SETUP_DETAILS.claude, /[Ff]lows/);
-  assert.match(SETUP_DETAILS.reviews, /backstory review/);
+  assert.match(SETUP_DETAILS.github, /review comments/);
+  assert.match(SETUP_DETAILS.claude, /explained/);
+  assert.match(SETUP_DETAILS.reviews, /coding agent/);
 });
 
 test("Claude Code's row tells not installed, logged out and ready apart", async () => {

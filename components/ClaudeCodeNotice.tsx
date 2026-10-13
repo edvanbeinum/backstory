@@ -26,13 +26,11 @@ export function ClaudeCodeNotice({
       <span>
         {needs && <>{needs} Claude Code. </>}
         {reason === "no-claude" ? (
-          <>
-            Backstory couldn&apos;t find <code className="mono">claude</code>.
-          </>
+          <>Backstory can&apos;t find Claude Code on this Mac.</>
         ) : (
           <>
-            Claude Code is logged out: run <code className="mono">claude</code>{" "}
-            in a terminal and log in.
+            Claude Code is signed out. Run <code className="mono">claude</code>{" "}
+            in Terminal and sign in.
           </>
         )}
       </span>

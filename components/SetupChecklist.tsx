@@ -13,7 +13,7 @@ const NAMES: Record<SetupId, string> = {
   git: "git",
   github: "GitHub",
   claude: "Claude Code",
-  reviews: "Agent reviews",
+  reviews: "Notes to your agent",
 };
 
 const BACKSTORY_COMMAND =
@@ -57,13 +57,18 @@ export function SetupChecklist({ onSkip }: { onSkip: () => void }) {
 
   return (
     <section className="rounded-md border border-[var(--border)] bg-[var(--canvas)] text-left">
-      <header className="flex items-center gap-2 border-b border-[var(--border)] px-4 py-2.5">
-        <h2 className="text-[14px] font-semibold">Set up Backstory</h2>
-        {!rows && !error && <Spinner className="!h-3 !w-3" />}
-        <span className="flex-1" />
-        <Button size="sm" variant="invisible" onClick={onSkip}>
-          Skip for now
-        </Button>
+      <header className="border-b border-[var(--border)] px-4 py-2.5">
+        <div className="flex items-center gap-2">
+          <h2 className="text-[14px] font-semibold">Set up Backstory</h2>
+          {!rows && !error && <Spinner className="!h-3 !w-3" />}
+          <span className="flex-1" />
+          <Button size="sm" variant="invisible" onClick={onSkip}>
+            Skip for now
+          </Button>
+        </div>
+        <p className="text-[12px] text-[var(--fg-muted)]">
+          Backstory only needs git. Each of the others adds something more.
+        </p>
       </header>
       {error && (
         <p className="flex items-center gap-1.5 px-4 py-3 text-[12px] text-[var(--attention)]">
@@ -94,7 +99,7 @@ export function SetupChecklist({ onSkip }: { onSkip: () => void }) {
                   </span>
                   {row.id === "git" && (
                     <span className="text-[11px] text-[var(--fg-subtle)]">
-                      required
+                      needed
                     </span>
                   )}
                 </div>
@@ -121,7 +126,7 @@ function Fix({ row }: { row: SetupRow }) {
       return (
         <span className="inline-flex flex-wrap items-center gap-2">
           <span>
-            Install Apple&apos;s command line tools: run this in Terminal.
+            Install Apple&apos;s developer tools. Paste this into Terminal:
           </span>
           <CopyButton
             value="xcode-select --install"
@@ -132,12 +137,12 @@ function Fix({ row }: { row: SetupRow }) {
     case "github":
       return row.state === "logged-out" ? (
         <span className="inline-flex flex-wrap items-center gap-2">
-          <span>Log in to GitHub: run this in Terminal.</span>
+          <span>Sign in to GitHub. Paste this into Terminal:</span>
           <CopyButton value="gh auth login" label="Copy: gh auth login" />
         </span>
       ) : (
         <Button size="sm" href="https://cli.github.com">
-          Get the GitHub CLI
+          Get GitHub&apos;s gh tool
         </Button>
       );
     case "claude":
@@ -149,12 +154,9 @@ function Fix({ row }: { row: SetupRow }) {
     case "reviews":
       return (
         <span className="inline-flex flex-wrap items-center gap-2">
-          <span>
-            Install the <code className="mono">backstory</code> command and add
-            its Stop hook to Claude Code.
-          </span>
+          <span>A one-time setup in Terminal.</span>
           <Button size="sm" href={BACKSTORY_COMMAND}>
-            How to set it up
+            Show me how
           </Button>
         </span>
       );
