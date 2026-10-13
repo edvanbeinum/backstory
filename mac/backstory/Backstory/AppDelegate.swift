@@ -87,12 +87,11 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
     }
 
     @IBAction func openRepo(_ sender: Any?) {
-        let panel = NSOpenPanel()
-        panel.canChooseDirectories = true
-        panel.canChooseFiles = false
-        panel.prompt = "Open Repo"
-        guard panel.runModal() == .OK, let folder = panel.url else { return }
-        windowController.open(RepoLink.address(forRepo: folder.standardizedFileURL.path, server: server))
+        windowController.chooseRepo()
+    }
+
+    @IBAction func showSetup(_ sender: Any?) {
+        windowController.open(RepoLink.setupAddress(server: server))
     }
 
     /// Starts the app at login, which keeps the server up for live updates

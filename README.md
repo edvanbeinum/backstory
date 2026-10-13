@@ -38,10 +38,15 @@ server handles all your checkouts (default port 4460).
 
 ### Adding a repo
 
-**File → Open Repo…** picks a checkout, and so does a folder dropped on the
-window or its Dock icon. Or use **Browse**, which finds them for you, or paste
-a path. From then on `/` is the inbox: every worktree of every repo you've
-opened, so you never type a path again.
+The first time, the inbox opens with **Set up Backstory**: a row each for
+git, GitHub, Claude Code and agent reviews, saying what each one unlocks, with
+a button for whatever is missing. It checks again when you come back to the
+window. **Backstory → Set Up Backstory…** brings it back.
+
+**Open Repo…** picks a checkout, and so does a folder dropped on the window or
+its Dock icon. Or use **Browse**, which finds them for you, or type a path.
+From then on `/` is the inbox: every worktree of every repo you've opened, so
+you never type a path again.
 
 Browse leads with the **sibling worktrees** of whatever repo is open, listed
 with the branch each one holds, straight from `git worktree list`. Below that
