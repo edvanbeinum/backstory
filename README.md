@@ -67,7 +67,8 @@ The server logs to `~/.backstory/server.log`.
 
 1. If you set up notes to your agent, choose **Backstory → Set Up Backstory…** and
    press **Remove…** on the **Notes to your agent** row. It takes the Stop hook and
-   `/backstory-review` out of `~/.claude`.
+   `/backstory-review` out of `~/.claude`. If you installed the command line
+   tool, choose **Backstory → Install Command Line Tool…** and press **Remove**.
 2. Turn off **Open at Login**, quit Backstory, and delete `Backstory.app`.
 3. Delete Backstory's data: notes, ticks, the outbox, traced flows, drafted
    models and data models, and the log.
@@ -171,6 +172,11 @@ to `~/.claude/commands/`, both naming the command by its place in the app.
 Your other hooks and settings stay as they are. Set it up with Backstory in
 Applications; if you move the app afterwards, press the row's button again to
 point the hook at its new place.
+
+To type `backstory` in a terminal, choose **Backstory → Install Command Line
+Tool…**. It links `/usr/local/bin/backstory` to the command in the app, asking
+for your password if that folder needs it. After that, `backstory` in a repo
+opens it in Backstory. If you move the app, choose it again to fix the link.
 
 ### Sending notes
 
