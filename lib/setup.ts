@@ -2,6 +2,7 @@ import { constants, promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
+import { isBackstoryHook } from "../bin/hook.mjs";
 import { aiProvider } from "./ai/provider";
 import { refreshLoginShellDirs, run } from "./exec";
 import { gh } from "./github";
@@ -136,11 +137,7 @@ async function reviewsState(claudeDir: string): Promise<SetupState> {
       stop.some(
         (entry) =>
           Array.isArray(entry?.hooks) &&
-          entry.hooks.some(
-            (hook) =>
-              typeof hook?.command === "string" &&
-              /backstory hook stop\s*$/.test(hook.command),
-          ),
+          entry.hooks.some((hook) => isBackstoryHook(hook?.command)),
       );
     return found ? "ready" : "missing";
   } catch {

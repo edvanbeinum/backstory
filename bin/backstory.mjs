@@ -14,6 +14,11 @@
  *                          any notes queued for it (reads the hook's JSON on
  *                          stdin; silent when there are none or Backstory is
  *                          down)
+ *   backstory setup claude [--check | --undo]
+ *                          add that hook and /backstory-review to Claude
+ *                          Code, naming this copy of the Mac app's command;
+ *                          --check prints what it would do as JSON, --undo
+ *                          takes them out (bin/claude-setup.mjs)
  *
  * The Mac app runs the server; this only ever asks it for things, launching
  * the app when it isn't running (bin/macapp.mjs).
@@ -29,6 +34,11 @@ import {
   recordPort,
   stopHook,
 } from "./hook.mjs";
+import {
+  applyClaudeSetup,
+  planClaudeSetup,
+  undoClaudeSetup,
+} from "./claude-setup.mjs";
 import { findMacApp, launchPlan, NOT_INSTALLED } from "./macapp.mjs";
 
 // First, before anything that could launch the app or wait on a server: the
@@ -42,6 +52,32 @@ if (process.argv[2] === "hook") {
     });
   }
   process.exit(0);
+}
+
+if (process.argv[2] === "setup" && process.argv[3] === "claude") {
+  const flag = process.argv[4];
+  try {
+    if (flag === "--check") {
+      console.log(JSON.stringify(planClaudeSetup(), null, 2));
+      process.exit(0);
+    }
+    const done =
+      flag === "--undo" ? undoClaudeSetup() : flag ? null : applyClaudeSetup();
+    if (!done) {
+      console.error(`unknown option: ${flag}`);
+      process.exit(2);
+    }
+    if (done.state === "error") {
+      console.error(`backstory: ${done.message}`);
+      process.exit(1);
+    }
+    if (done.state === "current") console.log("Already set up.");
+    else for (const change of done.changes) console.log(change);
+    process.exit(0);
+  } catch (err) {
+    console.error(`backstory: ${err.message}`);
+    process.exit(1);
+  }
 }
 
 function parseArgs(argv) {
@@ -58,6 +94,7 @@ function parseArgs(argv) {
         "usage: backstory [path] [--port N]\n" +
           "       backstory review [path] [--port N]\n" +
           "       backstory hook stop   (Claude Code Stop hook; see the README)\n" +
+          "       backstory setup claude [--check | --undo]   (add or remove that hook and /backstory-review)\n" +
           "Opens the repo (default: cwd) in Backstory's Mac app, launching it\n" +
           "if it isn't running. With --port, opens the Backstory on that port\n" +
           "in the browser instead.\n" +

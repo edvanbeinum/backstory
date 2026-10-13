@@ -176,8 +176,9 @@ blocks:
     code:
       - bin/backstory.mjs
       - bin/macapp.mjs
+      - bin/claude-setup.mjs
       - packaging/
-    summary: The `backstory` command, which opens a repo in the Mac app (launching it when it isn't running) or `backstory review`'s wait for notes, and the Claude Code command that runs it.
+    summary: The `backstory` command, which opens a repo in the Mac app (launching it when it isn't running) or `backstory review`'s wait for notes, and the Claude Code command that runs it. `backstory setup claude` adds the Stop hook and that command to `~/.claude`, naming the command in the Mac app by its path, and takes them out again.
     read: "`bin/macapp.mjs`, the comment on `launchPlan`"
   - name: Mac app
     code:

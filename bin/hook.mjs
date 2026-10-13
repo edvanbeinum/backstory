@@ -54,6 +54,21 @@ export function hookPort(env = process.env) {
   }
 }
 
+/**
+ * Whether a Stop hook's command is this one: it ends in `backstory hook stop`,
+ * bare or as a path, quoted or not. `backstory setup claude` and the setup
+ * checklist's Agent reviews row both use it, so a hook setup writes ticks
+ * the row.
+ *
+ * @param {unknown} command
+ */
+export function isBackstoryHook(command) {
+  return (
+    typeof command === "string" &&
+    /(^|[\s/'"])backstory['"]?\s+hook\s+stop\s*$/.test(command)
+  );
+}
+
 /** Well under the hook's timeout, and short enough not to be felt per turn. */
 export const TAKE_TIMEOUT_MS = 2000;
 
