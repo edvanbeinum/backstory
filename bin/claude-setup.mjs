@@ -69,9 +69,9 @@ const tilde = (file) =>
  */
 
 /**
- * Reads what's there and says what the button would do: set up for `none`
- * and `stale`, remove for `current`. `changes` describes that in words for
- * the alert, and `settings` is the file it would leave.
+ * Reads what's there and says what setup would do for `none` and `stale`, or
+ * what undo would for `current`. `changes` describes that in words for the
+ * alert, and `settings` is the file it would leave.
  *
  * @param {SetupOptions} [opts]
  * @returns {SetupPlan}
@@ -128,6 +128,21 @@ export function applyClaudeSetup(opts = {}) {
 }
 
 /**
+ * Says what Remove would take out: every Backstory hook, stale ones included,
+ * and `/backstory-review` when setup wrote it. On `error` it would write
+ * nothing.
+ *
+ * @param {SetupOptions} [opts]
+ * @returns {{ state: "remove" | "error", changes: string[], message?: string }}
+ */
+export function planClaudeUndo(opts = {}) {
+  const undo = readUndo(context(opts));
+  if ("error" in undo)
+    return { state: "error", changes: [], message: undo.error };
+  return { state: "remove", changes: undo.changes };
+}
+
+/**
  * Takes out every Backstory hook, and `/backstory-review` when setup wrote it.
  * A copy of the command made by hand stays.
  *
@@ -136,20 +151,30 @@ export function applyClaudeSetup(opts = {}) {
  */
 export function undoClaudeSetup(opts = {}) {
   const ctx = context(opts);
-  const read = readSettings(ctx.settingsFile);
-  if ("error" in read)
-    return { state: "error", changes: [], message: read.error };
-  const hooks = backstoryHooks(read.settings);
-  const commandFile = readCommandFile(ctx.commandFile);
-  const changes = undoChanges(ctx, hooks, commandFile);
-  if (hooks.length > 0) {
+  const undo = readUndo(ctx);
+  if ("error" in undo)
+    return { state: "error", changes: [], message: undo.error };
+  if (undo.hooks.length > 0) {
     writeAtomic(
       ctx.settingsFile,
-      JSON.stringify(takeOut(read.settings), null, 2) + "\n",
+      JSON.stringify(takeOut(undo.settings), null, 2) + "\n",
     );
   }
-  if (commandFile?.includes(BUNDLE_MARK)) rmSync(ctx.commandFile);
-  return { state: "removed", changes };
+  if (undo.commandFile?.includes(BUNDLE_MARK)) rmSync(ctx.commandFile);
+  return { state: "removed", changes: undo.changes };
+}
+
+function readUndo(ctx) {
+  const read = readSettings(ctx.settingsFile);
+  if ("error" in read) return read;
+  const hooks = backstoryHooks(read.settings);
+  const commandFile = readCommandFile(ctx.commandFile);
+  return {
+    settings: read.settings,
+    hooks,
+    commandFile,
+    changes: undoChanges(ctx, hooks, commandFile),
+  };
 }
 
 /** @param {SetupOptions} opts */

@@ -41,9 +41,9 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
 
         webView.navigationDelegate = self
         webView.uiDelegate = self
-        // The page posts "openRepo" and "claudeCode" here, and refreshes once
-        // the reply comes; the handler's presence is also how the page knows
-        // it's in the Mac app and offers those buttons.
+        // The page posts "openRepo", "setUpClaudeCode" and "removeClaudeCode"
+        // here, and refreshes once the reply comes; the handler's presence is
+        // also how the page knows it's in the Mac app and offers those buttons.
         webView.configuration.userContentController.addScriptMessageHandler(
             self, contentWorld: .page, name: "backstory")
         webView.allowsBackForwardNavigationGestures = true
@@ -233,9 +233,10 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         case "openRepo":
             chooseRepo()
             replyHandler(nil, nil)
-        case "claudeCode":
+        case "setUpClaudeCode", "removeClaudeCode":
+            let action: ClaudeSetup.Action = message.body as? String == "removeClaudeCode" ? .remove : .setUp
             Task {
-                await ClaudeSetup.run(from: window)
+                await ClaudeSetup.run(action, from: window)
                 replyHandler(nil, nil)
             }
         default:

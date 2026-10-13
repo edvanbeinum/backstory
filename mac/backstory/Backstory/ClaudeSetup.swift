@@ -19,9 +19,13 @@ enum ClaudeSetup {
         !path.hasPrefix("/Volumes/") && !path.contains("/AppTranslocation/")
     }
 
-    /// Shows the plan in a sheet on `window` and carries it out if the user
-    /// agrees; returns once the alerts are done.
-    static func run(from window: NSWindow?) async {
+    enum Action {
+        case setUp, remove
+    }
+
+    /// Shows what `action` changes in a sheet on `window` and carries it out
+    /// if the user agrees; returns once the alerts are done.
+    static func run(_ action: Action, from window: NSWindow?) async {
         let bundle = Bundle.main
         guard isStableLocation(bundle.bundleURL.path) else {
             return await tell(
@@ -38,24 +42,30 @@ enum ClaudeSetup {
         }
         let node = bundle.bundleURL.appendingPathComponent("Contents/Helpers/node").path
         let script = resources.appendingPathComponent("bin/backstory.mjs").path
+        let undo = action == .remove
 
         let plan: Plan
         do {
             plan = try JSONDecoder().decode(
-                Plan.self, from: try await setup(node: node, script: script, ["--check"]))
+                Plan.self,
+                from: try await setup(node: node, script: script, undo ? ["--check", "--undo"] : ["--check"]))
         } catch {
             return await tell("Couldn't check Claude Code's settings", "\(error)", on: window)
         }
 
-        let (title, button, flag): (String, String, String?)
-        switch plan.state {
-        case "error":
+        if plan.state == "error" {
             return await tell("Couldn't read Claude Code's settings", plan.message ?? "", on: window)
-        case "current":
-            (title, button, flag) = ("Remove Backstory from Claude Code?", "Remove", "--undo")
-        default:
-            (title, button, flag) = ("Set up Claude Code for Backstory?", "Set Up", nil)
         }
+        if undo && plan.changes.isEmpty {
+            return await tell("Backstory isn't set up in Claude Code", "There's nothing to remove.", on: window)
+        }
+        if !undo && plan.state == "current" {
+            return await tell("Claude Code is already set up for Backstory", "", on: window)
+        }
+        let (title, button) =
+            undo
+            ? ("Remove Backstory from Claude Code?", "Remove")
+            : ("Set up Claude Code for Backstory?", "Set Up")
         let alert = NSAlert()
         alert.messageText = title
         alert.informativeText = plan.changes.map { "• \($0)" }.joined(separator: "\n")
@@ -63,7 +73,7 @@ enum ClaudeSetup {
         alert.addButton(withTitle: "Cancel")
         guard await show(alert, on: window) == .alertFirstButtonReturn else { return }
         do {
-            _ = try await setup(node: node, script: script, flag.map { [$0] } ?? [])
+            _ = try await setup(node: node, script: script, undo ? ["--undo"] : [])
         } catch {
             await tell("Couldn't change Claude Code's settings", "\(error)", on: window)
         }

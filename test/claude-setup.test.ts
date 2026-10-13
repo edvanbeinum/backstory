@@ -16,6 +16,7 @@ import { test } from "node:test";
 import {
   applyClaudeSetup,
   planClaudeSetup,
+  planClaudeUndo,
   shellQuote,
   undoClaudeSetup,
 } from "../bin/claude-setup.mjs";
@@ -202,6 +203,35 @@ test("undo takes out only Backstory's hook and the groups it leaves empty", () =
       Stop: [stopGroup("notify-me")],
     },
   });
+});
+
+test("Remove offers to take out a stale hook, and does", () => {
+  const old =
+    "'/Volumes/Backstory/Backstory.app/Contents/Resources/bin/backstory' hook stop";
+  const dir = claudeDir({ hooks: { Stop: [stopGroup("notify-me", old)] } });
+  assert.equal(
+    planClaudeSetup({ claudeDir: dir, script: SCRIPT }).state,
+    "stale",
+  );
+  assert.deepEqual(planClaudeUndo({ claudeDir: dir, script: SCRIPT }), {
+    state: "remove",
+    changes: [
+      `Remove the Stop hook ${old} from ${path.join(dir, "settings.json")}`,
+    ],
+  });
+  undoClaudeSetup({ claudeDir: dir, script: SCRIPT });
+  assert.deepEqual(settingsOf(dir).hooks.Stop, [stopGroup("notify-me")]);
+});
+
+test("Remove offers nothing when Backstory isn't set up, and on a broken file says why", () => {
+  assert.deepEqual(
+    planClaudeUndo({ claudeDir: claudeDir({}), script: SCRIPT }).changes,
+    [],
+  );
+  assert.equal(
+    planClaudeUndo({ claudeDir: claudeDir("{"), script: SCRIPT }).state,
+    "error",
+  );
 });
 
 test("undo after setup on a fresh folder leaves no hooks key behind", () => {

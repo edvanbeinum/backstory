@@ -25,8 +25,9 @@ interface MacAppWindow {
 }
 
 /**
- * The Mac app's message handler, absent in a browser. It takes "openRepo" and
- * "claudeCode", and its promise settles once the panel or alerts are done.
+ * The Mac app's message handler, absent in a browser. It takes "openRepo",
+ * "setUpClaudeCode" and "removeClaudeCode", and its promise settles once the
+ * panel or alerts are done.
  */
 export const macApp = () =>
   (window as MacAppWindow).webkit?.messageHandlers?.backstory ?? null;
@@ -203,7 +204,9 @@ function ClaudeCodeSetup({
   const run = async () => {
     setBusy(true);
     try {
-      await macApp()?.postMessage("claudeCode");
+      await macApp()?.postMessage(
+        ready ? "removeClaudeCode" : "setUpClaudeCode",
+      );
     } catch {
       // The app's own alerts said what went wrong; the refetch shows the rest.
     }
