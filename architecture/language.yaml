@@ -79,6 +79,11 @@ terms:
     avoid:
       - dev mode
       - override
+  - name: setup checklist
+    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, agent reviews), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`."
+    avoid:
+      - onboarding
+      - wizard
   - name: primitive
     means: A named capability Backstory exposes for reuse, listed in `architecture/primitives.yaml`.
     avoid:

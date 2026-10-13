@@ -95,6 +95,12 @@ test("a link carries your place in both lists", () => {
   assert.equal(parsed.comment, "PRRT_abc");
 });
 
+test("Set Up Backstory's address round-trips, and other links leave it out", () => {
+  assert.equal(buildUrl({ setup: true }), "/?setup=1");
+  assert.deepEqual(parseUrlState("?setup=1"), { ...EMPTY, setup: true });
+  assert.doesNotMatch(buildUrl({ repo: "/r", setup: false }), /setup/);
+});
+
 test("a comment id resolves, falling back to the first OPEN thread", () => {
   const threads = [
     { id: "resolved-one", isResolved: true },

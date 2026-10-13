@@ -117,6 +117,8 @@ export default function Page() {
   /** True while the watch stream is connected — shown as the live dot. */
   const [live, setLive] = useState(false);
   const [browsing, setBrowsing] = useState(false);
+  /** `?setup=1`: the inbox shows the setup checklist whatever else it holds */
+  const [setup, setSetup] = useState(false);
   /** Previously-opened repos for the RepoBar dropdown. */
   const [recents, setRecents] = useState<RecentRepo[]>([]);
 
@@ -202,6 +204,7 @@ export default function Page() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL is only readable after mount
     setRepoPath(path);
     setRef(fromUrl.ref ?? null);
+    setSetup(Boolean(fromUrl.setup));
     if (fromUrl.rev) setRev(fromUrl.rev);
     if (fromUrl.comment) {
       setCommentId(fromUrl.comment);
@@ -304,11 +307,17 @@ export default function Page() {
     if (!ready) return;
     const inWorkspace = Boolean(repoPath);
     writeUrlState(
-      { repo: repoPath || null, ref, rev, comment: commentId },
+      {
+        repo: repoPath || null,
+        ref,
+        rev,
+        comment: commentId,
+        setup: setup && !inWorkspace,
+      },
       { push: inWorkspace !== wasInWorkspace.current },
     );
     wasInWorkspace.current = inWorkspace;
-  }, [ready, repoPath, ref, rev, commentId]);
+  }, [ready, repoPath, ref, rev, commentId, setup]);
 
   // Someone navigating with the back/forward buttons, or editing the URL by
   // hand, should land on the view they asked for.
@@ -319,6 +328,7 @@ export default function Page() {
       setRef(fromUrl.ref ?? null);
       setRev(fromUrl.rev ?? WORKING_REV);
       setCommentId(fromUrl.comment);
+      setSetup(Boolean(fromUrl.setup));
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -1132,6 +1142,7 @@ export default function Page() {
     window.localStorage.setItem(STORAGE_KEY, trimmed);
     setRef(branch ?? null);
     setRepoPath(trimmed);
+    setSetup(false);
   }, []);
 
   // j/k move through a list the way they would in a TUI: flow steps when the
@@ -1241,6 +1252,8 @@ export default function Page() {
             onAdd={rememberRoot}
             onBrowse={() => setBrowsing(true)}
             onForget={forgetRoot}
+            setupAsked={setup}
+            onSetupDone={() => setSetup(false)}
           />
           {browsing && (
             <RepoBrowser
