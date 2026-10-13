@@ -129,8 +129,7 @@ cd backstory
 npm link
 ```
 
-`npm link` puts `backstory` on your PATH. The command uses only Node's
-built-in modules, so it needs no `npm install`. From any checkout, `backstory` opens
+`npm link` puts `backstory` on your PATH. From any checkout, `backstory` opens
 that repo in the app, and `backstory <path>` opens another. If the app isn't
 running, it launches it with a `backstory://open?repo=<path>` link. That's a
 shortcut, not the way in — the app opens repos on its own. The command is
