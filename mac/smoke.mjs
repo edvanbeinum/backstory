@@ -5,12 +5,23 @@
  * server goes when the app quits or is killed. Update: Sparkle, given a local
  * appcast signed with the release key, offers a newer version and not its
  * own; run `npm run mac:appcast` first for `sign_update`, which takes the key
- * from SPARKLE_PRIVATE_KEY_FILE as `mac:appcast` does. Needs a login
+ * from SPARKLE_PRIVATE_KEY_FILE as `mac:appcast` does. Command: the
+ * `backstory` command in a copy of the bundle runs, and still runs once the
+ * copy is replaced at the same path, as a Sparkle update does, both by its path
+ * and through a link like the one in /usr/local/bin. Needs a login
  * session, so it isn't part of verify. Runs on spare ports with a temporary
  * home, so it touches neither `~/.backstory`, port 4460, nor the login agent.
  */
-import { execFile, spawn } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { execFile, execFileSync, spawn } from "node:child_process";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  writeFileSync,
+} from "node:fs";
 import http from "node:http";
 import net from "node:net";
 import { tmpdir } from "node:os";
@@ -248,11 +259,52 @@ async function update() {
   }
 }
 
+async function command() {
+  const dir = mkdtempSync(path.join(tmpdir(), "backstory smoke command "));
+  const copy = path.join(dir, "Backstory.app");
+  const home = mkdtempSync(path.join(tmpdir(), "backstory-smoke-home-"));
+  const backstory = path.join(
+    copy,
+    "Contents",
+    "Resources",
+    "bin",
+    "backstory",
+  );
+  // Stands in for /usr/local/bin, where Install Command Line Tool… links it.
+  const linked = path.join(dir, "bin", "backstory");
+  mkdirSync(path.dirname(linked));
+  symlinkSync(backstory, linked);
+  const run = (args, input = "", command = backstory) =>
+    execFileSync(command, args, {
+      encoding: "utf8",
+      input,
+      env: { ...process.env, BACKSTORY_HOME: home },
+    });
+  const both = (when) => {
+    if (!run(["--help"]).includes("usage: backstory")) {
+      throw new Error(`--help ${when} printed no usage`);
+    }
+    if (!run(["--help"], "", linked).includes("usage: backstory")) {
+      throw new Error(`--help through a link ${when} printed no usage`);
+    }
+    const hook = run(["hook", "stop"], "{}");
+    if (hook !== "") throw new Error(`hook stop ${when} printed ${hook}`);
+  };
+
+  await promisify(execFile)("ditto", [app, copy]);
+  both("in a copy of the app");
+  // Replace the bundle at the same path, as Sparkle does.
+  rmSync(copy, { recursive: true });
+  await promisify(execFile)("ditto", [app, copy]);
+  both("after the app was replaced");
+}
+
 let failed = false;
 for (const [name, check] of [
   ["attached", attached],
   ["owned", owned],
   ["update", update],
+  ["command", command],
 ]) {
   try {
     await check();

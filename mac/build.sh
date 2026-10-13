@@ -67,6 +67,14 @@ for item in server.js .next node_modules public package.json; do
 done
 cp mac/server-exit-with-parent.cjs "$app/Contents/Resources/"
 
+# The `backstory` command, which the Claude Code hook runs by its path in
+# here. The template sits at ../packaging/claude/ from bin/, as in a checkout.
+bin="$app/Contents/Resources/bin"
+mkdir -p "$bin" "$app/Contents/Resources/packaging/claude"
+cp bin/backstory.mjs bin/hook.mjs bin/macapp.mjs bin/claude-setup.mjs "$bin/"
+install -m 755 mac/bin/backstory "$bin/backstory"
+cp packaging/claude/backstory-review.md "$app/Contents/Resources/packaging/claude/"
+
 mkdir -p "$app/Contents/Helpers"
 cp "$node" "$app/Contents/Helpers/node"
 

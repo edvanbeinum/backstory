@@ -65,13 +65,11 @@ The server logs to `~/.backstory/server.log`.
 
 ### Uninstalling
 
-1. Turn off **Open at Login**, quit Backstory, and delete `Backstory.app`.
-2. If you ran `npm link`, remove the command:
-
-   ```bash
-   npm rm -g backstory
-   ```
-
+1. If you set up notes to your agent, choose **Backstory → Set Up Backstory…** and
+   press **Remove…** on the **Notes to your agent** row. It takes the Stop hook and
+   `/backstory-review` out of `~/.claude`. If you installed the command line
+   tool, choose **Backstory → Install Command Line Tool…** and press **Remove**.
+2. Turn off **Open at Login**, quit Backstory, and delete `Backstory.app`.
 3. Delete Backstory's data: notes, ticks, the outbox, traced flows, drafted
    models and data models, and the log.
 
@@ -79,11 +77,7 @@ The server logs to `~/.backstory/server.log`.
    rm -rf ~/.backstory
    ```
 
-4. If you added them, remove the `backstory hook stop` entry from
-   `~/.claude/settings.json` and delete
-   `~/.claude/commands/backstory-review.md`. Once the command is gone, the
-   hook fails with "command not found" each time a session stops.
-5. Optionally, remove the app's settings, its update state and the window's
+4. Optionally, remove the app's settings, its update state and the window's
    storage, which holds your recent repos:
 
    ```bash
@@ -169,19 +163,20 @@ Without Claude Code installed, Backstory works as before, with no flows.
 
 The agent's side of a review goes through the `backstory` command:
 `backstory review` and the Claude Code Stop hook below both run it. It comes
-from a checkout of this repo, with Node 22 or later on your PATH:
+inside the app, which runs it with its own Node.
 
-```bash
-git clone https://github.com/edvanbeinum/backstory.git
-cd backstory
-npm link
-```
+To hand it to Claude Code, choose **Backstory → Set Up Backstory…**, then
+press **Set Up** on the **Notes to your agent** row. It shows what it will change,
+then adds the Stop hook to `~/.claude/settings.json` and `/backstory-review`
+to `~/.claude/commands/`, both naming the command by its place in the app.
+Your other hooks and settings stay as they are. Set it up with Backstory in
+Applications. If you move the app afterwards, the row offers **Set Up** again,
+which points the hook at its new place.
 
-`npm link` puts `backstory` on your PATH. From any checkout, `backstory` opens
-that repo in the app, and `backstory <path>` opens another. If the app isn't
-running, it launches it with a `backstory://open?repo=<path>` link. That's a
-shortcut, not the way in — the app opens repos on its own. The command is
-here for `backstory review` and `backstory hook stop`.
+To type `backstory` in a terminal, choose **Backstory → Install Command Line
+Tool…**. It links `/usr/local/bin/backstory` to the command in the app, asking
+for your password if that folder needs it. After that, `backstory` in a repo
+opens it in Backstory. If you move the app, choose it again to fix the link.
 
 ### Sending notes
 
@@ -217,39 +212,17 @@ The hook is installed once, globally, in `~/.claude/settings.json`, and runs
 for every session. It stays silent until a checkout has notes queued, and
 never gets in the agent's way: with Backstory not running, unreachable or
 erroring, or in a directory that isn't a checkout, it prints nothing within
-about two seconds and the agent stops as usual.
-
-```json
-{
-  "hooks": {
-    "Stop": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "backstory hook stop",
-            "timeout": 10
-          }
-        ]
-      }
-    ]
-  }
-}
-```
+about two seconds and the agent stops as usual. **Set Up** on the setup
+checklist's Notes to your agent row adds it (see [The `backstory`
+command](#the-backstory-command)).
 
 Or let the agent ask. `backstory review` opens the uncommitted changes and waits;
 the window says an agent is waiting and offers **Send to agent** (or **Looks
 good**). While it waits, Send goes straight to it rather than into the queue:
 your notes are printed to the command's stdout and it exits — so an agent that
 runs it reads your review as the command's output. That works for any agent,
-not only Claude Code. For Claude Code, copy the command in:
-
-```bash
-mkdir -p ~/.claude/commands
-cp packaging/claude/backstory-review.md ~/.claude/commands/
-```
-
-and type `/backstory-review` in a session. The agent runs `backstory review` in the
+not only Claude Code. In Claude Code, the same **Set Up** adds it as a slash
+command: type `/backstory-review` in a session. The agent runs `backstory review` in the
 background and picks up where it left off once you send.
 
 Sent notes don't vanish. Whichever way they left — sent, queued or copied —

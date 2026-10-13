@@ -80,7 +80,7 @@ terms:
       - dev mode
       - override
   - name: setup checklist
-    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`."
+    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
     avoid:
       - onboarding
       - wizard
@@ -176,13 +176,14 @@ blocks:
     code:
       - bin/backstory.mjs
       - bin/macapp.mjs
+      - bin/claude-setup.mjs
       - packaging/
-    summary: The `backstory` command, which opens a repo in the Mac app (launching it when it isn't running) or `backstory review`'s wait for notes, and the Claude Code command that runs it.
+    summary: The `backstory` command, which opens a repo in the Mac app (launching it when it isn't running) or `backstory review`'s wait for notes, and the Claude Code command that runs it. `backstory setup claude` adds the Stop hook and that command to `~/.claude`, naming the command in the Mac app by its path, and takes them out again. The command reaches a terminal through the `/usr/local/bin/backstory` link the Mac app's Install Command Line Tool… makes.
     read: "`bin/macapp.mjs`, the comment on `launchPlan`"
   - name: Mac app
     code:
       - mac/
-    summary: A Swift app that starts, restarts and stops the standalone server with the Node in its bundle, with one web view on it, a native view while it isn't answering, and the `backstory://` URL scheme, and Check for Updates… through Sparkle. `mac/dmg.sh` packs it into a notarized disk image, `mac/appcast.sh` writes the Sparkle appcast that offers it, and `.github/workflows/release.yml` runs both on a version tag.
+    summary: A Swift app that starts, restarts and stops the standalone server with the Node in its bundle, with one web view on it, a native view while it isn't answering, and the `backstory://` URL scheme, and Check for Updates… through Sparkle. Its bundle carries the `backstory` command too (`mac/bin/backstory`, run by the bundled Node), which the Claude Code hook runs by its path there. Install Command Line Tool… in the Backstory menu links `/usr/local/bin/backstory` to it, or fixes or removes that link (`mac/backstory/Backstory/CommandLineTool.swift`). `mac/dmg.sh` packs it into a notarized disk image, `mac/appcast.sh` writes the Sparkle appcast that offers it, and `.github/workflows/release.yml` runs both on a version tag.
     read: "`mac/backstory/Backstory/ServerState.swift`, the comment on `ServerState`"
 
 invariants:

@@ -14,6 +14,11 @@
  *                          any notes queued for it (reads the hook's JSON on
  *                          stdin; silent when there are none or Backstory is
  *                          down)
+ *   backstory setup claude [--check] [--undo]
+ *                          add that hook and /backstory-review to Claude
+ *                          Code, naming this copy of the Mac app's command;
+ *                          --undo takes them out, and --check prints what
+ *                          either would do as JSON (bin/claude-setup.mjs)
  *
  * The Mac app runs the server; this only ever asks it for things, launching
  * the app when it isn't running (bin/macapp.mjs).
@@ -29,6 +34,12 @@ import {
   recordPort,
   stopHook,
 } from "./hook.mjs";
+import {
+  applyClaudeSetup,
+  planClaudeSetup,
+  planClaudeUndo,
+  undoClaudeSetup,
+} from "./claude-setup.mjs";
 import { findMacApp, launchPlan, NOT_INSTALLED } from "./macapp.mjs";
 
 // First, before anything that could launch the app or wait on a server: the
@@ -42,6 +53,35 @@ if (process.argv[2] === "hook") {
     });
   }
   process.exit(0);
+}
+
+if (process.argv[2] === "setup" && process.argv[3] === "claude") {
+  const flags = process.argv.slice(4);
+  const check = flags.includes("--check");
+  const undo = flags.includes("--undo");
+  const unknown = flags.find((flag) => flag !== "--check" && flag !== "--undo");
+  if (unknown) {
+    console.error(`unknown option: ${unknown}`);
+    process.exit(2);
+  }
+  try {
+    if (check) {
+      const plan = undo ? planClaudeUndo() : planClaudeSetup();
+      console.log(JSON.stringify(plan, null, 2));
+      process.exit(0);
+    }
+    const done = undo ? undoClaudeSetup() : applyClaudeSetup();
+    if (done.state === "error") {
+      console.error(`backstory: ${done.message}`);
+      process.exit(1);
+    }
+    if (done.state === "current") console.log("Already set up.");
+    else for (const change of done.changes) console.log(change);
+    process.exit(0);
+  } catch (err) {
+    console.error(`backstory: ${err.message}`);
+    process.exit(1);
+  }
 }
 
 function parseArgs(argv) {
@@ -58,6 +98,7 @@ function parseArgs(argv) {
         "usage: backstory [path] [--port N]\n" +
           "       backstory review [path] [--port N]\n" +
           "       backstory hook stop   (Claude Code Stop hook; see the README)\n" +
+          "       backstory setup claude [--check] [--undo]   (add or remove that hook and /backstory-review)\n" +
           "Opens the repo (default: cwd) in Backstory's Mac app, launching it\n" +
           "if it isn't running. With --port, opens the Backstory on that port\n" +
           "in the browser instead.\n" +

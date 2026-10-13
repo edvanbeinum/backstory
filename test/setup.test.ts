@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -103,7 +109,7 @@ test("the shim's git runs once the command line tools are installed", async () =
   assert.equal(state("git"), "ready");
 });
 
-test("agent reviews are ready only once the backstory Stop hook is in Claude Code's settings", async () => {
+test("notes to your agent are ready only once a Backstory Stop hook can run and /backstory-review is there", async () => {
   const stop = (...commands: string[]) =>
     JSON.stringify({
       hooks: {
@@ -112,14 +118,33 @@ test("agent reviews are ready only once the backstory Stop hook is in Claude Cod
         })),
       },
     });
-  const reviews = async (dir: string) =>
-    (await checks({ git: GIT }, { claudeDir: dir })).state("reviews");
+  const withCommand = (dir: string) => {
+    mkdirSync(path.join(dir, "commands"));
+    writeFileSync(path.join(dir, "commands", "backstory-review.md"), "");
+    return dir;
+  };
+  const reviews = async (dir: string, onPath: Record<string, string> = {}) =>
+    (await checks({ git: GIT, ...onPath }, { claudeDir: dir })).state(
+      "reviews",
+    );
+  const backstory = { backstory: "exit 0" };
 
   assert.equal(await reviews(claudeDir()), "missing");
   assert.equal(await reviews(claudeDir("{ not json")), "missing");
-  assert.equal(await reviews(claudeDir(stop("other-tool stop"))), "missing");
   assert.equal(
-    await reviews(claudeDir(stop("other-tool stop", "backstory hook stop"))),
-    "ready",
+    await reviews(withCommand(claudeDir(stop("other-tool stop"))), backstory),
+    "missing",
   );
+  const bare = stop("other-tool stop", "backstory hook stop");
+  assert.equal(await reviews(claudeDir(bare), backstory), "missing");
+  assert.equal(await reviews(withCommand(claudeDir(bare))), "missing");
+  assert.equal(await reviews(withCommand(claudeDir(bare)), backstory), "ready");
+
+  const app = mkdtempSync(path.join(os.tmpdir(), "backstory app "));
+  const script = path.join(app, "backstory");
+  writeFileSync(script, "#!/bin/sh\n", { mode: 0o755 });
+  const quoted = stop(`'${script}' hook stop`);
+  assert.equal(await reviews(withCommand(claudeDir(quoted))), "ready");
+  rmSync(script);
+  assert.equal(await reviews(withCommand(claudeDir(quoted))), "missing");
 });

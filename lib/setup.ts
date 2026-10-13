@@ -2,6 +2,7 @@ import { constants, promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
+import { backstoryHookProgram } from "../bin/hook.mjs";
 import { aiProvider } from "./ai/provider";
 import { refreshLoginShellDirs, run } from "./exec";
 import { gh } from "./github";
@@ -124,26 +125,46 @@ interface HookEntry {
   hooks?: { command?: unknown }[];
 }
 
-/** Looks for the `backstory hook stop` Stop hook; never writes the file. */
+/**
+ * Ready once a Backstory Stop hook can run and `/backstory-review` is there,
+ * as Set Up leaves them. A hook naming an app that has since moved counts as
+ * missing, so the row offers Set Up, which points it at this app again.
+ * Never writes either file.
+ */
 async function reviewsState(claudeDir: string): Promise<SetupState> {
+  let stop: HookEntry[] | undefined;
   try {
     const settings = JSON.parse(
       await fs.readFile(path.join(claudeDir, "settings.json"), "utf8"),
     ) as { hooks?: { Stop?: HookEntry[] } };
-    const stop = settings.hooks?.Stop;
-    const found =
-      Array.isArray(stop) &&
-      stop.some(
-        (entry) =>
-          Array.isArray(entry?.hooks) &&
-          entry.hooks.some(
-            (hook) =>
-              typeof hook?.command === "string" &&
-              /backstory hook stop\s*$/.test(hook.command),
-          ),
-      );
-    return found ? "ready" : "missing";
+    stop = settings.hooks?.Stop;
   } catch {
     return "missing";
+  }
+  const programs = (Array.isArray(stop) ? stop : []).flatMap((entry) =>
+    Array.isArray(entry?.hooks)
+      ? entry.hooks.map((hook) => backstoryHookProgram(hook?.command))
+      : [],
+  );
+  const runs = await Promise.all(
+    programs.map((program) => program !== null && canRun(program)),
+  );
+  if (!runs.includes(true)) return "missing";
+  try {
+    await fs.access(path.join(claudeDir, "commands", "backstory-review.md"));
+    return "ready";
+  } catch {
+    return "missing";
+  }
+}
+
+/** Whether `sh` would find `program`: a path that's executable, or a name on PATH. */
+async function canRun(program: string): Promise<boolean> {
+  if (!program.includes("/")) return (await onPath(program)) !== null;
+  try {
+    await fs.access(program, constants.X_OK);
+    return true;
+  } catch {
+    return false;
   }
 }

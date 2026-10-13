@@ -245,6 +245,189 @@ struct ServerStateTests {
     }
 }
 
+struct ClaudeSetupTests {
+    @Test(arguments: [
+        "/Volumes/Backstory/Backstory.app",
+        "/private/var/folders/xy/abc/T/AppTranslocation/1234-5678/d/Backstory.app",
+    ])
+    func aHookIsNeverWrittenFromWhereTheAppWontStay(_ path: String) {
+        #expect(!ClaudeSetup.isStableLocation(path))
+    }
+
+    @Test func applicationsIsAStableLocation() {
+        #expect(ClaudeSetup.isStableLocation("/Applications/Backstory.app"))
+    }
+}
+
+/// A temp dir holding a fake bundled command, `script`, and the path `link`
+/// that stands in for `/usr/local/bin/backstory`, in a folder not made yet.
+private struct CommandLineToolPlace {
+    let root: URL
+    let script: String
+    let link: String
+
+    init() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent(
+            "backstory cli 'test' \(UUID().uuidString)")
+        script = try Self.bundle(in: root, named: "Backstory.app")
+        link = root.appendingPathComponent("usr local/bin/backstory").path
+    }
+
+    /// Makes `…/<name>/Contents/Resources/bin/backstory` under `root`.
+    static func bundle(in root: URL, named name: String) throws -> String {
+        let bin = root.appendingPathComponent("\(name)/Contents/Resources/bin")
+        try FileManager.default.createDirectory(at: bin, withIntermediateDirectories: true)
+        let script = bin.appendingPathComponent("backstory").path
+        FileManager.default.createFile(atPath: script, contents: Data("#!/bin/sh\n".utf8))
+        return script
+    }
+
+    func lock(_ path: String) throws {
+        try FileManager.default.setAttributes([.posixPermissions: 0o555], ofItemAtPath: path)
+    }
+
+    /// Stands in for the password prompt: gives write access back, as root
+    /// would have it, and runs the command with `sh`.
+    func runAsRoot(unlocking path: String) -> (String) throws -> Void {
+        { command in
+            try FileManager.default.setAttributes([.posixPermissions: 0o755], ofItemAtPath: path)
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/bin/sh")
+            process.arguments = ["-c", command]
+            try process.run()
+            process.waitUntilExit()
+            #expect(process.terminationStatus == 0)
+        }
+    }
+
+    func cleanUp() {
+        if let paths = FileManager.default.enumerator(atPath: root.path) {
+            for case let path as String in paths {
+                try? FileManager.default.setAttributes(
+                    [.posixPermissions: 0o755], ofItemAtPath: root.appendingPathComponent(path).path)
+            }
+        }
+        try? FileManager.default.removeItem(at: root)
+    }
+}
+
+private func neverAsAdmin(_ command: String) throws {
+    Issue.record("asked for a password to run \(command)")
+}
+
+@MainActor
+struct CommandLineToolTests {
+    @Test func installMakesTheFolderAndLinksTheCommandWithoutAPassword() throws {
+        let place = try CommandLineToolPlace()
+        defer { place.cleanUp() }
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .missing)
+
+        try CommandLineTool.install(link: place.link, script: place.script, asAdmin: neverAsAdmin)
+
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .current)
+        #expect(try FileManager.default.destinationOfSymbolicLink(atPath: place.link) == place.script)
+    }
+
+    @Test func aFolderThisUserCantWriteGoesThroughThePasswordPrompt() throws {
+        let place = try CommandLineToolPlace()
+        defer { place.cleanUp() }
+        let locked = place.root.appendingPathComponent("usr local").path
+        try FileManager.default.createDirectory(atPath: locked, withIntermediateDirectories: true)
+        try place.lock(locked)
+        var commands: [String] = []
+        let asRoot = place.runAsRoot(unlocking: locked)
+
+        try CommandLineTool.install(link: place.link, script: place.script) { command in
+            commands.append(command)
+            #expect(!FileManager.default.fileExists(atPath: (place.link as NSString).deletingLastPathComponent))
+            try asRoot(command)
+        }
+
+        #expect(commands.count == 1)
+        #expect(commands.first?.hasPrefix("mkdir -p '") == true)
+        #expect(commands.first?.contains("ln -sfh '") == true)
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .current)
+    }
+
+    @Test func aLinkToAnAppThatMovedIsStaleAndInstallFixesIt() throws {
+        let place = try CommandLineToolPlace()
+        defer { place.cleanUp() }
+        let old = try CommandLineToolPlace.bundle(in: place.root, named: "Old/Backstory.app")
+        try CommandLineTool.install(link: place.link, script: old, asAdmin: neverAsAdmin)
+        try FileManager.default.removeItem(atPath: place.root.appendingPathComponent("Old").path)
+
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .stale(old))
+
+        try CommandLineTool.install(link: place.link, script: place.script, asAdmin: neverAsAdmin)
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .current)
+    }
+
+    @Test func aLinkToAnotherCopyOfTheAppIsStale() throws {
+        let place = try CommandLineToolPlace()
+        defer { place.cleanUp() }
+        let other = try CommandLineToolPlace.bundle(in: place.root, named: "Elsewhere/Backstory.app")
+        try CommandLineTool.install(link: place.link, script: other, asAdmin: neverAsAdmin)
+
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .stale(other))
+    }
+
+    @Test func aFileOrALinkToAnyOtherBackstoryIsSomethingElseAndInstallReplacesIt() throws {
+        let place = try CommandLineToolPlace()
+        defer { place.cleanUp() }
+        let checkout = place.root.appendingPathComponent("checkout/bin/backstory.mjs").path
+        try CommandLineTool.install(link: place.link, script: checkout, asAdmin: neverAsAdmin)
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .other("a link to \(checkout)"))
+        try CommandLineTool.install(link: place.link, script: place.script, asAdmin: neverAsAdmin)
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .current)
+
+        try FileManager.default.removeItem(atPath: place.link)
+        FileManager.default.createFile(atPath: place.link, contents: Data("#!/bin/sh\n".utf8))
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .other("a file"))
+        try CommandLineTool.install(link: place.link, script: place.script, asAdmin: neverAsAdmin)
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .current)
+    }
+
+    @Test func removeTakesOutOnlyTheLink() throws {
+        let place = try CommandLineToolPlace()
+        defer { place.cleanUp() }
+        try CommandLineTool.install(link: place.link, script: place.script, asAdmin: neverAsAdmin)
+
+        try CommandLineTool.remove(link: place.link, asAdmin: neverAsAdmin)
+
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .missing)
+        #expect(FileManager.default.fileExists(atPath: (place.link as NSString).deletingLastPathComponent))
+        #expect(FileManager.default.fileExists(atPath: place.script))
+    }
+
+    @Test func removeFromAFolderThisUserCantWriteGoesThroughThePasswordPrompt() throws {
+        let place = try CommandLineToolPlace()
+        defer { place.cleanUp() }
+        try CommandLineTool.install(link: place.link, script: place.script, asAdmin: neverAsAdmin)
+        let bin = (place.link as NSString).deletingLastPathComponent
+        try place.lock(bin)
+        var commands: [String] = []
+        let asRoot = place.runAsRoot(unlocking: bin)
+
+        try CommandLineTool.remove(link: place.link) { command in
+            commands.append(command)
+            try asRoot(command)
+        }
+
+        #expect(commands.count == 1)
+        #expect(commands.first?.hasPrefix("rm -f '") == true)
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .missing)
+    }
+
+    @Test func anEmptyOrMissingFolderIsMissing() throws {
+        let place = try CommandLineToolPlace()
+        defer { place.cleanUp() }
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .missing)
+        try FileManager.default.createDirectory(
+            atPath: (place.link as NSString).deletingLastPathComponent, withIntermediateDirectories: true)
+        #expect(CommandLineTool.state(link: place.link, script: place.script) == .missing)
+    }
+}
+
 @MainActor
 struct FindBarContainerTests {
     @Test func theBarKeepsItsHeightAcrossHideAndShow() {

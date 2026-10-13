@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { InboxResult } from "@/lib/inbox";
 import {
@@ -17,7 +11,12 @@ import {
   SyncIcon,
 } from "./icons";
 import { InboxRow } from "./InboxRow";
-import { SETUP_SKIPPED_KEY, SetupChecklist } from "./SetupChecklist";
+import {
+  macApp,
+  SETUP_SKIPPED_KEY,
+  SetupChecklist,
+  useInMacApp,
+} from "./SetupChecklist";
 import { Button, Spinner } from "./ui";
 
 /**
@@ -385,19 +384,6 @@ export function Inbox({
   );
 }
 
-interface MacAppWindow {
-  webkit?: {
-    messageHandlers?: {
-      backstory?: { postMessage: (message: string) => void };
-    };
-  };
-}
-
-/** The Mac app's message handler, which opens its Open Repo panel; absent in a browser. */
-const macApp = () =>
-  (window as MacAppWindow).webkit?.messageHandlers?.backstory ?? null;
-const noSubscription = () => () => {};
-
 function NoCheckouts({
   onBrowse,
   onAdd,
@@ -412,11 +398,7 @@ function NoCheckouts({
   checklist: React.ReactNode;
 }) {
   const [value, setValue] = useState("");
-  const inMacApp = useSyncExternalStore(
-    noSubscription,
-    () => macApp() !== null,
-    () => false,
-  );
+  const inMacApp = useInMacApp();
 
   return (
     <div className="mx-auto max-w-xl py-12 text-center">
@@ -432,7 +414,7 @@ function NoCheckouts({
         {inMacApp && (
           <Button
             variant="primary"
-            onClick={() => macApp()?.postMessage("openRepo")}
+            onClick={() => void macApp()?.postMessage("openRepo")}
           >
             Open Repo…
           </Button>
