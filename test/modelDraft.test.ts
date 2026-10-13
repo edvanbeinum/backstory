@@ -130,7 +130,7 @@ function recorded(answers: (object | Error)[]) {
   return { runner, prompts };
 }
 
-const available = async () => true;
+const ready = async () => "ready" as const;
 
 async function draft(
   root: string,
@@ -138,7 +138,7 @@ async function draft(
   redraft = false,
 ): Promise<{ status: DraftStatus; prompts: string[] }> {
   const { runner, prompts } = recorded(answers);
-  const started = await startDraft(root, { runner, available, redraft });
+  const started = await startDraft(root, { runner, status: ready, redraft });
   assert.equal(started.status, "running");
   await draftSettled(root);
   return { status: await draftStatus(root), prompts };
@@ -340,10 +340,21 @@ test("without Claude Code, no draft starts", async () => {
   const { runner, prompts } = recorded([CLEAN]);
   const status = await startDraft(repo.dir, {
     runner,
-    available: async () => false,
+    status: async () => "missing",
   });
   assert.deepEqual(status, { status: "unavailable", reason: "no-claude" });
   assert.deepEqual(await draftStatus(repo.dir), status);
+  assert.equal(prompts.length, 0);
+});
+
+test("with Claude Code logged out, no draft starts", async () => {
+  const repo = gitRepo();
+  const { runner, prompts } = recorded([CLEAN]);
+  const status = await startDraft(repo.dir, {
+    runner,
+    status: async () => "logged-out",
+  });
+  assert.deepEqual(status, { status: "unavailable", reason: "logged-out" });
   assert.equal(prompts.length, 0);
 });
 
@@ -352,7 +363,7 @@ test("a repo that commits a model is never drafted", async () => {
     "architecture/workspace.dsl": "workspace {\n    model {\n    }\n}\n",
   });
   const { runner, prompts } = recorded([CLEAN]);
-  const status = await startDraft(repo.dir, { runner, available });
+  const status = await startDraft(repo.dir, { runner, status: ready });
   assert.deepEqual(status, { status: "refused", reason: "committed" });
   assert.deepEqual(await draftStatus(repo.dir), { status: "idle" });
   assert.equal(prompts.length, 0);
@@ -365,7 +376,7 @@ test("a local model is only replaced by a redraft, which keeps the old one", asy
   const first = readFileSync(file, "utf8");
 
   const { runner, prompts } = recorded([CLEAN]);
-  assert.deepEqual(await startDraft(repo.dir, { runner, available }), {
+  assert.deepEqual(await startDraft(repo.dir, { runner, status: ready }), {
     status: "refused",
     reason: "exists",
   });
@@ -398,7 +409,7 @@ test("a redraft sent while a refused draft is still being checked still runs", a
   // resolve the model directory first, and that ordering isn't promised.
   // Stop waiting once the stale draft has settled too, since its claim can
   // come and go between two polls and would otherwise leave this spinning.
-  const stale = startDraft(repo.dir, { runner, available });
+  const stale = startDraft(repo.dir, { runner, status: ready });
   let settled = false;
   const markSettled = () => (settled = true);
   stale.then(markSettled, markSettled);
@@ -407,7 +418,7 @@ test("a redraft sent while a refused draft is still being checked still runs", a
   }
   const redraft = await startDraft(repo.dir, {
     runner,
-    available,
+    status: ready,
     redraft: true,
   });
   assert.deepEqual(await stale, { status: "refused", reason: "exists" });

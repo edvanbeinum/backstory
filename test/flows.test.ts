@@ -438,3 +438,20 @@ test("the hunk list stays near its budget, headers included", async () => {
   assert.doesNotMatch(text, /H401  /);
   assert.match(text, /200 more hunks not listed/);
 });
+
+test("with Claude Code logged out or missing, no run starts and each says why", async () => {
+  const { startFlows, startTrace } = await import("../lib/flows/cache");
+  const view = { root: os.tmpdir(), base: null, head: "HEAD" };
+  assert.deepEqual(
+    await startFlows(view, { status: async () => "logged-out" }),
+    { status: "unavailable", reason: "logged-out" },
+  );
+  assert.deepEqual(
+    await startTrace(view, "H1", { status: async () => "logged-out" }),
+    { status: "unavailable", reason: "logged-out" },
+  );
+  assert.deepEqual(await startFlows(view, { status: async () => "missing" }), {
+    status: "unavailable",
+    reason: "no-claude",
+  });
+});

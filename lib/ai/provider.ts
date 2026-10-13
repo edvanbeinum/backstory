@@ -26,16 +26,22 @@ export interface AiResult<T> {
   model: string | null;
 }
 
+/** Whether a provider can run: not installed, installed but logged out, or ready */
+export type ProviderStatus = "missing" | "logged-out" | "ready";
+
+/** Why a run didn't start, as flows, the map's draft and the data draft report it */
+export type ProviderGap = "no-claude" | "logged-out";
+
+export const providerGap = (status: ProviderStatus): ProviderGap | null =>
+  status === "ready" ? null : status === "missing" ? "no-claude" : status;
+
 export interface AiProvider {
   id: "claude";
   /** For copy: "Claude Code" */
   name: string;
-  /** What the user does when it isn't available, for copy: "Install Claude Code and sign in" */
-  setup: string;
   /** The model it will use, for the record */
   model(): string;
-  /** Ready to run, which for a hosted provider would mean signed in rather than installed */
-  available(): Promise<boolean>;
+  status(): Promise<ProviderStatus>;
   run: Runner;
 }
 

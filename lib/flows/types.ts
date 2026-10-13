@@ -5,6 +5,8 @@
  * window, which draws them.
  */
 
+import type { ProviderGap } from "../ai/provider";
+
 export interface FlowParticipant {
   /** The type's name, as steps' `from` and `to` refer to it */
   name: string;
@@ -81,4 +83,4 @@ export type FlowsStatus =
   | { status: "running"; startedAt: number; phase: string }
   | { status: "idle" }
   | { status: "failed"; error: string }
-  | { status: "unavailable"; reason: "uncommitted" | "no-claude" };
+  | { status: "unavailable"; reason: "uncommitted" | ProviderGap };

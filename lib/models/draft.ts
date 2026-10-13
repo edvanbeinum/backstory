@@ -1,7 +1,13 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import { aiProvider, type Runner } from "../ai/provider";
+import {
+  aiProvider,
+  providerGap,
+  type ProviderGap,
+  type ProviderStatus,
+  type Runner,
+} from "../ai/provider";
 import { git, gitLine } from "../exec";
 import { withSnapshot } from "../flows/generate";
 import { DRAFTED_PROPERTY, localModelDir, MODEL_DSL, showFile } from "../model";
@@ -44,7 +50,7 @@ export type DraftStatus =
       ambiguous: number;
     }
   | { status: "failed"; error: string }
-  | { status: "unavailable"; reason: "no-claude" };
+  | { status: "unavailable"; reason: ProviderGap };
 
 /** What `/api/model` answers: where the repo's model at HEAD comes from */
 export interface ModelSourceResponse {
@@ -258,7 +264,7 @@ export async function startDraft(
   opts: {
     redraft?: boolean;
     runner?: Runner;
-    available?: () => Promise<boolean>;
+    status?: () => Promise<ProviderStatus>;
   } = {},
 ): Promise<DraftStatus | DraftRefusal> {
   const dir = await localModelDir(root);
@@ -300,8 +306,9 @@ export async function startDraft(
       release();
       return { status: "refused", reason: "exists" };
     }
-    if (!(await (opts.available ?? aiProvider().available)())) {
-      job.status = { status: "unavailable", reason: "no-claude" };
+    const gap = providerGap(await (opts.status ?? aiProvider().status)());
+    if (gap) {
+      job.status = { status: "unavailable", reason: gap };
       return job.status;
     }
   } catch (err) {

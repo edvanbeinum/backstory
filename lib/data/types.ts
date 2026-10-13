@@ -4,6 +4,8 @@
  * draws and compares this, never the source format.
  */
 
+import type { ProviderGap } from "../ai/provider";
+
 export interface Field {
   name: string;
   /** The stack's own type name, e.g. "string", "integer 64" */
@@ -106,5 +108,5 @@ export type DataDraftStatus =
   | { status: "running"; phase: string; startedAt: number }
   | { status: "done"; costUsd: number; durationMs: number }
   | { status: "failed"; error: string }
-  /** The provider isn't ready: its name and what to do about it */
-  | { status: "unavailable"; provider: string; setup: string };
+  /** The provider isn't ready: its name and why */
+  | { status: "unavailable"; provider: string; reason: ProviderGap };
