@@ -55,19 +55,23 @@ export function hookPort(env = process.env) {
 }
 
 /**
- * Whether a Stop hook's command is this one: it ends in `backstory hook stop`,
- * bare or as a path, quoted or not. `backstory setup claude` and the setup
- * checklist's Notes to your agent row both use it, so a hook setup writes ticks
- * the row.
+ * Whether a Stop hook's command is this one: the whole command is
+ * `backstory hook stop`, bare or as a path, quoted or not. A command that
+ * chains it after something else, like `notify-me && backstory hook stop`, is
+ * the user's, so setup and undo never rewrite or delete their part.
+ * `backstory setup claude` and the setup checklist's Notes to your agent row
+ * both use it, so a hook setup writes ticks the row.
  *
  * @param {unknown} command
  */
 export function isBackstoryHook(command) {
-  return (
-    typeof command === "string" &&
-    /(^|[\s/'"])backstory['"]?\s+hook\s+stop\s*$/.test(command)
-  );
+  return typeof command === "string" && BACKSTORY_HOOK.test(command);
 }
+
+// The program is a single-quoted path (with `'\''` for a quote, as
+// shellQuote writes it), a double-quoted one, or a bare word.
+const BACKSTORY_HOOK =
+  /^\s*(?:'(?:(?:[^']|'\\'')*\/)?backstory'|"(?:[^"]*\/)?backstory"|(?:[^\s'"]*\/)?backstory)\s+hook\s+stop\s*$/;
 
 /** Well under the hook's timeout, and short enough not to be felt per turn. */
 export const TAKE_TIMEOUT_MS = 2000;

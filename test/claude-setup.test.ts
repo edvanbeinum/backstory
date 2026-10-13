@@ -166,6 +166,22 @@ test("setup drops a second Backstory hook, so one is left", () => {
   assert.deepEqual(settingsOf(dir).hooks.Stop, [stopGroup(COMMAND)]);
 });
 
+test("setup and undo leave a command that chains backstory hook stop after another", () => {
+  const chained = "notify-me && backstory hook stop";
+  const dir = claudeDir({ hooks: { Stop: [stopGroup(chained)] } });
+  assert.equal(
+    planClaudeSetup({ claudeDir: dir, script: SCRIPT }).state,
+    "none",
+  );
+  applyClaudeSetup({ claudeDir: dir, script: SCRIPT });
+  assert.deepEqual(settingsOf(dir).hooks.Stop, [
+    stopGroup(chained),
+    { hooks: [{ type: "command", command: COMMAND, timeout: 10 }] },
+  ]);
+  undoClaudeSetup({ claudeDir: dir, script: SCRIPT });
+  assert.deepEqual(settingsOf(dir).hooks.Stop, [stopGroup(chained)]);
+});
+
 test("undo takes out only Backstory's hook and the groups it leaves empty", () => {
   const dir = claudeDir({
     model: "opus",
@@ -308,18 +324,22 @@ test("setup refuses without the Mac app's command beside it", () => {
   );
 });
 
-test("only commands ending in backstory hook stop count as Backstory's", () => {
+test("only a whole backstory hook stop command counts as Backstory's", () => {
   for (const command of [
     "backstory hook stop",
     COMMAND,
     `"${SCRIPT}" hook stop`,
     `${SCRIPT} hook stop  `,
+    `${shellQuote("/tmp/it's here/backstory")} hook stop`,
   ])
     assert.ok(isBackstoryHook(command), command);
   for (const command of [
     "notify-me",
     "backstory hook stop --x",
     "mybackstory hook stop",
+    "notify-me && backstory hook stop",
+    "notify-me; backstory hook stop",
+    `cd /tmp && '${SCRIPT}' hook stop`,
     3,
   ])
     assert.ok(!isBackstoryHook(command), String(command));
