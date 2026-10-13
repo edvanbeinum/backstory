@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { loginShellDirs, toolDirsIn, withToolDirs } from "../lib/exec";
+import { loginShellDirs, run, toolDirsIn, withToolDirs } from "../lib/exec";
 import { standIns } from "./standins";
 
 const TOOL_DIRS = [
@@ -58,4 +58,10 @@ test("an alias is not a folder", () => {
     toolDirsIn("claude: aliased to /x/bin/claude --yolo\n", TOOLS),
     [],
   );
+});
+
+test("a program that exits without reading its input still resolves, rather than crashing on the write", async () => {
+  const quits = path.join(standIns({ quits: "exit 0" }), "quits");
+  const result = await run(quits, [], { input: "x".repeat(4 * 1024 * 1024) });
+  assert.equal(result.code, 0);
 });

@@ -214,8 +214,12 @@ export async function run(
       },
     );
 
-    if (input !== undefined) {
-      child.stdin?.end(input);
+    if (input !== undefined && child.stdin) {
+      // Swallow a failed write: a program that exits without reading its
+      // input makes it fail with EPIPE, which would otherwise crash the
+      // server, and its exit code already says what happened.
+      child.stdin.on("error", () => {});
+      child.stdin.end(input);
     }
   });
 }
