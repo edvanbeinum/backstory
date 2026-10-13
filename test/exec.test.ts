@@ -3,7 +3,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { loginShellDirs, withToolDirs } from "../lib/exec";
+import { loginShellDirs, toolDirsIn, withToolDirs } from "../lib/exec";
 import { standIns } from "./standins";
 
 const TOOL_DIRS = [
@@ -32,15 +32,14 @@ test("a tool directory already on PATH isn't added twice", () => {
 const shell = (body: string) => path.join(standIns({ zsh: body }), "zsh");
 const TOOLS = ["gh", "claude"];
 
-test("the login shell's folder for a tool joins PATH, and its other output is ignored", async () => {
-  const dirs = await loginShellDirs(
-    shell(
-      'echo "Welcome back"\necho /x/nvm/bin/claude\necho /etc/motd\necho "gh not found"',
+test("the login shell's folder for a tool joins PATH, and its other output is ignored", () => {
+  assert.deepEqual(
+    toolDirsIn(
+      "Welcome back\n/x/nvm/bin/claude\n/etc/motd\ngh not found\n",
+      TOOLS,
     ),
-    TOOLS,
-    2_000,
+    ["/x/nvm/bin"],
   );
-  assert.deepEqual(dirs, ["/x/nvm/bin"]);
 });
 
 test("a login shell that hangs finds nothing, within the timeout", async () => {
@@ -54,13 +53,9 @@ test("a login shell that fails finds nothing", async () => {
   assert.deepEqual(await loginShellDirs(shell("exit 1"), TOOLS, 2_000), []);
 });
 
-test("an alias is not a folder", async () => {
+test("an alias is not a folder", () => {
   assert.deepEqual(
-    await loginShellDirs(
-      shell('echo "claude: aliased to /x/bin/claude --yolo"'),
-      TOOLS,
-      2_000,
-    ),
+    toolDirsIn("claude: aliased to /x/bin/claude --yolo\n", TOOLS),
     [],
   );
 });

@@ -64,20 +64,24 @@ export async function loginShellDirs(
       }),
       timedOut,
     ]);
-    if (!result) return [];
-    const dirs = result.stdout
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(
-        (line) => path.isAbsolute(line) && tools.includes(path.basename(line)),
-      )
-      .map((line) => path.dirname(line));
-    return [...new Set(dirs)];
+    return result ? toolDirsIn(result.stdout, tools) : [];
   } catch {
     return [];
   } finally {
     clearTimeout(timer);
   }
+}
+
+/** The folders of the absolute paths to `tools` in a login shell's output. */
+export function toolDirsIn(output: string, tools: string[]): string[] {
+  const dirs = output
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(
+      (line) => path.isAbsolute(line) && tools.includes(path.basename(line)),
+    )
+    .map((line) => path.dirname(line));
+  return [...new Set(dirs)];
 }
 
 // Kept on globalThis because Next may load this module once per route bundle,
