@@ -138,11 +138,7 @@ function parse(root: string, entries: Record<string, Stored>): ForRoot {
         queuedAt: value.queuedAt,
         forSession: value.forSession,
         deliveredAt: value.deliveredAt,
-        // Rounds a review took under the old name still say so in the window.
-        deliveredTo:
-          value.deliveredTo === "differ review"
-            ? BACKSTORY_REVIEW
-            : value.deliveredTo,
+        deliveredTo: value.deliveredTo,
         claim: value.claim ?? null,
       });
     }

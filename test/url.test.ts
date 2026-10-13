@@ -30,7 +30,7 @@ const COMMITS = [commit(NEWEST), commit(OLDER)];
 
 test("round-trips awkward repo paths", () => {
   for (const repo of [
-    "/Users/ed/Source Code/café-app",
+    "/Users/me/Source Code/café-app",
     "/tmp/repo&with=separators",
     "/tmp/repo#hash",
     "/tmp/plus+and%percent",
@@ -44,8 +44,8 @@ test("round-trips awkward repo paths", () => {
 
 test("slashes stay readable, real separators stay encoded", () => {
   assert.equal(
-    buildUrl({ repo: "/Users/ed/code/backstory", rev: null }),
-    "/?repo=/Users/ed/code/backstory",
+    buildUrl({ repo: "/Users/me/code/backstory", rev: null }),
+    "/?repo=/Users/me/code/backstory",
   );
   // & would otherwise split the query into a bogus second parameter
   assert.match(buildUrl({ repo: "/a&b", rev: null }), /%26/);

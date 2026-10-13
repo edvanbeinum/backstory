@@ -206,26 +206,3 @@ enum HealthProbe {
         }
     }
 }
-
-/// The login agent the old `differ` command used to install, which
-/// `KeepAlive` would keep holding the port against the app.
-enum LoginAgent {
-    static let label = "dev.differ.server"
-
-    static var plist: URL {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/LaunchAgents/\(label).plist")
-    }
-
-    static func port(fromPlist data: Data) -> Int? {
-        let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any]
-        let env = plist?["EnvironmentVariables"] as? [String: Any]
-        return (env?["PORT"] as? String).flatMap { Int($0) }
-    }
-
-    /// Only an agent serving the app's own port is in its way, so a smoke test
-    /// on a spare port leaves the user's agent alone.
-    static func shouldBootOut(mode: ServerState.Mode, appPort: Int, agentPort: Int?) -> Bool {
-        mode == .owned && agentPort == appPort
-    }
-}

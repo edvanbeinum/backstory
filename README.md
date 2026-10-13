@@ -25,7 +25,10 @@ drag Backstory to Applications, and open it.
 It needs a Mac with Apple silicon on macOS 14.6 or later, **git**, and
 **[gh](https://cli.github.com)** authenticated (`gh auth login`) for the
 GitHub half. Without `gh` the commits and diffs still work — you just get a
-banner where the PR comments would be. The app carries its own server and the
+banner where the PR comments would be.
+[Claude Code](https://claude.com/claude-code), installed and signed in, is
+needed for **Draft a model**, **Draft the data model** and flows. Without it,
+diffs and review comments still work. The app carries its own server and the
 Node it runs on, so you don't need Node.
 
 The app gives Backstory its own Dock icon and Cmd-Tab entry, and runs the
@@ -54,6 +57,36 @@ updates with no window open.
 **Check for Updates…** in the same menu offers the latest GitHub release.
 
 The server logs to `~/.backstory/server.log`.
+
+### Uninstalling
+
+1. Turn off **Open at Login**, quit Backstory, and delete `Backstory.app`.
+2. If you ran `npm link`, remove the command:
+
+   ```bash
+   npm rm -g backstory
+   ```
+
+3. Delete Backstory's data: notes, ticks, the outbox, traced flows, drafted
+   models and data models, and the log.
+
+   ```bash
+   rm -rf ~/.backstory
+   ```
+
+4. If you added them, remove the `backstory hook stop` entry from
+   `~/.claude/settings.json` and delete
+   `~/.claude/commands/backstory-review.md`. Once the command is gone, the
+   hook fails with "command not found" each time a session stops.
+5. Optionally, remove the app's settings, its update state and the window's
+   storage, which holds your recent repos:
+
+   ```bash
+   defaults delete dev.backstory.app
+   rm -rf ~/Library/Caches/dev.backstory.app ~/Library/HTTPStorages/dev.backstory.app ~/Library/WebKit/dev.backstory.app
+   ```
+
+Nothing Backstory writes is inside your repos.
 
 ## What Backstory keeps
 
@@ -118,9 +151,10 @@ Backstory runs `claude -p` over a copy of the commit, with read-only tools. That
 - **It costs.** Tracing a change takes about a minute and usually $0.10–0.40
   on your Claude account. It only happens when you press "Trace this change",
   and the result is kept in `~/.backstory/flows/`, so a view is traced once.
-- **The model** is Sonnet unless you set `BACKSTORY_FLOWS_MODEL` (`opus`, or a
-  full model id). Every step Claude cites is checked against its line; the
-  ones that don't hold are shown dashed, as unverified.
+- **The model** is Sonnet. On a server you run yourself (`npm run dev`),
+  `BACKSTORY_FLOWS_MODEL` picks another (`opus`, or a full model id). Every
+  step Claude cites is checked against its line; the ones that don't hold are
+  shown dashed, as unverified.
 
 Without Claude Code installed, Backstory works as before, with no flows.
 
@@ -272,10 +306,10 @@ are.
 10 comments need a response
 across 5 branches · 21 worktrees checked out
 
-INDEE-IOS ─────────────────────────────────────────────────────────
- ●  feature/seek-target-1649        #40 merged   ▓▓░░░░░  2 of 7 handled
-    Publish the engine's pending seek target
- ✓  fix/audio-test-notification-36  #38 merged   ▓▓▓▓     all handled
+ACME-APP ──────────────────────────────────────────────────────────
+ ●  feature/offline-sync-1203       #40 merged   ▓▓░░░░░  2 of 7 handled
+    Queue edits made offline and replay them
+ ✓  fix/login-timeout-36            #38 merged   ▓▓▓▓     all handled
  ○  feature/release-script          no PR yet
 ```
 
@@ -296,9 +330,9 @@ note saying the counts are missing.
 ┌────┬──────────────────────┬───────────────────────────┐
 │2/7 │ COMMENT 3 OF 7  ‹ ›  │ Showing (⧉)(◍)(a commit…) │
 │    │                      │                           │
-│ ☑  │ [ ✓ Mark handled  x] │ ┌ AudioEngine.swift ─────  │
+│ ☑  │ [ ✓ Mark handled  x] │ ┌ OutboxQueue.swift ─────  │
 │ ☑  │                      │ │  29 + guard let target  │
-│ ▣  │ 🧑 julianrubisch     │ │  30 + engine.seek(…)    │
+│ ▣  │ 🧑 sam-hollister     │ │  30 + queue.replay(…)   │
 │ ☐  │ Keying off pending…  │ │     💬 the comment,     │
 │ ☐  │                      │ │        anchored inline  │
 │ ☐  │ YOUR RESPONSE        │ └───────────────────────── │

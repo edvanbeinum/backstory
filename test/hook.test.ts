@@ -3,7 +3,7 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { test } from "node:test";
 
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -96,19 +96,6 @@ test("the hook finds the port Backstory was last started on", () => {
   assert.equal(hookPort(env), 4555);
   // The agent's own BACKSTORY_PORT still wins.
   assert.equal(hookPort({ ...env, BACKSTORY_PORT: "4600" }), 4600);
-});
-
-test("recording the port moves the old directory into place rather than starting an empty one", () => {
-  const dir = mkdtempSync(path.join(tmpdir(), "backstory-hook-"));
-  const old = path.join(dir, ".differ");
-  mkdirSync(old);
-  writeFileSync(path.join(old, "notes.json"), "{}");
-  const env = { BACKSTORY_HOME: path.join(dir, ".backstory") };
-
-  recordPort(4555, env);
-  assert.ok(existsSync(path.join(dir, ".backstory", "notes.json")));
-  assert.equal(existsSync(old), false);
-  assert.equal(hookPort(env), 4555);
 });
 
 test("nothing queued prints nothing", async () => {

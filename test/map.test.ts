@@ -257,28 +257,6 @@ test("a drafted local model says so and where it is; a committed one says neithe
   }
 });
 
-test("a local model drafted under the old name still says it's a draft", async () => {
-  const repo = gitRepo();
-  const home = tempDir("backstory-home-");
-  const base = repo.commit({ README: "x\n" }, "base");
-  const head = repo.commit({ "src/a/one.ts": "1\n" }, "head");
-  write(
-    path.join(home, "models", path.basename(repo.dir)),
-    "workspace.dsl",
-    draftedDsl("differ.drafted"),
-  );
-
-  const previousHome = process.env.BACKSTORY_HOME;
-  process.env.BACKSTORY_HOME = home;
-  try {
-    const map = await buildMap(repo.dir, base, head);
-    assert.equal(map.drafted, "2026-10-05");
-  } finally {
-    if (previousHome === undefined) delete process.env.BACKSTORY_HOME;
-    else process.env.BACKSTORY_HOME = previousHome;
-  }
-});
-
 function draftedDsl(property: string): string {
   return dsl(BASE).replace(
     '"code.tests" "test/**"',

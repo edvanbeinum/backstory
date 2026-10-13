@@ -73,8 +73,8 @@ export const splitGlobs = (value: string | undefined) =>
   value?.split(/\s+/).filter(Boolean) ?? [];
 
 /**
- * Same options as the Step 0 script: `dot: true`, so a file such as
- * `LiftMachine.xcdatamodeld/.xccurrentversion` maps like any other. Node's
+ * Same options as the Step 0 script: `dot: true`, so a file such as a Core
+ * Data app's `Model.xcdatamodeld/.xccurrentversion` maps like any other. Node's
  * `path.matchesGlob` skips dotfiles.
  */
 const matcher = (globs: string[]) =>
@@ -178,9 +178,6 @@ export const localModelFile = async (root: string) =>
  */
 export const DRAFTED_PROPERTY = "backstory.drafted";
 
-/** What models drafted under the old name carry, so they still read as drafts. */
-const OLD_DRAFTED_PROPERTY = "differ.drafted";
-
 export interface ModelRead {
   /** Null when the file is there but couldn't be read: see `error` */
   model: Model | null;
@@ -199,10 +196,7 @@ function read(text: string, file: string | null): ModelRead {
       model,
       local,
       file,
-      drafted:
-        model.properties[DRAFTED_PROPERTY] ??
-        model.properties[OLD_DRAFTED_PROPERTY] ??
-        null,
+      drafted: model.properties[DRAFTED_PROPERTY] ?? null,
       error: null,
     };
   } catch (e) {
@@ -236,8 +230,8 @@ export async function readModelAt(
 
 /**
  * Tests and ignored files stay off the flows and the map. Without a model,
- * a default test pattern stands in, so a repo with no `architecture/` (Indee)
- * still gets flows over its app code.
+ * a default test pattern stands in, so a repo with no `architecture/` still
+ * gets flows over its app code.
  */
 const DEFAULT_TESTS = matcher([
   "**/test/**",

@@ -14,13 +14,7 @@
  * them to be taken again, never lost. Once delivered, the agent's next stop
  * finds nothing and it stops normally — no loop.
  */
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  renameSync,
-  writeFileSync,
-} from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -34,20 +28,12 @@ const portFile = (env) => path.join(home(env), "port");
  * Note the port a server was last reached on. A hook runs in the agent's
  * environment, not the one `backstory --port N` ran in, so it can't be told.
  *
- * Moves a `.differ` beside the home directory into place before creating it,
- * as `homeDir` in `lib/store.ts` does: `backstory` records the port before
- * the app it just launched has started, and an empty directory made here
- * would stop the app moving the old one.
- *
  * @param {number} port
  * @param {Record<string, string | undefined>} env
  */
 export function recordPort(port, env = process.env) {
   try {
-    const dir = home(env);
-    const old = path.join(path.dirname(dir), ".differ");
-    if (!existsSync(dir) && existsSync(old)) renameSync(old, dir);
-    mkdirSync(dir, { recursive: true });
+    mkdirSync(home(env), { recursive: true });
     writeFileSync(portFile(env), `${port}\n`);
   } catch {
     // The hook falls back to the default port; nothing worse.

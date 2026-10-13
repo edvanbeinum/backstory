@@ -13,17 +13,6 @@ final class ServerProcess {
 
         var log: URL { home.appendingPathComponent("server.log") }
 
-        /// Moves a `.differ` beside `home` into place when `home` isn't there
-        /// yet, as `homeDir` in `lib/store.ts` does. Runs before the app
-        /// creates `home` for its log, which would otherwise leave the
-        /// server's move nothing to do and the old data behind.
-        static func moveOldHome(to home: URL) {
-            let manager = FileManager.default
-            let old = home.deletingLastPathComponent().appendingPathComponent(".differ")
-            guard !manager.fileExists(atPath: home.path), manager.fileExists(atPath: old.path) else { return }
-            try? manager.moveItem(at: old, to: home)
-        }
-
         /// What the server needs from the app's bundle, or nil when this build
         /// carries no server, as `xcodebuild test` and Xcode's Run produce.
         static func inBundle(_ bundle: Bundle, port: Int, home: URL) -> Launch? {

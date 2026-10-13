@@ -217,7 +217,7 @@ function repeatedFlows(set: FlowSet | null): Finding[] {
       const a = set.flows[i];
       const b = set.flows[j];
       // Where they part: the same call made with different words.
-      const differ: Evidence[] = [];
+      const varied: Evidence[] = [];
       const parts: string[] = [];
       for (const s of a.after) {
         const sig = signature(s, externals[i]);
@@ -230,8 +230,8 @@ function repeatedFlows(set: FlowSet | null): Finding[] {
         );
         if (twin) {
           parts.push(sig!.split(".").pop()!);
-          differ.push({ flow: i, step: s.id, text: `${a.name}: ${s.label}` });
-          differ.push({
+          varied.push({ flow: i, step: s.id, text: `${a.name}: ${s.label}` });
+          varied.push({
             flow: j,
             step: twin.id,
             text: `${b.name}: ${twin.label}`,
@@ -239,7 +239,7 @@ function repeatedFlows(set: FlowSet | null): Finding[] {
         }
       }
       const at = parts.length
-        ? `; ${parts.length === n ? "all" : parts.length} of them ${parts.length === 1 ? "differs" : "differ"} in what's passed`
+        ? `; ${parts.length === n ? "all" : parts.length} of them ${parts.length === 1 ? "varies" : "vary"} in what's passed`
         : "";
       out.push({
         id: `repeated:${a.id}:${b.id}`,
@@ -247,8 +247,8 @@ function repeatedFlows(set: FlowSet | null): Finding[] {
         short: `flows ${i + 1} and ${j + 1} share ${n} calls`,
         title: `"${a.name}" and "${b.name}" make the same ${n} calls from different places${at}`,
         evidence:
-          differ.length > 0
-            ? differ.slice(0, 6)
+          varied.length > 0
+            ? varied.slice(0, 6)
             : [{ flow: i, text: `${n} calls in common` }],
         on: { flows: [i, j] },
         flowText: {

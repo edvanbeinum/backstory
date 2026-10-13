@@ -56,13 +56,8 @@ function props(values: Record<string, unknown>): Record<string, unknown> {
   );
 }
 
-/**
- * A property by its short name. Falls back to the `differ.*` name that flows
- * cached under the old name carry, so they read back rather than cost
- * another trace.
- */
 const prop = (bag: Record<string, unknown>, key: string): unknown =>
-  `${NS}.${key}` in bag ? bag[`${NS}.${key}`] : bag[`differ.${key}`];
+  bag[`${NS}.${key}`];
 
 const toLocation = (s: FlowStep, i: number): SarifLocation => ({
   location: {

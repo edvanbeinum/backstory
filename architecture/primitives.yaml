@@ -88,7 +88,7 @@ primitives:
       - readNamespaced
       - writeNamespaced
       - homeDir
-    use: "Every store file read and write. It keeps the store invariant, validates on read and writes atomically. `homeDir` is the one directory everything on this machine lives in (the store, the flow cache, the data cache, local models), and moves `~/.differ` into place the first time."
+    use: "Every store file read and write. It keeps the store invariant, validates on read and writes atomically. `homeDir` is the one directory everything on this machine lives in (the store, the flow cache, the data cache, local models)."
   - name: run the AI provider
     block: AI provider
     file: lib/ai/provider.ts

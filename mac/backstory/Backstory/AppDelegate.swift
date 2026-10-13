@@ -19,13 +19,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         return port > 0 ? port : 4460
     }()
 
-    private lazy var home: URL = {
-        let home =
-            defaults.string(forKey: "home").map { URL(fileURLWithPath: $0) }
-            ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".backstory")
-        ServerProcess.Launch.moveOldHome(to: home)
-        return home
-    }()
+    private lazy var home: URL =
+        defaults.string(forKey: "home").map { URL(fileURLWithPath: $0) }
+        ?? FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent(".backstory")
 
     private lazy var attachedURL: URL? = defaults.string(forKey: "serverURL").flatMap { URL(string: $0) }
 
@@ -61,10 +57,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             return
         }
         windowController.showWindow(nil)
-        Task {
-            await bootOutLoginAgent()
-            windowController.startPolling()
-        }
+        windowController.startPolling()
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
@@ -91,29 +84,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     func applicationSupportsSecureRestorableState(_ app: NSApplication) -> Bool {
         return true
-    }
-
-    /// Removes the login agent the old `differ` command used to install, when
-    /// it serves the app's port: its `KeepAlive` would hold the port against
-    /// the app, and nothing else removes it any more.
-    private func bootOutLoginAgent() async {
-        let plist = LoginAgent.plist
-        let agentPort = (try? Data(contentsOf: plist)).flatMap(LoginAgent.port(fromPlist:))
-        guard
-            LoginAgent.shouldBootOut(
-                mode: serverProcess == nil ? .attached : .owned, appPort: port, agentPort: agentPort)
-        else { return }
-        let launchctl = Process()
-        launchctl.executableURL = URL(fileURLWithPath: "/bin/launchctl")
-        launchctl.arguments = ["bootout", "gui/\(getuid())/\(LoginAgent.label)"]
-        launchctl.standardOutput = FileHandle.nullDevice
-        launchctl.standardError = FileHandle.nullDevice
-        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
-            launchctl.terminationHandler = { _ in done.resume() }
-            do { try launchctl.run() } catch { done.resume() }
-        }
-        try? FileManager.default.removeItem(at: plist)
-        NSLog("Backstory: removed the login agent \(LoginAgent.label); the app runs the server now")
     }
 
     @IBAction func openRepo(_ sender: Any?) {

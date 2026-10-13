@@ -57,11 +57,11 @@ test("migration carries all three link shapes plus drafts", async () => {
   await fs.writeFile(
     path.join(home, "links.json"),
     JSON.stringify({
-      "Indee/indee-ios#28": {
+      "acme/app#28": {
         legacy_untagged: { sha: SHA_A, patchId: PATCH_A },
         legacy_bare: SHA_B,
       },
-      "Indee/indee-rails#1589": {
+      "acme/api#1589": {
         tagged_commit: { kind: "commit", sha: SHA_B, patchId: PATCH_B },
         tagged_ack: { kind: "ack" },
       },
@@ -70,7 +70,7 @@ test("migration carries all three link shapes plus drafts", async () => {
   await fs.writeFile(
     path.join(home, "drafts.json"),
     JSON.stringify({
-      "Indee/indee-ios#28": {
+      "acme/app#28": {
         legacy_untagged: "Addressed in 76c66de",
         // The case a links-driven migration would silently drop: a reply in
         // progress on a comment with no link. The live file has one.
@@ -79,7 +79,7 @@ test("migration carries all three link shapes plus drafts", async () => {
     }),
   );
 
-  const ios = await getResponses("Indee/indee-ios#28");
+  const ios = await getResponses("acme/app#28");
   assert.deepEqual(ios.legacy_untagged.commits[0], {
     sha: SHA_A,
     patchId: PATCH_A,
@@ -94,7 +94,7 @@ test("migration carries all three link shapes plus drafts", async () => {
   assert.equal(ios.draft_only.reply, "Still thinking about this one");
   assert.equal(ios.draft_only.commits[0] ?? null, null);
 
-  const rails = await getResponses("Indee/indee-rails#1589");
+  const rails = await getResponses("acme/api#1589");
   assert.deepEqual(rails.tagged_commit.commits[0], {
     sha: SHA_B,
     patchId: PATCH_B,
@@ -119,7 +119,7 @@ test("migration preserves the handled count, including a stale link", async () =
   await fs.writeFile(
     path.join(home, "links.json"),
     JSON.stringify({
-      "Indee/indee-ios#40": {
+      "acme/app#40": {
         live: { sha: SHA_A, patchId: PATCH_A },
         // Rebased away. Today this reads as unaddressed, which is why #40
         // shows "1 of 7" rather than 2 — after migration it stays ticked,
@@ -129,7 +129,7 @@ test("migration preserves the handled count, including a stale link", async () =
     }),
   );
 
-  const forPr = await getResponses("Indee/indee-ios#40");
+  const forPr = await getResponses("acme/app#40");
   assert.equal(Object.values(forPr).filter((r) => r.done).length, 2);
 });
 

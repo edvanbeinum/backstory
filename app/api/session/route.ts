@@ -63,7 +63,7 @@ export async function GET(request: Request) {
 
     // Commits first: the boundary (and so the history walk) is defined by
     // the oldest unpushed commit, not by the raw merge base — after a rebase
-    // those differ, and the boundary is the honest one.
+    // those don't match, and the boundary is the honest one.
     let commits = await getCommits(repo, rawBase);
     const boundarySha = await getBoundarySha(
       repo.root,

@@ -1,5 +1,4 @@
 import { execFile } from "node:child_process";
-import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 
@@ -16,15 +15,18 @@ const EXTRA_PATH_DIRS = [
   path.join(homedir(), ".local", "bin"), // Claude Code's native installer
 ];
 
-{
-  const current = (process.env.PATH ?? "").split(path.delimiter);
-  const missing = EXTRA_PATH_DIRS.filter(
-    (dir) => !current.includes(dir) && existsSync(dir),
-  );
-  if (missing.length > 0) {
-    process.env.PATH = [...current, ...missing].join(path.delimiter);
-  }
+/**
+ * Appends the tool directories PATH lacks, including ones that don't exist
+ * yet, so a `claude` installed after the server started is found on the next
+ * spawn without a restart. A missing directory on PATH costs nothing.
+ */
+export function withToolDirs(current: string): string {
+  const dirs = current.split(path.delimiter);
+  const missing = EXTRA_PATH_DIRS.filter((dir) => !dirs.includes(dir));
+  return [...dirs, ...missing].join(path.delimiter);
 }
+
+process.env.PATH = withToolDirs(process.env.PATH ?? "");
 
 export interface ExecResult {
   stdout: string;
