@@ -102,13 +102,20 @@ final class ServerProcess {
         // Give the server a bare PATH: `lib/exec.ts` appends where Homebrew
         // and Claude Code live, and an app launched from the Dock has no
         // shell's PATH to pass on anyway.
-        process.environment = [
+        var environment = [
             "PORT": String(launch.port),
             "HOSTNAME": "127.0.0.1",
             "BACKSTORY_HOME": launch.home.path,
             "HOME": NSHomeDirectory(),
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
         ]
+        // Pass on CLAUDE_CONFIG_DIR, so the checklist reads the same Claude
+        // Code settings that Set Up, which inherits the app's environment,
+        // writes to.
+        if let claudeDir = ProcessInfo.processInfo.environment["CLAUDE_CONFIG_DIR"] {
+            environment["CLAUDE_CONFIG_DIR"] = claudeDir
+        }
+        process.environment = environment
         if let log = openLog() {
             process.standardOutput = log
             process.standardError = log
