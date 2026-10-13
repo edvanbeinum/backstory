@@ -1,0 +1,12 @@
+#!/bin/sh
+# The `backstory` command in the Mac app's bundle, run by the app's own Node.
+# Resolves its own path through any link to it, so a link in /usr/local/bin
+# still finds the bundle, and names nothing absolute, so a Sparkle update that
+# replaces the app at the same path keeps the Claude Code hook working.
+# BACKSTORY_APP makes `backstory` open this copy of the app, not whichever one
+# is in /Applications.
+set -e
+bin="$(dirname "$(readlink -f "$0")")"
+BACKSTORY_APP="${bin%/Contents/Resources/bin}"
+export BACKSTORY_APP
+exec "$BACKSTORY_APP/Contents/Helpers/node" "$bin/backstory.mjs" "$@"

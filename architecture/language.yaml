@@ -183,7 +183,7 @@ blocks:
   - name: Mac app
     code:
       - mac/
-    summary: A Swift app that starts, restarts and stops the standalone server with the Node in its bundle, with one web view on it, a native view while it isn't answering, and the `backstory://` URL scheme, and Check for Updates… through Sparkle. `mac/dmg.sh` packs it into a notarized disk image, `mac/appcast.sh` writes the Sparkle appcast that offers it, and `.github/workflows/release.yml` runs both on a version tag.
+    summary: A Swift app that starts, restarts and stops the standalone server with the Node in its bundle, with one web view on it, a native view while it isn't answering, and the `backstory://` URL scheme, and Check for Updates… through Sparkle. Its bundle carries the `backstory` command too (`mac/bin/backstory`, run by the bundled Node), which the Claude Code hook runs by its path there. `mac/dmg.sh` packs it into a notarized disk image, `mac/appcast.sh` writes the Sparkle appcast that offers it, and `.github/workflows/release.yml` runs both on a version tag.
     read: "`mac/backstory/Backstory/ServerState.swift`, the comment on `ServerState`"
 
 invariants:
