@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -160,27 +160,6 @@ test("requeue turns a round filed as answered back into a queued one", async () 
   assert.equal(queued?.deliveredAt, null);
   assert.equal(queued?.forSession, "s-1");
   assert.equal((await take(ROOT, "s-1")).length, 1);
-});
-
-test("a round a review took under the old name still reads as taken by a review", async () => {
-  useTempHome();
-  writeFileSync(
-    path.join(process.env.BACKSTORY_HOME!, "outbox.json"),
-    JSON.stringify({
-      [ROOT]: {
-        r1: {
-          noteIds: ["n1"],
-          message: "fix it",
-          queuedAt: 1,
-          forSession: null,
-          deliveredAt: 2,
-          deliveredTo: "differ review",
-        },
-      },
-    }),
-  );
-  const [old] = (await getOutbox(ROOT)).rounds;
-  assert.equal(old.deliveredTo, BACKSTORY_REVIEW);
 });
 
 test("a copied round is recorded as delivered and never taken", async () => {

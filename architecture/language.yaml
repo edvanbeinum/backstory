@@ -2,9 +2,9 @@
 
 terms:
   - name: Backstory
-    means: "The product: the Mac app, the server it runs, the page and the `backstory` command. It was called differ; that name stays only where it names the old thing: the `dev.differ.server` login agent the app removes, the `~/.differ` folder `homeDir` moves, and keys cached under it that are still read."
+    means: "The product: the Mac app, the server it runs, the page and the `backstory` command."
     avoid:
-      - differ, for anything current
+      - differ, the old name
   - name: flow
     means: "What the code does for one user action a change touches: the data, the Flows tab and the feature."
     drawing: sequence
