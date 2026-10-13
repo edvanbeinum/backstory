@@ -25,8 +25,7 @@ drag Backstory to Applications, and open it.
 It needs a Mac with Apple silicon on macOS 14.6 or later, **git**, and
 **[gh](https://cli.github.com)** authenticated (`gh auth login`) for the
 GitHub half. Without `gh` the commits and diffs still work — you just get a
-banner where the PR comments would be. The app carries its own server and the
-Node it runs on, so you don't need Node.
+banner where the PR comments would be.
 
 The app gives Backstory its own Dock icon and Cmd-Tab entry, and runs the
 server itself: it starts the server when you open the app, restarts it if it
@@ -119,9 +118,8 @@ Without Claude Code installed, Backstory works as before, with no flows.
 ### The `backstory` command
 
 The agent's side of a review goes through the `backstory` command:
-`backstory review` and the Claude Code Stop hook below both run it. It isn't
-in the disk image. It comes from a checkout of this repo, with Node 22 or
-later on your PATH:
+`backstory review` and the Claude Code Stop hook below both run it. It comes
+from a checkout of this repo, with Node 22 or later on your PATH:
 
 ```bash
 git clone https://github.com/edvanbeinum/backstory.git
@@ -444,8 +442,7 @@ With Xcode installed:
 npm run mac:build
 ```
 
-Drag `mac/build/Backstory.app` to Applications and open it. The app carries the
-server and the Node it runs on, so it needs no checkout or `node` once built.
+Drag `mac/build/Backstory.app` to Applications and open it.
 `npm run mac:dmg` packs it into a disk image; `packaging/README.md` says how to
 sign, notarize and release it.
 
