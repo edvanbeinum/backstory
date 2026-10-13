@@ -25,7 +25,8 @@ drag Backstory to Applications, and open it.
 It needs a Mac with Apple silicon on macOS 14.6 or later, **git**, and
 **[gh](https://cli.github.com)** authenticated (`gh auth login`) for the
 GitHub half. Without `gh` the commits and diffs still work — you just get a
-banner where the PR comments would be.
+banner where the PR comments would be. The app carries its own server and the
+Node it runs on, so you don't need Node.
 
 The app gives Backstory its own Dock icon and Cmd-Tab entry, and runs the
 server itself: it starts the server when you open the app, restarts it if it
