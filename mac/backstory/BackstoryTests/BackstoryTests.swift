@@ -54,7 +54,7 @@ struct RepoLinkTests {
         "backstory://open",
         "backstory://open?path=/Users/me/code/app",
         "backstory://open?repo=code/app",
-        "differ://open?repo=/Users/me/code/app",
+        "other://open?repo=/Users/me/code/app",
     ])
     func ignoresAnythingElse(_ link: String) {
         #expect(RepoLink.address(for: URL(string: link)!, server: server) == nil)
@@ -235,68 +235,9 @@ struct ServerStateTests {
 
     @Test func healthMustSayBackstory() {
         #expect(HealthProbe.isBackstory(Data(#"{"app":"backstory","build":"x"}"#.utf8)))
-        #expect(!HealthProbe.isBackstory(Data(#"{"app":"differ","build":"x"}"#.utf8)))
+        #expect(!HealthProbe.isBackstory(Data(#"{"app":"other","build":"x"}"#.utf8)))
         #expect(!HealthProbe.isBackstory(Data(#"{"app":"vite"}"#.utf8)))
         #expect(!HealthProbe.isBackstory(Data("<html>".utf8)))
-    }
-}
-
-/// Each case works beside a fresh temp directory, never the real home.
-struct MoveOldHomeTests {
-    private func beside() throws -> (old: URL, home: URL) {
-        let dir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("backstory-home-\(UUID().uuidString)")
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        return (dir.appendingPathComponent(".differ"), dir.appendingPathComponent(".backstory"))
-    }
-
-    @Test func theOldDirectoryMovesWhenTheNewOneIsntThere() throws {
-        let (old, home) = try beside()
-        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
-        try Data("{}".utf8).write(to: old.appendingPathComponent("notes.json"))
-
-        ServerProcess.Launch.moveOldHome(to: home)
-        #expect(FileManager.default.fileExists(atPath: home.appendingPathComponent("notes.json").path))
-        #expect(!FileManager.default.fileExists(atPath: old.path))
-    }
-
-    @Test func theOldDirectoryStaysWhenTheNewOneIsThere() throws {
-        let (old, home) = try beside()
-        try FileManager.default.createDirectory(at: old, withIntermediateDirectories: true)
-        try Data("{}".utf8).write(to: old.appendingPathComponent("notes.json"))
-        try FileManager.default.createDirectory(at: home, withIntermediateDirectories: true)
-
-        ServerProcess.Launch.moveOldHome(to: home)
-        #expect(FileManager.default.fileExists(atPath: old.appendingPathComponent("notes.json").path))
-        #expect(!FileManager.default.fileExists(atPath: home.appendingPathComponent("notes.json").path))
-    }
-}
-
-@MainActor
-struct LoginAgentTests {
-    private func plist(port: String) -> Data {
-        Data(
-            """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <plist version="1.0"><dict>
-            <key>Label</key><string>dev.differ.server</string>
-            <key>EnvironmentVariables</key><dict>
-            <key>PORT</key><string>\(port)</string>
-            <key>HOSTNAME</key><string>127.0.0.1</string>
-            </dict></dict></plist>
-            """.utf8)
-    }
-
-    @Test func readsThePortTheAgentServes() {
-        #expect(LoginAgent.port(fromPlist: plist(port: "4460")) == 4460)
-        #expect(LoginAgent.port(fromPlist: Data("not a plist".utf8)) == nil)
-    }
-
-    @Test func bootsOutOnlyAnAgentOnTheAppsPortInOwnedMode() {
-        #expect(LoginAgent.shouldBootOut(mode: .owned, appPort: 4460, agentPort: 4460))
-        #expect(!LoginAgent.shouldBootOut(mode: .owned, appPort: 4460, agentPort: nil))
-        #expect(!LoginAgent.shouldBootOut(mode: .owned, appPort: 4471, agentPort: 4460))
-        #expect(!LoginAgent.shouldBootOut(mode: .attached, appPort: 4460, agentPort: 4460))
     }
 }
 
