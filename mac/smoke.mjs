@@ -7,16 +7,19 @@
  * own; run `npm run mac:appcast` first for `sign_update`, which takes the key
  * from SPARKLE_PRIVATE_KEY_FILE as `mac:appcast` does. Command: the
  * `backstory` command in a copy of the bundle runs, and still runs once the
- * copy is replaced at the same path, as a Sparkle update does. Needs a login
+ * copy is replaced at the same path, as a Sparkle update does, both by its path
+ * and through a link like the one in /usr/local/bin. Needs a login
  * session, so it isn't part of verify. Runs on spare ports with a temporary
  * home, so it touches neither `~/.backstory`, port 4460, nor the login agent.
  */
 import { execFile, execFileSync, spawn } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs";
 import http from "node:http";
@@ -267,8 +270,12 @@ async function command() {
     "bin",
     "backstory",
   );
-  const run = (args, input = "") =>
-    execFileSync(backstory, args, {
+  // Stands in for /usr/local/bin, where Install Command Line Tool… links it.
+  const linked = path.join(dir, "bin", "backstory");
+  mkdirSync(path.dirname(linked));
+  symlinkSync(backstory, linked);
+  const run = (args, input = "", command = backstory) =>
+    execFileSync(command, args, {
       encoding: "utf8",
       input,
       env: { ...process.env, BACKSTORY_HOME: home },
@@ -276,6 +283,9 @@ async function command() {
   const both = (when) => {
     if (!run(["--help"]).includes("usage: backstory")) {
       throw new Error(`--help ${when} printed no usage`);
+    }
+    if (!run(["--help"], "", linked).includes("usage: backstory")) {
+      throw new Error(`--help through a link ${when} printed no usage`);
     }
     const hook = run(["hook", "stop"], "{}");
     if (hook !== "") throw new Error(`hook stop ${when} printed ${hook}`);
