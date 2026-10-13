@@ -16,6 +16,45 @@ reply for you to paste back.
 
 Whether a comment is handled is your call and nobody else's — you tick it.
 
+## Install
+
+Download `Backstory-<version>.dmg` from the
+[latest release](https://github.com/edvanbeinum/backstory/releases/latest),
+drag Backstory to Applications, and open it.
+
+It needs a Mac with Apple silicon on macOS 14.6 or later, **git**, and
+**[gh](https://cli.github.com)** authenticated (`gh auth login`) for the
+GitHub half. Without `gh` the commits and diffs still work — you just get a
+banner where the PR comments would be. The app carries its own server and the
+Node it runs on, so you don't need Node.
+
+The app gives Backstory its own Dock icon and Cmd-Tab entry, and runs the
+server itself: it starts the server when you open the app, restarts it if it
+stops, and stops it when you quit, so the window never shows a dead page. One
+server handles all your checkouts (default port 4460).
+
+### Adding a repo
+
+**File → Open Repo…** picks a checkout, and so does a folder dropped on the
+window or its Dock icon. Or use **Browse**, which finds them for you, or paste
+a path. From then on `/` is the inbox: every worktree of every repo you've
+opened, so you never type a path again.
+
+Browse leads with the **sibling worktrees** of whatever repo is open, listed
+with the branch each one holds, straight from `git worktree list`. Below that
+is a directory navigator that marks which folders are git checkouts. (It has
+to be server-side: a browser's native folder picker only ever yields relative
+paths, never the absolute one Backstory needs.)
+
+### Login, updates and logs
+
+**Open at Login** in the app menu starts Backstory with your Mac, for live
+updates with no window open.
+
+**Check for Updates…** in the same menu offers the latest GitHub release.
+
+The server logs to `~/.backstory/server.log`.
+
 ## What Backstory keeps
 
 Its own state lives under `~/.backstory`: drafts, ticks, and traced flows.
@@ -85,68 +124,27 @@ Backstory runs `claude -p` over a copy of the commit, with read-only tools. That
 
 Without Claude Code installed, Backstory works as before, with no flows.
 
-## Running it
+## Reviewing an agent's work
+
+### The `backstory` command
+
+The agent's side of a review goes through the `backstory` command:
+`backstory review` and the Claude Code Stop hook below both run it. It comes
+from a checkout of this repo, with Node 22 or later on your PATH:
 
 ```bash
-npm install
-npm run dev
+git clone https://github.com/edvanbeinum/backstory.git
+cd backstory
+npm link
 ```
-
-Open http://127.0.0.1:3000 and point Backstory at a checkout — **Browse**
-finds them for you, or paste a path. From then on `/` is the inbox: every
-worktree of every repo you've opened, so you never type a path again.
-
-Backstory used to be called differ, and kept its state in `~/.differ`. The
-first start of this build, the server's or the app's, moves that folder to
-`~/.backstory` whole, as long as there's no `~/.backstory` yet; after that
-nothing reads or writes `~/.differ`. Quit anything still running under the old
-name first, or it will make a new `~/.differ` and write there.
-
-Browse leads with the **sibling worktrees** of whatever repo is open, listed
-with the branch each one holds, straight from `git worktree list`. Below that
-is a directory navigator that marks which folders are git checkouts. (It has
-to be server-side: a browser's native folder picker only ever yields relative
-paths, never the absolute one Backstory needs.)
-
-## Running it as an app
-
-Backstory's Mac app gives it its own Dock icon and Cmd-Tab entry, and runs the
-server itself: it starts the server when you open the app, restarts it if it
-stops, and stops it when you quit, so the window never shows a dead page.
-With Xcode installed:
-
-```bash
-npm run mac:build
-```
-
-Drag `mac/build/Backstory.app` to Applications and open it. The app carries the
-server and the Node it runs on, so it needs no checkout or `node` once built.
-`npm run mac:dmg` packs it into a disk image to share; `packaging/README.md`
-says how to sign and notarize it. The server logs to `~/.backstory/server.log`, and **Open at Login** in the app menu
-starts Backstory with your Mac, for live updates with no window open.
-**Check for Updates…** in the same menu offers the latest GitHub release.
 
 `npm link` puts `backstory` on your PATH. From any checkout, `backstory` opens
-that repo in the app, launching it if it isn't running (with a
-`backstory://open?repo=<path>` link). File → Open Repo…, or a folder dropped on
-the window or its Dock icon, does the same. One server handles all your
-checkouts (default port 4460).
+that repo in the app, and `backstory <path>` opens another. If the app isn't
+running, it launches it with a `backstory://open?repo=<path>` link. That's a
+shortcut, not the way in — the app opens repos on its own. The command is
+here for `backstory review` and `backstory hook stop`.
 
-On its first start the app removes the login agent earlier versions of the
-`differ` command installed (`~/Library/LaunchAgents/dev.differ.server.plist`),
-which would otherwise hold the port.
-
-`npm run mac:smoke` checks the built app end to end on spare ports. To work on
-the app against a dev server, pass it the address; it shows that server
-instead of starting its own:
-
-```bash
-open mac/build/Backstory.app --args -serverURL http://127.0.0.1:3000
-```
-
-`backstory --port 3000` opens a repo on a dev server in the browser.
-
-## Reviewing an agent's work
+### Sending notes
 
 When an agent is making the change, you review what it made — uncommitted
 work, or the commits it made on its own if you let it run. Notes go on any
@@ -223,9 +221,9 @@ line. The bar keeps every round's count ("2 of 3 handled"), so an open note
 can't slip away just because its line moved, and **Clear handled** forgets the
 ones you've ticked.
 
-If no server is running, `backstory review` starts one detached (logging to
-`~/.backstory/server.log`), because it exits the moment you answer and the window
-you answered in shouldn't die with it.
+If Backstory isn't running, `backstory review` opens the Mac app and waits for
+its server to come up before asking for the review. The app keeps the server,
+so the window you answered in stays up after the command exits.
 
 ## Live updates
 
@@ -263,10 +261,6 @@ to the full one. If a link points at a commit that's since been pushed, Backstor
 falls back to the latest and tells you rather than silently showing something
 else. A bare `/` is the inbox — it used to reopen your last checkout, which
 hides the home screen behind a branch you may well be done with.
-
-Requirements: **git**, and **[gh](https://cli.github.com)** authenticated
-(`gh auth login`) for the GitHub half. Without `gh` the commits and diffs still
-work — you just get a banner where the PR comments would be.
 
 ## Three levels
 
@@ -440,7 +434,40 @@ Diffs are parsed and highlighted server-side. Each file is highlighted as two
 contiguous blocks (old side and new side) rather than line by line, so
 multi-line strings and block comments don't fall apart.
 
-## Tests
+## Working on Backstory
+
+To run it from a checkout:
+
+```bash
+npm install
+npm run dev
+```
+
+and open http://127.0.0.1:3000.
+
+### The Mac app
+
+With Xcode installed:
+
+```bash
+npm run mac:build
+```
+
+Drag `mac/build/Backstory.app` to Applications and open it.
+`npm run mac:dmg` packs it into a disk image; `packaging/README.md` says how to
+sign, notarize and release it.
+
+`npm run mac:smoke` checks the built app end to end on spare ports. To work on
+the app against a dev server, pass it the address; it shows that server
+instead of starting its own:
+
+```bash
+open mac/build/Backstory.app --args -serverURL http://127.0.0.1:3000
+```
+
+`backstory --port 3000` opens a repo on a dev server in the browser.
+
+### Tests
 
 ```bash
 npm test
