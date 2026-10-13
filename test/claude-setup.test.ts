@@ -6,6 +6,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -20,7 +21,7 @@ import {
   shellQuote,
   undoClaudeSetup,
 } from "../bin/claude-setup.mjs";
-import { isBackstoryHook } from "../bin/hook.mjs";
+import { backstoryHookProgram, isBackstoryHook } from "../bin/hook.mjs";
 import { setupChecks } from "../lib/setup";
 import { quietLoginShell, standIns } from "./standins";
 
@@ -82,13 +83,38 @@ test("setup writes one Stop hook and /backstory-review, both naming the app's co
   );
 });
 
+/** A launcher at `…/Backstory.app/Contents/Resources/bin/backstory` in a temp folder. */
+function bundledScript(): string {
+  const app = path.join(
+    mkdtempSync(path.join(os.tmpdir(), "backstory-app-")),
+    "Backstory.app",
+  );
+  const script = path.join(app, "Contents", "Resources", "bin", "backstory");
+  mkdirSync(path.dirname(script), { recursive: true });
+  writeFileSync(script, "#!/bin/sh\n", { mode: 0o755 });
+  return script;
+}
+
 test("the setup checklist's Notes to your agent row ticks after setup and clears after undo", async () => {
   const dir = claudeDir();
+  const script = bundledScript();
   assert.equal(await reviewsRow(dir), "missing");
-  applyClaudeSetup({ claudeDir: dir, script: SCRIPT });
+  applyClaudeSetup({ claudeDir: dir, script });
   assert.equal(await reviewsRow(dir), "ready");
-  undoClaudeSetup({ claudeDir: dir, script: SCRIPT });
+  undoClaudeSetup({ claudeDir: dir, script });
   assert.equal(await reviewsRow(dir), "missing");
+});
+
+test("the row offers Set Up again once the app has moved, and Set Up fixes it", async () => {
+  const dir = claudeDir();
+  const moved = bundledScript();
+  applyClaudeSetup({ claudeDir: dir, script: moved });
+  rmSync(moved);
+  assert.equal(await reviewsRow(dir), "missing");
+  const script = bundledScript();
+  assert.equal(planClaudeSetup({ claudeDir: dir, script }).state, "stale");
+  applyClaudeSetup({ claudeDir: dir, script });
+  assert.equal(await reviewsRow(dir), "ready");
 });
 
 test("setup keeps other Stop hooks, other events and other keys, in their order", () => {
@@ -311,7 +337,7 @@ test("a script path with a space and a quote still runs under sh -c", () => {
   applyClaudeSetup({ claudeDir: dir, script });
   const command = settingsOf(dir).hooks.Stop[0].hooks[0].command;
   assert.equal(command, `${shellQuote(script)} hook stop`);
-  assert.ok(isBackstoryHook(command));
+  assert.equal(backstoryHookProgram(command), script);
   assert.equal(
     execFileSync("sh", ["-c", command], { encoding: "utf8" }),
     "ran: hook stop\n",

@@ -170,8 +170,8 @@ press **Set Up** on the **Notes to your agent** row. It shows what it will chang
 then adds the Stop hook to `~/.claude/settings.json` and `/backstory-review`
 to `~/.claude/commands/`, both naming the command by its place in the app.
 Your other hooks and settings stay as they are. Set it up with Backstory in
-Applications; if you move the app afterwards, press the row's button again to
-point the hook at its new place.
+Applications. If you move the app afterwards, the row offers **Set Up** again,
+which points the hook at its new place.
 
 To type `backstory` in a terminal, choose **Backstory → Install Command Line
 Tool…**. It links `/usr/local/bin/backstory` to the command in the app, asking
