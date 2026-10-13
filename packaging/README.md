@@ -76,22 +76,29 @@ Once:
 
 Then, for each release:
 
-```bash
-npm version minor
-```
+1. Bump the version on a branch and merge it through a pull request, since
+   `main` takes no direct pushes:
 
-```bash
-git push --follow-tags
-```
+   ```bash
+   npm version minor --no-git-tag-version
+   ```
 
-`npm version` commits the new version and tags it, with the version as the
-tag's message, which becomes the release notes. Write better ones with
-`git tag -f -a v<version>` before pushing, or edit the release afterwards.
+2. Tag the merged commit and push the tag. The tag's message becomes the
+   release notes:
+
+   ```bash
+   git fetch origin && git tag -a v<version> origin/main
+   ```
+
+   ```bash
+   git push origin v<version>
+   ```
+
 The workflow stops if the tag doesn't match `package.json`'s version.
 
 When notarization fails, the `mac:dmg` step prints `notarytool log` with
-Apple's reasons. A failed run publishes nothing, so fix it, delete the tag
-locally and on GitHub, and tag again.
+Apple's reasons. A failed run publishes nothing, so merge a fix, delete the
+tag locally and on GitHub, and tag the new merge commit.
 
 ## Ports
 
