@@ -73,8 +73,8 @@ export const splitGlobs = (value: string | undefined) =>
   value?.split(/\s+/).filter(Boolean) ?? [];
 
 /**
- * Same options as the Step 0 script: `dot: true`, so a file such as
- * `LiftMachine.xcdatamodeld/.xccurrentversion` maps like any other. Node's
+ * Same options as the Step 0 script: `dot: true`, so a file such as a Core
+ * Data app's `Model.xcdatamodeld/.xccurrentversion` maps like any other. Node's
  * `path.matchesGlob` skips dotfiles.
  */
 const matcher = (globs: string[]) =>
@@ -230,8 +230,8 @@ export async function readModelAt(
 
 /**
  * Tests and ignored files stay off the flows and the map. Without a model,
- * a default test pattern stands in, so a repo with no `architecture/` (Indee)
- * still gets flows over its app code.
+ * a default test pattern stands in, so a repo with no `architecture/` still
+ * gets flows over its app code.
  */
 const DEFAULT_TESTS = matcher([
   "**/test/**",
