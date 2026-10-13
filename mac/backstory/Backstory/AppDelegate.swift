@@ -94,6 +94,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         windowController.open(RepoLink.setupAddress(server: server))
     }
 
+    @IBAction func installCommandLineTool(_ sender: Any?) {
+        Task { await CommandLineTool.run(from: window) }
+    }
+
     /// Starts the app at login, which keeps the server up for live updates
     /// with no window open, as the old login agent did.
     @IBAction func toggleOpenAtLogin(_ sender: Any?) {

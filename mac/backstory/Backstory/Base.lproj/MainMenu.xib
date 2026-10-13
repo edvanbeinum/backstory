@@ -42,6 +42,12 @@
                                     <action selector="showSetup:" target="-1" id="sUp-Bk-st2"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Install Command Line Tool…" id="iCl-Tl-st1">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="installCommandLineTool:" target="-1" id="iCl-Tl-st2"/>
+                                </connections>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="VOq-y0-SEH"/>
                             <menuItem title="Open at Login" id="oaL-Lg-1tm">
                                 <modifierMask key="keyEquivalentModifierMask"/>
