@@ -1,7 +1,7 @@
 /**
- * What Claude is asked, and the shape it answers in. Ported from the prompt
- * test in this repo's local/prototypes/flows/gen.py; the "before" prompt is that
- * script's edit prompt run backwards, from the head to the base.
+ * What Claude is asked, and the shape it answers in. `basePrompt` doesn't trace
+ * the base afresh: it rewrites the head's flows as they ran at the base, so the
+ * two sides pair up flow by flow.
  *
  * Claude returns compact steps; Backstory verifies them and wraps them in SARIF.
  */
