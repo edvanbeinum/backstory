@@ -19,6 +19,7 @@ import { flowRows, type FlowRow } from "@/lib/flows/rows";
 import { AlertIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
+import { ConnectGitHubLink } from "@/components/SetupChecklist";
 import { PrTitle } from "@/components/PrTitle";
 import { TickSpine, TickStrip } from "@/components/TickSpine";
 import { useStaleReload } from "@/components/useStaleReload";
@@ -1326,6 +1327,12 @@ export default function Page() {
               {session.github.unavailable && !session.github.pr && (
                 <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
                   {session.github.unavailable}
+                  {session.github.connect && (
+                    <>
+                      {" "}
+                      <ConnectGitHubLink />
+                    </>
+                  )}
                 </p>
               )}
 

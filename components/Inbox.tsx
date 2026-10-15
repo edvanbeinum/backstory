@@ -12,6 +12,7 @@ import {
 } from "./icons";
 import { InboxRow } from "./InboxRow";
 import {
+  ConnectGitHubLink,
   macApp,
   SETUP_SKIPPED_KEY,
   SetupChecklist,
@@ -299,6 +300,12 @@ export function Inbox({
                       {repo.unavailable} Everything below comes from git alone.
                       {repo.stale &&
                         " Counts shown are the last ones Backstory saw."}
+                      {repo.connect && (
+                        <>
+                          {" "}
+                          <ConnectGitHubLink />
+                        </>
+                      )}
                     </span>
                   </p>
                 )}

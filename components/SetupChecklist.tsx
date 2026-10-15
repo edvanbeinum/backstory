@@ -2,10 +2,12 @@
 
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 
+import { GITHUB_LOGIN_API } from "@/lib/constants";
+import type { GitHubLoginState } from "@/lib/githubLogin";
 import type { SetupId, SetupRow } from "@/lib/setup";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { AlertIcon, CheckIcon } from "./icons";
-import { Button, CopyButton, Spinner } from "./ui";
+import { Button, copyToClipboard, CopyButton, Spinner } from "./ui";
 
 export const SETUP_SKIPPED_KEY = "backstory.setupSkipped";
 
@@ -167,16 +169,7 @@ function Fix({
         </span>
       );
     case "github":
-      return row.state === "logged-out" ? (
-        <span className="inline-flex flex-wrap items-center gap-2">
-          <span>Sign in to GitHub. Paste this into Terminal:</span>
-          <CopyButton value="gh auth login" label="Copy: gh auth login" />
-        </span>
-      ) : (
-        <Button size="sm" href="https://cli.github.com">
-          Get GitHub&apos;s gh tool
-        </Button>
-      );
+      return <ConnectGitHub onConnected={onChanged} />;
     case "claude":
       return (
         <ClaudeCodeNotice
@@ -190,6 +183,126 @@ function Fix({
         <span>Set it up from Backstory&apos;s Mac app.</span>
       );
   }
+}
+
+/** For a notice saying GitHub needs connecting: opens the setup checklist, where the sign-in lives. */
+export function ConnectGitHubLink() {
+  return (
+    // A full load, not <Link>: the page reads `?setup=1` only on arrival and on popstate
+    // eslint-disable-next-line @next/next/no-html-link-for-pages
+    <a
+      href="/?setup=1"
+      className="font-medium text-[var(--accent)] hover:underline"
+    >
+      Connect GitHub
+    </a>
+  );
+}
+
+const LOGIN_POLL_MS = 2000;
+
+const LOGIN_ENDED: Partial<Record<GitHubLoginState["state"], string>> = {
+  denied: "The code was denied on GitHub.",
+  expired: "The code expired before it was approved.",
+  offline: "Backstory couldn't reach GitHub.",
+};
+
+async function askLogin(method: "GET" | "POST"): Promise<GitHubLoginState> {
+  const response = await fetch(GITHUB_LOGIN_API, {
+    method,
+    cache: "no-store",
+  });
+  if (!response.ok) throw new Error(response.statusText);
+  return (await response.json()) as GitHubLoginState;
+}
+
+/**
+ * Connect GitHub: shows the code GitHub gives, with one button that copies it
+ * and opens GitHub, then polls until it's approved or the sign-in ends.
+ */
+function ConnectGitHub({ onConnected }: { onConnected: () => Promise<void> }) {
+  const [login, setLogin] = useState<GitHubLoginState>({ state: "idle" });
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    // Picks up a sign-in already waiting, after the page reloads mid-way
+    void askLogin("GET")
+      .then((now) => {
+        if (now.state === "waiting") setLogin(now);
+      })
+      .catch(() => {});
+  }, []);
+
+  const waiting = login.state === "waiting";
+  useEffect(() => {
+    if (!waiting) return;
+    const timer = setInterval(() => {
+      void askLogin("GET")
+        .then((now) => {
+          setLogin(now);
+          if (now.state === "connected") void onConnected();
+        })
+        .catch(() => {});
+    }, LOGIN_POLL_MS);
+    return () => clearInterval(timer);
+  }, [waiting, onConnected]);
+
+  const start = async () => {
+    setBusy(true);
+    try {
+      setLogin(await askLogin("POST"));
+    } catch (err) {
+      setLogin({
+        state: "failed",
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
+    setBusy(false);
+  };
+
+  if (login.state === "waiting") {
+    return (
+      <div className="flex flex-col items-start gap-2">
+        <span>Enter this code on GitHub:</span>
+        <code className="mono text-[20px] font-semibold tracking-wider">
+          {login.userCode}
+        </code>
+        <Button
+          size="sm"
+          variant="primary"
+          href={login.verificationUri}
+          onClick={() => void copyToClipboard(login.userCode)}
+        >
+          Copy code and open GitHub
+        </Button>
+        <span className="inline-flex items-center gap-1.5 text-[var(--fg-muted)]">
+          <Spinner className="!h-3 !w-3" /> Waiting for you to approve it on
+          GitHub…
+        </span>
+      </div>
+    );
+  }
+
+  const ended =
+    login.state === "failed" ? login.message : LOGIN_ENDED[login.state];
+  return (
+    <div className="flex flex-col items-start gap-1.5">
+      {ended && (
+        <span className="flex items-center gap-1.5 text-[var(--attention)]">
+          <AlertIcon size={12} /> {ended}
+        </span>
+      )}
+      <Button size="sm" variant="primary" disabled={busy} onClick={start}>
+        {ended ? "Try again" : "Connect GitHub"}
+      </Button>
+      <span className="inline-flex flex-wrap items-center gap-2 text-[var(--fg-muted)]">
+        <span>
+          Or sign in with GitHub&apos;s <code className="mono">gh</code> tool:
+        </span>
+        <CopyButton value="gh auth login" label="Copy: gh auth login" />
+      </span>
+    </div>
+  );
 }
 
 /** Asks the Mac app to add the Stop hook and `/backstory-review`, or take them out. */
