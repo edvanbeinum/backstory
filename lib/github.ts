@@ -129,7 +129,7 @@ function tokenCovers(host: string | null): boolean {
 /** GitHub refused the saved token: revoked (401), or missing the `repo` scope. */
 class TokenRejected extends Error {}
 
-/** GitHub answered the saved token's request with GraphQL errors. */
+/** GitHub answered the saved token's request with an error status or GraphQL errors. */
 class TokenRequestError extends Error {}
 
 /** The saved token's request never reached GitHub: no network, or a timeout. */
@@ -179,7 +179,7 @@ async function askWithToken<T>(
     throw new TokenRejected("missing the repo scope");
   }
   if (!response.ok) {
-    throw new Error(`GitHub answered ${response.status}`);
+    throw new TokenRequestError(`GitHub answered ${response.status}`);
   }
   const body = (await response.json()) as {
     data?: T;
@@ -228,7 +228,10 @@ function ghNotReady(err: unknown): boolean {
 /**
  * Runs a GitHub read with the saved token when there is one and the remote is
  * github.com, and through `gh` otherwise. A refused token is forgotten and the
- * read tried again through `gh`.
+ * read tried again through `gh`. Any other error on the token is tried again
+ * through `gh` too, because an organisation that hasn't approved Backstory
+ * hides its repos from the token but not from a signed-in `gh`; when `gh`
+ * can't read it either, the token's error is the one shown.
  */
 async function tokenOrGh<T>(
   host: string | null,
@@ -242,7 +245,14 @@ async function tokenOrGh<T>(
       try {
         return await withToken(token);
       } catch (err) {
-        if (!(err instanceof TokenRejected)) throw err;
+        if (err instanceof GitHubOffline) throw err;
+        if (!(err instanceof TokenRejected)) {
+          try {
+            return await withGh();
+          } catch {
+            throw err;
+          }
+        }
         rejected = true;
         await forgetGitHubToken().catch(() => {});
       }

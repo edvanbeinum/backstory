@@ -266,6 +266,27 @@ test("a repository GitHub can't find on the token names organisation approval", 
   assert.equal(on.keychain(), TOKEN);
 });
 
+test("a repository the token can't see is read through a signed-in gh, which an organisation's approval doesn't limit", async () => {
+  const on = machine({ gh: true, token: true });
+  const { data, calls } = await load(on, () => ({
+    json: {
+      errors: [
+        {
+          message:
+            "Could not resolve to a Repository with the name 'acme/app'.",
+        },
+      ],
+    },
+  }));
+
+  assert.equal(data.unavailable, null);
+  assert.equal(data.pr?.number, 7);
+  assert.equal(data.threads.length, 1);
+  assert.equal(calls.length, 2);
+  assert.match(on.ghLog(), /^pr list /m);
+  assert.equal(on.keychain(), TOKEN);
+});
+
 test("the remote's host comes out of every spelling, so the token knows where it may go", () => {
   assert.equal(parseRemote("git@github.com:acme/app.git").host, "github.com");
   assert.equal(parseRemote("https://github.com/acme/app").host, "github.com");
