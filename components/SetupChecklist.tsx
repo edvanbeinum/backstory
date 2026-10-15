@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { GITHUB_LOGIN_API } from "@/lib/constants";
 import type { GitHubLoginState } from "@/lib/githubLogin";
 import type { SetupId, SetupRow } from "@/lib/setup";
+import type { ApiError } from "@/lib/types";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { AlertIcon, CheckIcon } from "./icons";
 import { Button, copyToClipboard, CopyButton, Spinner } from "./ui";
@@ -217,7 +218,14 @@ async function askLogin(method: "GET" | "POST"): Promise<GitHubLoginState> {
     method,
     cache: "no-store",
   });
-  if (!response.ok) throw new Error(response.statusText);
+  if (!response.ok) {
+    // Reads the server's own error: statusText is empty over HTTP/2, which
+    // would leave the failure blank
+    const body = (await response.json().catch(() => null)) as ApiError | null;
+    throw new Error(
+      body?.detail ?? body?.error ?? `Backstory answered ${response.status}.`,
+    );
+  }
   return (await response.json()) as GitHubLoginState;
 }
 
