@@ -41,25 +41,29 @@ test("every file a term names exists", () => {
   }
 });
 
-test("every README section a block's read: names exists", () => {
-  const headings = new Set(
-    readText("README.md")
-      .split("\n")
-      .flatMap((line) => line.match(/^#{2,3} (.+)$/)?.[1] ?? []),
-  );
+test("every doc section a block's read: names exists", () => {
+  const headings = (file: string) =>
+    new Set(
+      readText(file)
+        .split("\n")
+        .flatMap((line) => line.match(/^#{2,3} (.+)$/)?.[1] ?? []),
+    );
   let named = 0;
   for (const block of entries("blocks")) {
     // field() returns the raw YAML scalar: outer quotes kept, ' written as ''.
     const read = (field(block, "read") ?? "").replaceAll("''", "'");
-    for (const [, heading] of read.matchAll(/README "(.+)"'?$/g)) {
+    for (const [, doc, heading] of read.matchAll(
+      /(README|docs\/[\w-]+\.md) "(.+)"'?$/g,
+    )) {
       named++;
+      const file = doc === "README" ? "README.md" : doc;
       assert.ok(
-        headings.has(heading),
-        `${field(block, "name")}: README has no section "${heading}"`,
+        existsSync(path.join(root, file)) && headings(file).has(heading),
+        `${field(block, "name")}: ${file} has no section "${heading}"`,
       );
     }
   }
-  assert.ok(named > 0, "no block's read: names a README section");
+  assert.ok(named > 0, "no block's read: names a doc section");
 });
 
 test("every invariant has a rule", () => {

@@ -82,8 +82,11 @@ terms:
   - name: setup checklist
     means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
     avoid:
-      - onboarding
-      - wizard
+      - onboarding      - wizard
+  - name: answering commit
+    means: "A commit you link to a review comment as one that answers it, kept in the comment's response beside the tick and the drafted reply (`commits` in `lib/responses.ts`). It stores the commit's patch-id as well as its sha, so a rebase re-matches it (`healed`); when nothing matches it's `missing` and you choose another. It never ticks the comment."
+    avoid:
+      - link, as a noun (link stays the verb, as in "Link another…")
   - name: primitive
     means: A named capability Backstory exposes for reuse, listed in `architecture/primitives.yaml`.
     avoid:
@@ -98,7 +101,7 @@ blocks:
       - lib/pushed.ts
       - lib/view.ts
     summary: Reads repos, commits, patches and the working tree through git, and works out what counts as not yet pushed.
-    read: '`lib/git.ts` header, then README "How "not yet pushed" is decided"'
+    read: '`lib/git.ts` header, then docs/how-it-works.md "How "not yet pushed" is decided"'
   - name: diff and anchors
     code:
       - lib/diff.ts
@@ -112,7 +115,7 @@ blocks:
       - lib/github.ts
       - lib/inbox.ts
     summary: Pull requests and review threads through `gh`, degrading to "unavailable" rather than failing.
-    read: '`lib/github.ts` header, then README "Three levels"'
+    read: '`lib/github.ts` header, then docs/how-it-works.md "The inbox"'
   - name: store
     code:
       - lib/store.ts
@@ -126,7 +129,7 @@ blocks:
     code:
       - lib/flows/
     summary: Traces a view's flows with the AI provider, checks each step against its line, and caches the result.
-    read: '`lib/flows/generate.ts` header, then README "Diagrams: the map, the data model and flows"'
+    read: '`lib/flows/generate.ts` header, then docs/using-backstory.md "The map, flows and the data model"'
   - name: AI provider
     code:
       - lib/ai/
@@ -144,7 +147,7 @@ blocks:
     code:
       - lib/data/
     summary: Reads the data model at both ends of a view and diffs it, with the first data reader that finds one, or the drafted data model.
-    read: '`lib/data/build.ts` header, then README "Diagrams: the map, the data model and flows"'
+    read: '`lib/data/build.ts` header, then docs/using-backstory.md "The map, flows and the data model"'
   - name: agent review loop
     code:
       - lib/review.ts
@@ -152,7 +155,7 @@ blocks:
       - lib/outbox.ts
       - bin/hook.mjs
     summary: Notes on an agent's work, sent to a waiting `backstory review` or queued for the agent's Stop hook.
-    read: 'README "Reviewing an agent''s work"'
+    read: 'docs/using-backstory.md "Reviewing an agent''s work"'
   - name: setup
     code:
       - lib/setup.ts
