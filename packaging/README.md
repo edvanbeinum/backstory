@@ -74,13 +74,18 @@ Once:
    - `NOTARY_KEY_ID` and `NOTARY_ISSUER`: that key's ID and issuer ID
    - `SPARKLE_PRIVATE_KEY`: the contents of `sparkle-private-key`
 
+Raise the minor version for a release with a change people would notice, such
+as a new feature or a redesign. Raise the patch version for anything else:
+fixes, a new icon, dependency updates.
+
 Then, for each release:
 
 1. Bump the version on a branch and merge it through a pull request, since
-   `main` takes no direct pushes:
+   `main` takes no direct pushes. Use `minor` in place of `patch` for a minor
+   release:
 
    ```bash
-   npm version minor --no-git-tag-version
+   npm version patch --no-git-tag-version
    ```
 
 2. Tag the merged commit and push the tag. The tag's message becomes the
