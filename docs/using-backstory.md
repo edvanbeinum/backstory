@@ -209,35 +209,35 @@ selects; `j`/`k` move; `x` ticks. In a narrow window it becomes a strip under
 the header.
 
 The **response** is what you're doing about the comment on screen: the tick, a
-drafted reply, and optionally the commit that answers it. All three are
-independent.
+drafted reply, and optionally its **answering commits**, the commits you link to
+the comment as the ones that answer it. All three are independent.
 
 A thread that isn't on a line in the current change is counted rather than shown
 as a card.
 
-Only you decide when a comment is handled: you tick it. Linking a commit,
-drafting a reply or a reply on GitHub never ticks it for you.
+Only you decide when a comment is handled: you tick it. An answering commit, a
+drafted reply or a reply on GitHub never ticks it for you.
 [How it works](how-it-works.md#handling-a-comment-is-deliberate) says why.
 
-A comment answered without any code change is one you tick without linking a
+A comment answered without any code change is one you tick with no answering
 commit — the reply templates drop `Addressed in <commit>` and offer a plain 👍
 or "No change needed".
 
-### Links survive rebases
+### Answering commits survive rebases
 
-Rebasing a stack rewrites every sha, which would break every linked commit. So a
-link stores the commit's **patch-id** — a hash of its diff alone — alongside the
-sha. A rebased commit keeps its patch-id, so a stale link is re-matched to the
-rewritten commit automatically and marked _re-matched after a rebase_.
+Rebasing a stack rewrites every sha. So each answering commit is stored with its
+**patch-id**, a hash of its diff alone, as well as its sha. A rebased commit
+keeps its patch-id, so Backstory finds the rewritten commit automatically and
+marks it _re-matched after a rebase_.
 
-| you did                                              | result                               |
-| ---------------------------------------------------- | ------------------------------------ |
-| rebase / restack (clean)                             | re-matched automatically             |
-| reword a commit message                              | re-matched: same diff, same patch-id |
-| squash, amend the content, rebase through a conflict | `26ef8f7 gone`, asks for a new link  |
+| you did                                              | result                                          |
+| ---------------------------------------------------- | ----------------------------------------------- |
+| rebase / restack (clean)                             | re-matched automatically                        |
+| reword a commit message                              | re-matched: same diff, same patch-id            |
+| squash, amend the content, rebase through a conflict | `26ef8f7 gone`, asks you to choose a new commit |
 
-**A rebase never unticks anything.** It rewrites the link and only the link, so
-the comment stays handled and re-linking is offered.
+**A rebase never unticks anything.** It changes only the answering commit, so
+the comment stays handled and Backstory offers to link another.
 
 ## Shareable URLs
 
@@ -251,7 +251,7 @@ checkout. A copy button in the header copies the current one.
 ```
 
 `rev` is optional and accepts a short sha, which is normalised to the full one.
-If a link points at a commit that's since been pushed, Backstory falls back to
+If a URL points at a commit that's since been pushed, Backstory falls back to
 the latest and tells you. A bare `/` is the inbox.
 
 ## Login, updates and logs

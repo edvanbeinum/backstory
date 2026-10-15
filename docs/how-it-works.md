@@ -24,9 +24,9 @@ Backstory doesn't guess when a comment is handled. A guess, such as the newest
 commit touching the file, always finds _something_, so every comment would read
 as handled and the list couldn't work as a checklist.
 
-So there is exactly one thing that means handled: **you tick it.** Not linking a
-commit, not drafting a reply, not a reply spotted on GitHub. A checklist only
-works if you are the one checking things off.
+So there is exactly one thing that means handled: **you tick it.** Not an
+answering commit, not a drafted reply, not a reply spotted on GitHub. A
+checklist only works if you are the one checking things off.
 
 The tick is animated: the box springs, the check mark draws in, and one ring
 expands. The animation stays small, because a big effect on every comment stops
@@ -36,16 +36,18 @@ drafted reply at once. Unticking isn't animated, so undoing a mistaken tick
 doesn't feel like a second event. With `prefers-reduced-motion`, the tick
 changes instantly.
 
-## Links survive rebases
+## Answering commits survive rebases
 
-A rebase rewrites the link and only the link. The work was done and only the
-pointer to it broke, so the comment stays handled, the count doesn't move, and
-re-linking is offered rather than demanded.
+A rebase changes only the answering commit. The work was done and only the
+record of which commit did it broke, so the comment stays handled, the count
+doesn't move, and Backstory offers to link another commit rather than demanding
+it.
 
-Squashing, amending the content or rebasing through a conflict asks for a new
-link on purpose: those change the diff, so attaching your reply to a guessed
-commit would be worse than admitting the link broke. Same when two commits share
-a patch-id (revert-then-reapply): an ambiguous match never resolves itself.
+Squashing, amending the content or rebasing through a conflict asks you to
+choose a new answering commit on purpose: those change the diff, so attaching
+your reply to a guessed commit would be worse than saying the commit is gone.
+Same when two commits share a patch-id (revert-then-reapply): an ambiguous match
+never resolves itself.
 
 Note that "still on the branch" means _reachable from HEAD_, not "the object
 exists": rebased-away commits stay in the object database and would otherwise
