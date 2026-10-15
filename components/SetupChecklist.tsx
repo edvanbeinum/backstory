@@ -169,7 +169,12 @@ function Fix({
         </span>
       );
     case "github":
-      return <ConnectGitHub onConnected={onChanged} />;
+      return (
+        <ConnectGitHub
+          ghInstalled={row.state !== "missing"}
+          onConnected={onChanged}
+        />
+      );
     case "claude":
       return (
         <ClaudeCodeNotice
@@ -220,7 +225,13 @@ async function askLogin(method: "GET" | "POST"): Promise<GitHubLoginState> {
  * Connect GitHub: shows the code GitHub gives, with one button that copies it
  * and opens GitHub, then polls until it's approved or the sign-in ends.
  */
-function ConnectGitHub({ onConnected }: { onConnected: () => Promise<void> }) {
+function ConnectGitHub({
+  ghInstalled,
+  onConnected,
+}: {
+  ghInstalled: boolean;
+  onConnected: () => Promise<void>;
+}) {
   const [login, setLogin] = useState<GitHubLoginState>({ state: "idle" });
   const [busy, setBusy] = useState(false);
 
@@ -299,7 +310,13 @@ function ConnectGitHub({ onConnected }: { onConnected: () => Promise<void> }) {
         <span>
           Or sign in with GitHub&apos;s <code className="mono">gh</code> tool:
         </span>
-        <CopyButton value="gh auth login" label="Copy: gh auth login" />
+        {ghInstalled ? (
+          <CopyButton value="gh auth login" label="Copy: gh auth login" />
+        ) : (
+          <Button size="sm" href="https://cli.github.com">
+            Get GitHub&apos;s gh tool
+          </Button>
+        )}
       </span>
     </div>
   );
