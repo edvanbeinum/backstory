@@ -12,11 +12,11 @@ had checked out two renames ago. So the folder name is shown only when it
 differs from the branch. Progress sits in a fixed right-hand column so the
 counts line up down the page.
 
-This costs **one `gh` call per repository**, not per worktree: a single aliased
-GraphQL query asks for every branch at once. Three repos and twenty-one
+This costs **one GitHub call per repository**, not per worktree: a single
+aliased GraphQL query asks for every branch at once. Three repos and twenty-one
 worktrees resolve in about half a second. The PR and counts come from GitHub:
-without `gh`, or without a remote, every worktree still appears with a note
-saying the counts are missing.
+without GitHub connected, or without a remote, every worktree still appears
+with a note saying the counts are missing.
 
 ## Handling a comment is deliberate
 
