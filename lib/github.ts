@@ -118,17 +118,42 @@ export async function forgetGitHubToken(only?: string): Promise<void> {
   ]);
 }
 
+const GITHUB_HOSTS = new Set(["github.com", "ssh.github.com"]);
+const ALIAS_SHAPE = /^[a-z0-9][a-z0-9._-]*$/;
+
 /**
- * The token only goes to github.com. A dotless host is an ssh alias such as
- * `git@github-work:Owner/Repo`, assumed to be github.com; an Enterprise
- * server keeps using `gh`.
+ * The token only goes to github.com. Any other host may be an ssh alias, such
+ * as `github.com-work` or `github-work`, so it's looked up in the ssh config:
+ * one that names github.com gets the token, and anything else, an Enterprise
+ * server included, keeps using `gh`.
  */
-function tokenCovers(host: string | null): boolean {
-  return (
-    host === "github.com" ||
-    host === "ssh.github.com" ||
-    (host !== null && host !== "" && !host.includes("."))
-  );
+async function tokenCovers(host: string | null): Promise<boolean> {
+  if (!host) return false;
+  if (GITHUB_HOSTS.has(host)) return true;
+  const real = await sshHostname(host);
+  return real !== null && GITHUB_HOSTS.has(real);
+}
+
+const sshHosts = new Map<string, Promise<string | null>>();
+
+/**
+ * The hostname ssh would connect to for `alias`, from `ssh -G`, which reads
+ * the ssh config without connecting. Remembered for the server's life.
+ */
+function sshHostname(alias: string): Promise<string | null> {
+  let found = sshHosts.get(alias);
+  if (!found) {
+    found = ALIAS_SHAPE.test(alias)
+      ? run("ssh", ["-G", alias], { timeout: 5_000 })
+          .then(
+            ({ stdout }) =>
+              stdout.match(/^hostname (\S+)$/m)?.[1]?.toLowerCase() ?? null,
+          )
+          .catch(() => null)
+      : Promise.resolve(null);
+    sshHosts.set(alias, found);
+  }
+  return found;
 }
 
 /** GitHub refused the saved token: revoked (401), or missing the `repo` scope. */
@@ -244,7 +269,7 @@ async function tokenOrGh<T>(
   withGh: () => Promise<T>,
 ): Promise<T> {
   let rejected = false;
-  if (tokenCovers(host)) {
+  if (await tokenCovers(host)) {
     const token = await githubToken();
     if (token) {
       try {

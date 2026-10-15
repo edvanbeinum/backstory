@@ -94,8 +94,19 @@ case "$*" in
   *) cat "$dir/threads.json" ;;
 esac`;
 
+/** An `ssh` whose config sends `github.com-work` and `github-home` to github.com, and `ghe` to an Enterprise server. */
+const SSH = `case "$2" in
+  github.com-work|github-home) echo "hostname github.com" ;;
+  ghe) echo "hostname ghe.example.com" ;;
+  *) echo "hostname $2" ;;
+esac`;
+
 function machine(opts: { gh?: boolean; token?: boolean }) {
-  const dir = standIns({ security: SECURITY, ...(opts.gh && { gh: GH }) });
+  const dir = standIns({
+    security: SECURITY,
+    ssh: SSH,
+    ...(opts.gh && { gh: GH }),
+  });
   writeFileSync(path.join(dir, "pr-list.json"), JSON.stringify([PR]));
   writeFileSync(path.join(dir, "threads.json"), JSON.stringify(THREADS_JSON));
   if (opts.token) writeFileSync(path.join(dir, "keychain"), TOKEN);
@@ -298,6 +309,24 @@ test("a refused token is only forgotten while it's still the saved one, so a new
 
   assert.equal(on.keychain(), NEWER);
   assert.equal(data.connect, true);
+});
+
+test("an ssh alias gets the token only when the ssh config sends it to github.com", async () => {
+  for (const host of ["github.com-work", "github-home"]) {
+    const { data, calls } = await load(
+      machine({ token: true }),
+      github,
+      repo({ host }),
+    );
+    assert.equal(data.pr?.number, 7, host);
+    assert.equal(calls.length, 2, host);
+  }
+
+  const on = machine({ gh: true, token: true });
+  const { data, calls } = await load(on, github, repo({ host: "ghe" }));
+  assert.equal(calls.length, 0);
+  assert.equal(data.pr?.number, 7);
+  assert.ok(on.ghLog().length > 0);
 });
 
 test("the remote's host comes out of every spelling, so the token knows where it may go", () => {
