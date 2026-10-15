@@ -226,22 +226,21 @@ function ghNotReady(err: unknown): boolean {
 }
 
 /**
- * Every GitHub read: a GraphQL query, with the saved token when there is one
- * and the remote is github.com, through `gh` otherwise. A refused token is
- * forgotten and the call tried again through `gh`.
+ * Runs a GitHub read with the saved token when there is one and the remote is
+ * github.com, and through `gh` otherwise. A refused token is forgotten and the
+ * read tried again through `gh`.
  */
-export async function githubGraphql<T>(
-  cwd: string,
-  query: string,
-  variables: Variables,
-  opts: { host: string | null },
+async function tokenOrGh<T>(
+  host: string | null,
+  withToken: (token: string) => Promise<T>,
+  withGh: () => Promise<T>,
 ): Promise<T> {
   let rejected = false;
-  if (tokenCovers(opts.host)) {
+  if (tokenCovers(host)) {
     const token = await githubToken();
     if (token) {
       try {
-        return await askWithToken<T>(token, query, variables);
+        return await withToken(token);
       } catch (err) {
         if (!(err instanceof TokenRejected)) throw err;
         rejected = true;
@@ -250,11 +249,25 @@ export async function githubGraphql<T>(
     }
   }
   try {
-    return await askWithGh<T>(cwd, query, variables);
+    return await withGh();
   } catch (err) {
     if (rejected && ghNotReady(err)) throw new GitHubConnectError();
     throw err;
   }
+}
+
+/** Every GitHub GraphQL read, with the saved token or through `gh`. */
+export function githubGraphql<T>(
+  cwd: string,
+  query: string,
+  variables: Variables,
+  opts: { host: string | null },
+): Promise<T> {
+  return tokenOrGh(
+    opts.host,
+    (token) => askWithToken<T>(token, query, variables),
+    () => askWithGh<T>(cwd, query, variables),
+  );
 }
 
 /**
@@ -455,38 +468,39 @@ export async function loadGitHubData(repo: RepoInfo): Promise<GitHubData> {
   }
 }
 
+interface PullRequestRow {
+  number: number;
+  title: string;
+  url: string;
+  state: string;
+  isDraft: boolean;
+  baseRefName: string;
+  headRefName: string;
+  author: { login: string } | null;
+  isCrossRepository?: boolean;
+  headRepositoryOwner?: { login: string } | null;
+}
+
 async function findPullRequest(
   repo: RepoInfo,
   branch: string,
 ): Promise<PullRequestInfo | null> {
-  const data = await githubGraphql<{
-    repository?: {
-      pullRequests?: {
-        nodes: Array<{
-          number: number;
-          title: string;
-          url: string;
-          state: string;
-          isDraft: boolean;
-          baseRefName: string;
-          headRefName: string;
-          author: { login: string } | null;
-          isCrossRepository?: boolean;
-          headRepositoryOwner?: { login: string } | null;
-        }>;
-      };
-    };
-  }>(
-    repo.root,
-    PULL_REQUESTS_QUERY,
-    { owner: repo.owner ?? "", name: repo.name ?? "", branch },
-    { host: repo.host },
+  const rows = await tokenOrGh(
+    repo.host,
+    async (token) => {
+      const data = await askWithToken<{
+        repository?: { pullRequests?: { nodes: PullRequestRow[] } };
+      }>(token, PULL_REQUESTS_QUERY, {
+        owner: repo.owner ?? "",
+        name: repo.name ?? "",
+        branch,
+      });
+      return data?.repository?.pullRequests?.nodes ?? [];
+    },
+    () => listPullRequestsWithGh(repo.root, branch),
   );
 
-  const chosen = pickPullRequest(
-    data?.repository?.pullRequests?.nodes ?? [],
-    repo.owner,
-  );
+  const chosen = pickPullRequest(rows, repo.owner);
   if (!chosen) return null;
 
   return {
@@ -499,6 +513,31 @@ async function findPullRequest(
     headRefName: chosen.headRefName,
     author: chosen.author?.login ?? "",
   };
+}
+
+/**
+ * Lists the branch's PRs with `gh pr list`, which asks the repo `gh` treats
+ * as the base (`gh repo set-default`, or the upstream of a fork), not just
+ * origin. `--head` also works when the branch has no upstream and no local
+ * origin ref, which `gh pr view` cannot always manage.
+ */
+async function listPullRequestsWithGh(
+  cwd: string,
+  branch: string,
+): Promise<PullRequestRow[]> {
+  const { stdout } = await gh(cwd, [
+    "pr",
+    "list",
+    "--head",
+    branch,
+    "--state",
+    "all",
+    "--limit",
+    "10",
+    "--json",
+    "number,title,url,state,isDraft,baseRefName,headRefName,author,isCrossRepository,headRepositoryOwner",
+  ]);
+  return JSON.parse(stdout || "[]") as PullRequestRow[];
 }
 
 async function loadThreads(repo: RepoInfo, number: number) {

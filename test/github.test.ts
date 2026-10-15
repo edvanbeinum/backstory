@@ -90,13 +90,13 @@ const GH = `PATH=/usr/bin:/bin
 dir="\${0%/*}"
 echo "$*" >> "$dir/gh.log"
 case "$*" in
-  *"pullRequests(headRefName"*) cat "$dir/prs.json" ;;
+  "pr list"*) cat "$dir/pr-list.json" ;;
   *) cat "$dir/threads.json" ;;
 esac`;
 
 function machine(opts: { gh?: boolean; token?: boolean }) {
   const dir = standIns({ security: SECURITY, ...(opts.gh && { gh: GH }) });
-  writeFileSync(path.join(dir, "prs.json"), JSON.stringify(PRS_JSON));
+  writeFileSync(path.join(dir, "pr-list.json"), JSON.stringify([PR]));
   writeFileSync(path.join(dir, "threads.json"), JSON.stringify(THREADS_JSON));
   if (opts.token) writeFileSync(path.join(dir, "keychain"), TOKEN);
   const read = (name: string) =>
@@ -179,7 +179,7 @@ test("with a saved token and no gh, the PR, its threads and reviews come from Gi
   assert.ok(!on.securityLog().includes(TOKEN));
 });
 
-test("with no token and a signed-in gh, the same data comes through gh api graphql, with no pr list", async () => {
+test("with no token and a signed-in gh, the PR comes from gh pr list, which follows gh's base repo, and its threads from gh api graphql", async () => {
   const on = machine({ gh: true });
   const { data, calls } = await load(on, github);
 
@@ -188,10 +188,9 @@ test("with no token and a signed-in gh, the same data comes through gh api graph
   assert.equal(data.threads.length, 1);
   assert.equal(data.reviews.length, 1);
   assert.equal(calls.length, 0);
+  assert.match(on.ghLog(), /^pr list --head feature --state all /m);
   assert.match(on.ghLog(), /^api graphql -f query=/m);
-  assert.match(on.ghLog(), /-f branch=feature/);
   assert.match(on.ghLog(), /-F number=7/);
-  assert.doesNotMatch(on.ghLog(), /pr list/);
 });
 
 test("a revoked token is forgotten and the read tried again through gh", async () => {
