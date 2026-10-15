@@ -4,5 +4,3 @@ packaging
 package-lock.json
 # Xcode writes these in its own format and rewrites them on every save.
 mac/backstory
-site/dist
-site/copy.md

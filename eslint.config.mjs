@@ -15,7 +15,7 @@ export default defineConfig([
     "mac/build/**",
   ]),
   {
-    files: ["bin/**/*.mjs", "mac/*.mjs", "site/**/*.mjs"],
+    files: ["bin/**/*.mjs", "mac/*.mjs"],
     languageOptions: { globals: globals.node },
   },
   {
