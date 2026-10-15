@@ -1,10 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512" role="img" aria-label="Backstory">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="512" height="512" role="img" aria-label="Backstory" xmlns:c2pa="http://c2pa.org/manifest">
   <rect x=".75" y=".75" width="62.5" height="62.5" rx="13.5" fill="#ffffff" stroke="#d1d9e0" stroke-width="1.5"></rect>
-  <rect x="12" y="18.1" width="29.5" height="9.1" rx="4.55" fill="#1f883d"></rect>
-  <circle cx="51.1" cy="22.9" r="5" fill="#1f883d"></circle>
-  <rect x="48.7" y="22.3" width="4.8" height="1.2" rx=".6" fill="#ffffff"></rect>
-  <rect x="50.5" y="20.5" width="1.2" height="4.8" rx=".6" fill="#ffffff"></rect>
-  <circle cx="13.1" cy="40.9" r="4.9" fill="#cf222e"></circle>
-  <rect x="10.8" y="40.3" width="4.6" height="1.2" rx=".6" fill="#ffffff"></rect>
-  <rect x="22.5" y="36.4" width="29.5" height="8.9" rx="4.45" fill="#cf222e"></rect>
+  <path d="M32 24V31H18V38M32 31H46V38" fill="none" stroke="#1f2328" stroke-width="4" stroke-linejoin="round"></path>
+  <rect x="24" y="10" width="16" height="12" rx="2.5" fill="none" stroke="#1f2328" stroke-width="4"></rect>
+  <rect x="10" y="40" width="16" height="12" rx="2.5" fill="none" stroke="#1f2328" stroke-width="4"></rect>
+  <rect x="36" y="38" width="20" height="16" rx="3.5" fill="#1f883d"></rect>
 </svg>
