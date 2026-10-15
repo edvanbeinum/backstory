@@ -250,14 +250,17 @@ async function askWithGh<T>(
   return parsed.data as T;
 }
 
+/** `gh`'s exit code when it isn't signed in, whatever its message says */
+const GH_SIGNED_OUT = 4;
+
 /**
- * `gh` is missing or signed out. Matches `gh`'s own sign-in hint and a 401,
- * not any mention of "auth", which an organisation's SAML or OAuth App
+ * `gh` is missing or signed out. Matches its exit code, its sign-in hint and
+ * a 401, not any mention of "auth", which an organisation's SAML or OAuth App
  * restriction also makes while `gh` is signed in.
  */
 function ghNotReady(err: unknown): boolean {
   if (!(err instanceof ExecError)) return false;
-  if (err.code === 127) return true;
+  if (err.code === 127 || err.code === GH_SIGNED_OUT) return true;
   return /gh auth login|not logged in|http 401/i.test(err.message);
 }
 

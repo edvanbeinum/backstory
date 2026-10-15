@@ -342,6 +342,18 @@ test("an Enterprise repo with gh signed out is told to sign in with gh, not to C
   assert.match(data.unavailable ?? "", /gh auth login/);
 });
 
+test("gh inside a GitHub Actions run, signed out, counts as signed out by its exit code", async () => {
+  const actions = standIns({
+    security: SECURITY,
+    ssh: SSH,
+    gh: 'echo "gh: To use GitHub CLI in a GitHub Actions workflow, set the GH_TOKEN environment variable." >&2; exit 4',
+  });
+  const { data } = await load({ ...machine({}), dir: actions }, github);
+
+  assert.equal(data.unavailable, CONNECT);
+  assert.equal(data.connect, true);
+});
+
 test("an organisation's SAML refusal through a signed-in gh isn't mistaken for signed out", async () => {
   const saml = standIns({
     security: SECURITY,

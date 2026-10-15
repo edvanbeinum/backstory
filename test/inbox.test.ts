@@ -223,7 +223,11 @@ async function inboxWithToken(
   root: string,
   answer: (call: ApiCall) => ApiAnswer,
 ) {
-  const dir = standIns({ security: SECURITY });
+  // A signed-out `gh` ahead of /usr/bin, where CI's runners have a real one
+  const dir = standIns({
+    security: SECURITY,
+    gh: 'echo "To get started with GitHub CLI, please run:  gh auth login" >&2; exit 4',
+  });
   writeFileSync(path.join(dir, "keychain"), "gho_saved1");
   const api = await githubApiStandIn(answer);
   const saved = {
@@ -255,7 +259,7 @@ test("with a saved token and no gh, the inbox counts come from GitHub's API", as
   assert.deepEqual(row?.progress, { done: 0, total: 3, truncated: false });
 });
 
-test("with a refused token and no gh, the repo asks to Connect GitHub and still lists its rows", async () => {
+test("with a refused token and gh signed out, the repo asks to Connect GitHub and still lists its rows", async () => {
   const { inbox } = await inboxWithToken(repoOnGitHub("other"), () => ({
     status: 401,
   }));
