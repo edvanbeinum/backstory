@@ -183,6 +183,7 @@ async function askWithToken<T>(
   token: string,
   query: string,
   variables: Variables,
+  timeoutMs = 20_000,
 ): Promise<T> {
   const api = process.env.BACKSTORY_GITHUB_API ?? "https://api.github.com";
   let response: Response;
@@ -195,7 +196,7 @@ async function askWithToken<T>(
         Accept: "application/json",
       },
       body: JSON.stringify({ query, variables }),
-      signal: AbortSignal.timeout(20_000),
+      signal: AbortSignal.timeout(timeoutMs),
       cache: "no-store",
     });
   } catch (err) {
@@ -323,7 +324,9 @@ export async function githubTokenWorks(): Promise<boolean | null> {
   const token = await githubToken();
   if (!token) return null;
   try {
-    await askWithToken(token, "query { viewer { login } }", {});
+    // Well under the checklist's own 15s, which a network that hangs rather
+    // than refuses would otherwise use up
+    await askWithToken(token, "query { viewer { login } }", {}, 5_000);
     return true;
   } catch (err) {
     if (!(err instanceof TokenRejected)) return true;
