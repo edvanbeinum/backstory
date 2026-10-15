@@ -1,7 +1,7 @@
 # Packaging Backstory
 
-Backstory ships as a Mac app that runs its own server; the README's "Working
-on Backstory" says how to build it.
+Backstory ships as a Mac app that runs its own server;
+[Working on Backstory](../docs/contributing.md) says how to build it.
 
 ## Signing and notarization
 

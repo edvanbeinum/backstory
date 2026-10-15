@@ -97,7 +97,7 @@ function parseArgs(argv) {
       console.log(
         "usage: backstory [path] [--port N]\n" +
           "       backstory review [path] [--port N]\n" +
-          "       backstory hook stop   (Claude Code Stop hook; see the README)\n" +
+          "       backstory hook stop   (Claude Code Stop hook; see docs/using-backstory.md)\n" +
           "       backstory setup claude [--check] [--undo]   (add or remove that hook and /backstory-review)\n" +
           "Opens the repo (default: cwd) in Backstory's Mac app, launching it\n" +
           "if it isn't running. With --port, opens the Backstory on that port\n" +
