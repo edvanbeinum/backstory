@@ -32,8 +32,11 @@ You need:
 - **git**.
 - [Claude Code](https://claude.com/claude-code), installed and signed in, to
   trace flows and draft a map or data model.
-- [gh](https://cli.github.com), signed in with `gh auth login`, to bring in the
-  PR and its review comments.
+- A GitHub connection, to bring in the PR and its review comments. Press
+  **Connect GitHub** on the setup checklist and approve the code it shows on
+  github.com. If [gh](https://cli.github.com) is already signed in with
+  `gh auth login`, the setup checklist shows GitHub as ready and Backstory
+  reads through `gh`. On GitHub Enterprise, sign in with `gh`.
 
 1. Download `Backstory-<version>.dmg` from the
    [latest release](https://github.com/edvanbeinum/backstory/releases/latest).
@@ -70,8 +73,9 @@ reach an agent that's busy.
 [Claude Code](https://claude.com/claude-code) and sign in, then press **Look
 again**.
 
-**A banner sits where the PR's review comments should be.** `gh` is missing or
-signed out. Run `gh auth login`, then refresh the window.
+**A banner sits where the PR's review comments should be.** GitHub isn't
+connected. Press **Connect GitHub** in the banner and approve the code on
+github.com, or run `gh auth login` and refresh the window.
 
 **The map strip names a line instead of drawing the map.** The repo's
 `architecture/workspace.dsl` uses something Backstory doesn't read, such as

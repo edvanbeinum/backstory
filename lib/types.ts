@@ -103,6 +103,8 @@ export interface RepoInfo {
   /** True when HEAD is detached */
   detached: boolean;
   remoteUrl: string | null;
+  /** The remote's host, so a github.com token never goes to an Enterprise server */
+  host: string | null;
   owner: string | null;
   name: string | null;
   defaultBranch: string | null;
@@ -221,6 +223,8 @@ export interface GitHubData {
   reviews: ReviewSummary[];
   /** Set when GitHub data could not be loaded; the app still shows diffs */
   unavailable: string | null;
+  /** The fix is Connect GitHub, so the page links to the setup checklist */
+  connect: boolean;
 }
 
 /** Headline numbers for the combined branch-vs-default diff. */

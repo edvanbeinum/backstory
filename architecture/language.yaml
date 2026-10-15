@@ -80,9 +80,15 @@ terms:
       - dev mode
       - override
   - name: setup checklist
-    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
+    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`, and so does the Connect GitHub link on a repo or inbox notice. The GitHub row offers Connect GitHub, with `gh auth login` as the alternative. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
     avoid:
-      - onboarding      - wizard
+      - onboarding
+      - wizard
+  - name: Connect GitHub
+    means: "Signing Backstory in to GitHub without `gh`: the setup checklist's GitHub row shows a code from GitHub's device flow, the user approves it on github.com, and the token goes in the macOS Keychain (`lib/githubLogin.ts`, `app/api/github/login/route.ts`). Only offered when `gh` isn't signed in. Disconnect GitHub, in the Mac app's Backstory menu, deletes the token."
+    avoid:
+      - log in, for this (`gh auth login` is `gh`'s own sign-in)
+      - OAuth, in copy
   - name: answering commit
     means: "A commit you link to a review comment as one that answers it, kept in the comment's response beside the tick and the drafted reply (`commits` in `lib/responses.ts`). It stores the commit's patch-id as well as its sha, so a rebase re-matches it (`healed`); when nothing matches it's `missing` and you choose another. It never ticks the comment."
     avoid:
@@ -113,8 +119,10 @@ blocks:
   - name: GitHub
     code:
       - lib/github.ts
+      - lib/githubLogin.ts
       - lib/inbox.ts
-    summary: Pull requests and review threads through `gh`, degrading to "unavailable" rather than failing.
+      - app/api/github/
+    summary: Pull requests and review threads through a token in the Keychain, or `gh`, degrading to "unavailable" rather than failing. Connect GitHub's sign-in, and Disconnect GitHub.
     read: '`lib/github.ts` header, then docs/how-it-works.md "The inbox"'
   - name: store
     code:
@@ -160,7 +168,7 @@ blocks:
     code:
       - lib/setup.ts
       - app/api/setup/
-    summary: "Checks what Backstory needs on this machine (git, GitHub's `gh`, Claude Code and the agent review Stop hook), and only looks, never changes anything."
+    summary: "Checks what Backstory needs on this machine (git, GitHub through Connect GitHub's token or `gh`, Claude Code and the agent review Stop hook), and only looks, except that it forgets a saved GitHub token GitHub refuses."
     read: "`lib/setup.ts` header"
   - name: live updates
     code:
@@ -186,7 +194,7 @@ blocks:
   - name: Mac app
     code:
       - mac/
-    summary: A Swift app that starts, restarts and stops the standalone server with the Node in its bundle, with one web view on it, a native view while it isn't answering, and the `backstory://` URL scheme, and Check for Updates… through Sparkle. Its bundle carries the `backstory` command too (`mac/bin/backstory`, run by the bundled Node), which the Claude Code hook runs by its path there. Install Command Line Tool… in the Backstory menu links `/usr/local/bin/backstory` to it, or fixes or removes that link (`mac/backstory/Backstory/CommandLineTool.swift`). `mac/dmg.sh` packs it into a notarized disk image, `mac/appcast.sh` writes the Sparkle appcast that offers it, and `.github/workflows/release.yml` runs both on a version tag.
+    summary: A Swift app that starts, restarts and stops the standalone server with the Node in its bundle, with one web view on it, a native view while it isn't answering, and the `backstory://` URL scheme, and Check for Updates… through Sparkle. Its bundle carries the `backstory` command too (`mac/bin/backstory`, run by the bundled Node), which the Claude Code hook runs by its path there. Install Command Line Tool… in the Backstory menu links `/usr/local/bin/backstory` to it, or fixes or removes that link (`mac/backstory/Backstory/CommandLineTool.swift`). Disconnect GitHub, under it, asks the server to delete Connect GitHub's token. `mac/dmg.sh` packs it into a notarized disk image, `mac/appcast.sh` writes the Sparkle appcast that offers it, and `.github/workflows/release.yml` runs both on a version tag.
     read: "`mac/backstory/Backstory/ServerState.swift`, the comment on `ServerState`"
 
 invariants:

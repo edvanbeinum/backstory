@@ -274,13 +274,17 @@ Its own state lives under `~/.backstory`: traced flows, drafted models and data
 models, notes, ticks and drafted replies, and the outbox. Nothing Backstory
 writes is inside your repos.
 
+If you connected GitHub, its token is in your login Keychain, under
+`dev.backstory.github`.
+
 ## Uninstalling
 
 1. If you set up notes to your agent, choose **Backstory → Set Up Backstory…**
    and press **Remove…** on the **Notes to your agent** row. It takes the Stop
    hook and `/backstory-review` out of `~/.claude`. If you installed the command
    line tool, choose **Backstory → Install Command Line Tool…** and press
-   **Remove**.
+   **Remove**. If you connected GitHub, choose **Backstory → Disconnect
+   GitHub**. It deletes Backstory's GitHub token from your Keychain.
 2. Turn off **Open at Login**, quit Backstory, and delete `Backstory.app`.
 3. Delete Backstory's data: notes, ticks, the outbox, traced flows, drafted
    models and data models, and the log.
@@ -296,3 +300,7 @@ writes is inside your repos.
    defaults delete dev.backstory.app
    rm -rf ~/Library/Caches/dev.backstory.app ~/Library/HTTPStorages/dev.backstory.app ~/Library/WebKit/dev.backstory.app
    ```
+
+5. Optionally, to remove Backstory from your GitHub account too, open
+   github.com → Settings → Applications → Authorized OAuth Apps, choose
+   Backstory and press **Revoke**.

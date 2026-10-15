@@ -15,6 +15,7 @@ import {
   XIcon,
 } from "./icons";
 import { RepoBrowser } from "./RepoBrowser";
+import { ConnectGitHubLink } from "./SetupChecklist";
 import { Badge, Button, CopyButton, Spinner } from "./ui";
 import type { RecentRepo } from "@/lib/recents";
 import type { SessionResponse } from "@/lib/types";
@@ -290,6 +291,7 @@ export function RepoBar({
               <span className="flex items-center gap-1.5 text-[var(--fg-subtle)]">
                 <AlertIcon size={12} />
                 {session.github.unavailable}
+                {session.github.connect && <ConnectGitHubLink />}
               </span>
             )
           )}

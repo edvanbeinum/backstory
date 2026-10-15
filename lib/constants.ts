@@ -12,6 +12,13 @@ export const DIFF_API = "/api/diff";
 export const NOTES_API = "/api/notes";
 export const REVIEW_API = "/api/review";
 export const OUTBOX_API = "/api/outbox";
+export const GITHUB_LOGIN_API = "/api/github/login";
+
+/**
+ * Backstory's OAuth App on GitHub, with Device Flow on. Safe to ship: the
+ * device flow needs no client secret.
+ */
+export const GITHUB_CLIENT_ID = "Ov23liKf55SoAcIcJfeK";
 
 export const STORAGE_KEY = "backstory.repoPath";
 

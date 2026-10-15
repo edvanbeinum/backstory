@@ -3,7 +3,7 @@ import path from "node:path";
 import { listWorktrees } from "./browse";
 import { run } from "./exec";
 import { parseRemote } from "./git";
-import { describeGhError, gh, pickPullRequest } from "./github";
+import { describeGhError, githubGraphql, pickPullRequest } from "./github";
 import { countProgress, type Progress } from "./progress";
 import { getAllResponses, prKey } from "./responses";
 
@@ -15,7 +15,7 @@ import { getAllResponses, prKey } from "./responses";
  * find its PR, fetch its threads — is two network round trips *per worktree*,
  * so twenty worktrees is twenty seconds of GitHub latency before the home
  * screen paints. Instead one aliased GraphQL query asks for every branch of a
- * repo at once, which makes the whole screen **one `gh` call per repository**:
+ * repo at once, which makes the whole screen **one GitHub call per repository**:
  * measured at 0.48s for ten branches. Everything else is local git.
  */
 
@@ -73,6 +73,8 @@ export interface InboxRepo {
   label: string;
   /** gh missing, unauthenticated, no remote… Rows are still returned. */
   unavailable: string | null;
+  /** The fix is Connect GitHub, so the inbox links to the setup checklist */
+  connect: boolean;
   /** Served from cache after a live failure, so the counts may lag. */
   stale: boolean;
 }
@@ -179,6 +181,7 @@ const CHUNK = 25;
 
 async function loadPullRequests(
   root: string,
+  host: string | null,
   owner: string,
   name: string,
   branches: string[],
@@ -203,28 +206,20 @@ ${fields}
 }`;
 
     // Branch names ride in as variables, never interpolated into the query.
-    const args = [
-      "api",
-      "graphql",
-      "-f",
-      `query=${query}`,
-      "-F",
-      `owner=${owner}`,
-      "-F",
-      `name=${name}`,
-      ...slice.flatMap((branch, i) => ["-F", `b${i}=${branch}`]),
-    ];
+    const data = await githubGraphql<{
+      repository?: Record<string, { nodes: GqlInboxPr[] }>;
+    }>(
+      root,
+      query,
+      {
+        owner,
+        name,
+        ...Object.fromEntries(slice.map((branch, i) => [`b${i}`, branch])),
+      },
+      { host },
+    );
 
-    const { stdout } = await gh(root, args);
-    const parsed = JSON.parse(stdout) as {
-      data?: { repository?: Record<string, { nodes: GqlInboxPr[] }> };
-      errors?: Array<{ message: string }>;
-    };
-    if (parsed.errors?.length) {
-      throw new Error(parsed.errors.map((e) => e.message).join("; "));
-    }
-
-    const repository = parsed.data?.repository ?? {};
+    const repository = data?.repository ?? {};
     slice.forEach((branch, i) => {
       found.set(branch, repository[`w${i}`]?.nodes ?? []);
     });
@@ -315,7 +310,7 @@ async function buildRepo(
     getAllResponses(),
   ]);
 
-  const { owner, name } = parseRemote(remoteUrl);
+  const { host, owner, name } = parseRemote(remoteUrl);
   const repo: InboxRepo = {
     commonDir,
     root,
@@ -323,6 +318,7 @@ async function buildRepo(
     name,
     label: name ?? label,
     unavailable: null,
+    connect: false,
     stale: false,
   };
 
@@ -347,10 +343,12 @@ async function buildRepo(
       prs = hit.slice.prs;
     } else {
       try {
-        prs = await loadPullRequests(root, owner, name, branches);
+        prs = await loadPullRequests(root, host, owner, name, branches);
         cache.set(key, { at: Date.now(), slice: { prs } });
       } catch (err) {
-        repo.unavailable = describeGhError(err);
+        const { message, connect } = describeGhError(err);
+        repo.unavailable = message;
+        repo.connect = connect;
         // Any cached copy, at any age, beats a blank screen: the difference
         // between "GitHub blipped" and "your work disappeared".
         if (hit) {

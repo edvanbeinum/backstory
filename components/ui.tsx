@@ -73,6 +73,7 @@ export function Button({
         target="_blank"
         rel="noreferrer"
         title={title}
+        onClick={onClick}
         className={`${base} ${sizes[size]} ${variants[variant]} ${className}`}
       >
         {children}

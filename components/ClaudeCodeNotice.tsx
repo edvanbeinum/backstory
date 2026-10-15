@@ -3,7 +3,8 @@
 import type { ProviderGap } from "@/lib/ai/provider";
 import { Button, CopyButton } from "./ui";
 
-export const CLAUDE_CODE_INSTALL = "https://code.claude.com/docs/en/setup";
+export const CLAUDE_CODE_INSTALL =
+  "https://code.claude.com/docs/en/setup#install-claude-code";
 
 /**
  * What to do when Claude Code isn't installed or is logged out, with the

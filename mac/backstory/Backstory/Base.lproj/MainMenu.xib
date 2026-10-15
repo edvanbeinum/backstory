@@ -48,6 +48,12 @@
                                     <action selector="installCommandLineTool:" target="-1" id="iCl-Tl-st2"/>
                                 </connections>
                             </menuItem>
+                            <menuItem title="Disconnect GitHub" id="dGh-Cn-st1">
+                                <modifierMask key="keyEquivalentModifierMask"/>
+                                <connections>
+                                    <action selector="disconnectGitHub:" target="-1" id="dGh-Cn-st2"/>
+                                </connections>
+                            </menuItem>
                             <menuItem isSeparatorItem="YES" id="VOq-y0-SEH"/>
                             <menuItem title="Open at Login" id="oaL-Lg-1tm">
                                 <modifierMask key="keyEquivalentModifierMask"/>

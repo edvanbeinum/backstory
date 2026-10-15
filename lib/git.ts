@@ -83,7 +83,7 @@ export async function resolveRepo(
 
   const detached = branchRaw === "HEAD" || branchRaw === null;
   const checkedOut = detached ? null : branchRaw;
-  const { owner, name } = parseRemote(remoteUrl);
+  const { host, owner, name } = parseRemote(remoteUrl);
   const defaultBranch = await resolveDefaultBranch(root);
 
   // A branch you asked for that isn't the one checked out here. Nothing about
@@ -103,18 +103,21 @@ export async function resolveRepo(
     tip: reviewing ?? "HEAD",
     detached: detached && !reviewing,
     remoteUrl,
+    host,
     owner,
     name,
     defaultBranch,
   };
 }
 
-/** Pull `owner/repo` out of any of git's remote URL spellings. */
+/** Pull the host and `owner/repo` out of any of git's remote URL spellings. */
 export function parseRemote(url: string | null): {
+  host: string | null;
   owner: string | null;
   name: string | null;
 } {
-  if (!url) return { owner: null, name: null };
+  const none = { host: null, owner: null, name: null };
+  if (!url) return none;
 
   const cleaned = url.trim().replace(/\.git$/, "");
 
@@ -123,7 +126,11 @@ export function parseRemote(url: string | null): {
   if (scp) {
     const parts = scp[2].split("/").filter(Boolean);
     if (parts.length >= 2)
-      return { owner: parts[parts.length - 2], name: parts[parts.length - 1] };
+      return {
+        host: scp[1].toLowerCase(),
+        owner: parts[parts.length - 2],
+        name: parts[parts.length - 1],
+      };
   }
 
   // URL-style: https://github.com/Owner/Repo, ssh://git@github.com/Owner/Repo
@@ -131,12 +138,16 @@ export function parseRemote(url: string | null): {
     const parsed = new URL(cleaned);
     const parts = parsed.pathname.split("/").filter(Boolean);
     if (parts.length >= 2)
-      return { owner: parts[parts.length - 2], name: parts[parts.length - 1] };
+      return {
+        host: parsed.hostname.toLowerCase(),
+        owner: parts[parts.length - 2],
+        name: parts[parts.length - 1],
+      };
   } catch {
     // not a URL
   }
 
-  return { owner: null, name: null };
+  return none;
 }
 
 /**
