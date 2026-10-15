@@ -4,6 +4,8 @@ Stop reading diffs. Backstory shows what a change did to your system, on a C4
 map, as sequence diagrams and in the data model, so you can review an agent's
 work without reading every line.
 
+![The map for a 1,611-line branch: four components touched, page shell, map strip, flow engine and model reader, each with its changed files and line counts.](site/img/map.png)
+
 An agent can write a change faster than you can read it, and you're still
 answerable for what ships. Reading the diff line by line is slow, and it doesn't
 answer the questions that matter most: what parts of the system does this touch,
@@ -16,6 +18,10 @@ For a branch, a commit or your uncommitted work, Backstory draws:
 - **Flows**: a sequence diagram of each user action the change touches, before
   and after.
 - **The data model**: the entities, fields and relationships the change touched.
+
+![A flow: a 12-step sequence diagram of what happens when the user clicks "Draft a model".](site/img/flow.png)
+
+![The data model for a Mastodon pull request, "Add email subscriptions": a new EmailSubscription entity with four new fields, linked to the existing Account.](site/img/data.png)
 
 The diff is a click away from any component or step. Notes on what needs fixing
 go back to the agent that wrote the change. The PR's review comments appear on
