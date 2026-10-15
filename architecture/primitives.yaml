@@ -75,7 +75,7 @@ primitives:
     symbols:
       - gh
       - githubGraphql
-    use: "Every GitHub read, as a GraphQL query through `githubGraphql`: with the token Connect GitHub saved in the Keychain when there is one and the remote is github.com, through `gh` otherwise. A token GitHub refuses is forgotten and the read tried again through `gh`. `gh` runs any other `gh` call, with the pager and colour off and a timeout."
+    use: "Every GitHub GraphQL read, through `githubGraphql`: with the token Connect GitHub saved in the Keychain when there is one and the remote is github.com (or an ssh alias for it), through `gh` otherwise. A token GitHub refuses is forgotten, and any failed read on the token is tried again through `gh`. `gh` runs any other `gh` call, such as finding a branch's PR with `gh pr list`, with the pager and colour off and a timeout."
   - name: PR and threads
     block: GitHub
     file: lib/github.ts
