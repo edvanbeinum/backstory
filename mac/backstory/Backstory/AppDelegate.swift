@@ -98,6 +98,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         Task { await CommandLineTool.run(from: window) }
     }
 
+    /// Asks the server to delete the GitHub token Connect GitHub saved, then
+    /// reloads the page so the setup checklist offers Connect GitHub again.
+    /// The server does it, not Swift, so the item stays one only `security`
+    /// has touched and the Keychain never asks for access.
+    @IBAction func disconnectGitHub(_ sender: Any?) {
+        var request = URLRequest(url: server.appendingPathComponent("api/github/login"))
+        request.httpMethod = "DELETE"
+        Task {
+            do {
+                let (_, response) = try await URLSession.shared.data(for: request)
+                let status = (response as? HTTPURLResponse)?.statusCode ?? 0
+                guard status == 200 else {
+                    await tell(
+                        "Couldn't disconnect GitHub",
+                        "Backstory's server answered \(status).", on: window)
+                    return
+                }
+                windowController.reloadPage(nil)
+            } catch {
+                await tell("Couldn't disconnect GitHub", error.localizedDescription, on: window)
+            }
+        }
+    }
+
     /// Starts the app at login, which keeps the server up for live updates
     /// with no window open, as the old login agent did.
     @IBAction func toggleOpenAtLogin(_ sender: Any?) {
