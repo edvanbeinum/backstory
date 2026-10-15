@@ -1,15 +1,17 @@
 import assert from "node:assert/strict";
-import { mkdtempSync, readdirSync } from "node:fs";
+import { existsSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import * as githubLogin from "../app/api/github/login/route";
 import * as notes from "../app/api/notes/route";
 import * as outbox from "../app/api/outbox/route";
 import * as responses from "../app/api/responses/route";
 import * as review from "../app/api/review/route";
 import { crossSite } from "../lib/api";
 import { waitingReview } from "../lib/review";
+import { SECURITY, standIns } from "./standins";
 import { readText, root } from "./yaml";
 
 const req = (headers: Record<string, string>) =>
@@ -169,6 +171,14 @@ test("a cross-site request to a route that writes is refused and writes nothing"
       "review DELETE",
       review.DELETE(send(at("review", "id=r1"), "DELETE", EVIL)),
     ],
+    [
+      "github login POST",
+      githubLogin.POST(send(at("github/login", ""), "POST", EVIL)),
+    ],
+    [
+      "github login DELETE",
+      githubLogin.DELETE(send(at("github/login", ""), "DELETE", EVIL)),
+    ],
   ];
 
   for (const [name, call] of calls) {
@@ -176,6 +186,24 @@ test("a cross-site request to a route that writes is refused and writes nothing"
   }
   assert.deepEqual(readdirSync(home), []);
   assert.equal(waitingReview(REPO), null);
+});
+
+test("Disconnect GitHub deletes the saved token, and does nothing with none saved", async () => {
+  const dir = standIns({ security: SECURITY });
+  writeFileSync(path.join(dir, "keychain"), "gho_saved1");
+  const saved = process.env.PATH;
+  process.env.PATH = dir;
+  try {
+    const disconnect = () =>
+      githubLogin.DELETE(send(at("github/login", ""), "DELETE", {}));
+    const first = await disconnect();
+    assert.equal(first.status, 200);
+    assert.deepEqual(await first.json(), { state: "idle" });
+    assert.equal(existsSync(path.join(dir, "keychain")), false);
+    assert.equal((await disconnect()).status, 200);
+  } finally {
+    process.env.PATH = saved;
+  }
 });
 
 test("the CLI's request and the page's own get past the check", async () => {
