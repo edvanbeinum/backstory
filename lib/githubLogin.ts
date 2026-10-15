@@ -36,8 +36,8 @@ const REAL: LoginDeps = {
 
 const SLOW_DOWN_STEP_S = 5;
 
-// Kept on globalThis because Next may load this module once per route
-// bundle, and GET has to see the sign-in POST started.
+// Stores the sign-in on globalThis, because Next may load this module once
+// per route bundle, and GET has to see the sign-in POST started.
 const memo = globalThis as {
   __backstoryGitHubLogin?: { current: GitHubLoginState; run: number };
 };

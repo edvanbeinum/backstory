@@ -61,9 +61,9 @@ function security(args: string[], opts: { input?: string } = {}) {
 }
 
 /**
- * The token Connect GitHub saved, or null. Read on every call rather than
- * kept in env, so `claude`, `git` and `gh` children never inherit it. A read
- * that fails for any reason counts as no token, which falls back to `gh`.
+ * The token Connect GitHub saved, or null. Reads it on every call rather than
+ * keeping it in env, so `claude`, `git` and `gh` children never inherit it. A
+ * read that fails for any reason counts as no token, which falls back to `gh`.
  */
 export async function githubToken(): Promise<string | null> {
   try {
@@ -324,8 +324,8 @@ export async function githubTokenWorks(): Promise<boolean | null> {
   const token = await githubToken();
   if (!token) return null;
   try {
-    // Well under the checklist's own 15s, which a network that hangs rather
-    // than refuses would otherwise use up
+    // Gives up after 5s, well under the checklist's own 15s, which a network
+    // that hangs rather than refuses would otherwise use up
     await askWithToken(token, "query { viewer { login } }", {}, 5_000);
     return true;
   } catch (err) {
@@ -435,9 +435,9 @@ interface GqlReviewNode {
  * a remote change, so the watcher passes `fresh` for those (and the manual
  * refresh button does too).
  *
- * Kept on globalThis because Next may load this module once per route
- * bundle, and the login route's clearGitHubCache has to empty the session
- * route's copy.
+ * Stores the cache on globalThis, because Next may load this module once per
+ * route bundle, and the login route's clearGitHubCache has to empty the
+ * session route's copy.
  */
 const GH_CACHE_TTL_MS = 30_000;
 const shared = globalThis as {
