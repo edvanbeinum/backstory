@@ -34,9 +34,9 @@ You need:
   trace flows and draft a map or data model.
 - A GitHub connection, to bring in the PR and its review comments. Press
   **Connect GitHub** on the setup checklist and approve the code it shows on
-  github.com. If you use [gh](https://cli.github.com), signed in with
-  `gh auth login`, Backstory uses that instead. On GitHub Enterprise, sign in
-  with `gh`.
+  github.com. If [gh](https://cli.github.com) is already signed in with
+  `gh auth login`, the setup checklist shows GitHub as ready and Backstory
+  reads through `gh`. On GitHub Enterprise, sign in with `gh`.
 
 1. Download `Backstory-<version>.dmg` from the
    [latest release](https://github.com/edvanbeinum/backstory/releases/latest).
