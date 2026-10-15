@@ -13,13 +13,26 @@ const escape = (text) =>
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
 
-const inline = (text) =>
-  escape(text)
+const styles = (text) =>
+  text
     .replace(/`([^`]+)`/g, "<code>$1</code>")
     .replace(
       /\*([^*]+)\*|(?<!\w)_([^_]+)_(?!\w)/g,
       (_, a, b) => `<em>${a ?? b}</em>`,
     );
+
+// Style the text around [text](url) links but not their URLs, where an
+// underscore would otherwise turn into emphasis.
+const inline = (text) =>
+  escape(text)
+    .split(/(\[[^\]]+\]\(https?:\/\/[^)\s]+\))/)
+    .map((part) => {
+      const link = part.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      return link
+        ? `<a href="${link[2]}">${styles(link[1])}</a>`
+        : styles(part);
+    })
+    .join("");
 
 /** Lines joined into one, where a line ending in two spaces breaks the line. */
 const lines = (para) =>

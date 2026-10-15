@@ -2,8 +2,9 @@
 
 Every word on the page, in page order. Each heading names a slot in
 `template.html`, and the text under it fills that slot. Lines starting with a
-dash make a list. Backticks set code, and asterisks or underscores set
-emphasis. A blank line starts a new paragraph. Run `npm run site` to rebuild.
+dash make a list. Backticks set code, asterisks or underscores set emphasis,
+and `[text](https://…)` makes a link. A blank line starts a new paragraph. Run
+`npm run site` to rebuild.
 
 ## page.title
 
@@ -17,59 +18,37 @@ edvanbeinum /
 
 backstory
 
-## nav.watch
-
-Watch
-
-## nav.star
-
-Star
-
-## hero.label
-
-What does it even mean to review a PR?
-
 ## hero.headline
 
-Feeling guilty about not reading diffs anymore?
+How am I supposed to review all this?!
 
 ## hero.lede
 
-Yeah, me too. There's too much code to read, and I'm still responsible for all of it.
-
-If our job is now design and architecture, shouldn't PR review look like this?
-
-## cta.star
-
-Star on GitHub
-
-## cta.watch
-
-Watch for the first release
+What if your PR review tooling showed you *this* instead of a code diff?
 
 ## hero.shot.alt
 
-Backstory's map: four components touched, page shell, map strip, flow engine and model reader, each with its changed files and line counts. Below sit Claude Code, the state directory and the git reader.
+Backstory's map: four components touched, page shell, map strip, flow engine and model reader, each with its changed files and line counts. 
 
 ## hero.shot.caption
 
-A real branch: the parts of the system it touches, not the 1,611 lines it adds.
-
-## why.heading
-
-We still can't trust an LLM to design a solid (arf) system.
+This is a real branch. 1,611 lines of code and here's what changes in the system.
 
 ## why.sub
 
-So review the design instead:
+AI can write PRs faster than I can understand them, but I'm still responsible for what ships. If our job as software engineers is increasingly about design and architecture, why do our review tools still just show us a code diff? A diff requires me to rescontruct all of that from changed lines, and frankly, it's exhausting. 
 
-- What parts of the system does it touch?
-- What does each action do now?
+What if our review tools  answered these questions for us:
+
+- What parts of the system does this change touch?
+- What does each user action do now?
 - What happens to the data?
+
+We've used sequence diagrams and C4 maps for decades; why not use them to help us understand code changes?
 
 ## basics.heading
 
-Backstory answers all three.
+What might a code review tool for 2026 look like?
 
 ## map.label
 
@@ -77,27 +56,27 @@ The architecture
 
 ## map.heading
 
-Get context on which parts of the system the change affects
+See where things have changed
 
 ## map.body
 
-Get context for which part of the system changed int your actual human brain quickly with a C4 diagram of the system, with every changed component shown.
+A [C4 map](https://www.youtube.com/watch?v=x2-rSnhpw0g) highlights the components the change touches. See how it fits into the system before digging into individual files.
 
 ## map.shot.alt
 
-A close-up of the map: the map strip, the flow engine and the model reader, which holds two new files, route.ts and draft.ts.
+A close-up of the map: the map strip, the flow engine and the model reader, which has two new files, route.ts and draft.ts.
 
 ## flows.label
 
-The flow
+The flows
 
 ## flows.heading
 
-What it does
+Understand the data flow and API
 
 ## flows.body
 
-A sequence diagram for each user action the change affects
+A sequence diagram for each user action. Follow the calls between components and what data passes between them.
 
 ## flows.shot.alt
 
@@ -109,11 +88,11 @@ The data model
 
 ## data.heading
 
-What it changes underneath
+Data models are tricky
 
 ## data.body
 
-The data model is hardest thing to change later. So lets show that clearly, including what fields changes and the relationships.
+The data model is what bites us in the butt later, so our tooling should show us the changes to entities, fields and relationships before we merge.
 
 ## data.shot.alt
 
@@ -121,16 +100,12 @@ Backstory's data view on a Mastodon pull request, "Add email subscriptions": a n
 
 ## close.heading
 
-Here's Backstory.
+Would you review a PR this way?
 
 ## close.body
 
-The code's still there when you want it. You just don't start with it. Not released yet: star the repo to follow along.
+I'm playing around with this concept to get me up to speed quickly when a change needs my attention.
 
-## footer.left
+I'd love your take: would this help you judge a change? What would you still need before you'd merge?
 
-Backstory · understand the change, not the code
 
-## footer.right
-
-Screenshots: Backstory reviewing one of its own branches, and a Mastodon pull request
