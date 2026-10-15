@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="What if your PR review tools showed you the system design instead of a code diff? Backstory shows a change on a C4 map, as sequence diagrams and in the data model."
+      content="Backstory: stop reading diffs. What if your PR review tools showed you the system design instead of a code diff? Backstory shows a change on a C4 map, as sequence diagrams and in the data model."
     />
-    <title>Backstory</title>
+    <title>Backstory · Stop reading diffs</title>
     <link rel="icon" href="img/logo/backstory-icon.svg" type="image/svg+xml" />
     <link rel="icon" href="img/logo/backstory-icon-32.png" sizes="32x32" />
     <link rel="apple-touch-icon" href="img/logo/backstory-icon-180.png" />
@@ -172,7 +172,8 @@
         height: 28px;
         flex: none;
       }
-      .brand .owner {
+      .brand .tagline {
+        margin-left: 6px;
         color: var(--fg-muted);
         font-weight: 400;
       }
@@ -410,7 +411,7 @@
         }
       }
       @media (max-width: 480px) {
-        .header .brand .owner {
+        .header .brand .tagline {
           display: none;
         }
         .header nav .btn:not(.primary) {
@@ -475,7 +476,7 @@
               fill="var(--success-emphasis)"
             />
           </svg>
-          <span><span class="owner">edvanbeinum /</span> backstory</span>
+          <span>Backstory <span class="tagline">Stop reading diffs</span></span>
         </a>
         <nav aria-label="Repository">
           <a
@@ -616,17 +617,17 @@
       <div class="close">
         <h2>Would you review a PR this way?</h2>
         <p>
-          I'm playing around with this concept to get me up to speed quickly
-          when a change needs my attention.<br /><br />I'd love your take: would
-          this help you judge a change? What would you still need before you'd
-          merge?
+          Backstory is me playing around with this concept, to get me up to
+          speed quickly when a change needs my attention.<br /><br />I'd love
+          your take: would this help you judge a change? What would you still
+          need before you'd merge?
         </p>
         <div class="ctas">
           <a
             class="btn primary lg"
             href="https://github.com/edvanbeinum/backstory/releases/latest"
           >
-            Download for Mac
+            Download Backstory for Mac
           </a>
           <a class="btn lg" href="https://github.com/edvanbeinum/backstory">
             Star on GitHub
