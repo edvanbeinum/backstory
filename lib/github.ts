@@ -102,8 +102,13 @@ export async function saveGitHubToken(token: string): Promise<void> {
   }
 }
 
-/** Deletes the saved token. With none saved, does nothing. */
-export async function forgetGitHubToken(): Promise<void> {
+/**
+ * Deletes the saved token. With none saved, does nothing. With `only`, deletes
+ * it only while it is still that token, so a read that started before Connect
+ * GitHub saved a new one can't delete the new one when the old one is refused.
+ */
+export async function forgetGitHubToken(only?: string): Promise<void> {
+  if (only !== undefined && (await githubToken()) !== only) return;
   await security([
     "delete-generic-password",
     "-s",
@@ -254,7 +259,7 @@ async function tokenOrGh<T>(
           }
         }
         rejected = true;
-        await forgetGitHubToken().catch(() => {});
+        await forgetGitHubToken(token).catch(() => {});
       }
     }
   }
@@ -293,7 +298,7 @@ export async function githubTokenWorks(): Promise<boolean | null> {
     return true;
   } catch (err) {
     if (!(err instanceof TokenRejected)) return true;
-    await forgetGitHubToken().catch(() => {});
+    await forgetGitHubToken(token).catch(() => {});
     return false;
   }
 }

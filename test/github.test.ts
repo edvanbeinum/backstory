@@ -287,6 +287,19 @@ test("a repository the token can't see is read through a signed-in gh, which an 
   assert.equal(on.keychain(), TOKEN);
 });
 
+test("a refused token is only forgotten while it's still the saved one, so a newer token survives", async () => {
+  const on = machine({ token: true });
+  const NEWER = "gho_newerToken456";
+  const { data } = await load(on, () => {
+    // Connect GitHub saves a new token while the old one's request is out
+    writeFileSync(path.join(on.dir, "keychain"), NEWER);
+    return { status: 401 };
+  });
+
+  assert.equal(on.keychain(), NEWER);
+  assert.equal(data.connect, true);
+});
+
 test("the remote's host comes out of every spelling, so the token knows where it may go", () => {
   assert.equal(parseRemote("git@github.com:acme/app.git").host, "github.com");
   assert.equal(parseRemote("https://github.com/acme/app").host, "github.com");
