@@ -19,7 +19,7 @@ import {
 quietLoginShell();
 
 const TOKEN = "gho_standInToken123";
-const CONNECT = "Connect GitHub to see this pull request's review comments.";
+const CONNECT = "GitHub isn't connected.";
 
 const PR = {
   number: 7,
@@ -327,6 +327,32 @@ test("an ssh alias gets the token only when the ssh config sends it to github.co
   assert.equal(calls.length, 0);
   assert.equal(data.pr?.number, 7);
   assert.ok(on.ghLog().length > 0);
+});
+
+test("an Enterprise repo with gh signed out is told to sign in with gh, not to Connect GitHub", async () => {
+  const signedOut = standIns({
+    security: SECURITY,
+    ssh: SSH,
+    gh: 'echo "To get started with GitHub CLI, please run:  gh auth login" >&2; exit 4',
+  });
+  const on = { ...machine({}), dir: signedOut };
+  const { data } = await load(on, github, repo({ host: "ghe.example.com" }));
+
+  assert.equal(data.connect, false);
+  assert.match(data.unavailable ?? "", /gh auth login/);
+});
+
+test("an organisation's SAML refusal through a signed-in gh isn't mistaken for signed out", async () => {
+  const saml = standIns({
+    security: SECURITY,
+    ssh: SSH,
+    gh: 'echo "GraphQL: Resource protected by organization SAML enforcement. You must grant your OAuth token access to this organization." >&2; exit 1',
+  });
+  const on = { ...machine({}), dir: saml };
+  const { data } = await load(on, github);
+
+  assert.equal(data.connect, false);
+  assert.match(data.unavailable ?? "", /SAML enforcement/);
 });
 
 test("the remote's host comes out of every spelling, so the token knows where it may go", () => {

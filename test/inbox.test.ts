@@ -261,7 +261,7 @@ test("with a refused token and no gh, the repo asks to Connect GitHub and still 
   }));
 
   assert.equal(inbox.repos[0].connect, true);
-  assert.match(inbox.repos[0].unavailable ?? "", /Connect GitHub/);
+  assert.equal(inbox.repos[0].unavailable, "GitHub isn't connected.");
   assert.deepEqual(
     inbox.rows.map((r) => [r.branch, r.pr]),
     [["feature", null]],

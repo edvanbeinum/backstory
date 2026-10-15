@@ -166,12 +166,13 @@ class TokenRequestError extends Error {}
 class GitHubOffline extends Error {}
 
 /**
- * GitHub can't be reached with anything Backstory has: the saved token was
- * refused and `gh` is missing or logged out. The fix is Connect GitHub.
+ * A github.com repo that nothing Backstory has can read: no saved token, or a
+ * refused one, and `gh` missing or signed out. The fix is Connect GitHub. The
+ * message is short because the page puts a Connect GitHub link after it.
  */
 export class GitHubConnectError extends Error {
   constructor() {
-    super("Connect GitHub to see this pull request's review comments.");
+    super("GitHub isn't connected.");
     this.name = "GitHubConnectError";
   }
 }
@@ -248,11 +249,15 @@ async function askWithGh<T>(
   return parsed.data as T;
 }
 
+/**
+ * `gh` is missing or signed out. Matches `gh`'s own sign-in hint and a 401,
+ * not any mention of "auth", which an organisation's SAML or OAuth App
+ * restriction also makes while `gh` is signed in.
+ */
 function ghNotReady(err: unknown): boolean {
   if (!(err instanceof ExecError)) return false;
   if (err.code === 127) return true;
-  const msg = err.message.toLowerCase();
-  return msg.includes("auth") || msg.includes("login");
+  return /gh auth login|not logged in|http 401/i.test(err.message);
 }
 
 /**
@@ -268,8 +273,8 @@ async function tokenOrGh<T>(
   withToken: (token: string) => Promise<T>,
   withGh: () => Promise<T>,
 ): Promise<T> {
-  let rejected = false;
-  if (await tokenCovers(host)) {
+  const covered = await tokenCovers(host);
+  if (covered) {
     const token = await githubToken();
     if (token) {
       try {
@@ -283,7 +288,6 @@ async function tokenOrGh<T>(
             throw err;
           }
         }
-        rejected = true;
         await forgetGitHubToken(token).catch(() => {});
       }
     }
@@ -291,7 +295,7 @@ async function tokenOrGh<T>(
   try {
     return await withGh();
   } catch (err) {
-    if (rejected && ghNotReady(err)) throw new GitHubConnectError();
+    if (covered && ghNotReady(err)) throw new GitHubConnectError();
     throw err;
   }
 }
@@ -644,16 +648,24 @@ const NOT_REACHABLE =
 
 /**
  * A readable reason for a failed GitHub read. `connect` is set when the fix
- * is Connect GitHub, so the page can link to the setup checklist.
+ * is Connect GitHub, so the page can link to the setup checklist. Connect
+ * GitHub can't reach an Enterprise server, so its repos are told to use `gh`.
  */
 export function describeGhError(err: unknown): {
   message: string;
   connect: boolean;
 } {
-  if (err instanceof GitHubConnectError || ghNotReady(err)) {
-    return { message: new GitHubConnectError().message, connect: true };
+  if (err instanceof GitHubConnectError) {
+    return { message: err.message, connect: true };
   }
   const failed = (message: string) => ({ message, connect: false });
+  if (ghNotReady(err)) {
+    return failed(
+      (err as ExecError).code === 127
+        ? "GitHub's gh tool isn't installed. Install it and run gh auth login to see pull requests."
+        : "GitHub's gh tool isn't signed in. Run gh auth login to see pull requests.",
+    );
+  }
   if (err instanceof TokenRequestError) {
     if (err.message.toLowerCase().includes("could not resolve to a repository"))
       return failed(
