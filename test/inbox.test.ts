@@ -1,9 +1,27 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { test } from "node:test";
 
 import { pickPullRequest } from "../lib/github";
+import { buildInbox } from "../lib/inbox";
 import { countProgress } from "../lib/progress";
 import type { ResponseRecord } from "../lib/responses";
+import {
+  githubApiStandIn,
+  quietLoginShell,
+  SECURITY,
+  standIns,
+  type ApiAnswer,
+  type ApiCall,
+} from "./standins";
+
+quietLoginShell();
+process.env.BACKSTORY_HOME ??= mkdtempSync(
+  path.join(os.tmpdir(), "backstory-inbox-"),
+);
 
 const record = (over: Partial<ResponseRecord> = {}): ResponseRecord => ({
   done: false,
@@ -147,4 +165,105 @@ test("neither a linked commit nor a draft counts as handled", () => {
     t2: record({ reply: "Addressed in abc1234" }),
   };
   assert.equal(countProgress(["t1", "t2"], responses).done, 0);
+});
+
+/** A repo on branch `feature` whose origin is `acme/<name>` on github.com. */
+function repoOnGitHub(name: string): string {
+  const root = mkdtempSync(path.join(os.tmpdir(), "backstory-inbox-repo-"));
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", root, ...args], { encoding: "utf8" });
+  git("init", "-q", "-b", "feature");
+  git("config", "user.email", "t@example.com");
+  git("config", "user.name", "T");
+  writeFileSync(path.join(root, "a.txt"), "a\n");
+  git("add", "-A");
+  git("commit", "-qm", "First");
+  git("remote", "add", "origin", `git@github.com:acme/${name}.git`);
+  return root;
+}
+
+const INBOX_PR = {
+  number: 7,
+  title: "Add things",
+  state: "OPEN",
+  isDraft: false,
+  url: "https://github.com/acme/app/pull/7",
+  updatedAt: "2026-10-01T00:00:00Z",
+  baseRefName: "main",
+  isCrossRepository: false,
+  headRepositoryOwner: { login: "acme" },
+  reviewThreads: {
+    totalCount: 2,
+    nodes: [
+      { id: "t1", isResolved: false },
+      { id: "t2", isResolved: true },
+    ],
+  },
+  reviews: { nodes: [{ id: "r1", body: "Hi" }] },
+};
+
+/** Answers each branch alias, with the PR for `feature`. */
+const inboxApi = (call: ApiCall): ApiAnswer => ({
+  json: {
+    data: {
+      repository: Object.fromEntries(
+        Object.entries(call.variables)
+          .filter(([key]) => /^b\d+$/.test(key))
+          .map(([key, branch]) => [
+            `w${key.slice(1)}`,
+            { nodes: branch === "feature" ? [INBOX_PR] : [] },
+          ]),
+      ),
+    },
+  },
+});
+
+/** The inbox on a machine with a saved token, no `gh`, and `answer` for GitHub. */
+async function inboxWithToken(
+  root: string,
+  answer: (call: ApiCall) => ApiAnswer,
+) {
+  const dir = standIns({ security: SECURITY });
+  writeFileSync(path.join(dir, "keychain"), "gho_saved1");
+  const api = await githubApiStandIn(answer);
+  const saved = {
+    path: process.env.PATH,
+    api: process.env.BACKSTORY_GITHUB_API,
+  };
+  process.env.PATH = `${dir}:/usr/bin:/bin`;
+  process.env.BACKSTORY_GITHUB_API = api.url;
+  try {
+    return { inbox: await buildInbox([root]), calls: api.calls };
+  } finally {
+    process.env.PATH = saved.path;
+    if (saved.api === undefined) delete process.env.BACKSTORY_GITHUB_API;
+    else process.env.BACKSTORY_GITHUB_API = saved.api;
+    await api.close();
+  }
+}
+
+test("with a saved token and no gh, the inbox counts come from GitHub's API", async () => {
+  const { inbox, calls } = await inboxWithToken(repoOnGitHub("app"), inboxApi);
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].authorization, "Bearer gho_saved1");
+  assert.equal(inbox.repos[0].unavailable, null);
+  assert.equal(inbox.repos[0].connect, false);
+  const row = inbox.rows.find((r) => r.branch === "feature");
+  assert.equal(row?.pr?.number, 7);
+  assert.equal(row?.pr?.unresolved, 1);
+  assert.deepEqual(row?.progress, { done: 0, total: 3, truncated: false });
+});
+
+test("with a refused token and no gh, the repo asks to Connect GitHub and still lists its rows", async () => {
+  const { inbox } = await inboxWithToken(repoOnGitHub("other"), () => ({
+    status: 401,
+  }));
+
+  assert.equal(inbox.repos[0].connect, true);
+  assert.match(inbox.repos[0].unavailable ?? "", /Connect GitHub/);
+  assert.deepEqual(
+    inbox.rows.map((r) => [r.branch, r.pr]),
+    [["feature", null]],
+  );
 });

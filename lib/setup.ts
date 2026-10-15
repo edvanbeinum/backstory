@@ -5,11 +5,12 @@ import path from "node:path";
 import { backstoryHookProgram } from "../bin/hook.mjs";
 import { aiProvider } from "./ai/provider";
 import { refreshLoginShellDirs, run } from "./exec";
-import { gh } from "./github";
+import { gh, githubTokenWorks } from "./github";
 
 /**
  * The setup checklist's checks: what Backstory needs on this machine, and
- * what each piece unlocks. Each one only looks, and changes nothing.
+ * what each piece unlocks. Each one only looks, and changes nothing, except
+ * that a saved GitHub token GitHub refuses is forgotten.
  */
 
 export type SetupId = "git" | "github" | "claude" | "reviews";
@@ -111,7 +112,13 @@ async function gitState(shim: string): Promise<SetupState> {
   return (await succeeds(git, ["--version"])) ? "ready" : "missing";
 }
 
+/**
+ * Ready with a working saved token, otherwise with a signed-in `gh`: the same
+ * order every GitHub read takes. A refused token is forgotten here, so the
+ * row offers Connect GitHub again.
+ */
 async function githubState(): Promise<SetupState> {
+  if (await githubTokenWorks()) return "ready";
   try {
     // Scoped to github.com: a bad token for another host fails the bare command
     await gh(process.cwd(), ["auth", "status", "--hostname", "github.com"]);

@@ -11,7 +11,12 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { SETUP_DETAILS, setupChecks, type SetupId } from "../lib/setup";
-import { quietLoginShell, standIns } from "./standins";
+import {
+  githubApiStandIn,
+  quietLoginShell,
+  SECURITY,
+  standIns,
+} from "./standins";
 
 quietLoginShell();
 
@@ -27,9 +32,14 @@ function claudeDir(settings?: string): string {
 
 async function checks(
   scripts: Record<string, string>,
-  opts: { claudeDir?: string; gitShim?: (dir: string) => string } = {},
+  opts: {
+    claudeDir?: string;
+    gitShim?: (dir: string) => string;
+    before?: (dir: string) => void;
+  } = {},
 ) {
   const dir = standIns(scripts);
+  opts.before?.(dir);
   const saved = process.env.PATH;
   process.env.PATH = dir;
   try {
@@ -90,6 +100,62 @@ test("GitHub's row tells no gh, logged out and ready apart", async () => {
     (await checks({ git: GIT, gh: "exit 0" })).state("github"),
     "ready",
   );
+});
+
+/** GitHub's row on a machine with no `gh`, a saved token, and `api` answering for GitHub. */
+async function githubRowWithToken(api: string) {
+  const saved = process.env.BACKSTORY_GITHUB_API;
+  process.env.BACKSTORY_GITHUB_API = api;
+  try {
+    const { dir, state } = await checks(
+      { git: GIT, security: SECURITY },
+      {
+        before: (dir) =>
+          writeFileSync(path.join(dir, "keychain"), "gho_saved1"),
+      },
+    );
+    return {
+      state: state("github"),
+      kept: existsSync(path.join(dir, "keychain")),
+    };
+  } finally {
+    if (saved === undefined) delete process.env.BACKSTORY_GITHUB_API;
+    else process.env.BACKSTORY_GITHUB_API = saved;
+  }
+}
+
+test("GitHub's row is ready with a working saved token and no gh", async () => {
+  const api = await githubApiStandIn(() => ({
+    json: { data: { viewer: { login: "ed" } } },
+  }));
+  try {
+    assert.deepEqual(await githubRowWithToken(api.url), {
+      state: "ready",
+      kept: true,
+    });
+    assert.equal(api.calls[0].authorization, "Bearer gho_saved1");
+  } finally {
+    await api.close();
+  }
+});
+
+test("a revoked saved token is forgotten, and the row offers Connect GitHub again", async () => {
+  const api = await githubApiStandIn(() => ({ status: 401 }));
+  try {
+    assert.deepEqual(await githubRowWithToken(api.url), {
+      state: "missing",
+      kept: false,
+    });
+  } finally {
+    await api.close();
+  }
+});
+
+test("a saved token with no network keeps the row ready", async () => {
+  assert.deepEqual(await githubRowWithToken("http://127.0.0.1:1"), {
+    state: "ready",
+    kept: true,
+  });
 });
 
 test("a git that is only Apple's shim reads as missing without running it", async () => {
