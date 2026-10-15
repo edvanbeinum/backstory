@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   // Safari takes its icon from apple-touch-icon instead of these. The SVG is
   // listed first for browsers that take it — it stays
   // sharp at any tab size — with the PNGs behind it for those that don't, and
-  // app/favicon.ico (16/32/64) as the last resort.
+  // app/favicon.ico (16/32/48) as the last resort.
   icons: {
     icon: [
       { url: "/icon.svg", type: "image/svg+xml" },
