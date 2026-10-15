@@ -1,5 +1,5 @@
 import { GITHUB_CLIENT_ID } from "./constants";
-import { clearGitHubCache, saveGitHubToken } from "./github";
+import { clearGitHubCache, forgetGitHubToken, saveGitHubToken } from "./github";
 
 /**
  * Connect GitHub: GitHub's device flow, one sign-in at a time, held in the
@@ -166,6 +166,11 @@ async function poll(
           state: "failed",
           message: err instanceof Error ? err.message : String(err),
         };
+      }
+      // Disconnect GitHub, or a new sign-in, came while the save was running
+      if (login.run !== run) {
+        await forgetGitHubToken(body.access_token).catch(() => {});
+        return login.current;
       }
       clearGitHubCache();
       return { state: "connected" };

@@ -1,9 +1,14 @@
 import assert from "node:assert/strict";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { test } from "node:test";
 
-import { startGitHubLogin, type LoginDeps } from "../lib/githubLogin";
+import { forgetGitHubToken } from "../lib/github";
+import {
+  resetGitHubLogin,
+  startGitHubLogin,
+  type LoginDeps,
+} from "../lib/githubLogin";
 import { SECURITY, standIns } from "./standins";
 
 const TOKEN = "gho_approvedToken456";
@@ -143,6 +148,42 @@ test("starting a second sign-in drops the first, whose token is never saved", as
     await first.finished;
 
     assert.equal(second.started.state, "waiting");
+    assert.equal(existsSync(path.join(dir, "keychain")), false);
+  } finally {
+    process.env.PATH = saved;
+  }
+});
+
+test("Disconnect GitHub while the token is being saved leaves no token behind", async () => {
+  // A `security` whose save waits for the test to say go, so the Disconnect
+  // lands mid-save
+  const dir = standIns({
+    security: SECURITY.replace(
+      "-i) read -r line;",
+      '-i) read -r line; touch "$dir/saving"; while [ ! -f "$dir/go" ]; do sleep 0.02; done;',
+    ),
+  });
+  const saved = process.env.PATH;
+  process.env.PATH = dir;
+  try {
+    const { finished } = await startGitHubLogin({
+      fetch: async (_url, init) =>
+        Response.json(
+          String(init?.body).includes("device_code=")
+            ? { access_token: TOKEN }
+            : CODE,
+        ),
+      sleep: async () => {},
+      now: () => 0,
+    });
+    while (!existsSync(path.join(dir, "saving"))) {
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
+    resetGitHubLogin();
+    await forgetGitHubToken();
+    writeFileSync(path.join(dir, "go"), "");
+
+    assert.deepEqual(await finished, { state: "idle" });
     assert.equal(existsSync(path.join(dir, "keychain")), false);
   } finally {
     process.env.PATH = saved;
