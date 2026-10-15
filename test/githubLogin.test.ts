@@ -22,12 +22,16 @@ const CODE = {
 };
 
 /**
- * A sign-in driven by canned answers to each poll, with no network and no
- * waiting. `sleeps` records each delay asked for.
+ * A sign-in driven by canned answers to each poll, then `rest` for every poll
+ * after them, with no network and no waiting: the clock moves only by the
+ * delays asked for, which `sleeps` records.
  */
 async function signIn(
   polls: Array<Record<string, unknown> | "throw">,
-  opts: { code?: Record<string, unknown> | "throw" } = {},
+  opts: {
+    code?: Record<string, unknown> | "throw";
+    rest?: Record<string, unknown> | "throw";
+  } = {},
 ) {
   const dir = standIns({ security: SECURITY });
   const saved = process.env.PATH;
@@ -36,14 +40,15 @@ async function signIn(
   const answers = [opts.code ?? CODE, ...polls];
   const deps: LoginDeps = {
     fetch: async () => {
-      const next = answers.shift() ?? { error: "authorization_pending" };
+      const next = answers.shift() ??
+        opts.rest ?? { error: "authorization_pending" };
       if (next === "throw") throw new TypeError("fetch failed");
       return Response.json(next);
     },
     sleep: async (ms) => {
       sleeps.push(ms);
     },
-    now: () => 0,
+    now: () => sleeps.reduce((sum, ms) => sum + ms, 0),
   };
   try {
     const { started, finished } = await startGitHubLogin(deps);
@@ -100,11 +105,19 @@ test("slow_down waits the interval GitHub asks for", async () => {
   assert.deepEqual(run.state, { state: "connected" });
 });
 
-test("no network is offline, whether asking for the code or polling", async () => {
+test("no network is offline when asking for the code, or when it lasts until the code expires", async () => {
   assert.deepEqual((await signIn([], { code: "throw" })).state, {
     state: "offline",
   });
-  assert.deepEqual((await signIn(["throw"])).state, { state: "offline" });
+  assert.deepEqual((await signIn([], { rest: "throw" })).state, {
+    state: "offline",
+  });
+});
+
+test("a failed poll keeps the sign-in going, so an approval that follows still connects", async () => {
+  const run = await signIn(["throw", { access_token: TOKEN }]);
+  assert.deepEqual(run.state, { state: "connected" });
+  assert.equal(run.token, TOKEN);
 });
 
 test("an app with the device flow off fails with GitHub's reason", async () => {

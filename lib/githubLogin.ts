@@ -141,10 +141,15 @@ async function poll(
 ): Promise<GitHubLoginState> {
   const expiresAt = waiting.state === "waiting" ? waiting.expiresAt : 0;
   let interval = firstInterval;
+  // Keeps polling through a failed request: the code stays good until it
+  // expires, and the user may be approving it on github.com right now.
+  let unreachable = false;
   for (;;) {
     await deps.sleep(interval * 1000);
     if (login.run !== run) return login.current;
-    if (deps.now() >= expiresAt) return { state: "expired" };
+    if (deps.now() >= expiresAt) {
+      return { state: unreachable ? "offline" : "expired" };
+    }
 
     let body: Record<string, unknown>;
     try {
@@ -154,8 +159,10 @@ async function poll(
         grant_type: "urn:ietf:params:oauth:grant-type:device_code",
       });
     } catch {
-      return { state: "offline" };
+      unreachable = true;
+      continue;
     }
+    unreachable = false;
     if (login.run !== run) return login.current;
 
     if (typeof body.access_token === "string") {
