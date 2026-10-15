@@ -18,13 +18,21 @@ edvanbeinum /
 
 backstory
 
+## nav.watch
+
+Watch
+
+## nav.star
+
+Star
+
 ## hero.headline
 
-How am I supposed to review all this?!
+How am I supposed to review all this
 
 ## hero.lede
 
-What if your PR review tooling showed you *this* instead of a code diff?
+What if your PR review tools showed you *this* instead of a code diff:
 
 ## hero.shot.alt
 
@@ -36,9 +44,9 @@ This is a real branch. 1,611 lines of code and here's what changes in the system
 
 ## why.sub
 
-AI can write PRs faster than I can understand them, but I'm still responsible for what ships. If our job as software engineers is increasingly about design and architecture, why do our review tools still just show us a code diff? A diff requires me to rescontruct all of that from changed lines, and frankly, it's exhausting. 
+AI can write PRs faster than I can understand them, but I'm still responsible for what ships. If our job as software engineers is increasingly about design and architecture, why do our PR review tools still just show us a code diff? 
 
-What if our review tools  answered these questions for us:
+What if our PR review tools answered these questions for us:
 
 - What parts of the system does this change touch?
 - What does each user action do now?
@@ -48,11 +56,11 @@ We've used sequence diagrams and C4 maps for decades; why not use them to help u
 
 ## basics.heading
 
-What might a code review tool for 2026 look like?
+What might a PR review tool for 2026 look like?
 
 ## map.label
 
-The architecture
+Help understand the architecture
 
 ## map.heading
 
@@ -68,7 +76,7 @@ A close-up of the map: the map strip, the flow engine and the model reader, whic
 
 ## flows.label
 
-The flows
+Help understand the flows
 
 ## flows.heading
 
@@ -76,7 +84,7 @@ Understand the data flow and API
 
 ## flows.body
 
-A sequence diagram for each user action. Follow the calls between components and what data passes between them.
+A sequence diagram for each user action. I want to know the calls between components and what data passes between them.
 
 ## flows.shot.alt
 
@@ -84,7 +92,7 @@ A Backstory flow: a 12-step sequence diagram of what happens when the user click
 
 ## data.label
 
-The data model
+Help understand the data model
 
 ## data.heading
 
@@ -92,7 +100,7 @@ Data models are tricky
 
 ## data.body
 
-The data model is what bites us in the butt later, so our tooling should show us the changes to entities, fields and relationships before we merge.
+A flaw in the data model layer is what bites us in the butt later, so our PR review tools should show us the changes to entities, fields and relationships before we merge.
 
 ## data.shot.alt
 
@@ -108,4 +116,10 @@ I'm playing around with this concept to get me up to speed quickly when a change
 
 I'd love your take: would this help you judge a change? What would you still need before you'd merge?
 
+## cta.download
 
+Download for Mac
+
+## cta.star
+
+Star on GitHub

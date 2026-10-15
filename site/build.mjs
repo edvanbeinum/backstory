@@ -131,9 +131,12 @@ if (errors.length > 0) {
   process.exit(1);
 }
 
-// Inline every screenshot as a data URI, because the artifact viewer serves
-// the page where its relative img/ paths don't resolve.
-const sources = [...new Set(filled.match(/img\/[\w-]+\.png/g) ?? [])];
+// Inline every image, the favicons too, as a data URI, because the artifact
+// viewer serves the page where its relative img/ paths don't resolve, and
+// Pages publishes only index.html.
+const types = { png: "image/png", svg: "image/svg+xml" };
+const asset = /(src|href)="(img\/[\w/-]+\.(png|svg))"/g;
+const sources = [...new Set([...filled.matchAll(asset)].map((m) => m[2]))];
 const images = new Map(
   await Promise.all(
     sources.map(async (src) => [
@@ -143,8 +146,9 @@ const images = new Map(
   ),
 );
 const out = filled.replace(
-  /src="(img\/[\w-]+\.png)"/g,
-  (_, src) => `src="data:image/png;base64,${images.get(src)}"`,
+  asset,
+  (_, attr, src, ext) =>
+    `${attr}="data:${types[ext]};base64,${images.get(src)}"`,
 );
 
 await mkdir(path.join(dir, "dist"), { recursive: true });
