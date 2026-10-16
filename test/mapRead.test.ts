@@ -665,6 +665,21 @@ test("main's read writes trunk.json, and isn't started again after it fails", as
   assert.equal(await readMain(other.root, recorder().runner), false);
 });
 
+test("main's read starts again when the map trunk.json points at is gone", async () => {
+  const repo = mainRepo();
+  assert.equal(await readMain(repo.root, recorder().runner), true);
+  rmSync(
+    path.join(
+      await mapsFolder(repo.root),
+      `${(await trunk(repo.root)).tree}.json`,
+    ),
+  );
+  const ai = recorder();
+  assert.equal(await readMain(repo.root, ai.runner), true);
+  assert.deepEqual(ai.calls, ["full"]);
+  assert.equal((await mapFile(repo.root, repo.tree(repo.main))).from, null);
+});
+
 test("main's read doesn't start without a ready provider", async () => {
   const repo = mainRepo();
   const ai = recorder();

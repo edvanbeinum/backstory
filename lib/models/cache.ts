@@ -548,7 +548,7 @@ async function trunkToRead(
   status?: () => Promise<ProviderStatus>,
 ): Promise<string | null> {
   const tip = await mainTip(root);
-  if (!tip || (await readJson<Trunk>(trunkPath(dir)))) return null;
+  if (!tip || (await savedTrunk(dir))) return null;
   if (await mapRefusal(root, tip)) return null;
   if (providerGap(await (status ?? aiProvider().status)())) return null;
   return tip;
@@ -586,7 +586,7 @@ export async function startMapTrunkRead(
     const started = Date.now();
     try {
       // A view's read queued ahead of this one may have saved main's map.
-      if (await readJson<Trunk>(trunkPath(dir))) return;
+      if (await savedTrunk(dir)) return;
       const t = await tree(root, at);
       await mapAt(c, { tree: t, rev: at }, null, { full: PHASES.firstMain });
       await writeJson(trunkPath(dir), { tree: t, commit: at });
