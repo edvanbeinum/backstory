@@ -379,8 +379,11 @@ export function readSql(files: Map<string, string>): DataModel {
       const index = s.match(UNIQUE_INDEX);
       if (index) {
         const { inner, rest } = parenthesised(s, index[0].length - 1);
-        // Postgres and SQLite put WHERE last, so all that follows it is the condition.
-        const where = rest.match(/\bwhere\s+([\s\S]+)$/i)?.[1];
+        // Take what follows WHERE as the condition, up to the WITH (…) or
+        // ON <filegroup> that SQL Server puts after it.
+        const where = rest.match(
+          /\bwhere\s+([\s\S]+?)(?:\s+(?:with\s*\(|on\s)[\s\S]*)?$/i,
+        )?.[1];
         later.push({
           table: qualified(index[1]),
           rule: {

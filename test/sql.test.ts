@@ -212,6 +212,20 @@ CREATE UNIQUE INDEX users_c ON users (c);
   ]);
 });
 
+test("a SQL Server filtered index's condition stops before WITH and ON", () => {
+  const entities = read({
+    "db/schema.sql": `
+CREATE TABLE [dbo].[users] ([email] nvarchar(255), [name] nvarchar(255));
+CREATE UNIQUE INDEX [ux_email] ON [dbo].[users] ([email]) WHERE [email] IS NOT NULL WITH (FILLFACTOR = 80) ON [PRIMARY];
+CREATE UNIQUE INDEX [ux_name] ON [dbo].[users] ([name]) WHERE [name] <> '' ON [PRIMARY];
+`,
+  });
+  assert.deepEqual(entities.get("User")!.constraints, [
+    { kind: "unique", fields: ["email"], condition: "[email] IS NOT NULL" },
+    { kind: "unique", fields: ["name"], condition: "[name] <> ''" },
+  ]);
+});
+
 test("a foreign key keeps the columns it references, wherever it's written", () => {
   const entities = read({
     "db/schema.sql": `
