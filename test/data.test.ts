@@ -1396,6 +1396,14 @@ test("a view queued behind main's read shows main's phase, and fails with it", a
   assert.deepEqual(existsSync(dir) ? readdirSync(dir) : [], []);
 });
 
+test("a failed read of main isn't started again when the repo opens again", async () => {
+  const repo = mainRepo();
+  const failing = recorder({ failures: Infinity });
+  assert.equal(await readMain(repo.root, failing.runner), true);
+  assert.equal(await readMain(repo.root, failing.runner), false);
+  assert.deepEqual(failing.calls, ["head"]);
+});
+
 test("a failed head read keeps the base's model, and Try again reads only the head", async () => {
   const repo = notesRepo();
   const failing = recorder({ failDeltas: true });

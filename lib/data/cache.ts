@@ -586,7 +586,9 @@ async function trunkToRead(
 /**
  * Starts reading main's model in full, when the repo has no saved main model,
  * no data reader reads it at main, and the provider is ready. True when a
- * read was queued.
+ * read was queued. Not after this read failed: every repo open asks, and a
+ * read can fail after it's been paid for. A view's read in full of a base on
+ * main, or Redraft, makes main's model instead.
  */
 export async function startTrunkRead(
   root: string,
@@ -594,11 +596,9 @@ export async function startTrunkRead(
 ): Promise<boolean> {
   const dir = await dataDir(root);
   const key = trunkKey(dir);
-  if (registry.jobs.has(key)) return false;
+  if (registry.jobs.has(key) || registry.ended.get(key)?.status === "failed")
+    return false;
   const { job, release } = claim(key);
-  // Clear the last read's end as soon as the key is claimed: a view queued
-  // behind this claim would otherwise fail with that older error.
-  registry.ended.delete(key);
 
   let ready: { tip: string; files: string[] | null } | null = null;
   try {
