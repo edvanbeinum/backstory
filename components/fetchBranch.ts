@@ -12,10 +12,10 @@ export async function requestFetch(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ repo, branch, base }),
   });
-  const data = (await response.json()) as FetchResult | ApiError;
   if (!response.ok) {
-    const err = data as ApiError;
+    const err = (await response.json().catch(() => null)) as ApiError | null;
+    if (!err) throw new Error(`Backstory answered ${response.status}.`);
     throw new Error(err.detail ? `${err.error} ${err.detail}` : err.error);
   }
-  return data as FetchResult;
+  return (await response.json()) as FetchResult;
 }
