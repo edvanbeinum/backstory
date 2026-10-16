@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { WORKING_REV } from "../lib/constants";
-import { getNotes } from "../lib/notes";
+import { changeNotes, getNotes } from "../lib/notes";
 import { getOutbox } from "../lib/outbox";
 import { getAllResponses, getResponses } from "../lib/responses";
 import { db, transaction } from "../lib/store";
@@ -248,4 +248,49 @@ test("a home with only responses.json imports it, and the other tables are empty
     assert.equal(count(table), 0, table);
   }
   assert.ok(existsSync(path.join(home, "responses.json.migrated")));
+});
+
+test("a time too large to read back is refused, and a fractional one is kept", async () => {
+  const home = tempHome();
+  writeJson(home, "notes", {
+    "/repo": { n1: NOTE, n2: { ...NOTE, id: "n2", createdAt: 2 ** 60 } },
+  });
+  writeJson(home, "outbox", {
+    "/repo": { r1: ROUND, r2: { ...ROUND, queuedAt: 2 ** 60 } },
+  });
+  writeJson(home, "responses", {
+    "o/r#1": { t1: { done: true, doneAt: 1786114704182.595 } },
+  });
+
+  assert.deepEqual(
+    (await getNotes("/repo")).map((n) => n.id),
+    ["n1"],
+  );
+  assert.deepEqual(
+    (await getOutbox("/repo")).rounds.map((r) => r.id),
+    ["r1"],
+  );
+  assert.equal((await getResponses("o/r#1")).t1.doneAt, 1786114704182.595);
+
+  await assert.rejects(
+    changeNotes("/repo", {
+      op: "save",
+      note: {
+        ...NOTE,
+        id: "n3",
+        sentAt: null,
+        done: false,
+        createdAt: 2 ** 60,
+      },
+    }),
+    /Invalid note/,
+  );
+  await assert.rejects(
+    changeNotes("/repo", { op: "send", ids: ["n1"], at: 2 ** 60 }),
+    /Invalid send time/,
+  );
+  assert.deepEqual(
+    (await getNotes("/repo")).map((n) => n.id),
+    ["n1"],
+  );
 });

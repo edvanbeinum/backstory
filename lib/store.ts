@@ -145,6 +145,14 @@ export function db(): DatabaseSync {
 /** A JSON store file as it was: `namespace -> key -> record`, unchecked. */
 export type Legacy = Record<string, Record<string, unknown>>;
 
+/**
+ * A time in ms, within 2^53 either way: `node:sqlite` throws when it reads back
+ * a larger whole number, and that row would then fail every read of its table.
+ * A fraction is stored as REAL and reads back as it went in.
+ */
+export const isTime = (value: unknown): value is number =>
+  typeof value === "number" && Math.abs(value) <= Number.MAX_SAFE_INTEGER;
+
 /** A JSON object, as opposed to an array, null or a scalar. */
 export const isObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);

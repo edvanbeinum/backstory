@@ -1,7 +1,14 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import { BRANCH_REV, WORKING_REV } from "./constants";
-import { isObject, KEY, reading, transaction, type Legacy } from "./store";
+import {
+  isObject,
+  isTime,
+  KEY,
+  reading,
+  transaction,
+  type Legacy,
+} from "./store";
 import type { Note } from "./types";
 
 /**
@@ -19,7 +26,7 @@ const MAX_BODY = 20_000;
 const MAX_QUOTE = 2_000;
 const MAX_PATH = 1_000;
 
-const isTime = (value: unknown) => value === null || typeof value === "number";
+const isTimeOrNull = (value: unknown) => value === null || isTime(value);
 
 const isRev = (value: unknown) =>
   value === WORKING_REV ||
@@ -41,15 +48,16 @@ function isStoredNote(value: unknown): value is Note {
     (n.path === null ||
       (typeof n.path === "string" && n.path.length <= MAX_PATH)) &&
     (n.side === "old" || n.side === "new") &&
-    (n.line === null || (Number.isInteger(n.line) && (n.line as number) > 0)) &&
+    (n.line === null ||
+      (Number.isSafeInteger(n.line) && (n.line as number) > 0)) &&
     (n.quote === null ||
       (typeof n.quote === "string" && n.quote.length <= MAX_QUOTE)) &&
     typeof n.body === "string" &&
     n.body.length <= MAX_BODY &&
-    typeof n.createdAt === "number" &&
-    (n.sentAt === undefined || isTime(n.sentAt)) &&
+    isTime(n.createdAt) &&
+    (n.sentAt === undefined || isTimeOrNull(n.sentAt)) &&
     (n.done === undefined || typeof n.done === "boolean") &&
-    (n.doneAt === undefined || isTime(n.doneAt))
+    (n.doneAt === undefined || isTimeOrNull(n.doneAt))
   );
 }
 
@@ -166,7 +174,7 @@ export function parseChange(body: unknown): NotesChange {
     case "send":
       if (!Array.isArray(b.ids) || !b.ids.every(isId))
         throw new Error("Invalid note id");
-      if (typeof b.at !== "number") throw new Error("Invalid send time");
+      if (!isTime(b.at)) throw new Error("Invalid send time");
       return { op: "send", ids: b.ids, at: b.at };
     case "unsend":
       if (!Array.isArray(b.ids) || !b.ids.every(isId))

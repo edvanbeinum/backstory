@@ -3,7 +3,14 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 import { writeNotes } from "./notes";
-import { isObject, KEY, reading, transaction, type Legacy } from "./store";
+import {
+  isObject,
+  isTime,
+  KEY,
+  reading,
+  transaction,
+  type Legacy,
+} from "./store";
 import type { Note } from "./types";
 
 /**
@@ -436,14 +443,12 @@ export function formatTaken(rounds: OutboxRound[]): string {
 
 /* --- Import from outbox.json ----------------------------------------- */
 
-const isTime = (value: unknown) => value === null || typeof value === "number";
+const isTimeOrNull = (value: unknown) => value === null || isTime(value);
 
 const isClaim = (value: unknown) =>
   value === undefined ||
   value === null ||
-  (isObject(value) &&
-    isSessionId(value.session) &&
-    typeof value.until === "number");
+  (isObject(value) && isSessionId(value.session) && isTime(value.until));
 
 function isRound(value: unknown): value is Omit<
   OutboxRound,
@@ -457,9 +462,9 @@ function isRound(value: unknown): value is Omit<
     value.noteIds.every((id) => typeof id === "string" && KEY.test(id)) &&
     typeof value.message === "string" &&
     value.message.length <= MAX_MESSAGE &&
-    typeof value.queuedAt === "number" &&
+    isTime(value.queuedAt) &&
     (value.forSession === null || isSessionId(value.forSession)) &&
-    isTime(value.deliveredAt) &&
+    isTimeOrNull(value.deliveredAt) &&
     (value.deliveredTo === null || typeof value.deliveredTo === "string") &&
     isClaim(value.claim)
   );
@@ -468,7 +473,7 @@ function isRound(value: unknown): value is Omit<
 function isSeen(value: unknown): value is Record<string, number> {
   if (!isObject(value)) return false;
   return Object.entries(value).every(
-    ([session, at]) => isSessionId(session) && typeof at === "number",
+    ([session, at]) => isSessionId(session) && isTime(at),
   );
 }
 

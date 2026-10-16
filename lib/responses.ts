@@ -1,6 +1,13 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { isObject, KEY, reading, transaction, type Legacy } from "./store";
+import {
+  isObject,
+  isTime,
+  KEY,
+  reading,
+  transaction,
+  type Legacy,
+} from "./store";
 
 /**
  * Everything you've done about one review comment, in one record: the
@@ -287,7 +294,7 @@ function normalize(value: Record<string, unknown>): ResponseRecord {
 
   return {
     done: value.done === true,
-    doneAt: typeof value.doneAt === "number" ? value.doneAt : null,
+    doneAt: isTime(value.doneAt) ? value.doneAt : null,
     reply,
     commits: onePerSha(commits),
   };
