@@ -94,7 +94,8 @@ function missingOnOrigin(err: unknown, branch: string): boolean {
 /**
  * Fetches `branch` and `base` together, and `branch` alone when origin no
  * longer has `base`, trying each credential in turn. Throws git's error from
- * the last attempt, which names the real cause.
+ * the last attempt, which names the real cause, or from the first attempt that
+ * found origin without `branch`.
  */
 async function fetchFromOrigin(
   root: string,
@@ -116,14 +117,18 @@ async function fetchFromOrigin(
       return;
     } catch (err) {
       last = err;
-      if (!base || !missingOnOrigin(err, base)) continue;
     }
-    try {
-      await attempt(env, [branch]);
-      return;
-    } catch (err) {
-      last = err;
+    if (base && missingOnOrigin(last, base)) {
+      try {
+        await attempt(env, [branch]);
+        return;
+      } catch (err) {
+        last = err;
+      }
     }
+    // Stops once origin has answered that the branch isn't there, so the
+    // next attempt's sign-in error can't replace that answer.
+    if (missingOnOrigin(last, branch)) break;
   }
   throw last;
 }
