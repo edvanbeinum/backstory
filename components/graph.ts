@@ -137,28 +137,39 @@ function descend(
   around: Around | undefined,
   flip: 1 | -1,
 ) {
-  const inWay = (around?.boxes ?? [])
-    .map((c) => (flip === 1 ? c : { ...c, y: -(c.y + c.h) }))
+  const boxes = (around?.boxes ?? []).map((c) =>
+    flip === 1 ? c : { ...c, y: -(c.y + c.h) },
+  );
+  const inWay = boxes
     .filter((c) => c.y >= y1 && c.y + c.h <= y2)
     .sort((p, q) => p.y - q.y);
   const clearance = around?.clearance ?? 0;
   const at = (x: number, y: number) => `${x} ${flip * y}`;
-  // Bend in the gap just above `top`, below every box in the way that ends
-  // above it, so a curve never crosses a box the run has already passed.
-  const gapTop = (top: number) =>
-    Math.max(
-      y1,
-      ...inWay.map((c) => c.y + c.h).filter((bottom) => bottom <= top),
-    );
 
   let x = ax;
   let y = y1;
   let d = `M${at(ax, y1)}`;
+  // Bend in the gap just above `top`, clear of every box the curve sweeps
+  // across: below those ending above it and above those starting in it. A
+  // taller card beside either end reaches into that gap, so the bend can't
+  // be measured from the end's own box.
   const curve = (nx: number, top: number, end: number) => {
-    const from = gapTop(top);
+    const across = boxes.filter(
+      (c) => c.x < Math.max(x, nx) && c.x + c.w > Math.min(x, nx),
+    );
+    const from = Math.max(
+      y1,
+      ...inWay.map((c) => c.y + c.h).filter((bottom) => bottom <= top),
+      ...across.map((c) => c.y + c.h).filter((bottom) => bottom <= top),
+    );
+    const to = Math.min(
+      top,
+      ...across.map((c) => c.y).filter((t) => t >= from),
+    );
     if (from > y) d += ` L${at(x, from)}`;
-    const mid = (from + top) / 2;
-    d += ` C${at(x, mid)} ${at(nx, mid)} ${at(nx, end)}`;
+    const mid = (from + to) / 2;
+    d += ` C${at(x, mid)} ${at(nx, mid)} ${at(nx, Math.min(to, end))}`;
+    if (end > to) d += ` L${at(nx, end)}`;
     x = nx;
     return mid;
   };

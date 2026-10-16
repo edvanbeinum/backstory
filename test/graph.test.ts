@@ -173,6 +173,20 @@ test("an upward arrow steps around the card between too", () => {
   assert.ok(ly > b.y + b.h && ly < mid.y);
 });
 
+test("a bend stays clear of a taller card beside either end", () => {
+  const top = box(100, 0, 200, 36);
+  const tall = box(322, 0, 200, 300);
+  const mid = box(150, 364, 200, 60);
+  const low = box(400, 488, 200, 60);
+  const boxes = [top, tall, mid, low];
+  const down = edgePath(top, low, 0, 1, 0, 1, { boxes, clearance: 11 });
+  assert.deepEqual(runs(down.d), [200, 361]);
+  assertClear(down.d, boxes);
+  const up = edgePath(low, top, 0, 1, 0, 1, { boxes, clearance: 11 });
+  assertClear(up.d, boxes);
+  for (const b of boxes) assert.ok(!inside(up.lx, up.ly, b));
+});
+
 test("an arrow within one row loops underneath as before", () => {
   const a = box(0, 0);
   const b = box(300, 0);
