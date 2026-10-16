@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import { BRANCH_REV, WORKING_REV } from "./constants";
-import { KEY, reading, transaction, type Legacy } from "./store";
+import { isObject, KEY, reading, transaction, type Legacy } from "./store";
 import type { Note } from "./types";
 
 /**
@@ -33,8 +33,8 @@ const isRev = (value: unknown) =>
  * go.
  */
 function isStoredNote(value: unknown): value is Note {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const n = value as Record<string, unknown>;
+  if (!isObject(value)) return false;
+  const n = value;
   return (
     typeof n.id === "string" &&
     (n.rev === undefined || isRev(n.rev)) &&
