@@ -1,5 +1,11 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmdirSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -293,4 +299,21 @@ test("a time too large to read back is refused, and a fractional one is kept", a
     (await getNotes("/repo")).map((n) => n.id),
     ["n1"],
   );
+});
+
+test("a JSON file that can't be read stops the open, and the next start imports it", async () => {
+  const home = tempHome();
+  // A directory where notes.json should be fails the read with EISDIR.
+  mkdirSync(path.join(home, "notes.json"));
+  writeJson(home, "responses", { "o/r#1": { t1: { done: true, doneAt: 1 } } });
+
+  assert.throws(() => db(), /EISDIR/);
+  assert.deepEqual(await getNotes("/repo"), []);
+  assert.ok(existsSync(path.join(home, "responses.json")));
+
+  rmdirSync(path.join(home, "notes.json"));
+  writeJson(home, "notes", { "/repo": { n1: NOTE } });
+  assert.deepEqual(await getNotes("/repo"), [NOTE]);
+  assert.equal((await getResponses("o/r#1")).t1.done, true);
+  assert.ok(existsSync(path.join(home, "notes.json.migrated")));
 });

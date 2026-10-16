@@ -107,13 +107,14 @@ export function db(): DatabaseSync {
   // builtin this new; `getBuiltinModule` is a call they leave alone.
   const { DatabaseSync } = process.getBuiltinModule("node:sqlite");
   const database = new DatabaseSync(file);
-  // A dev server and the Mac app can share a home: WAL lets one read while
-  // the other writes, and the timeout makes a writer wait rather than fail.
-  database.exec("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;");
-
   let imported: string[] = [];
-  database.exec("BEGIN IMMEDIATE");
+  // Close the connection on any failure: `db()` runs again on the next
+  // request, and each failed open would otherwise leave one behind.
   try {
+    // A dev server and the Mac app can share a home: WAL lets one read while
+    // the other writes, and the timeout makes a writer wait rather than fail.
+    database.exec("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;");
+    database.exec("BEGIN IMMEDIATE");
     const { user_version } = database.prepare("PRAGMA user_version").get() as {
       user_version: number;
     };
@@ -124,7 +125,8 @@ export function db(): DatabaseSync {
     }
     database.exec("COMMIT");
   } catch (err) {
-    database.exec("ROLLBACK");
+    // SQLite may already have rolled back, after a full disk or an I/O error.
+    if (database.isTransaction) database.exec("ROLLBACK");
     database.close();
     throw err;
   }
@@ -178,13 +180,18 @@ function importJson(database: DatabaseSync, home: string): string[] {
   return read;
 }
 
-/** Null when the file isn't there; a file that won't parse reads as empty. */
+/**
+ * Null when the file isn't there; a file that won't parse reads as empty.
+ * Any other read error throws, so the database isn't marked imported and the
+ * next start tries again.
+ */
 function readLegacy(file: string): Legacy | null {
   let raw: string;
   try {
     raw = readFileSync(file, "utf8");
-  } catch {
-    return null;
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw err;
   }
   let parsed: unknown;
   try {
