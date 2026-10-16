@@ -45,8 +45,8 @@ import type { DataDraftStatus, DataModel } from "./types";
  * When a view's base is on main and past main's model, the read the base
  * needed anyway is main's drift, and main's model moves to the base. Main is
  * read in full again only when the patch from main's model to a commit on
- * main is past the cap, which reads that commit in full and makes it main's
- * model, or on Redraft. Redraft reads main in full again and removes every
+ * main is past the cap, which reads that commit in full and, when it is past
+ * main's model, makes it main's model, or on Redraft. Redraft reads main in full again and removes every
  * derived model, since an error in main's model is copied into each of them.
  *
  * Reads run one at a time: a full read on a large repo is a few minutes and a
