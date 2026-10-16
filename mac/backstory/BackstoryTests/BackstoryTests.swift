@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import Testing
+import WebKit
 
 @testable import Backstory
 
@@ -428,20 +429,191 @@ struct CommandLineToolTests {
     }
 }
 
+// Run one at a time: each test opens a window, and two at once take focus from
+// each other mid-test.
 @MainActor
+@Suite(.serialized)
 struct FindBarContainerTests {
     @Test func theBarKeepsItsHeightAcrossHideAndShow() {
         let content = NSView()
         let container = FindBarContainer(content: content)
         container.frame = NSRect(x: 0, y: 0, width: 800, height: 600)
         let bar = NSView(frame: NSRect(x: 0, y: 0, width: 0, height: 28))
-        container.findBarView = bar
-        for visible in [true, false, true] {
-            container.isFindBarVisible = visible
+        for _ in 0..<2 {
+            container.findBarView = bar
             container.layout()
+            #expect(container.isFindBarVisible)
             #expect(bar.frame.height == 28)
-            #expect(bar.isHidden == !visible)
-            #expect(content.frame.height == (visible ? 572 : 600))
+            #expect(content.frame.height == 572)
+            container.isFindBarVisible = false
+            container.layout()
+            #expect(container.findBarView == nil)
+            #expect(bar.superview == nil)
+            #expect(bar.frame.height == 28)
+            #expect(content.frame.height == 600)
         }
+    }
+
+    @Test func theBarComesBackOnEveryCmdF() async throws {
+        let find = try await FindWindow()
+        defer { find.close() }
+        for (step, hide) in [("Escape", find.escape), ("Done", find.done)] {
+            find.cmdF()
+            await find.expectBarShown("Cmd-F before \(step)")
+            hide()
+            await find.expectBarHidden(step)
+        }
+        find.cmdF()
+        await find.expectBarShown("Cmd-F after Done")
+    }
+
+    @Test func clickingIntoThePageLeavesTheBarUp() async throws {
+        let find = try await FindWindow()
+        defer { find.close() }
+        find.cmdF()
+        await find.expectBarShown("first Cmd-F")
+        find.window.makeFirstResponder(find.webView)
+        await find.expectBarUp("click into the page")
+        find.cmdF()
+        await find.expectBarShown("Cmd-F after the click")
+    }
+}
+
+/// The find wiring `MainWindowController` builds, in a window of its own, with
+/// a page that has something to find.
+@MainActor
+private final class FindWindow {
+    let window = NSWindow(
+        contentRect: NSRect(x: 0, y: 0, width: 800, height: 600), styleMask: [.titled], backing: .buffered,
+        defer: false)
+    let webView = DropWebView(frame: .zero, configuration: WKWebViewConfiguration())
+    let page: FindBarContainer
+    let textFinder = NSTextFinder()
+    private let loading = PageLoad()
+
+    init() async throws {
+        page = FindBarContainer(content: webView)
+        textFinder.client = webView
+        textFinder.findBarContainer = page
+        textFinder.isIncrementalSearchingEnabled = true
+        webView.textFinder = textFinder
+        window.isReleasedWhenClosed = false
+        window.contentView = page
+        window.makeKeyAndOrderFront(nil)
+        try await loading.load("<p>apple pear apple plum apple</p>", into: webView)
+        window.makeFirstResponder(webView)
+    }
+
+    func close() {
+        window.close()
+    }
+
+    // Sends Find the way the menu item does: its tag is the finder action, and
+    // it travels the responder chain from whatever has focus.
+    func cmdF() {
+        let item = NSMenuItem(title: "Find…", action: #selector(NSResponder.performTextFinderAction(_:)), keyEquivalent: "f")
+        item.tag = NSTextFinder.Action.showFindInterface.rawValue
+        window.firstResponder?.tryToPerform(#selector(NSResponder.performTextFinderAction(_:)), with: item)
+    }
+
+    // Sends the command the Escape key turns into, to the search field's field
+    // editor, which asks its delegate before anyone else.
+    func escape() {
+        window.firstResponder?.doCommand(by: #selector(NSResponder.cancelOperation(_:)))
+    }
+
+    func done() {
+        textFinder.performAction(.hideFindInterface)
+    }
+
+    private var bar: NSView? { page.findBarView }
+    private var lastShownBar: NSView?
+
+    private var focusIsInBar: Bool {
+        guard let bar = bar ?? lastShownBar, let focus = window.firstResponder as? NSView else { return false }
+        return focus.isDescendant(of: bar)
+    }
+
+    private var barIsUp: Bool {
+        page.layoutSubtreeIfNeeded()
+        guard page.isFindBarVisible, let bar else { return false }
+        return bar.superview === page && !bar.isHiddenOrHasHiddenAncestor && bar.frame.height > 0
+            && bar.frame.maxY == page.bounds.height
+            && webView.frame.height == page.bounds.height - bar.frame.height
+    }
+
+    private var barIsDown: Bool {
+        page.layoutSubtreeIfNeeded()
+        return !page.isFindBarVisible && (bar == nil || bar?.isHiddenOrHasHiddenAncestor == true)
+            && webView.frame.height == page.bounds.height && !focusIsInBar
+    }
+
+    // Polls rather than sleeping a fixed time, because the finder finishes
+    // part of each action on a later turn of the run loop.
+    private func settle(until condition: () -> Bool) async {
+        let deadline = ContinuousClock.now + .seconds(2)
+        while !condition(), ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+    }
+
+    func expectBarUp(_ step: String, sourceLocation: SourceLocation = #_sourceLocation) async {
+        await settle { barIsUp }
+        #expect(page.isFindBarVisible, "\(step): container shows the bar", sourceLocation: sourceLocation)
+        guard let bar else {
+            Issue.record("\(step): no find bar", sourceLocation: sourceLocation)
+            return
+        }
+        #expect(bar.superview === page, "\(step): bar in the container", sourceLocation: sourceLocation)
+        #expect(!bar.isHiddenOrHasHiddenAncestor, "\(step): bar not hidden", sourceLocation: sourceLocation)
+        #expect(bar.frame.height > 0, "\(step): bar has height", sourceLocation: sourceLocation)
+        #expect(bar.frame.maxY == page.bounds.height, "\(step): bar at the top", sourceLocation: sourceLocation)
+        #expect(
+            webView.frame.height == page.bounds.height - bar.frame.height, "\(step): page makes room",
+            sourceLocation: sourceLocation)
+    }
+
+    func expectBarShown(_ step: String, sourceLocation: SourceLocation = #_sourceLocation) async {
+        await settle { barIsUp && focusIsInBar }
+        await expectBarUp(step, sourceLocation: sourceLocation)
+        #expect(
+            focusIsInBar, "\(step): focus in the bar, not \(String(describing: window.firstResponder))",
+            sourceLocation: sourceLocation)
+        lastShownBar = bar
+    }
+
+    func expectBarHidden(_ step: String, sourceLocation: SourceLocation = #_sourceLocation) async {
+        await settle { barIsDown }
+        #expect(!page.isFindBarVisible, "\(step): container hides the bar", sourceLocation: sourceLocation)
+        #expect(
+            bar == nil || bar?.isHiddenOrHasHiddenAncestor == true, "\(step): bar hidden",
+            sourceLocation: sourceLocation)
+        #expect(webView.frame.height == page.bounds.height, "\(step): page has its height back", sourceLocation: sourceLocation)
+        #expect(
+            !focusIsInBar, "\(step): focus left the bar, still \(String(describing: window.firstResponder))",
+            sourceLocation: sourceLocation)
+    }
+}
+
+@MainActor
+private final class PageLoad: NSObject, WKNavigationDelegate {
+    private var finished: CheckedContinuation<Void, Error>?
+
+    func load(_ html: String, into webView: WKWebView) async throws {
+        webView.navigationDelegate = self
+        try await withCheckedThrowingContinuation { continuation in
+            finished = continuation
+            webView.loadHTMLString(html, baseURL: nil)
+        }
+    }
+
+    func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+        finished?.resume()
+        finished = nil
+    }
+
+    func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        finished?.resume(throwing: error)
+        finished = nil
     }
 }
