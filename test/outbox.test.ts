@@ -83,7 +83,10 @@ test("sessions in other checkouts don't count as seen here", async () => {
 test("a queued round survives a restart", async () => {
   useTempHome();
   await take(ROOT, "s-1");
-  const { round: queued } = await sendRound(ROOT, round(["n1", "n2"], "the notes"));
+  const { round: queued } = await sendRound(
+    ROOT,
+    round(["n1", "n2"], "the notes"),
+  );
   // Nothing is held in memory: a fresh read of the database is all a new server has.
   const { rounds, lastSeen } = await getOutbox(ROOT);
   assert.equal(lastSeen?.session, "s-1");
@@ -253,4 +256,14 @@ test("bad ids are refused", async () => {
   useTempHome();
   assert.throws(() => take(ROOT, "not a session"), /Invalid session/);
   assert.throws(() => sendRound(ROOT, round(["../x"])), /Invalid note/);
+});
+
+test("re-aiming a round keeps its place among rounds sent in the same millisecond", async () => {
+  useTempHome();
+  const { round: first } = await sendRound(ROOT, round(["n1"], "first", 1));
+  await sendRound(ROOT, round(["n2"], "second", 1));
+  await retarget(ROOT, first.id, null);
+  await requeue(ROOT, first.id);
+  const text = formatTaken(await take(ROOT, "s-1"));
+  assert.ok(text.indexOf("first") < text.indexOf("second"));
 });

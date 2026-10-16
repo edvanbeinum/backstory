@@ -105,7 +105,7 @@ function toRound(row: RoundRow): OutboxRound {
 function insertRound(database: DatabaseSync, round: OutboxRound): void {
   database
     .prepare(
-      `INSERT OR REPLACE INTO rounds
+      `INSERT INTO rounds
          (root, id, note_ids, message, queued_at, for_session, delivered_at,
           delivered_to, claim_session, claim_until)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -364,8 +364,10 @@ export function retarget(
     const round = getRound(database, root, id);
     if (!round || round.deliveredAt !== null)
       return { result: null, changed: false };
+    database
+      .prepare("UPDATE rounds SET for_session = ? WHERE root = ? AND id = ?")
+      .run(forSession, root, id);
     round.forSession = forSession;
-    insertRound(database, round);
     return { result: round, changed: true };
   });
 }
@@ -404,7 +406,12 @@ export function requeue(root: string, id: string): Promise<OutboxRound | null> {
     round.deliveredAt = null;
     round.deliveredTo = null;
     round.forSession = lastSeen(database, root)?.session ?? null;
-    insertRound(database, round);
+    database
+      .prepare(
+        `UPDATE rounds SET delivered_at = NULL, delivered_to = NULL, for_session = ?
+         WHERE root = ? AND id = ?`,
+      )
+      .run(round.forSession, root, id);
     return { result: round, changed: true };
   });
 }
