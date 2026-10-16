@@ -10,7 +10,14 @@ import {
 } from "../ai/provider";
 import { git, gitLine } from "../exec";
 import { withSnapshot } from "../flows/generate";
-import { DRAFTED_PROPERTY, localModelDir, MODEL_DSL, showFile } from "../model";
+import {
+  DRAFTED_PROPERTY,
+  exists,
+  localModelDir,
+  localModelFile,
+  MODEL_DSL,
+  showFile,
+} from "../model";
 import { assignIds, serializeModel, type DraftIds } from "./dsl";
 import { checkGlobs, type GlobCheck } from "./globs";
 import {
@@ -25,7 +32,7 @@ import {
 /**
  * Drafting a C4 model for a repo that has none: Claude reads the code at
  * HEAD and Backstory writes the result to the local model file the map
- * already reads, `~/.backstory/models/<repo>/workspace.dsl`. Never into the
+ * already reads, `~/.backstory/models/<repo key>/workspace.dsl`. Never into the
  * repo.
  *
  * One job per repo, in memory on globalThis, as `lib/flows/cache.ts` keeps
@@ -55,7 +62,7 @@ export type DraftStatus =
 /** What `/api/model` answers: where the repo's model at HEAD comes from */
 export interface ModelSourceResponse {
   source: "committed" | "local" | "none";
-  /** The local model's path, when there is one */
+  /** The local model's path, or where a draft would write it; null for a committed one */
   file: string | null;
   job: DraftStatus;
 }
@@ -221,12 +228,6 @@ interface Job {
 const g = globalThis as { __backstoryModels?: Map<string, Job> };
 const jobs: Map<string, Job> = (g.__backstoryModels ??= new Map());
 
-const exists = (file: string) =>
-  fs.access(file).then(
-    () => true,
-    () => false,
-  );
-
 /**
  * Writes through a temp file and a rename, so the map never reads half a
  * model. The old model is copied to `.bak` only now, just before it's
@@ -302,7 +303,8 @@ export async function startDraft(
       release();
       return { status: "refused", reason: "committed" };
     }
-    if (!opts.redraft && (await exists(path.join(dir, "workspace.dsl")))) {
+    const file = await localModelFile(root);
+    if (!opts.redraft && (await exists(file))) {
       release();
       return { status: "refused", reason: "exists" };
     }

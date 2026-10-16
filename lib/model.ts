@@ -4,7 +4,8 @@ import path from "node:path";
 import picomatch from "picomatch";
 
 import { DslError, readDsl } from "./dsl";
-import { gitLine, gitTry } from "./exec";
+import { gitTry } from "./exec";
+import { gitCommonDir, repoKey, repoKeyOf } from "./git";
 import { homeDir } from "./store";
 
 /**
@@ -154,22 +155,56 @@ export async function showFile(
 
 /**
  * A model kept on this machine for a repo that doesn't commit one:
- * `~/.backstory/models/<repo>/workspace.dsl`, named after the main checkout's
- * folder so every worktree finds it. One model for every commit, so it can
- * say where a change landed but not what it added or removed.
+ * `~/.backstory/models/<repo key>/workspace.dsl`, so every worktree of a repo
+ * finds it and two repos whose checkouts share a folder name don't. One model
+ * for every commit, so it can say where a change landed but not what it
+ * added or removed.
  */
 export async function localModelDir(root: string): Promise<string> {
-  const common =
-    (await gitLine(root, [
-      "rev-parse",
-      "--path-format=absolute",
-      "--git-common-dir",
-    ])) ?? path.join(root, ".git");
-  return path.join(homeDir(), "models", path.basename(path.dirname(common)));
+  return path.join(homeDir(), "models", await repoKey(root));
 }
 
-export const localModelFile = async (root: string) =>
-  path.join(await localModelDir(root), "workspace.dsl");
+export const exists = (file: string) =>
+  fs.access(file).then(
+    () => true,
+    () => false,
+  );
+
+function unlessMissing(err: NodeJS.ErrnoException) {
+  if (err.code !== "ENOENT") throw err;
+}
+
+/**
+ * Returns the local model's file. Moves a model still in the folder named
+ * after the main checkout alone, `~/.backstory/models/<folder>/`, the first
+ * time it's looked for, rather than reading it there: read in place, two
+ * repos with that folder name would go on sharing it, and a Draft wouldn't
+ * see it.
+ * Ignores a file that's gone mid-move, so two reads moving it at once don't
+ * throw.
+ */
+export async function localModelFile(root: string): Promise<string> {
+  const common = await gitCommonDir(root);
+  const dir = path.join(homeDir(), "models", repoKeyOf(common));
+  const file = path.join(dir, "workspace.dsl");
+  if (await exists(file)) return file;
+  const old = path.join(
+    homeDir(),
+    "models",
+    path.basename(path.dirname(common)),
+  );
+  if (!(await exists(path.join(old, "workspace.dsl")))) return file;
+  await fs.mkdir(dir, { recursive: true });
+  for (const name of ["workspace.dsl", "workspace.dsl.bak"]) {
+    await fs
+      .rename(path.join(old, name), path.join(dir, name))
+      .catch(unlessMissing);
+  }
+  await fs.rmdir(old).catch((err: NodeJS.ErrnoException) => {
+    if (err.code !== "ENOTEMPTY" && err.code !== "EEXIST") unlessMissing(err);
+  });
+  return file;
+}
 
 /**
  * The workspace property a drafted model carries, with the day it was

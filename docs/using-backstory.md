@@ -74,8 +74,14 @@ before reading its lines:
   touched, added or removed. It reads `architecture/workspace.dsl`, a
   [Structurizr](https://docs.structurizr.com) model, from the repo at the
   change's base and head. A repo that doesn't commit a model can keep one at
-  `~/.backstory/models/<repo>/workspace.dsl`; it shows which components a change
-  touched, but not what it added or removed. With no model at all, **Draft a
+  `~/.backstory/models/<folder>-<hash>/workspace.dsl`, where `<folder>` is the
+  main checkout's folder and `<hash>` is 8 characters that tell apart repos
+  with the same folder name; every worktree of the repo reads it, and the map
+  strip shows its path, or where it goes when there isn't one yet. The hash
+  comes from where the checkout is on disk, so after you move or rename the
+  checkout, rename its folder under `~/.backstory/models/` to the one the map
+  strip shows. It shows which components a change touched,
+  but not what it added or removed. With no model at all, **Draft a
   model** in the map strip has Claude Code read the code at HEAD and write one
   there, never into the repo: a draft, marked as one, for you to correct.
 - **The data model** shows the entities the change touched: new fields,

@@ -6,6 +6,7 @@ import path from "node:path";
 import { after, test } from "node:test";
 
 import { buildMap, type MapResponse } from "../lib/map";
+import { localModelFile } from "../lib/model";
 
 const dirs: string[] = [];
 after(() => {
@@ -198,24 +199,18 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
   const home = tempDir("backstory-home-");
   const base = repo.commit({ README: "x\n" }, "base");
   const head = repo.commit({ "src/a/one.ts": "1\n" }, "head");
-  write(
-    path.join(home, "models", path.basename(repo.dir)),
-    "workspace.dsl",
-    dsl(BASE),
-  );
 
   const previousHome = process.env.BACKSTORY_HOME;
   process.env.BACKSTORY_HOME = home;
   try {
+    const file = await localModelFile(repo.dir);
+    write(path.dirname(file), "workspace.dsl", dsl(BASE));
     const map = await buildMap(repo.dir, base, head);
     assert.equal(map.status, "ok");
     assert.equal(map.local, true);
     assert.equal(map.baseModel, false);
     assert.equal(map.fileComponents["src/a/one.ts"], "Alpha");
-    assert.equal(
-      map.modelFile,
-      path.join(home, "models", path.basename(repo.dir), "workspace.dsl"),
-    );
+    assert.equal(map.modelFile, file);
     assert.equal(map.drafted, null);
   } finally {
     // Restore npm test's throwaway BACKSTORY_HOME so later tests can use it.
@@ -229,17 +224,12 @@ test("a drafted local model says so and where it is; a committed one says neithe
   const home = tempDir("backstory-home-");
   const base = repo.commit({ README: "x\n" }, "base");
   const head = repo.commit({ "src/a/one.ts": "1\n" }, "head");
-  const file = path.join(
-    home,
-    "models",
-    path.basename(repo.dir),
-    "workspace.dsl",
-  );
-  write(path.dirname(file), "workspace.dsl", draftedDsl("backstory.drafted"));
 
   const previousHome = process.env.BACKSTORY_HOME;
   process.env.BACKSTORY_HOME = home;
   try {
+    const file = await localModelFile(repo.dir);
+    write(path.dirname(file), "workspace.dsl", draftedDsl("backstory.drafted"));
     const map = await buildMap(repo.dir, base, head);
     assert.equal(map.drafted, "2026-10-05");
     assert.equal(map.modelFile, file);

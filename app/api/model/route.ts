@@ -1,10 +1,8 @@
-import { promises as fs } from "node:fs";
-
 import { NextResponse } from "next/server";
 
 import { crossSite, errorResponse } from "@/lib/api";
 import { resolveRepo } from "@/lib/git";
-import { localModelFile, MODEL_DSL, showFile } from "@/lib/model";
+import { exists, localModelFile, MODEL_DSL, showFile } from "@/lib/model";
 import {
   draftStatus,
   startDraft,
@@ -35,11 +33,7 @@ async function sourceOf(root: string): Promise<ModelSourceResponse> {
   if ((await showFile(root, "HEAD", MODEL_DSL)) !== null)
     return { source: "committed", file: null, job };
   const file = await localModelFile(root);
-  const local = await fs.access(file).then(
-    () => true,
-    () => false,
-  );
-  return { source: local ? "local" : "none", file: local ? file : null, job };
+  return { source: (await exists(file)) ? "local" : "none", file, job };
 }
 
 export async function GET(request: Request) {

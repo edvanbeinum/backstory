@@ -9,7 +9,7 @@ import {
   type Runner,
 } from "../ai/provider";
 import { gitLine } from "../exec";
-import { repoKey } from "../flows/cache";
+import { repoKey } from "../git";
 import { homeDir } from "../store";
 import {
   deltaPatch,
