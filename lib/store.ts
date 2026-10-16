@@ -90,8 +90,9 @@ const SCHEMA = `
 let open: { file: string; database: DatabaseSync } | null = null;
 
 /**
- * The open database, opened on first use and reopened when `homeDir` moves,
- * so a request that writes nothing never makes the directory.
+ * The open database, opened on first use rather than at import, so a request
+ * that never reaches the store makes nothing on disk; reopened when `homeDir`
+ * moves.
  */
 export function db(): DatabaseSync {
   const home = homeDir();
