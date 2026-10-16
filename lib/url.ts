@@ -168,9 +168,13 @@ export function resolveRev(
    */
   pinned: string[] = [],
 ): RevResolution {
+  // Open on uncommitted work while there is some, as that's what an agent
+  // waiting on review has just written; otherwise on the whole branch.
   const fallback = hasWorkingChanges
     ? WORKING_REV
-    : (commits[0]?.sha ?? WORKING_REV);
+    : hasBranchDiff
+      ? BRANCH_REV
+      : (commits[0]?.sha ?? WORKING_REV);
 
   if (requested === WORKING_REV) {
     return hasWorkingChanges

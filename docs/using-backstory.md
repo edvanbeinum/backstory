@@ -47,8 +47,9 @@ ACME-APP ───────────────────────�
 ```
 
 **The workspace** is one branch. Its header picks the change: the whole branch,
-your uncommitted work, or any one commit on it. Under the header are three tabs,
-as on a pull request, and every change opens on the first:
+your uncommitted work, or any one commit on it. It opens on your uncommitted
+work when there is some, and on the whole branch otherwise. Under the header are
+three tabs, as on a pull request, and every change opens on the first:
 
 - **Story** shows the map at full width, a line under it saying what it shows,
   then each flow as a card. Before a change is traced, one card in place of the

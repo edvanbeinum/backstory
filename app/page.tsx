@@ -441,7 +441,6 @@ export default function Page() {
             const thread = data.github.threads.find((t) => t.id === landedOn);
             const linked = thread?.response.commits.find((c) => !c.missing);
             if (linked) return linked.sha;
-            if (data.branchDiff) return BRANCH_REV;
           }
           return next;
         });

@@ -205,6 +205,21 @@ test("a rev that is no longer unpushed falls back and says so", () => {
   assert.equal(notice, "deadbee", "and reports what was asked for");
 });
 
+test("a clean tree opens on the whole branch when there is one", () => {
+  assert.deepEqual(resolveRev(WORKING_REV, COMMITS, false, true), {
+    rev: "branch",
+    notice: null,
+  });
+  assert.deepEqual(resolveRev(WORKING_REV, COMMITS, true, true), {
+    rev: WORKING_REV,
+    notice: null,
+  });
+  assert.deepEqual(resolveRev("deadbee", COMMITS, false, true), {
+    rev: "branch",
+    notice: "deadbee",
+  });
+});
+
 test("working falls back to a commit when the tree is clean", () => {
   assert.deepEqual(resolveRev(WORKING_REV, COMMITS, false), {
     rev: NEWEST,
