@@ -50,7 +50,10 @@ async function checkBranchName(root: string, name: string): Promise<void> {
  * organisation that hasn't approved Backstory hides its repos from the token
  * but not from the user's git. The token goes in through `GIT_CONFIG_*`
  * rather than `-c`, which would put it in argv, where `ps` shows it, and the
- * key is scoped to github.com so no other host is ever sent it.
+ * key is scoped to github.com so no other host is ever sent it. The attempt
+ * also empties the credential helper list: on a 401, git would otherwise
+ * retry with the helper's credentials under the same header, fail again, and
+ * tell the helper to erase credentials that work.
  */
 export function credentialAttempts(
   remoteUrl: string,
@@ -60,9 +63,11 @@ export function credentialAttempts(
   const basic = Buffer.from(`x-access-token:${token}`).toString("base64");
   return [
     {
-      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_COUNT: "2",
       GIT_CONFIG_KEY_0: `http.${GITHUB_HTTPS}.extraHeader`,
       GIT_CONFIG_VALUE_0: `Authorization: Basic ${basic}`,
+      GIT_CONFIG_KEY_1: "credential.helper",
+      GIT_CONFIG_VALUE_1: "",
     },
     {},
   ];

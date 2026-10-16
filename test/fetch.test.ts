@@ -301,8 +301,10 @@ test("only an https github.com remote with a token gets the token, and only for 
     assert.equal(attempts.length, 2);
     assert.deepEqual(attempts[1], {});
     const [env] = attempts;
-    assert.equal(env.GIT_CONFIG_COUNT, "1");
+    assert.equal(env.GIT_CONFIG_COUNT, "2");
     assert.equal(env.GIT_CONFIG_KEY_0, "http.https://github.com/.extraHeader");
+    assert.equal(env.GIT_CONFIG_KEY_1, "credential.helper");
+    assert.equal(env.GIT_CONFIG_VALUE_1, "");
     const value = env.GIT_CONFIG_VALUE_0 ?? "";
     assert.match(value, /^Authorization: Basic /);
     assert.equal(
@@ -325,6 +327,29 @@ test("only an https github.com remote with a token gets the token, and only for 
   ]) {
     assert.deepEqual(credentialAttempts(url, "gho_abc123"), [{}], url);
   }
+});
+
+test("the token's attempt never reaches the user's credential helper, so a refused token can't make it erase anything", () => {
+  const { mine } = setup();
+  const log = path.join(mine, "..", "helper.log");
+  run(
+    mine,
+    "config",
+    "credential.helper",
+    `!f() { echo "$1" >> '${log}'; }; f`,
+  );
+  const [env] = credentialAttempts("https://github.com/acme/app", "gho_abc123");
+  const ask = (extra: Record<string, string>) =>
+    execFileSync("git", ["credential", "reject"], {
+      cwd: mine,
+      input: "protocol=https\nhost=github.com\nusername=me\npassword=pw\n\n",
+      env: { ...process.env, ...extra },
+    });
+
+  ask(env);
+  assert.equal(existsSync(log), false);
+  ask({});
+  assert.equal(readFileSync(log, "utf8").trim(), "erase");
 });
 
 test("with a token saved, a fetch from a non-GitHub origin never reads it and never puts it in argv", async () => {
