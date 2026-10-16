@@ -900,8 +900,7 @@ tr.note-row td {
   background: var(--accent);
 }
 
-/* The diff's side of the sync: a chip on each anchored line, and the line
-   nearest the reading line lit. */
+/* A flow step on a diff line. */
 .flow-chip {
   display: inline-block;
   margin-left: 10px;
@@ -923,50 +922,6 @@ tr.note-row td {
   border-color: color-mix(in srgb, var(--danger) 45%, transparent);
   color: var(--danger);
 }
-tr.flow-inview td {
-  background: color-mix(
-    in srgb,
-    var(--accent-subtle) 80%,
-    var(--canvas)
-  ) !important;
-}
-tr.line-add.flow-inview td {
-  background: color-mix(
-    in srgb,
-    var(--accent-subtle) 80%,
-    var(--diff-add-bg)
-  ) !important;
-}
-tr.line-del.flow-inview td {
-  background: color-mix(
-    in srgb,
-    var(--accent-subtle) 70%,
-    var(--diff-del-bg)
-  ) !important;
-}
-tr.flow-inview td.diff-num {
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-
-.col-resizer {
-  width: 16px;
-  align-self: stretch;
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  cursor: col-resize;
-  touch-action: none;
-}
-.col-resizer::before {
-  content: "";
-  width: 1px;
-  background: transparent;
-  transition: background-color 120ms ease;
-}
-.col-resizer:hover::before,
-.col-resizer[data-dragging="true"]::before {
-  background: var(--accent);
-}
 
 @media (prefers-reduced-motion: reduce) {
   .flow-row,
@@ -977,59 +932,6 @@ tr.flow-inview td.diff-num {
 
 /* --- The map ----------------------------------------------------------- */
 
-.map-strip {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--canvas);
-}
-.map-strip.quiet {
-  gap: 6px;
-  padding: 8px 12px;
-  background: var(--canvas-subtle);
-}
-.map-thumb {
-  flex-shrink: 0;
-  border-radius: 4px;
-  background-image: radial-gradient(
-    circle,
-    var(--border-muted) 1px,
-    transparent 1.2px
-  );
-  background-size: 8px 8px;
-}
-.map-btn {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--canvas-subtle);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.map-btn:hover {
-  border-color: var(--fg-subtle);
-}
-.map-overlay {
-  position: absolute;
-  left: -1px;
-  right: -1px;
-  top: calc(100% + 6px);
-  z-index: 30;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--canvas);
-  box-shadow: var(--overlay-shadow);
-}
 .map-card {
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1323,7 +1225,7 @@ tr.flow-inview td.diff-num {
   background: var(--canvas-subtle);
 }
 
-/* A file's component, on its header; outlined while its box is hovered. */
+/* A file's component, on its header. */
 .file-owner {
   flex-shrink: 0;
   padding: 0 8px;
@@ -1333,14 +1235,6 @@ tr.flow-inview td.diff-num {
   font-size: 11px;
   line-height: 18px;
   color: var(--fg-muted);
-}
-section.file-linked {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-section.file-linked .file-owner {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 /* Components on a flow: a band over each component's lanes, a line where
@@ -1477,13 +1371,6 @@ tr.step-code-target td.diff-num {
 
 /* --- The data model -------------------------------------------------- */
 
-.data-glyph {
-  display: flex;
-  width: 112px;
-  flex-shrink: 0;
-  justify-content: center;
-  color: var(--fg-subtle);
-}
 .data-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));

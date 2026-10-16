@@ -173,7 +173,7 @@ export default function Page() {
   const onModelChange = useCallback(() => setModelTick((t) => t + 1), []);
   /**
    * Keeps the data with the view it was read for, and shows none while
-   * another view's read is on the way, so the data strip never offers a paid
+   * another view's read is on the way, so the story never offers a paid
    * Redraft for one view beside the model of another.
    */
   const [dataRead, setDataRead] = useState<{

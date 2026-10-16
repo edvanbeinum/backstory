@@ -114,6 +114,12 @@ primitives:
     symbols:
       - withSnapshot
     use: "A commit's tracked files in a temp dir, for Claude to read: none of the worktree's untracked, ignored or uncommitted files."
+  - name: steps on lines
+    block: flow engine
+    file: lib/flows/rows.ts
+    symbols:
+      - stepMarks
+    use: "Every flow's steps by file and line, as `1·7` marks for the diff's gutter."
   - name: read the C4 model
     block: model reader (the map)
     file: lib/model.ts
@@ -145,14 +151,14 @@ primitives:
       - crossSite
     use: Blocks a POST that another website sends to Backstory's local port.
   - name: URL state
-    block: UI columns and panels
+    block: UI tabs
     file: lib/url.ts
     symbols:
       - buildUrl
       - writeUrlState
     use: Builds and writes the page state into the URL, so a view can be shared.
   - name: buttons and copy
-    block: UI columns and panels
+    block: UI tabs
     file: components/ui.tsx
     symbols:
       - Button
@@ -160,13 +166,13 @@ primitives:
       - copyToClipboard
     use: "The shared controls. A `Button` with `href` is a link that opens in a new window, which the Mac app hands to the browser."
   - name: Claude Code notice
-    block: UI columns and panels
+    block: UI tabs
     file: components/ClaudeCodeNotice.tsx
     symbols:
       - ClaudeCodeNotice
-    use: "The one message and button for Claude Code not installed (Get Claude Code) or logged out (Copy: claude). Flows, both strips' drafts and the setup checklist show it, so they never word it differently."
+    use: "The one message and button for Claude Code not installed (Get Claude Code) or logged out (Copy: claude). Flows, the map's and the data model's drafts and the setup checklist show it, so they never word it differently."
   - name: graph layout
-    block: UI columns and panels
+    block: UI tabs
     file: components/graph.ts
     symbols:
       - layeredLayout

@@ -4,7 +4,7 @@ terms:
   - name: Backstory
     means: "The product: the Mac app, the server it runs, the page and the `backstory` command."
   - name: flow
-    means: "What the code does for one user action a change touches: the data, the Flows tab and the feature."
+    means: "What the code does for one user action a change touches: the data, a card in the story and the feature."
     drawing: sequence
     avoid:
       - sequence, for the data
@@ -22,18 +22,20 @@ terms:
     means: The Diff / Before / After switch on a flow (`FlowMode` in `lib/flows/rows.ts`).
     avoid:
       - view
-  - name: column
-    means: "A vertical region of the page. The side column (left: map strip, data strip, and the Flows and Comments tabs) and the diff column (the change picker and the diff)."
+  - name: tab
+    means: "One of the three views of a change under its header, as a pull request's tabs: Story, Files changed and Comments (`components/Tabs.tsx`). The open tab is in the URL."
     avoid:
       - pane
-      - rail
-  - name: panel
-    means: One tab's content inside the side column. The flows panel, the comments panel, and the response panel inside it.
+      - panel
+      - column
+  - name: story
+    means: "The Story tab, where every view lands: the map at full width with one line of what it says, then each flow as a card (`components/Story.tsx`)."
     avoid:
-      - pane
-  - name: strip
-    means: A one-line summary bar at the top of the side column that opens an overlay. The map strip and the data strip.
-    avoid: []
+      - strip, for the map or the data model's summary
+  - name: gutter mark
+    means: "A mark beside a line in Files changed: `⇄ 1·7` is flow 1, step 7, and opens it in the story; `💬 2` is review comment 2, and opens it in Comments."
+    avoid:
+      - chip, for the mark itself
   - name: Rails
     means: Ruby on Rails, one of the data readers.
     boundary: "`lib/data/` only"
@@ -179,13 +181,13 @@ blocks:
       - components/useStaleReload.ts
     summary: Watches the worktree and git dir and pushes change events to the window over SSE.
     read: "`app/api/watch/route.ts` header"
-  - name: UI columns and panels
+  - name: UI tabs
     code:
       - app/page.tsx
       - components/
       - lib/recents.ts
-    summary: The page, its side column and diff column, the panels and strips inside them, and the recent repos kept in the browser's localStorage.
-    read: "`components/SideColumn.tsx`, the comment on `SideColumn`"
+    summary: The page, the change's header and its three tabs (Story, Files changed and Comments), and the recent repos kept in the browser's localStorage.
+    read: "`components/Story.tsx`, the comment on `Story`"
   - name: CLI
     code:
       - bin/backstory.mjs

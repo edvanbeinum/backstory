@@ -87,9 +87,8 @@ export function DiffFile({
   // drops straight into the same rendering path.
   const shown = showWhole && whole ? whole.file : file;
 
-  // Anchoring survives only to mark where the comment you're reading points.
-  // The comments themselves live in the spine and the response panel; the
-  // diff column is the diff.
+  // Anchoring only marks where comments point. The comments themselves live
+  // in the spine and the Comments tab; Files changed is the diff.
   const { byNewLine, byOldLine } = useMemo(
     () => anchorThreads(shown, threads),
     [shown, threads],

@@ -35,7 +35,7 @@ export function ResponsePanel({
   thread: ReviewThread;
   repo: RepoInfo;
   pr: PullRequestInfo | null;
-  /** The change currently open in the diff column, offered as a link target. */
+  /** The change currently on screen, offered as a link target. */
   commit: CommitSummary | null;
   commitCandidates?: CommitSummary[];
   onToggleDone: (threadId: string, done: boolean) => void;
