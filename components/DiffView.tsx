@@ -11,7 +11,8 @@ import type {
   RepoInfo,
   ReviewThread,
 } from "@/lib/types";
-import { DiffFile, type FileMarks } from "./DiffFile";
+import type { StepMarks } from "@/lib/flows/rows";
+import { DiffFile } from "./DiffFile";
 import { FileNav } from "./FileNav";
 import { AlertIcon } from "./icons";
 import { Spinner } from "./ui";
@@ -45,9 +46,9 @@ function partitionThreads(diff: DiffResponse | null, threads: ReviewThread[]) {
  * its new one; the file needs both.
  */
 function marksFor(
-  marks: Map<string, FileMarks> | null,
+  marks: Map<string, StepMarks> | null,
   file: DiffFileType,
-): FileMarks | null {
+): StepMarks | null {
   if (!marks) return null;
   const a = file.newPath ? marks.get(file.newPath) : undefined;
   const b =
@@ -76,7 +77,6 @@ export function DiffView({
   noteRev = null,
   marks = null,
   fileComponents = null,
-  hoveredComponent = null,
 }: {
   diff: DiffResponse | null;
   loading: boolean;
@@ -89,10 +89,9 @@ export function DiffView({
   notes?: NotesApi | null;
   /** The change on screen, as notes record it: a full sha, or a pseudo-rev */
   noteRev?: string | null;
-  /** The selected flow's steps, by file */
-  marks?: Map<string, FileMarks> | null;
+  /** Every flow's steps, by file */
+  marks?: Map<string, StepMarks> | null;
   fileComponents?: Record<string, string> | null;
-  hoveredComponent?: string | null;
 }) {
   const { perFile } = useMemo(
     () => partitionThreads(diff, threads),
@@ -165,10 +164,6 @@ export function DiffView({
             fileNotes={notesPerFile.get(file) ?? NO_NOTES}
             marks={marksFor(marks, file)}
             component={fileComponents?.[file.path] ?? null}
-            linked={
-              hoveredComponent !== null &&
-              fileComponents?.[file.path] === hoveredComponent
-            }
           />
         ))
       )}

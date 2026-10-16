@@ -10,13 +10,7 @@ import type {
   SessionResponse,
 } from "@/lib/types";
 import { CommitHeader } from "./CommitHeader";
-import type { FileMarks } from "./DiffFile";
-import { DiffView } from "./DiffView";
 import { CommitPicker } from "./CommitPicker";
-import { FeedbackBar } from "./FeedbackBar";
-import { useNotes } from "./useNotes";
-import { useOutbox } from "./useOutbox";
-import { useReview } from "./useReview";
 import { CommentIcon, FileDiffIcon, GitCommitIcon, PencilIcon } from "./icons";
 
 export interface ChangeOption {
@@ -101,67 +95,29 @@ export function openingChangeFor(thread: ReviewThread | null): string | null {
 }
 
 /**
- * The diff column: the change picker and the diff of the change you picked.
- * Picking a change leaves the selected comment alone.
+ * Above the tabs: the change picker, the comments this change answers, and
+ * the commit's header. Picking a change leaves the focused comment alone.
  */
-export function DiffColumn({
+export function ChangeHeader({
   session,
   rev,
   onRevChange,
   commit,
   diff,
-  loading,
-  error,
   threads,
   thread,
-  focusedThreadId,
   pushed,
-  reviewTick,
-  flowMarks = null,
-  fileComponents = null,
-  hoveredComponent = null,
-  layout = "code",
-  onLayout,
 }: {
   session: SessionResponse;
   rev: string;
   onRevChange: (rev: string) => void;
   commit: CommitSummary | null;
   diff: DiffResponse | null;
-  loading: boolean;
-  error: string | null;
   threads: ReviewThread[];
-  /** The comment on the left, so its thread can be highlighted here */
+  /** The focused comment, so the landing line can say this change answers it */
   thread: ReviewThread | null;
-  focusedThreadId: string | null;
   pushed: boolean;
-  /** Moves when an agent starts or stops waiting, or a round is queued or collected */
-  reviewTick: number;
-  /** The selected flow's steps, anchored on the diff's lines */
-  flowMarks?: Map<string, FileMarks> | null;
-  /** Each file's C4 component, from the map */
-  fileComponents?: Record<string, string> | null;
-  hoveredComponent?: string | null;
-  /** "diagrams" hides the diff: the flows lead, the code is opened from them */
-  layout?: "diagrams" | "code";
-  /** Offered only where there are flows to lead with */
-  onLayout?: ((layout: "diagrams" | "code") => void) | null;
 }) {
-  const notes = useNotes(session.repo.root);
-  const review = useReview(session.repo.root, reviewTick);
-  const outbox = useOutbox(session.repo.root, reviewTick, notes.reload);
-
-  // The change on screen as a note records it: a commit by its full sha,
-  // which is what stays comparable across views. Null until the diff showing
-  // is this change's — for a moment after switching it's still the last one,
-  // and a note left then would be filed against the wrong change.
-  const noteRev = useMemo(() => {
-    if (!diff || diff.rev !== rev) return null;
-    if (rev === WORKING_REV || rev === BRANCH_REV) return rev;
-    if (commit && /^[0-9a-f]{40}$/.test(commit.sha)) return commit.sha;
-    return /^[0-9a-f]{40}$/.test(rev) ? rev : null;
-  }, [diff, rev, commit]);
-
   const options = useMemo(() => changesFor(thread, session), [thread, session]);
 
   /**
@@ -222,25 +178,6 @@ export function DiffColumn({
             align="left"
           />
         )}
-        {onLayout && (
-          <span className="seg ml-auto" role="group" aria-label="Layout">
-            {(["diagrams", "code"] as const).map((l) => (
-              <button
-                key={l}
-                type="button"
-                aria-pressed={layout === l}
-                onClick={() => onLayout(l)}
-                title={
-                  l === "diagrams"
-                    ? "Lead with the map and the flows; open code from a step"
-                    : "The flow beside the full diff"
-                }
-              >
-                {l === "diagrams" ? "Diagrams" : "Code"}
-              </button>
-            ))}
-          </span>
-        )}
       </div>
 
       {landing.length > 0 && (
@@ -250,7 +187,7 @@ export function DiffColumn({
           {landing.length === 1 ? "s" : ""} in this change
           {thread && landing.some((t) => t.id === thread.id) && (
             <span className="text-[var(--accent)]">
-              · including the one on the left
+              · including the one you&apos;re on
             </span>
           )}
         </p>
@@ -263,43 +200,6 @@ export function DiffColumn({
         pr={session.github.pr}
         pushed={pushed}
       />
-
-      {layout === "code" && (
-        <DiffView
-          diff={diff}
-          loading={loading}
-          error={error}
-          threads={threads}
-          repo={session.repo}
-          commit={commit}
-          focusedThreadId={focusedThreadId}
-          notes={noteRev ? notes : null}
-          noteRev={noteRev}
-          marks={flowMarks}
-          fileComponents={fileComponents}
-          hoveredComponent={hoveredComponent}
-        />
-      )}
-
-      {/* Pinned to the bottom of the window while the diff scrolls, so a
-          general note or Send is always a click away. */}
-      {/* In either layout: an agent waiting on review must never be invisible. */}
-      {(noteRev ||
-        notes.notes.length > 0 ||
-        review.waiting ||
-        review.error) && (
-        <div className="sticky bottom-4 z-20">
-          <FeedbackBar
-            notes={notes}
-            noteRev={noteRev}
-            diff={noteRev ? diff : null}
-            session={session}
-            review={review}
-            outbox={outbox}
-            onRevChange={onRevChange}
-          />
-        </div>
-      )}
     </div>
   );
 }

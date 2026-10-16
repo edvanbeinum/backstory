@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import { anchorThreads } from "@/lib/anchor";
+import type { StepMark, StepMarks } from "@/lib/flows/rows";
 import { anchorNotes, draftNote } from "@/lib/feedback";
 import type {
   ApiError,
@@ -30,19 +31,7 @@ import { NoteCard, NoteComposer } from "./NoteCard";
 import { copyToClipboard, CopyButton, Spinner } from "./ui";
 import type { NotesApi } from "./useNotes";
 
-/** A flow step anchored on a line: its row key, and the chip to show. */
-export interface FlowMark {
-  key: string;
-  chip: string;
-  was: boolean;
-}
-
-export interface FileMarks {
-  old: Map<number, FlowMark[]>;
-  new: Map<number, FlowMark[]>;
-}
-
-const NO_MARKS: FlowMark[] = [];
+const NO_MARKS: StepMark[] = [];
 
 /** The line a note is being written on. */
 interface NoteTarget {
@@ -70,7 +59,6 @@ export function DiffFile({
   fileNotes = [],
   marks = null,
   component = null,
-  linked = false,
 }: {
   file: DiffFileType;
   threads: ReviewThread[];
@@ -84,11 +72,9 @@ export function DiffFile({
   /** This file's notes, on this change */
   fileNotes?: Note[];
   /** Flow steps anchored in this file */
-  marks?: FileMarks | null;
+  marks?: StepMarks | null;
   /** The C4 component this file belongs to */
   component?: string | null;
-  /** Its component is hovered on the map */
-  linked?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
@@ -239,9 +225,9 @@ export function DiffFile({
       // header's containing scrollport, and since the section itself never
       // scrolls, the filename would never actually stick. Corners are
       // rounded per-edge instead.
-      className={`rounded-md border border-[var(--border)] bg-[var(--canvas)] ${linked ? "file-linked" : ""}`}
-      // Jump targets must clear the sticky app bar, or FileNav's scroll
-      // lands the section header underneath it.
+      className="rounded-md border border-[var(--border)] bg-[var(--canvas)]"
+      // Jump targets must clear the sticky app bar, or a jump lands the
+      // section header underneath it.
       style={{ scrollMarginTop: "calc(var(--header-height, 0px) + 8px)" }}
     >
       {/* last:rounded-b-md covers the collapsed state, where the header is
@@ -461,7 +447,7 @@ function HunkRows({
   drafting: NoteTarget | null;
   onDraft: (target: NoteTarget | null) => void;
   onSaveNew: (target: NoteTarget, body: string) => void;
-  marks: FileMarks | null | undefined;
+  marks: StepMarks | null | undefined;
 }) {
   // Clicking a line number copies the editor-style "path:line" reference —
   // the thing you paste into a terminal, an editor, or a review reply. The

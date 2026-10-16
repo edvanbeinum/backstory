@@ -2,20 +2,22 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { CommentsPanel } from "@/components/CommentsPanel";
-import { DiffColumn, openingChangeFor } from "@/components/DiffColumn";
-import type { FileMarks } from "@/components/DiffFile";
-import { FlowCoverage } from "@/components/FlowCoverage";
-import { FlowPanel, type FlowSelection } from "@/components/FlowPanel";
+import { ChangeHeader, openingChangeFor } from "@/components/ChangeHeader";
+import { Comments } from "@/components/Comments";
+import { FeedbackBar } from "@/components/FeedbackBar";
+import { FilesChanged, type FilesJump } from "@/components/FilesChanged";
+import type { StoryTarget } from "@/components/FlowCard";
 import type { ComponentInfo, DataField } from "@/components/FlowSequence";
-import { DataStrip } from "@/components/DataStrip";
+import { Story } from "@/components/Story";
+import { Tabs } from "@/components/Tabs";
 import { findings as designQuestions } from "@/lib/findings";
-import { jumpToFile, MapStrip } from "@/components/MapStrip";
 import type { DataResponse } from "@/lib/data/types";
 import type { MapResponse } from "@/lib/map";
-import { SideColumn, type ColumnTab } from "@/components/SideColumn";
 import { useFlows } from "@/components/useFlows";
-import { flowRows, type FlowRow } from "@/lib/flows/rows";
+import { useNotes, type NotesApi } from "@/components/useNotes";
+import { useOutbox, type OutboxApi } from "@/components/useOutbox";
+import { useReview, type ReviewApi } from "@/components/useReview";
+import { stepMarks, type FlowRow } from "@/lib/flows/rows";
 import { AlertIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
@@ -48,7 +50,9 @@ import {
   readUrlState,
   resolveComment,
   resolveRev,
+  resolveTab,
   writeUrlState,
+  type Tab,
 } from "@/lib/url";
 import type {
   ApiError,
@@ -68,9 +72,6 @@ const WORKING_COMMIT: CommitSummary = {
   url: null,
   isMerge: false,
 };
-
-/** This viewer's layout: "diagrams" (the default) or "code". */
-const LAYOUT_KEY = "backstory.layout";
 
 const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
@@ -94,6 +95,29 @@ async function getJson<T>(url: string): Promise<T> {
     );
   }
   return data as T;
+}
+
+/**
+ * The repo's notes, agent review and outbox, held only while a repo is open
+ * so the inbox asks for none of them.
+ */
+function WithReview({
+  root,
+  tick,
+  children,
+}: {
+  root: string;
+  tick: number;
+  children: (api: {
+    notes: NotesApi;
+    review: ReviewApi;
+    outbox: OutboxApi;
+  }) => React.ReactNode;
+}) {
+  const notes = useNotes(root);
+  const review = useReview(root, tick);
+  const outbox = useOutbox(root, tick, notes.reload);
+  return children({ notes, review, outbox });
 }
 
 export default function Page() {
@@ -123,8 +147,13 @@ export default function Page() {
   /** Previously-opened repos for the RepoBar dropdown. */
   const [recents, setRecents] = useState<RecentRepo[]>([]);
 
-  /** The review thread open in the comments panel. */
+  /** The focused review thread: marked on the spine, outlined in Comments. */
   const [commentId, setCommentId] = useState<string | null>(null);
+  /** Focus asked for from outside Comments, which scrolls the thread into view. */
+  const [focusAsk, setFocusAsk] = useState<{ id: string; at: number } | null>(
+    null,
+  );
+  const [tab, setTab] = useState<Tab>("story");
   /** Set when a URL asked for a comment that isn't in this PR. */
   const [commentNotice, setCommentNotice] = useState<string | null>(null);
   const [linkNotice, setLinkNotice] = useState<string | null>(null);
@@ -137,11 +166,6 @@ export default function Page() {
   const [reviewTick, setReviewTick] = useState(0);
   /** Bumped when a flow run finishes. */
   const [flowsTick, setFlowsTick] = useState(0);
-  const [columnTab, setColumnTab] = useState<ColumnTab>("flows");
-  const [flowSel, setFlowSel] = useState<FlowSelection>({
-    index: 0,
-    mode: "diff",
-  });
   const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
   const [map, setMap] = useState<MapResponse | null>(null);
   /** Bumped when a model or data model draft is written, so both are read again */
@@ -158,8 +182,6 @@ export default function Page() {
   } | null>(null);
   const dataView = `${repoPath}\n${rev}`;
   const dataModel = dataRead?.view === dataView ? dataRead.data : null;
-  /** The map component under the pointer: its files are outlined in the diff. */
-  const [hoveredComponent, setHoveredComponent] = useState<string | null>(null);
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
   const refRef = useRef(ref);
@@ -207,9 +229,10 @@ export default function Page() {
     setRef(fromUrl.ref ?? null);
     setSetup(Boolean(fromUrl.setup));
     if (fromUrl.rev) setRev(fromUrl.rev);
+    setTab(resolveTab(fromUrl));
     if (fromUrl.comment) {
       setCommentId(fromUrl.comment);
-      setColumnTab("comments");
+      setFocusAsk({ id: fromUrl.comment, at: Date.now() });
     }
     if (fromUrl.repo) window.localStorage.setItem(STORAGE_KEY, fromUrl.repo);
     setRecents(loadRecents());
@@ -313,12 +336,13 @@ export default function Page() {
         ref,
         rev,
         comment: commentId,
+        tab: inWorkspace ? tab : undefined,
         setup: setup && !inWorkspace,
       },
       { push: inWorkspace !== wasInWorkspace.current },
     );
     wasInWorkspace.current = inWorkspace;
-  }, [ready, repoPath, ref, rev, commentId, setup]);
+  }, [ready, repoPath, ref, rev, commentId, tab, setup]);
 
   // Someone navigating with the back/forward buttons, or editing the URL by
   // hand, should land on the view they asked for.
@@ -329,6 +353,7 @@ export default function Page() {
       setRef(fromUrl.ref ?? null);
       setRev(fromUrl.rev ?? WORKING_REV);
       setCommentId(fromUrl.comment);
+      setTab(resolveTab(fromUrl));
       setSetup(Boolean(fromUrl.setup));
     };
     window.addEventListener("popstate", onPopState);
@@ -617,48 +642,19 @@ export default function Page() {
   /**
    * Whether there's a checklist to show at all. Not "is there a PR": this
    * branch has a draft PR nobody has reviewed, which is exactly the case
-   * where the comment columns are dead weight.
+   * where the Comments tab and the spine are dead weight.
    */
   const hasComments = threads.length > 0;
 
-  /**
-   * The diagram column shows for any commit or the whole branch, where there
-   * are flows to trace, and wherever there are comments to work through.
-   */
-  const showColumn = hasComments || rev !== WORKING_REV;
-
-  /**
-   * Diagrams or code. The flows lead wherever there are any: uncommitted
-   * work, and a change with no flows, stay on the diff. The choice is this
-   * viewer's own; "Show in diff" from a step switches for this view only.
-   */
-  const [layoutPref, setLayoutPref] = useState<"diagrams" | "code">("diagrams");
-  const [layoutOverride, setLayoutOverride] = useState<
-    "diagrams" | "code" | null
-  >(null);
-  const [jumpTo, setJumpTo] = useState<string | null>(null);
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem(LAYOUT_KEY) === "code")
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
-        setLayoutPref("code");
-    } catch {
-      // Storage blocked: lead with the diagrams.
-    }
-  }, []);
-  const chooseLayout = useCallback((next: "diagrams" | "code") => {
-    setLayoutPref(next);
-    setLayoutOverride(next);
-    try {
-      window.localStorage.setItem(LAYOUT_KEY, next);
-    } catch {
-      // As above.
-    }
-  }, []);
   // Only once the session says there are none: before it loads, a
   // ?comment= link's tab must survive.
-  if (session && !hasComments && columnTab === "comments")
-    setColumnTab("flows");
+  if (session && !hasComments && tab === "comments") setTab("story");
+
+  // A tab mounts the first time it's opened and stays mounted, so a note
+  // being typed in Files changed or a step open in the story survives a
+  // look at another tab, and a landing on Story never renders the diff.
+  const [visited, setVisited] = useState<Set<Tab>>(() => new Set([tab]));
+  if (!visited.has(tab)) setVisited(new Set([...visited, tab]));
 
   // "All changes" follows HEAD: when the diff is fetched again, so are its
   // flows, or the last head's flows would sit on the new head's lines.
@@ -668,67 +664,59 @@ export default function Page() {
     `${flowsTick}:${workingDiffKey}`,
   );
   const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
-  // Diagrams lead only where there are flows to lead with: an untraced
-  // view opens on the diff, with "Trace this change" in the column.
-  const hasFlows =
-    rev !== WORKING_REV && flowSet !== null && flowSet.flows.length > 0;
+
+  /** A flow and step for Story to open, from a gutter mark, a badge or a comment. */
+  const [storyTarget, setStoryTarget] = useState<StoryTarget | null>(null);
+  /** A file or line for Files changed to bring up once it renders. */
+  const [filesJump, setFilesJump] = useState<FilesJump | null>(null);
+  /** A component for the map to outline, from a Files changed group. */
+  const [mapHighlight, setMapHighlight] = useState<{
+    name: string;
+    at: number;
+  } | null>(null);
+  /** The filter Files changed opens with, from "read these yourself". */
+  const [filesFilter, setFilesFilter] = useState<{
+    filter: "yourself";
+    at: number;
+  } | null>(null);
+
   const viewKey = `${repoPath}@${rev}`;
   // Reset while rendering, not in an effect, so a new view never paints
-  // with the last one's selection.
+  // with the last one's requests.
   const [shownView, setShownView] = useState(viewKey);
   if (shownView !== viewKey) {
     setShownView(viewKey);
-    setLayoutOverride(null);
-    setJumpTo(null);
-    setFlowSel({ index: 0, mode: "diff" });
+    setStoryTarget(null);
+    setFilesJump(null);
+    setMapHighlight(null);
+    setFilesFilter(null);
   }
-  // Decided once per view, when its flows have loaded. Status is null for a
-  // moment on every move and "running" through a regenerate; deciding then
-  // would flash the diff and remount it. A run landing later doesn't flip
-  // the view either, so a note being typed survives; the switch appears.
-  const [lead, setLead] = useState<{ view: string; lead: boolean } | null>(
-    null,
-  );
-  const settled = flows.status !== null && flows.status.status !== "running";
-  if (settled && lead?.view !== viewKey)
-    setLead({ view: viewKey, lead: hasFlows });
-  const flowsLead = lead?.lead ?? false;
-  const layout = layoutOverride ?? (flowsLead ? layoutPref : "code");
-  const canChooseLayout = flowsLead || hasFlows;
-  const inlineCode =
-    layout === "diagrams"
-      ? {
-          repo: repoPath,
-          rev,
-          onShowInDiff: (row: FlowRow) => {
-            setLayoutOverride("code");
-            setJumpTo(row.key);
-          },
-        }
-      : null;
-  const pendingJump = layout === "code" ? jumpTo : null;
 
-  // A file picked on the map: in Diagrams there's no diff to show it in,
-  // so switch to Code for this view, then bring the file up once it renders.
-  const [pendingFile, setPendingFile] = useState<string | null>(null);
-  const openFile = useCallback(
-    (path: string) => {
-      if (layout === "diagrams") setLayoutOverride("code");
-      setPendingFile(path);
-    },
-    [layout],
-  );
-  useEffect(() => {
-    if (!pendingFile || layout !== "code") return;
-    let tries = 0;
-    const poll = setInterval(() => {
-      if (jumpToFile(pendingFile) || ++tries > 40) {
-        clearInterval(poll);
-        setPendingFile(null);
-      }
-    }, 100);
-    return () => clearInterval(poll);
-  }, [pendingFile, layout]);
+  const showInFiles = useCallback((row: FlowRow) => {
+    setFilesJump({
+      path: row.step.file,
+      side: row.side,
+      line: row.step.line,
+      at: Date.now(),
+    });
+    setTab("files");
+  }, []);
+
+  const clearFilesJump = useCallback(() => setFilesJump(null), []);
+
+  const openFile = useCallback((path: string) => {
+    setFilesJump({ path, at: Date.now() });
+    setTab("files");
+  }, []);
+
+  const showYourself = useCallback(() => {
+    setFilesFilter({ filter: "yourself", at: Date.now() });
+    setTab("files");
+    window.scrollTo({ top: 0 });
+  }, []);
+
+  /** Every flow's steps, by the diff line each sits on, for the gutter marks. */
+  const marks = useMemo(() => (flowSet ? stepMarks(flowSet) : null), [flowSet]);
 
   /** Notes on the change's shape, pinned on the data cards and under flow titles. */
   const questions = useMemo(
@@ -784,59 +772,6 @@ export default function Page() {
     return info;
   }, [map]);
 
-  // A regenerate can return fewer flows than the one selected. Index 0 is
-  // left alone: with no flows it is still "out of range", and resetting it
-  // on every render would loop.
-  if (flowSet && flowSel.index > 0 && flowSel.index >= flowSet.flows.length)
-    setFlowSel({ index: 0, mode: "diff" });
-
-  const selectedFlow = flowSet?.flows[flowSel.index] ?? null;
-  const flowMode =
-    selectedFlow?.before === null && flowSel.mode === "before"
-      ? "diff"
-      : flowSel.mode;
-  const rows = useMemo(
-    () =>
-      selectedFlow && flowSet
-        ? flowRows(selectedFlow, flowMode, flowSet.hunks)
-        : [],
-    [selectedFlow, flowMode, flowSet],
-  );
-
-  /** The selected flow's steps, by the diff line each sits on. */
-  const flowMarks = useMemo(() => {
-    if (!showColumn || columnTab !== "flows" || rows.length === 0) return null;
-    const marks = new Map<string, FileMarks>();
-    for (const row of rows) {
-      const entry = marks.get(row.step.file) ?? {
-        old: new Map(),
-        new: new Map(),
-      };
-      const side = entry[row.side];
-      const number = row.kind === "del" ? row.was : (row.now ?? row.was);
-      side.set(row.step.line, [
-        ...(side.get(row.step.line) ?? []),
-        {
-          key: row.key,
-          chip: row.kind === "del" ? `was step ${number}` : `step ${number}`,
-          was: row.kind === "del",
-        },
-      ]);
-      marks.set(row.step.file, entry);
-    }
-    return marks;
-  }, [rows, showColumn, columnTab]);
-
-  const filesInDiff = useMemo(
-    () =>
-      new Set(
-        (diff?.files ?? []).flatMap((f) =>
-          [f.newPath, f.oldPath].filter((p): p is string => Boolean(p)),
-        ),
-      ),
-    [diff],
-  );
-
   /**
    * Commits a thread can be pinned to: the unpushed ones first, then a slice
    * of pushed history. The right commit is often neither the guess nor the
@@ -856,40 +791,24 @@ export default function Page() {
     [threads, commentId],
   );
 
-  const commentIndex = useMemo(
-    () => threads.findIndex((t) => t.id === commentId),
-    [threads, commentId],
-  );
-
   /**
-   * Selecting a comment opens the change column on its linked commit if it
-   * has one, or the whole branch diff if it doesn't — never a guess about
-   * which commit answers it. Picking a commit leaves the comment alone, so
-   * the two lists stay separate axes.
+   * Focusing a comment opens Comments on it, and the change on its linked
+   * commit if it has one — never a guess about which commit answers it.
+   * Picking a commit leaves the comment alone, so the two stay separate axes.
    */
   const selectComment = useCallback(
     (id: string) => {
       setCommentId(id);
       setFocusedThreadId(id);
-      setColumnTab("comments");
+      setFocusAsk({ id, at: Date.now() });
+      setTab("comments");
       const thread = threads.find((t) => t.id === id) ?? null;
-      // null means leave the diff column alone — comments and changes are
-      // separate axes, and an unlinked comment has nothing to say about which
-      // change you should be looking at.
+      // null leaves the change alone: an unlinked comment has nothing to say
+      // about which change you should be looking at.
       const linked = openingChangeFor(thread);
       if (linked) setRev(linked);
-      window.scrollTo({ top: 0 });
     },
     [threads],
-  );
-
-  const stepComment = useCallback(
-    (delta: number) => {
-      if (commentIndex === -1) return;
-      const next = threads[commentIndex + delta];
-      if (next) selectComment(next.id);
-    },
-    [threads, commentIndex, selectComment],
   );
 
   /** Sent with every write; see `keyFor`. */
@@ -1130,6 +1049,7 @@ export default function Page() {
     setSessionError(null);
     setCommentId(null);
     setRev(WORKING_REV);
+    setTab("story");
   }, []);
 
   /**
@@ -1144,10 +1064,41 @@ export default function Page() {
     setRef(branch ?? null);
     setRepoPath(trimmed);
     setSetup(false);
+    setTab("story");
   }, []);
 
-  // j/k move through a list the way they would in a TUI: flow steps when the
-  // Flows tab is open, else comments when there are any, else changes.
+  /** A change picked above the tabs: it opens on Story, as every view does. */
+  const pickRev = useCallback(
+    (next: string) => {
+      // Remember anything that isn't in the offered list, so a pasted sha
+      // survives the next refresh.
+      if (
+        session &&
+        !session.commits.some((c) => c.sha === next) &&
+        !session.history.some((c) => c.sha === next)
+      ) {
+        pickedRevs.current = [...new Set([...pickedRevs.current, next])];
+      }
+      setRev(next);
+      setTab("story");
+    },
+    [session],
+  );
+
+  // The change on screen as a note records it: a commit by its full sha,
+  // which is what stays comparable across views. Null until the diff showing
+  // is this change's — for a moment after switching it's still the last one,
+  // and a note left then would be filed against the wrong change.
+  const noteRev = useMemo(() => {
+    if (!diff || diff.rev !== rev) return null;
+    if (rev === WORKING_REV || rev === BRANCH_REV) return rev;
+    if (commitForRev && /^[0-9a-f]{40}$/.test(commitForRev.sha))
+      return commitForRev.sha;
+    return /^[0-9a-f]{40}$/.test(rev) ? rev : null;
+  }, [diff, rev, commitForRev]);
+
+  // j/k move through a list the way they would in a TUI, the open tab's:
+  // flow steps on Story, comments on Comments, changes on Files changed.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
@@ -1164,29 +1115,17 @@ export default function Page() {
       }
       if (!session) return;
 
-      // With the Flows tab open, j/k walk the flow's steps instead.
-      if (
-        showColumn &&
-        columnTab === "flows" &&
-        event.key !== "x" &&
-        flowNavRef.current?.(event.key === "j" ? 1 : -1)
-      ) {
-        event.preventDefault();
-        return;
-      }
-
-      // `x` ticks in place and deliberately does not advance: auto-advancing
-      // steals the moment you just earned and makes a mis-tick awkward to
-      // undo. `j` is right there.
-      if (event.key === "x") {
-        const thread = threads.find((t) => t.id === commentId);
-        if (!thread) return;
-        event.preventDefault();
-        toggleDone(thread.id, !thread.response.done);
-        return;
-      }
-
-      if (threads.length > 0) {
+      if (tab === "comments") {
+        // `x` ticks in place and deliberately does not advance: auto-advancing
+        // steals the moment you just earned and makes a mis-tick awkward to
+        // undo. `j` is right there.
+        if (event.key === "x") {
+          const thread = threads.find((t) => t.id === commentId);
+          if (!thread) return;
+          event.preventDefault();
+          toggleDone(thread.id, !thread.response.done);
+          return;
+        }
         const ids = threads.map((t) => t.id);
         const at = commentId ? ids.indexOf(commentId) : -1;
         if (at === -1) return;
@@ -1195,6 +1134,14 @@ export default function Page() {
 
         event.preventDefault();
         selectComment(ids[step]);
+        return;
+      }
+      if (event.key === "x") return;
+
+      // On Story, j/k walk the steps of the topmost open flow; with none to
+      // walk, they move changes as Files changed does.
+      if (tab === "story" && flowNavRef.current?.(event.key === "j" ? 1 : -1)) {
+        event.preventDefault();
         return;
       }
 
@@ -1218,16 +1165,7 @@ export default function Page() {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [
-    session,
-    rev,
-    threads,
-    commentId,
-    toggleDone,
-    selectComment,
-    showColumn,
-    columnTab,
-  ]);
+  }, [session, rev, threads, commentId, toggleDone, selectComment, tab]);
 
   return (
     <div className="min-h-screen">
@@ -1278,9 +1216,8 @@ export default function Page() {
         <div className="flex items-start">
           {/* No comments, no checklist. A branch nobody has reviewed yet —
               often work an agent just wrote, which you're reading before it
-              goes anywhere — was giving up the spine and a 440px column to
-              say "no review comments" twice. The diff is what you came for;
-              it gets the window. */}
+              goes anywhere — would give up the spine to say "no review
+              comments". The story is what you came for; it gets the window. */}
           {hasComments && (
             <TickSpine
               threads={threads}
@@ -1289,7 +1226,7 @@ export default function Page() {
             />
           )}
 
-          <main className="min-w-0 flex-1 space-y-3 pb-16">
+          <main className="min-w-0 flex-1 pb-16">
             {/* Below lg the spine can't sit beside the content, and the old
                 300px list simply vanished at this width — leaving the checklist
                 unreachable. Same squares, laid out sideways. */}
@@ -1300,7 +1237,7 @@ export default function Page() {
                 onSelect={(thread) => selectComment(thread.id)}
               />
             )}
-            <div className="space-y-3 p-4 pt-3">
+            <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
               {session.github.pr && <PrTitle pr={session.github.pr} />}
 
               {revNotice && (
@@ -1390,187 +1327,82 @@ export default function Page() {
                 </p>
               )}
 
-              {layout === "diagrams" ? (
-                // Flow-first: the change, then where it landed and what it does.
-                // The diff is a click away, from any step.
-                <div className="mx-auto w-full max-w-[1280px] space-y-4">
-                  <DiffColumn
-                    session={session}
-                    rev={rev}
-                    onRevChange={(next) => {
-                      // Remember anything that isn't in the offered list, so a
-                      // pasted sha survives the next refresh.
-                      if (
-                        !session.commits.some((c) => c.sha === next) &&
-                        !session.history.some((c) => c.sha === next)
-                      ) {
-                        pickedRevs.current = [
-                          ...new Set([...pickedRevs.current, next]),
-                        ];
-                      }
-                      setRev(next);
-                    }}
-                    commit={commitForRev}
-                    diff={diff}
-                    loading={diffLoading}
-                    error={diffError}
-                    threads={threads}
-                    thread={selectedThread}
-                    focusedThreadId={focusedThreadId}
-                    pushed={revIsPushed}
-                    reviewTick={reviewTick}
-                    flowMarks={flowMarks}
-                    fileComponents={map?.fileComponents ?? null}
-                    hoveredComponent={hoveredComponent}
-                    layout={layout}
-                    onLayout={canChooseLayout ? chooseLayout : null}
-                  />
-                  <SideColumn
-                    full
-                    tab={columnTab}
-                    onTab={setColumnTab}
-                    flowCount={flowSet ? flowSet.flows.length : null}
-                    commentCount={threads.length}
-                    showComments={hasComments}
-                    header={
-                      rev !== WORKING_REV ? (
-                        <>
-                          <MapStrip
-                            map={map}
-                            repo={repoPath}
-                            onHover={setHoveredComponent}
-                            onOpenFile={openFile}
-                            onModelChange={onModelChange}
-                          />
-                          <DataStrip
-                            data={dataModel}
-                            notes={entityNotes}
-                            repo={repoPath}
-                            rev={rev}
-                            onRead={onModelChange}
-                          />
-                        </>
-                      ) : null
-                    }
-                    flows={
-                      <FlowPanel
-                        api={flows}
-                        selection={{ ...flowSel, mode: flowMode }}
-                        onSelect={setFlowSel}
-                        rows={rows}
-                        filesInDiff={filesInDiff}
-                        navRef={flowNavRef}
-                        code={inlineCode}
-                        jumpTo={pendingJump}
-                        components={componentInfo}
-                        dataFields={dataFields}
-                        flowNotes={flowNotes}
-                        onJumped={() => setJumpTo(null)}
-                        coverage={
-                          flowSet && diff && diff.rev === rev ? (
-                            <FlowCoverage
-                              set={flowSet}
-                              files={diff.files}
-                              tracing={
-                                flows.status?.status === "ready"
-                                  ? flows.status.tracing
-                                  : []
-                              }
-                              onTrace={flows.trace}
-                              inline={inlineCode && { repo: repoPath, rev }}
-                            />
-                          ) : null
-                        }
-                      />
-                    }
-                    comments={
-                      <CommentsPanel
-                        threads={threads}
-                        thread={selectedThread}
-                        index={commentIndex}
-                        onStep={stepComment}
-                        repo={session.repo}
-                        pr={session.github.pr}
-                        commit={commitForRev}
-                        branch={session.repo.branch}
-                        commitCandidates={pinCandidates}
-                        onToggleDone={toggleDone}
-                        onLinkCommit={linkCommit}
-                        onDraftChange={saveDraft}
-                      />
-                    }
-                  />
-                </div>
-              ) : (
-                /* Two columns, two independent selections: the flow or comment
-                you're working on stays put on the left while you browse
-                changes on the right. Stacks below xl, where side-by-side would
-                squeeze the diff too hard. */
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:gap-0">
-                  {showColumn && (
-                    <SideColumn
-                      tab={columnTab}
-                      onTab={setColumnTab}
-                      flowCount={flowSet ? flowSet.flows.length : null}
-                      commentCount={threads.length}
-                      showComments={hasComments}
-                      header={
-                        rev !== WORKING_REV ? (
-                          <>
-                            <MapStrip
-                              map={map}
-                              repo={repoPath}
-                              onHover={setHoveredComponent}
-                              onOpenFile={openFile}
-                              onModelChange={onModelChange}
-                            />
-                            <DataStrip
-                              data={dataModel}
-                              notes={entityNotes}
-                              repo={repoPath}
-                              rev={rev}
-                              onRead={onModelChange}
-                            />
-                          </>
-                        ) : null
-                      }
-                      flows={
-                        <FlowPanel
-                          api={flows}
-                          selection={{ ...flowSel, mode: flowMode }}
-                          onSelect={setFlowSel}
-                          rows={rows}
-                          filesInDiff={filesInDiff}
+              <ChangeHeader
+                session={session}
+                rev={rev}
+                onRevChange={pickRev}
+                commit={commitForRev}
+                diff={diff}
+                threads={threads}
+                thread={selectedThread}
+                pushed={revIsPushed}
+              />
+
+              <Tabs
+                tab={tab}
+                onTab={setTab}
+                fileCount={diff && diff.rev === rev ? diff.files.length : null}
+                threads={threads}
+              />
+
+              <WithReview root={session.repo.root} tick={reviewTick}>
+                {({ notes, review, outbox }) => (
+                  <>
+                    {visited.has("story") && (
+                      <div hidden={tab !== "story"}>
+                        <Story
+                          repo={repoPath}
+                          rev={rev}
+                          map={map}
+                          data={dataModel}
+                          entityNotes={entityNotes}
+                          onModelChange={onModelChange}
+                          mapHighlight={mapHighlight}
+                          onOpenFile={openFile}
+                          flows={flows}
+                          diff={diff && diff.rev === rev ? diff : null}
+                          onShowFiles={() => setTab("files")}
+                          onShowYourself={showYourself}
+                          target={storyTarget}
+                          onShowInFiles={showInFiles}
                           navRef={flowNavRef}
-                          code={inlineCode}
-                          jumpTo={pendingJump}
                           components={componentInfo}
                           dataFields={dataFields}
                           flowNotes={flowNotes}
-                          onJumped={() => setJumpTo(null)}
-                          coverage={
-                            flowSet && diff && diff.rev === rev ? (
-                              <FlowCoverage
-                                set={flowSet}
-                                files={diff.files}
-                                tracing={
-                                  flows.status?.status === "ready"
-                                    ? flows.status.tracing
-                                    : []
-                                }
-                                onTrace={flows.trace}
-                                inline={inlineCode && { repo: repoPath, rev }}
-                              />
-                            ) : null
-                          }
                         />
-                      }
-                      comments={
-                        <CommentsPanel
+                      </div>
+                    )}
+                    {visited.has("files") && (
+                      <div hidden={tab !== "files"}>
+                        <FilesChanged
+                          diff={diff}
+                          loading={diffLoading}
+                          error={diffError}
                           threads={threads}
-                          thread={selectedThread}
-                          index={commentIndex}
-                          onStep={stepComment}
+                          repo={session.repo}
+                          commit={commitForRev}
+                          focusedThreadId={focusedThreadId}
+                          notes={noteRev ? notes : null}
+                          noteRev={noteRev}
+                          fileComponents={map?.fileComponents ?? null}
+                          marks={marks}
+                          jump={filesJump}
+                          onJumped={clearFilesJump}
+                          filterAsk={filesFilter}
+                        />
+                      </div>
+                    )}
+                    {hasComments && visited.has("comments") && (
+                      <div hidden={tab !== "comments"}>
+                        <Comments
+                          threads={threads}
+                          focusedId={commentId}
+                          focusAsk={focusAsk}
+                          onFocus={(id) => {
+                            setCommentId(id);
+                            setFocusedThreadId(id);
+                          }}
+                          fileComponents={map?.fileComponents ?? null}
                           repo={session.repo}
                           pr={session.github.pr}
                           commit={commitForRev}
@@ -1580,45 +1412,31 @@ export default function Page() {
                           onLinkCommit={linkCommit}
                           onDraftChange={saveDraft}
                         />
-                      }
-                    />
-                  )}
+                      </div>
+                    )}
 
-                  <div className="min-w-0 flex-1">
-                    <DiffColumn
-                      session={session}
-                      rev={rev}
-                      onRevChange={(next) => {
-                        // Remember anything that isn't in the offered list, so a
-                        // pasted sha survives the next refresh.
-                        if (
-                          !session.commits.some((c) => c.sha === next) &&
-                          !session.history.some((c) => c.sha === next)
-                        ) {
-                          pickedRevs.current = [
-                            ...new Set([...pickedRevs.current, next]),
-                          ];
-                        }
-                        setRev(next);
-                      }}
-                      commit={commitForRev}
-                      diff={diff}
-                      loading={diffLoading}
-                      error={diffError}
-                      threads={threads}
-                      thread={selectedThread}
-                      focusedThreadId={focusedThreadId}
-                      pushed={revIsPushed}
-                      reviewTick={reviewTick}
-                      flowMarks={flowMarks}
-                      fileComponents={map?.fileComponents ?? null}
-                      hoveredComponent={hoveredComponent}
-                      layout={layout}
-                      onLayout={canChooseLayout ? chooseLayout : null}
-                    />
-                  </div>
-                </div>
-              )}
+                    {/* Pinned to the bottom of the window on every tab: an
+                        agent waiting on review must never be invisible, and
+                        notes written in Files changed are sent from anywhere. */}
+                    {(noteRev ||
+                      notes.notes.length > 0 ||
+                      review.waiting ||
+                      review.error) && (
+                      <div className="sticky bottom-4 z-20">
+                        <FeedbackBar
+                          notes={notes}
+                          noteRev={noteRev}
+                          diff={noteRev ? diff : null}
+                          session={session}
+                          review={review}
+                          outbox={outbox}
+                          onRevChange={pickRev}
+                        />
+                      </div>
+                    )}
+                  </>
+                )}
+              </WithReview>
             </div>
           </main>
         </div>

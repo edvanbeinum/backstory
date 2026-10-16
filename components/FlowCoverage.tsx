@@ -10,76 +10,74 @@ import { StepCode } from "./StepCode";
 import { Spinner } from "./ui";
 
 /**
- * "3 of 4 changed hunks are on a flow", with the rest named, as unmapped
- * files are on the map. A hunk on no flow can have one traced on demand:
- * only the flows asked for cost anything.
+ * "20 of 23 changed hunks are on a flow · read these 3 yourself", beside the
+ * Flows heading, with the rest listed beneath it. Each opens its code in
+ * place, and a hunk on no flow can have one traced on demand: only the flows
+ * asked for cost anything. Its parts sit in the heading's wrapping row.
  */
 export function FlowCoverage({
   set,
   files,
   tracing,
   onTrace,
-  inline = null,
+  repo,
+  rev,
+  onShowYourself,
 }: {
   set: FlowSet;
   files: DiffFile[];
   tracing: string[];
   onTrace: (hunkId: string) => void;
-  /**
-   * The flow-first layout: the list is the code still to read, so it starts
-   * open, and each hunk opens its code in place rather than in the diff.
-   */
-  inline?: { repo: string; rev: string } | null;
+  repo: string;
+  rev: string;
+  /** Files changed, filtered to the hunks on no flow */
+  onShowYourself: () => void;
 }) {
   const hunks = useMemo(() => coverage(set, files), [set, files]);
-  const [open, setOpen] = useState(inline !== null);
+  const [open, setOpen] = useState(false);
   const [reading, setReading] = useState<string | null>(null);
   if (hunks.length === 0) return null;
   const on = hunks.filter((h) => h.onFlow).length;
   const off = hunks.filter((h) => !h.onFlow);
 
-  const jump = (file: string, side: "old" | "new", line: number) => {
-    const section = document.getElementById(`file-${encodeURIComponent(file)}`);
-    const row = section?.querySelector<HTMLElement>(
-      `tr[data-${side}-line="${line}"]`,
-    );
-    (row ?? section)?.scrollIntoView({ block: "center" });
-  };
-
   return (
-    <div className="rounded-md border border-[var(--border)] bg-[var(--canvas)] text-[12px]">
-      <button
-        type="button"
-        className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[var(--fg-muted)] disabled:cursor-default"
-        disabled={off.length === 0}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {off.length > 0 &&
-          (open ? (
-            <ChevronDownIcon size={12} />
-          ) : (
-            <ChevronRightIcon size={12} />
-          ))}
-        <span>
-          <b className="font-semibold text-[var(--fg)]">{on}</b> of{" "}
-          {hunks.length} changed {hunks.length === 1 ? "hunk is" : "hunks are"}{" "}
-          on a flow
+    <>
+      <span className="flow-cover">
+        <button
+          type="button"
+          className="inline-flex items-center gap-1 disabled:cursor-default"
+          disabled={off.length === 0}
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
+        >
           {off.length > 0 &&
-            (inline ? (
-              <span className="text-[var(--attention)]">
-                {" "}
-                · read {off.length === 1
-                  ? "this one"
-                  : `these ${off.length}`}{" "}
-                yourself
-              </span>
+            (open ? (
+              <ChevronDownIcon size={12} />
             ) : (
-              <> · {off.length} not</>
+              <ChevronRightIcon size={12} />
             ))}
-        </span>
-      </button>
+          <span>
+            <b>{on}</b> of {hunks.length} changed{" "}
+            {hunks.length === 1 ? "hunk is" : "hunks are"} on a flow
+          </span>
+        </button>
+        {off.length > 0 && (
+          <>
+            {" · "}
+            <button
+              type="button"
+              className="text-[var(--attention)] hover:underline"
+              onClick={onShowYourself}
+              title="Show them in Files changed"
+            >
+              read {off.length === 1 ? "this one" : `these ${off.length}`}{" "}
+              yourself
+            </button>
+          </>
+        )}
+      </span>
       {open && off.length > 0 && (
-        <ul className="divide-y divide-[var(--border-muted)] border-t border-[var(--border-muted)]">
+        <ul className="basis-full divide-y divide-[var(--border-muted)] rounded-md border border-[var(--border)] bg-[var(--canvas)] text-[12px] font-normal normal-case tracking-normal">
           {off.map((h) => {
             const target = h.offFlow[0];
             const busy = target ? tracing.includes(target.id) : false;
@@ -92,9 +90,7 @@ export function FlowCoverage({
                       type="button"
                       className="mono truncate text-[var(--accent)] hover:underline"
                       onClick={() =>
-                        inline
-                          ? setReading((r) => (r === key ? null : key))
-                          : jump(h.file, h.side, h.line)
+                        setReading((r) => (r === key ? null : key))
                       }
                     >
                       {h.file.split("/").pop()}:{h.line}
@@ -122,10 +118,10 @@ export function FlowCoverage({
                     </button>
                   )}
                 </div>
-                {inline && reading === key && (
+                {reading === key && (
                   <StepCode
-                    repo={inline.repo}
-                    rev={inline.rev}
+                    repo={repo}
+                    rev={rev}
                     path={h.file}
                     side={h.side}
                     line={h.line}
@@ -137,6 +133,6 @@ export function FlowCoverage({
           })}
         </ul>
       )}
-    </div>
+    </>
   );
 }

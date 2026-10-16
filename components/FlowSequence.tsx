@@ -340,6 +340,7 @@ export function FlowSequence({
                   <div
                     role="button"
                     tabIndex={-1}
+                    data-row={row.key}
                     className={`flow-grid flow-row k-${row.kind} ${activeKeys.has(row.key) ? "inview" : ""}`}
                     onClick={() => onRowClick(row)}
                     title={`${row.step.caller} · ${row.step.file}:${row.step.line}`}
