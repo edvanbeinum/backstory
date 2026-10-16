@@ -175,8 +175,8 @@ function unlessMissing(err: NodeJS.ErrnoException) {
 }
 
 /**
- * The local model's file. Moves a model still in the folder named after the
- * main checkout alone, `~/.backstory/models/<folder>/`, the first time it's
+ * Returns the local model's file. Moves a model still in the folder named
+ * after the main checkout alone, `~/.backstory/models/<folder>/`, the first time it's
  * looked for, rather than reading it there: read in place, two repos with
  * that folder name would go on sharing it, and a Draft wouldn't see it.
  * Ignores a file that's gone mid-move, so two reads moving it at once don't
