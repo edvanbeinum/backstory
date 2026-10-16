@@ -256,18 +256,6 @@ function file(
   return entry;
 }
 
-/** File a sent round, leaving its notes as they are. */
-export function queueRound(
-  root: string,
-  round: NewRound,
-): Promise<OutboxRound> {
-  checkNewRound(round);
-  return change(root, (database) => ({
-    result: file(database, root, round),
-    changed: true,
-  }));
-}
-
 /**
  * Send: file the round and mark its notes sent at the round's time, in one
  * transaction, so there's never a round with drafts or sent notes with no
@@ -390,14 +378,6 @@ function withdraw(database: DatabaseSync, root: string, id: string) {
     .prepare("DELETE FROM rounds WHERE root = ? AND id = ?")
     .run(root, id);
   return round;
-}
-
-/** Withdraw a waiting round, leaving its notes as they are. */
-export function cancel(root: string, id: string): Promise<OutboxRound | null> {
-  return change(root, (database) => {
-    const round = withdraw(database, root, id);
-    return { result: round, changed: round !== null };
-  });
 }
 
 /**
