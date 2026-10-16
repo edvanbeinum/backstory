@@ -1,19 +1,20 @@
-import { promises as fs } from "node:fs";
+import { mkdirSync, promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
+import type { DatabaseSync } from "node:sqlite";
 
 /**
- * The tiny JSON store behind pins and drafts.
+ * The SQLite database behind notes, rounds and responses: `backstory.db` in
+ * `homeDir`.
  *
- * Deliberately not a database: the whole thing is a few KB of click-driven
- * writes with no queries. Keeping it as plain JSON means no dependency, no
- * native build to complicate the standalone bundle in the Mac app, and a
- * file you can `cat`, hand-edit or `rm` — which is a real feature in a
- * local dev tool.
+ * One database, so a write that touches two kinds of record commits or fails
+ * as one (Send files a round and marks its notes sent), and so the schema is
+ * the one place a record's shape is defined. It is `node:sqlite`, from the
+ * Node the Mac app bundles: no dependency, and nothing native for the
+ * standalone bundle to trace.
  *
- * Everything goes through this module so that if the data ever does outgrow
- * a file (relational shape, or writes on a timer rather than a click),
- * swapping in SQLite is a change here and nowhere else.
+ * The flow cache, the data cache and local models stay files: each is written
+ * whole and read by its key, and nothing writes two of them at once.
  */
 
 /**
@@ -25,6 +26,121 @@ import path from "node:path";
  */
 export function homeDir(): string {
   return process.env.BACKSTORY_HOME || path.join(homedir(), ".backstory");
+}
+
+const FILE = "backstory.db";
+const VERSION = 1;
+
+const SCHEMA = `
+  CREATE TABLE notes (
+    root TEXT NOT NULL,
+    id TEXT NOT NULL,
+    rev TEXT NOT NULL,
+    path TEXT,
+    side TEXT NOT NULL CHECK (side IN ('old', 'new')),
+    line INTEGER CHECK (line > 0),
+    quote TEXT,
+    body TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    sent_at INTEGER,
+    done INTEGER NOT NULL CHECK (done IN (0, 1)),
+    done_at INTEGER,
+    CHECK (done = 0 OR sent_at IS NOT NULL),
+    CHECK (done = 1 OR done_at IS NULL),
+    PRIMARY KEY (root, id)
+  );
+  CREATE TABLE rounds (
+    root TEXT NOT NULL,
+    id TEXT NOT NULL,
+    note_ids TEXT NOT NULL CHECK (json_valid(note_ids)),
+    message TEXT NOT NULL,
+    queued_at INTEGER NOT NULL,
+    for_session TEXT,
+    delivered_at INTEGER,
+    delivered_to TEXT,
+    claim_session TEXT,
+    claim_until INTEGER,
+    CHECK ((claim_session IS NULL) = (claim_until IS NULL)),
+    PRIMARY KEY (root, id)
+  );
+  CREATE TABLE seen (
+    root TEXT NOT NULL,
+    session TEXT NOT NULL,
+    at INTEGER NOT NULL,
+    PRIMARY KEY (root, session)
+  );
+  CREATE TABLE responses (
+    pr TEXT NOT NULL,
+    thread TEXT NOT NULL,
+    done INTEGER NOT NULL CHECK (done IN (0, 1)),
+    done_at INTEGER,
+    reply TEXT,
+    commits TEXT NOT NULL CHECK (json_valid(commits)),
+    PRIMARY KEY (pr, thread)
+  );
+`;
+
+let open: { file: string; database: DatabaseSync } | null = null;
+
+/**
+ * The open database, opened on first use and reopened when `homeDir` moves,
+ * so a request that writes nothing never makes the directory.
+ */
+export function db(): DatabaseSync {
+  const home = homeDir();
+  const file = path.join(home, FILE);
+  if (open?.file === file) return open.database;
+
+  open?.database.close();
+  open = null;
+  mkdirSync(home, { recursive: true });
+
+  // Loaded at run time rather than imported, so neither bundler has to know a
+  // builtin this new; `getBuiltinModule` is a call they leave alone.
+  const { DatabaseSync } = process.getBuiltinModule("node:sqlite");
+  const database = new DatabaseSync(file);
+  // A dev server and the Mac app can share a home: WAL lets one read while
+  // the other writes, and the timeout makes a writer wait rather than fail.
+  database.exec("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;");
+
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const { user_version } = database.prepare("PRAGMA user_version").get() as {
+      user_version: number;
+    };
+    if (user_version === 0) {
+      database.exec(SCHEMA);
+      database.exec(`PRAGMA user_version = ${VERSION}`);
+    }
+    database.exec("COMMIT");
+  } catch (err) {
+    database.exec("ROLLBACK");
+    database.close();
+    throw err;
+  }
+
+  open = { file, database };
+  return database;
+}
+
+/**
+ * Run `fn` inside one `BEGIN IMMEDIATE … COMMIT`, rolling back if it throws.
+ * Inside a transaction already, `fn` joins it, so one module's write can be
+ * part of a larger one. `fn` must be synchronous: an `await` in it would let
+ * the commit run before the work.
+ */
+export function transaction<T>(fn: (database: DatabaseSync) => T): T {
+  const database = db();
+  if (database.isTransaction) return fn(database);
+  database.exec("BEGIN IMMEDIATE");
+  try {
+    const result = fn(database);
+    database.exec("COMMIT");
+    return result;
+  } catch (err) {
+    database.exec("ROLLBACK");
+    throw err;
+  }
 }
 
 export function storePath(name: string): string {
