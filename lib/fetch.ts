@@ -200,12 +200,12 @@ export async function fetchBranch(
     return { outcome: "created", sha: after };
   }
 
+  if (local === after) return { outcome: "unchanged", sha: local };
+
   const holder = (await listWorktrees(root)).find((w) => w.branch === branch);
   if (holder) {
     return { outcome: "checked-out", sha: local, worktree: holder.path };
   }
-
-  if (local === after) return { outcome: "unchanged", sha: local };
 
   // Checks the old origin tip as well as the new one, so a teammate's
   // force-push after a rebase still moves a branch with nothing of its own.
