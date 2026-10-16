@@ -532,17 +532,24 @@ function useMapDraft(
     return () => clearInterval(timer);
   }, [running, request]);
 
-  // With reading turned on, a view with no map yet starts its read on open,
-  // once per view: a read that fails or can't run doesn't start again.
+  // With reading turned on, a view with no map yet, or with a drafted head
+  // but no base to compare it with, starts its read on open. It starts once
+  // until the view's read status changes: a read that fails or can't run
+  // stays that way, while the branch view, whose rev stays "branch" as HEAD
+  // moves, reads again once its new head needs it.
   const autoStart =
-    map?.status === "none" &&
-    !map.error &&
+    !map?.error &&
+    (map?.status === "none" || (map?.source === "drafted" && !map.baseModel)) &&
     map.draft?.status === "idle" &&
     map.draft.auto;
   const autoStarted = useRef<string | null>(null);
   useEffect(() => {
     const view = `${repo}\n${rev}`;
-    if (!autoStart || autoStarted.current === view) return;
+    if (!autoStart) {
+      autoStarted.current = null;
+      return;
+    }
+    if (autoStarted.current === view) return;
     autoStarted.current = view;
     void request("POST");
   }, [autoStart, repo, rev, request]);
