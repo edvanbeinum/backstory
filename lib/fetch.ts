@@ -182,7 +182,14 @@ export async function fetchBranch(
 
   const local = await sha(root, `refs/heads/${branch}`);
   if (!local) {
-    await git(root, ["branch", "--track", branch, `origin/${branch}`]);
+    // Names the full ref, because a local branch called `origin/<branch>`
+    // would win over the remote-tracking one.
+    await git(root, [
+      "branch",
+      "--track",
+      branch,
+      `refs/remotes/origin/${branch}`,
+    ]);
     return { outcome: "created", sha: after };
   }
 
