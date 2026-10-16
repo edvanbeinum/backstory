@@ -91,7 +91,10 @@ export interface InboxRepo {
   connect: boolean;
   /** Served from cache after a live failure, so the counts may lag. */
   stale: boolean;
-  /** Open same-repo PRs first, newest first, then branches without one. */
+  /**
+   * Open same-repo PRs first, most recently updated first, then branches
+   * without one, newest commit first.
+   */
   onGitHub: RemoteBranch[];
 }
 
