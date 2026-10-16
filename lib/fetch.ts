@@ -119,7 +119,8 @@ async function fetchFromOrigin(
         "origin",
         ...branches.map(refspec),
       ],
-      { env, timeout: FETCH_TIMEOUT_MS },
+      // Keeps git's messages in English, which missingOnOrigin matches.
+      { env: { ...env, LC_ALL: "C" }, timeout: FETCH_TIMEOUT_MS },
     );
 
   let last: unknown = null;
