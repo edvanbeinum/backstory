@@ -127,10 +127,17 @@ export function db(): DatabaseSync {
     database.close();
     throw err;
   }
-  // Renamed, never deleted, so a user can put a file back by hand.
-  for (const name of imported) renameSync(name, `${name}.migrated`);
-
   open = { file, database };
+  // Rename, never delete, so a user can put a file back by hand. A file that
+  // won't rename is left where it is: the import has committed, and a
+  // database at this version never reads the files again.
+  for (const name of imported) {
+    try {
+      renameSync(name, `${name}.migrated`);
+    } catch (err) {
+      console.error(`Backstory couldn't rename ${name}:`, err);
+    }
+  }
   return database;
 }
 

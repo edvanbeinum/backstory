@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -221,6 +221,22 @@ test("a first start imports every valid record from the three files, and renames
   assert.equal(count("rounds"), 1);
   assert.equal(count("responses"), 1);
   assert.ok(existsSync(path.join(home, "notes.json")));
+});
+
+test("a file that won't rename keeps the import, and leaves the others renamed", async () => {
+  const home = tempHome();
+  writeAllThree(home);
+  // A directory in the way makes renaming outbox.json fail.
+  mkdirSync(path.join(home, "outbox.json.migrated"));
+
+  assert.deepEqual(
+    (await getNotes("/repo")).map((n) => n.id),
+    ["n1"],
+  );
+  assert.equal(count("rounds"), 1);
+  assert.ok(existsSync(path.join(home, "outbox.json")));
+  assert.ok(existsSync(path.join(home, "notes.json.migrated")));
+  assert.ok(existsSync(path.join(home, "responses.json.migrated")));
 });
 
 test("a home with only responses.json imports it, and the other tables are empty", async () => {
