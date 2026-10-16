@@ -190,12 +190,20 @@ export async function fetchBranch(
   const local = await sha(root, `refs/heads/${branch}`);
   if (!local) {
     // Names the full ref, because a local branch called `origin/<branch>`
-    // would win over the remote-tracking one.
+    // would win over the remote-tracking one. Writes the upstream itself,
+    // because `--track` refuses a ref that origin's fetch refspec doesn't
+    // cover, as in a single-branch or shallow clone.
     await git(root, [
       "branch",
-      "--track",
+      "--no-track",
       branch,
       `refs/remotes/origin/${branch}`,
+    ]);
+    await git(root, ["config", `branch.${branch}.remote`, "origin"]);
+    await git(root, [
+      "config",
+      `branch.${branch}.merge`,
+      `refs/heads/${branch}`,
     ]);
     return { outcome: "created", sha: after };
   }

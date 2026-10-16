@@ -110,6 +110,27 @@ test("a local branch called origin/feature doesn't stand in for origin's feature
   assert.equal(run(mine, "rev-parse", "refs/heads/feature"), tip);
 });
 
+test("a single-branch clone still gets the branch, tracking origin's copy", async () => {
+  const { teammate, mine } = setup();
+  const tip = pushFeature(teammate);
+  run(
+    mine,
+    "config",
+    "remote.origin.fetch",
+    "+refs/heads/main:refs/remotes/origin/main",
+  );
+
+  assert.deepEqual(await fetchBranch(mine, "feature"), {
+    outcome: "created",
+    sha: tip,
+  });
+  assert.equal(run(mine, "rev-parse", "refs/heads/feature"), tip);
+  assert.equal(
+    run(mine, "config", "branch.feature.merge"),
+    "refs/heads/feature",
+  );
+});
+
 test("a new push moves the local branch, and nothing new leaves it unchanged", async () => {
   const { teammate, mine } = setup();
   pushFeature(teammate);
