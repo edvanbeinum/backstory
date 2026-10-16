@@ -1,8 +1,9 @@
 /**
  * Checks the built Mac app end to end. Attached: against a stand-in server, a
  * `backstory://open` link loads `/?repo=<path>`, and the app survives the
- * server going away. Owned: the app starts the server in its bundle, and the
- * server goes when the app quits or is killed. Update: Sparkle, given a local
+ * server going away. Owned: the app starts the server in its bundle, the
+ * server keeps a note in its database, and the server goes when the app quits
+ * or is killed. Update: Sparkle, given a local
  * appcast signed with the release key, offers a newer version and not its
  * own; run `npm run mac:appcast` first for `sign_update`, which takes the key
  * from SPARKLE_PRIVATE_KEY_FILE as `mac:appcast` does. Command: the
@@ -123,6 +124,44 @@ async function health(port) {
   }
 }
 
+/**
+ * Save a note through the server and read it back, so `node:sqlite` is shown
+ * to load in the Node the bundle has, and the database to be made in its home.
+ */
+async function storesANote(port, home) {
+  const url = `http://127.0.0.1:${port}/api/notes?repo=%2Fsmoke%2Frepo`;
+  const note = {
+    id: "smoke",
+    rev: "working",
+    path: null,
+    side: "new",
+    line: null,
+    quote: null,
+    body: "smoke",
+    createdAt: 1,
+    sentAt: null,
+    done: false,
+    doneAt: null,
+  };
+  const saved = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ op: "save", note }),
+  });
+  if (!saved.ok) {
+    throw new Error(
+      `saving a note answered ${saved.status}: ${await saved.text()}`,
+    );
+  }
+  const { notes } = await (await fetch(url)).json();
+  if (notes?.[0]?.body !== "smoke") {
+    throw new Error(`the note didn't read back: ${JSON.stringify(notes)}`);
+  }
+  if (!existsSync(path.join(home, "backstory.db"))) {
+    throw new Error(`no backstory.db in ${home}`);
+  }
+}
+
 async function owned() {
   const port = await sparePort();
   const home = mkdtempSync(path.join(tmpdir(), "backstory-smoke-home-"));
@@ -142,6 +181,7 @@ async function owned() {
   let child = launch(args);
   try {
     await withLog(() => waitFor(`Backstory ${version} on :${port}`, up));
+    await withLog(() => storesANote(port, home));
 
     const repo = mkdtempSync(path.join(tmpdir(), "backstory smoke owned "));
     await promisify(execFile)("open", ["-a", app, repoLink(repo)]);
