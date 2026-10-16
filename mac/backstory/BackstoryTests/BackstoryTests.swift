@@ -623,4 +623,9 @@ private final class PageLoad: NSObject, WKNavigationDelegate {
         finished?.resume(throwing: error)
         finished = nil
     }
+
+    func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+        finished?.resume(throwing: error)
+        finished = nil
+    }
 }
