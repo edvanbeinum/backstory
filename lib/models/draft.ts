@@ -12,6 +12,7 @@ import { git, gitLine } from "../exec";
 import { withSnapshot } from "../flows/generate";
 import {
   DRAFTED_PROPERTY,
+  exists,
   localModelDir,
   localModelFile,
   MODEL_DSL,
@@ -226,12 +227,6 @@ interface Job {
 
 const g = globalThis as { __backstoryModels?: Map<string, Job> };
 const jobs: Map<string, Job> = (g.__backstoryModels ??= new Map());
-
-const exists = (file: string) =>
-  fs.access(file).then(
-    () => true,
-    () => false,
-  );
 
 /**
  * Writes through a temp file and a rename, so the map never reads half a

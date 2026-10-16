@@ -164,7 +164,7 @@ export async function localModelDir(root: string): Promise<string> {
   return path.join(homeDir(), "models", await repoKey(root));
 }
 
-const exists = (file: string) =>
+export const exists = (file: string) =>
   fs.access(file).then(
     () => true,
     () => false,
