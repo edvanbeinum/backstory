@@ -1,3 +1,6 @@
+-- Run only when `db()` in lib/store.ts makes a new database. An existing
+-- database never reads this file again, so a change here also needs `VERSION`
+-- bumped and a migration in lib/store.ts.
 CREATE TABLE notes (
   root TEXT NOT NULL,
   id TEXT NOT NULL,
