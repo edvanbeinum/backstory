@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { test } from "node:test";
 
-import { readSql } from "../lib/data/sql";
+import { readSql, sqlReader } from "../lib/data/sql";
 import type { Entity } from "../lib/data/types";
 
 const read = (files: Record<string, string>) =>
@@ -301,4 +304,69 @@ test("a table declared twice is taken from the first file in path order", () => 
   });
   assert.equal(entities.get("Item")?.file, "a/schema.sql");
   assert.deepEqual(fields(entities.get("Item")), [["a", "int", false]]);
+});
+
+test("this repo's data model reads from lib/schema.sql", async () => {
+  const root = path.join(import.meta.dirname, "..");
+  const tracked = execFileSync("git", ["ls-files"], {
+    cwd: root,
+    encoding: "utf8",
+  })
+    .split("\n")
+    .filter(Boolean);
+  const model = await sqlReader.read({
+    root,
+    rev: "working",
+    listing: async () => tracked,
+    steered: false,
+    show: async (file) => readFileSync(path.join(root, file), "utf8"),
+  });
+  assert.equal(model?.source, "sql");
+  const entities = model?.entities ?? new Map<string, Entity>();
+  assert.deepEqual(
+    [...entities.keys()],
+    ["Note", "Round", "Seen", "Response", "Setting"],
+  );
+  for (const entity of entities.values()) {
+    assert.equal(entity.file, "lib/schema.sql", entity.name);
+  }
+  assert.deepEqual(fields(entities.get("Note")), [
+    ["root", "text", true],
+    ["id", "text", true],
+    ["rev", "text", true],
+    ["path", "text", false],
+    ["side", "text", true],
+    ["line", "integer", false],
+    ["quote", "text", false],
+    ["body", "text", true],
+    ["created_at", "integer", true],
+    ["sent_at", "integer", false],
+    ["done", "integer", true],
+    ["done_at", "integer", false],
+  ]);
+  assert.deepEqual(fields(entities.get("Round")), [
+    ["root", "text", true],
+    ["id", "text", true],
+    ["note_ids", "text", true],
+    ["message", "text", true],
+    ["queued_at", "integer", true],
+    ["for_session", "text", false],
+    ["delivered_at", "integer", false],
+    ["delivered_to", "text", false],
+    ["claim_session", "text", false],
+    ["claim_until", "integer", false],
+  ]);
+  assert.deepEqual(fields(entities.get("Seen")), [
+    ["root", "text", true],
+    ["session", "text", true],
+    ["at", "integer", true],
+  ]);
+  assert.deepEqual(fields(entities.get("Response")), [
+    ["pr", "text", true],
+    ["thread", "text", true],
+    ["done", "integer", true],
+    ["done_at", "integer", false],
+    ["reply", "text", false],
+    ["commits", "text", true],
+  ]);
 });
