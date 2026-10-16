@@ -4,8 +4,8 @@ import path from "node:path";
 import picomatch from "picomatch";
 
 import { DslError, readDsl } from "./dsl";
-import { gitLine, gitTry } from "./exec";
-import { repoKey } from "./git";
+import { gitTry } from "./exec";
+import { gitCommonDir, repoKey, repoKeyOf } from "./git";
 import { homeDir } from "./store";
 
 /**
@@ -183,19 +183,14 @@ function unlessMissing(err: NodeJS.ErrnoException) {
  * throw.
  */
 export async function localModelFile(root: string): Promise<string> {
-  const dir = await localModelDir(root);
+  const common = await gitCommonDir(root);
+  const dir = path.join(homeDir(), "models", repoKeyOf(common ?? root));
   const file = path.join(dir, "workspace.dsl");
   if (await exists(file)) return file;
-  const common =
-    (await gitLine(root, [
-      "rev-parse",
-      "--path-format=absolute",
-      "--git-common-dir",
-    ])) ?? path.join(root, ".git");
   const old = path.join(
     homeDir(),
     "models",
-    path.basename(path.dirname(common)),
+    path.basename(path.dirname(common ?? path.join(root, ".git"))),
   );
   if (!(await exists(path.join(old, "workspace.dsl")))) return file;
   await fs.mkdir(dir, { recursive: true });

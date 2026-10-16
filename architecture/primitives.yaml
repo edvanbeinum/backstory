@@ -30,6 +30,8 @@ primitives:
     file: lib/git.ts
     symbols:
       - repoKey
+      - repoKeyOf
+      - gitCommonDir
     use: "The folder name a repo gets under `~/.backstory/flows/`, `data/` and `models/`: the main checkout's folder plus a hash of the common git dir, the same from every worktree and different for two repos with the same folder name."
   - name: a view's commits
     block: git reader

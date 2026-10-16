@@ -49,12 +49,15 @@ export function expandPath(input: string): string {
  * a name don't.
  */
 export async function repoKey(root: string): Promise<string> {
-  const common =
-    (await gitLine(root, [
-      "rev-parse",
-      "--path-format=absolute",
-      "--git-common-dir",
-    ])) ?? root;
+  return repoKeyOf((await gitCommonDir(root)) ?? root);
+}
+
+/** The absolute git dir every worktree of a repo shares, or null. */
+export const gitCommonDir = (root: string) =>
+  gitLine(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+
+/** `repoKey` for a common git dir already in hand. */
+export function repoKeyOf(common: string): string {
   const name = path
     .basename(path.dirname(common))
     .replace(/[^A-Za-z0-9._-]/g, "_");
