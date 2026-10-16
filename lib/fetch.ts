@@ -105,10 +105,17 @@ async function fetchFromOrigin(
 ): Promise<void> {
   const token = isGitHubHttps(remoteUrl) ? await githubToken() : null;
   const attempt = (env: GitEnv, branches: string[]) =>
-    git(root, ["fetch", "--no-tags", "origin", ...branches.map(refspec)], {
-      env: { ...process.env, ...env },
-      timeout: FETCH_TIMEOUT_MS,
-    });
+    git(
+      root,
+      [
+        "fetch",
+        "--no-tags",
+        "--no-recurse-submodules",
+        "origin",
+        ...branches.map(refspec),
+      ],
+      { env: { ...process.env, ...env }, timeout: FETCH_TIMEOUT_MS },
+    );
 
   let last: unknown = null;
   for (const env of credentialAttempts(remoteUrl, token)) {
