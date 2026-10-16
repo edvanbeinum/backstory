@@ -51,14 +51,15 @@ const relSame = (a: Relationship, b: Relationship) =>
 // Key a rule by its condition and referenced columns too, so two rules on the
 // same columns with different conditions stay two, and changing either one
 // reads as the old rule removed and the new one added.
+// Key with JSON, not a separator: a condition can contain ":" or ",".
 const constraintKey = (c: Constraint) =>
-  [
+  JSON.stringify([
     c.kind,
-    (c.kind === "unique" ? [...c.fields].sort() : c.fields).join(","),
+    c.kind === "unique" ? [...c.fields].sort() : c.fields,
     c.target ?? "",
-    (c.targetFields ?? []).join(","),
+    c.targetFields ?? [],
     c.condition ?? "",
-  ].join(":");
+  ]);
 
 function diffEntity(
   name: string,
