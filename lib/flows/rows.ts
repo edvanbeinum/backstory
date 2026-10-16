@@ -1,5 +1,5 @@
 import { isAddedLine } from "./hunks";
-import type { Flow, FlowHunk, FlowStep } from "./types";
+import type { Flow, FlowHunk, FlowSet, FlowStep } from "./types";
 
 /**
  * A flow as rows to draw, diffed like lines: a step is kept, added or
@@ -295,4 +295,52 @@ export function componentPath(flow: Flow, rows: FlowRow[]): string[] {
     }
   }
   return path;
+}
+
+/** A flow step on a diff line: `1·7` is flow 1, step 7. */
+export interface StepMark {
+  /** Unique across flows; the diff's anchor for the step */
+  key: string;
+  /** The flow's index in the set */
+  flow: number;
+  /** The step's row key in the flow's diff mode */
+  row: string;
+  chip: string;
+  /** A removed step, on the line as it was */
+  was: boolean;
+}
+
+export interface StepMarks {
+  old: Map<number, StepMark[]>;
+  new: Map<number, StepMark[]>;
+}
+
+/** The number a row shows: a removed step by its old one. */
+const stepNumber = (row: FlowRow) =>
+  row.kind === "del" ? row.was : (row.now ?? row.was);
+
+/** Every flow's steps, by file and by the line each sits on. */
+export function stepMarks(set: FlowSet): Map<string, StepMarks> {
+  const out = new Map<string, StepMarks>();
+  set.flows.forEach((flow, i) => {
+    for (const row of flowRows(flow, "diff", set.hunks)) {
+      const entry = out.get(row.step.file) ?? {
+        old: new Map(),
+        new: new Map(),
+      };
+      const side = entry[row.side];
+      side.set(row.step.line, [
+        ...(side.get(row.step.line) ?? []),
+        {
+          key: `${i}/${row.key}`,
+          flow: i,
+          row: row.key,
+          chip: `${i + 1}·${stepNumber(row)}`,
+          was: row.kind === "del",
+        },
+      ]);
+      out.set(row.step.file, entry);
+    }
+  });
+  return out;
 }

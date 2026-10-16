@@ -6,9 +6,10 @@ import {
   flowRows,
   groupParticipants,
   shortLabels,
+  stepMarks,
   summarise,
 } from "../lib/flows/rows";
-import type { Flow, FlowHunk, FlowStep } from "../lib/flows/types";
+import type { Flow, FlowHunk, FlowSet, FlowStep } from "../lib/flows/types";
 
 const step = (
   id: string,
@@ -291,4 +292,39 @@ test("participants group by component, in the order the flow reaches them", () =
     ],
   );
   assert.deepEqual(componentPath(f, rows), ["Native API", "Access", "Catalog"]);
+});
+
+const flowSet = (flows: Flow[], extra: Partial<FlowSet> = {}): FlowSet => ({
+  base: "b",
+  head: "h",
+  generatedAt: 0,
+  flows,
+  hunks,
+  appFiles: [],
+  costUsd: 0,
+  durationMs: 0,
+  ...extra,
+});
+
+test("stepMarks marks every flow's steps on their lines", () => {
+  const marks = stepMarks(
+    flowSet([
+      flow(null, [step("open", 3)]),
+      flow(
+        [step("gone", 9, { file: "b.ts" })],
+        [step("kept", 5, { file: "b.ts" })],
+      ),
+      flow(null, []),
+    ]),
+  );
+  const chips = (file: string, side: "old" | "new", line: number) =>
+    marks
+      .get(file)
+      ?.[side].get(line)
+      ?.map((m) => `${m.chip}${m.was ? " was" : ""}`);
+
+  assert.deepEqual(chips("a.ts", "new", 3), ["1·1"]);
+  assert.deepEqual(chips("b.ts", "new", 5), ["2·1"]);
+  assert.deepEqual(chips("b.ts", "old", 9), ["2·1 was"]);
+  assert.deepEqual([...marks.keys()].sort(), ["a.ts", "b.ts"]);
 });
