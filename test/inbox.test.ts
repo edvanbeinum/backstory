@@ -266,8 +266,92 @@ test("with a refused token and gh signed out, the repo asks to Connect GitHub an
 
   assert.equal(inbox.repos[0].connect, true);
   assert.equal(inbox.repos[0].unavailable, "GitHub isn't connected.");
+  assert.deepEqual(inbox.repos[0].onGitHub, []);
   assert.deepEqual(
     inbox.rows.map((r) => [r.branch, r.pr]),
     [["feature", null]],
+  );
+});
+
+const openPr = (number: number, branch: string, over = {}) => ({
+  number,
+  title: `PR ${number}`,
+  isDraft: false,
+  url: `https://github.com/acme/app/pull/${number}`,
+  baseRefName: "main",
+  headRefName: branch,
+  isCrossRepository: false,
+  author: { login: "teammate" },
+  headRef: { target: { committedDate: "2026-10-02T00:00:00Z" } },
+  ...over,
+});
+
+const head = (name: string) => ({
+  name,
+  target: { committedDate: "2026-10-01T00:00:00Z" },
+});
+
+/** The branch aliases as `inboxApi` answers them, plus what On GitHub reads. */
+const onGitHubApi = (call: ApiCall): ApiAnswer => {
+  const answer = inboxApi(call).json as {
+    data: { repository: Record<string, unknown> };
+  };
+  Object.assign(answer.data.repository, {
+    open: {
+      nodes: [
+        openPr(8, "teammate/pr"),
+        openPr(9, "their-fork", { isCrossRepository: true }),
+        openPr(7, "feature"),
+      ],
+    },
+    heads: {
+      nodes: [
+        head("main"),
+        head("feature"),
+        head("teammate/pr"),
+        head("plain"),
+      ],
+    },
+    defaultBranchRef: { name: "main" },
+  });
+  return { json: answer };
+};
+
+test("On GitHub lists same-repo PRs, then plain branches, leaving out local branches, the default branch and forks", async () => {
+  const { inbox, calls } = await inboxWithToken(
+    repoOnGitHub("listed"),
+    onGitHubApi,
+  );
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(inbox.repos[0].onGitHub, [
+    {
+      branch: "teammate/pr",
+      lastCommitAt: "2026-10-02T00:00:00Z",
+      pr: {
+        number: 8,
+        title: "PR 8",
+        author: "teammate",
+        isDraft: false,
+        baseRefName: "main",
+        url: "https://github.com/acme/app/pull/8",
+      },
+    },
+    { branch: "plain", lastCommitAt: "2026-10-01T00:00:00Z", pr: null },
+  ]);
+});
+
+test("a clone with no local branches still asks GitHub, and still lists what's there", async () => {
+  const root = mkdtempSync(path.join(os.tmpdir(), "backstory-inbox-empty-"));
+  const git = (...args: string[]) => execFileSync("git", ["-C", root, ...args]);
+  git("init", "-q", "-b", "nothing-yet");
+  git("remote", "add", "origin", "git@github.com:acme/fresh.git");
+
+  const { inbox, calls } = await inboxWithToken(root, onGitHubApi);
+
+  assert.equal(calls.length, 1);
+  assert.deepEqual(
+    inbox.repos[0].onGitHub.map((b) => b.branch),
+    ["teammate/pr", "feature", "plain"],
   );
 });
