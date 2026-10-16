@@ -136,8 +136,11 @@ export function FlowCard({
   const anyOpen = steps.size > 0;
   useEffect(() => {
     if (!anyOpen) return;
+    // Close the steps only while the card is on screen: Esc on another tab
+    // is closing something there.
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setSteps(NO_STEPS);
+      if (e.key === "Escape" && !cardRef.current?.closest("[hidden]"))
+        setSteps(NO_STEPS);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);

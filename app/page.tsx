@@ -664,8 +664,10 @@ export default function Page() {
   // A tab mounts the first time it's opened and stays mounted, so a note
   // being typed in Files changed or a step open in the story survives a
   // look at another tab, and a landing on Story never renders the diff.
-  const [visited, setVisited] = useState<Set<Tab>>(() => new Set([tab]));
-  if (!visited.has(tab)) setVisited(new Set([...visited, tab]));
+  // Waits for `ready`: until the URL is read, `tab` is the default, and a
+  // ?tab=files link would mount Story too.
+  const [visited, setVisited] = useState<Set<Tab>>(() => new Set());
+  if (ready && !visited.has(tab)) setVisited(new Set([...visited, tab]));
 
   // "All changes" follows HEAD: when the diff is fetched again, so are its
   // flows, or the last head's flows would sit on the new head's lines.
