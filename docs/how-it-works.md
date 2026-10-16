@@ -18,8 +18,8 @@ worktrees resolve in about half a second. The PR and counts come from GitHub:
 without GitHub connected, or without a remote, every worktree still appears
 with a note saying the counts are missing.
 
-The same call lists the repo's 50 newest open pull requests and 100 newest
-branches, for **On GitHub**: the ones this clone has no local branch for, minus
+The same call lists the repo's 50 newest open pull requests and its first 100
+branches by name, for **On GitHub**: the ones this clone has no local branch for, minus
 pull requests from forks and the default branch.
 
 ## Handling a comment is deliberate

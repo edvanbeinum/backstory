@@ -221,7 +221,7 @@ const ON_GITHUB = `
         headRef { target { ... on Commit { committedDate } } }
       }
     }
-    heads: refs(refPrefix: "refs/heads/", first: 100, orderBy: {field: TAG_COMMIT_DATE, direction: DESC}) {
+    heads: refs(refPrefix: "refs/heads/", first: 100) {
       nodes { name target { ... on Commit { committedDate } } }
     }
     defaultBranchRef { name }`;
@@ -330,7 +330,14 @@ function remoteBranches(loaded: Loaded, local: Set<string>): RemoteBranch[] {
       },
     });
   }
-  for (const head of loaded.heads) {
+  // Sorts here, because GitHub orders branches by name: its commit-date order
+  // applies only to tags.
+  const heads = [...loaded.heads].sort((a, b) =>
+    (b.target?.committedDate ?? "").localeCompare(
+      a.target?.committedDate ?? "",
+    ),
+  );
+  for (const head of heads) {
     if (taken.has(head.name)) continue;
     taken.add(head.name);
     out.push({

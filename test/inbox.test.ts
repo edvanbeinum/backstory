@@ -286,9 +286,9 @@ const openPr = (number: number, branch: string, over = {}) => ({
   ...over,
 });
 
-const head = (name: string) => ({
+const head = (name: string, committedDate = "2026-10-01T00:00:00Z") => ({
   name,
-  target: { committedDate: "2026-10-01T00:00:00Z" },
+  target: { committedDate },
 });
 
 /** The branch aliases as `inboxApi` answers them, plus what On GitHub reads. */
@@ -306,6 +306,7 @@ const onGitHubApi = (call: ApiCall): ApiAnswer => {
     },
     heads: {
       nodes: [
+        head("aged", "2026-09-01T00:00:00Z"),
         head("main"),
         head("feature"),
         head("teammate/pr"),
@@ -338,6 +339,7 @@ test("On GitHub lists same-repo PRs, then plain branches, leaving out local bran
       },
     },
     { branch: "plain", lastCommitAt: "2026-10-01T00:00:00Z", pr: null },
+    { branch: "aged", lastCommitAt: "2026-09-01T00:00:00Z", pr: null },
   ]);
 });
 
@@ -352,6 +354,6 @@ test("a clone with no local branches still asks GitHub, and still lists what's t
   assert.equal(calls.length, 1);
   assert.deepEqual(
     inbox.repos[0].onGitHub.map((b) => b.branch),
-    ["teammate/pr", "feature", "plain"],
+    ["teammate/pr", "feature", "plain", "aged"],
   );
 });
