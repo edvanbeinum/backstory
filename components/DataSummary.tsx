@@ -843,7 +843,7 @@ export function DataSummary({
               ? `Drafted by ${data.drafted.provider}: a model read once in full, then updated from what each change differs by. It may be wrong.`
               : `From ${data.label}, at the base and the head.`}{" "}
             {whole
-              ? "Every entity at the head; this change touches none of them. Arrows point from the entity that has a link to the one it links to."
+              ? `Every entity at the head; ${data.baseModel ? "this change touches none of them" : "there is no model at the base to compare with"}. Arrows point from the entity that has a link to the one it links to.`
               : "Click an entity for its fields. Arrows point from the entity that has a link to the one it links to; grey boxes are unchanged entities a changed one links to."}
           </p>
           {data.drafted && (
