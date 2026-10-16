@@ -114,6 +114,16 @@ test("a card between the ends but off to the side is passed without a jog", () =
   assertClear(d, [a, side, b]);
 });
 
+test("a run within clearance of a card's edge steps aside too", () => {
+  const a = box(100, 0);
+  const edge = box(205, 124);
+  const { d } = edgePath(a, box(0, 248), 0, 1, 0, 1, {
+    boxes: [edge],
+    clearance: 11,
+  });
+  assert.deepEqual(runs(d), [194]);
+});
+
 test("the jog goes to the side of the card nearer the destination", () => {
   const a = box(100, 0);
   const mid = box(100, 124);
