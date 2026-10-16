@@ -114,7 +114,7 @@ async function fetchFromOrigin(
         "origin",
         ...branches.map(refspec),
       ],
-      { env: { ...process.env, ...env }, timeout: FETCH_TIMEOUT_MS },
+      { env, timeout: FETCH_TIMEOUT_MS },
     );
 
   let last: unknown = null;
