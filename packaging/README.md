@@ -105,6 +105,28 @@ When notarization fails, the `mac:dmg` step prints `notarytool log` with
 Apple's reasons. A failed run publishes nothing, so merge a fix, delete the
 tag locally and on GitHub, and tag the new merge commit.
 
+## Dependency updates
+
+Dependabot opens a pull request once a week when a dependency has a new
+version, from `.github/dependabot.yml`: one for `next` and `eslint-config-next`
+together, one for the other npm packages' patch and minor updates, one for the
+GitHub Actions the workflows use, and one for Sparkle. A security update comes
+as soon as an advisory is published. Each pull request runs `check`, and
+`.github/workflows/dependabot-merge.yml` merges a patch or minor update once
+`check` passes. A major update, or one that fails `check`, waits in the pull
+request list for a person. A merge changes nothing installed: updates reach the
+app at the next release.
+
+A Sparkle pull request needs one change by hand before it merges. On its
+branch, set `sparkle_version` and `sparkle_sha256` in `mac/appcast.sh` to the
+new version and the `checksum` in Sparkle's `Package.swift` at that tag, so the
+tools that sign the appcast match the framework the app links. The pull
+request is a major or minor update, so it waits for that change.
+
+The Node the app bundles is pinned in `mac/build.sh` with its checksum. To
+bump it, set `node_version` and take `node_sha256` from
+`https://nodejs.org/dist/v<version>/SHASUMS256.txt`.
+
 ## Ports
 
 Default is **4460** (`BACKSTORY_PORT` or `--port` to override). The app and the

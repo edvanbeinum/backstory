@@ -1,0 +1,41 @@
+# Dependabot opens a pull request when a dependency has a new version, and
+# check.yml runs on each one. dependabot-merge.yml merges the patch and minor
+# ones that pass; a major one waits for a person. Security updates come as
+# soon as an advisory is published, on the repository setting, in the same groups.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      # next and eslint-config-next are pinned to one version and must move
+      # together, whatever the update type. Everything else arrives as one
+      # patch-and-minor pull request; a major update comes on its own.
+      next:
+        patterns: ["next", "eslint-config-next"]
+      next-security:
+        applies-to: security-updates
+        patterns: ["next", "eslint-config-next"]
+      npm:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
+      npm-security:
+        applies-to: security-updates
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        patterns: ["*"]
+
+  # Sparkle, resolved in the Xcode project's Package.resolved. A Sparkle bump
+  # also needs mac/appcast.sh's pin changed by hand; packaging/README.md says
+  # how.
+  - package-ecosystem: swift
+    directory: /mac/backstory
+    schedule:
+      interval: weekly
