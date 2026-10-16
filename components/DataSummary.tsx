@@ -577,25 +577,38 @@ function useDataDraft(
     void request("POST");
   }, [autoStart, repo, rev, request]);
 
-  const turnOff = useCallback(async () => {
-    try {
-      const response = await fetch("/api/data?auto=0", { method: "POST" });
-      if (!response.ok)
-        throw new Error(`Backstory answered ${response.status}.`);
-      onReadRef.current();
-    } catch (err) {
-      setError({
-        over: given,
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }, [given]);
+  // Turning reading on starts main's read before the page reads the view
+  // again, so the view's own read waits behind it instead of reading its base
+  // in full.
+  const setAuto = useCallback(
+    async (on: boolean) => {
+      try {
+        const response = await fetch(`/api/data?auto=${on ? 1 : 0}`, {
+          method: "POST",
+        });
+        if (!response.ok)
+          throw new Error(`Backstory answered ${response.status}.`);
+        if (on)
+          await fetch(`/api/data?repo=${encodeURIComponent(repo)}&trunk=1`, {
+            method: "POST",
+          });
+        onReadRef.current();
+      } catch (err) {
+        setError({
+          over: given,
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    },
+    [repo, given],
+  );
 
   return {
     data,
     error: error?.over === given ? error.message : null,
     start: (redraft = false) => void request("POST", redraft),
-    turnOff: () => void turnOff(),
+    turnOn: () => void setAuto(true),
+    turnOff: () => void setAuto(false),
   };
 }
 
@@ -661,6 +674,7 @@ function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
     job.status === "unavailable" ||
     job.status === "done";
   const provider = job?.status === "idle" ? job.provider : null;
+  const offerAuto = job?.status === "idle" && !job.auto;
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
@@ -674,6 +688,11 @@ function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
         {job && idle && (
           <Button size="sm" variant="primary" onClick={() => draft.start()}>
             Draft the data model
+          </Button>
+        )}
+        {offerAuto && (
+          <Button size="sm" onClick={draft.turnOn}>
+            Read automatically
           </Button>
         )}
         <DraftProgress data={data} draft={draft} />

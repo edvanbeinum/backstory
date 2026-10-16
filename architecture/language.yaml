@@ -89,7 +89,7 @@ terms:
       - dev mode
       - override
   - name: setup checklist
-    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, data models, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Data models row, shown once Claude Code is ready, states what reading data models costs, and its Read data models automatically button turns that on. The Mac app's Set Up Backstory… brings it back at `/?setup=1`, and so does the Connect GitHub link on a repo or inbox notice. The GitHub row offers Connect GitHub, with `gh auth login` as the alternative. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
+    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, data models, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Data models row, shown once Claude Code is ready, states what reading data models costs, and its Read data models automatically button turns that on, as does Read automatically beside Draft the data model on Story. The Mac app's Set Up Backstory… brings it back at `/?setup=1`, and so does the Connect GitHub link on a repo or inbox notice. The GitHub row offers Connect GitHub, with `gh auth login` as the alternative. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
     avoid:
       - onboarding
       - wizard

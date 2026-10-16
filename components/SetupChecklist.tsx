@@ -333,7 +333,7 @@ function ConnectGitHub({
   );
 }
 
-/** Turns on reading data models as repos and views open; Turn off is on each drafted view's Data line. */
+/** Turns on reading data models as repos and views open, as Read automatically on an undrafted view does; Turn off is on each drafted view's Data line. */
 function ReadDataModels({ onChanged }: { onChanged: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);

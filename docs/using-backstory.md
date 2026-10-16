@@ -117,7 +117,8 @@ before reading its lines:
     **Read data models automatically**. With it on, opening a repo starts the
     read of main's data model, and opening a view on Story starts the view's
     read, with its progress on the Data line. With it off, **Draft the data
-    model** under the map on Story reads one view.
+    model** under the map on Story reads one view, and **Read automatically**
+    beside it turns reading on and starts this view's read.
   - On a drafted view, the Data line says what this repo's data models have
     cost, and has **Turn off** for reading automatically, and **Redraft**.
     **Show data** opens the whole model when the change touches none of it.
