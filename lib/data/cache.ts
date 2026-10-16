@@ -592,6 +592,9 @@ export async function startTrunkRead(
   const key = trunkKey(dir);
   if (registry.jobs.has(key)) return false;
   const { job, release } = claim(key);
+  // Clear the last read's end as soon as the key is claimed: a view queued
+  // behind this claim would otherwise fail with that older error.
+  registry.ended.delete(key);
 
   let ready: { tip: string; files: string[] | null } | null = null;
   try {
@@ -601,7 +604,6 @@ export async function startTrunkRead(
   }
   if (!ready) return false;
 
-  registry.ended.delete(key);
   job.phase = PHASES.waiting;
   const { tip, files } = ready;
   const c = chain(root, dir, files, job, { runner: opts.runner });
