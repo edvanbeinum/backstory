@@ -132,6 +132,7 @@ blocks:
   - name: store
     code:
       - lib/store.ts
+      - lib/schema.sql
       - lib/responses.ts
       - lib/drafts.ts
       - lib/notes.ts

@@ -17,6 +17,8 @@ const nextConfig: NextConfig = {
   // `lib/exec.ts` makes Next trace the whole project, which would copy the
   // Mac app's sources and its Xcode build output into the server.
   outputFileTracingExcludes: { "/*": ["./mac/**/*"] },
+  // `lib/store.ts` reads the schema at run time, which tracing can't see.
+  outputFileTracingIncludes: { "/*": ["./lib/schema.sql"] },
 };
 
 export default nextConfig;
