@@ -52,6 +52,7 @@ type Filter = "all" | "yourself" | number;
  * hunks no flow explains or to one flow's files.
  */
 export function FilesChanged({
+  view,
   diff,
   loading,
   error,
@@ -72,6 +73,8 @@ export function FilesChanged({
   onStep,
   onComment,
 }: {
+  /** The repo and change on screen */
+  view: string;
   diff: DiffResponse | null;
   loading: boolean;
   error: string | null;
@@ -100,6 +103,12 @@ export function FilesChanged({
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [byPath, setByPath] = useState(false);
+  // A filter names this change's flows, so it doesn't carry to the next one.
+  const [shownView, setShownView] = useState(view);
+  if (shownView !== view) {
+    setShownView(view);
+    setFilter("all");
+  }
   const [askedAt, setAskedAt] = useState<number | null>(null);
   if (filterAsk && filterAsk.at !== askedAt) {
     setAskedAt(filterAsk.at);

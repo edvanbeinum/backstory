@@ -63,6 +63,7 @@ export function FlowCard({
   rev,
   onShowInFiles,
   target,
+  onTargetDone,
   navRef,
   components,
   dataFields,
@@ -81,6 +82,7 @@ export function FlowCard({
   onShowInFiles: (row: FlowRow) => void;
   /** A step to open, asked for from elsewhere; this card is already open */
   target: StoryTarget | null;
+  onTargetDone: (at: number) => void;
   /** Set on the topmost open card only: j/k walk its steps */
   navRef: React.MutableRefObject<((delta: number) => boolean) | null> | null;
   components?: Map<string, ComponentInfo>;
@@ -132,6 +134,9 @@ export function FlowCard({
     );
     if (row) scrollToReadingLine(row);
   }, [scrollTo]);
+  useEffect(() => {
+    if (seen !== null) onTargetDone(seen);
+  }, [seen, onTargetDone]);
 
   const anyOpen = steps.size > 0;
   useEffect(() => {

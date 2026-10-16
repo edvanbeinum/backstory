@@ -717,6 +717,13 @@ export default function Page() {
 
   const clearFilesJump = useCallback(() => setFilesJump(null), []);
 
+  // Clear a target once a card has opened it, or a regenerate's remount would
+  // open it again and scroll the window from behind another tab.
+  const clearStoryTarget = useCallback(
+    (at: number) => setStoryTarget((t) => (t?.at === at ? null : t)),
+    [],
+  );
+
   const openFile = useCallback((path: string) => {
     setFilesJump({ path, at: Date.now() });
     setTab("files");
@@ -737,6 +744,10 @@ export default function Page() {
     setTab("files");
     window.scrollTo({ top: 0 });
   }, []);
+
+  // The last view's diff stays on screen while this one's loads; this view's
+  // flows must wait for it, or their marks sit on the old diff's lines.
+  const diffIsCurrent = diff?.rev === rev;
 
   /** Every flow's steps, by the diff line each sits on, for the gutter marks. */
   const marks = useMemo(() => (flowSet ? stepMarks(flowSet) : null), [flowSet]);
@@ -1432,6 +1443,7 @@ export default function Page() {
                           onShowFiles={() => setTab("files")}
                           onShowYourself={showYourself}
                           target={storyTarget}
+                          onTargetDone={clearStoryTarget}
                           onShowInFiles={showInFiles}
                           navRef={flowNavRef}
                           components={componentInfo}
@@ -1445,6 +1457,7 @@ export default function Page() {
                     {visited.has("files") && (
                       <div hidden={tab !== "files"}>
                         <FilesChanged
+                          view={viewKey}
                           diff={diff}
                           loading={diffLoading}
                           error={diffError}
@@ -1455,8 +1468,8 @@ export default function Page() {
                           notes={noteRev ? notes : null}
                           noteRev={noteRev}
                           map={map}
-                          flowSet={flowSet}
-                          marks={marks}
+                          flowSet={diffIsCurrent ? flowSet : null}
+                          marks={diffIsCurrent ? marks : null}
                           jump={filesJump}
                           onJumped={clearFilesJump}
                           filterAsk={filesFilter}

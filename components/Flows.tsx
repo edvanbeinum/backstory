@@ -16,6 +16,8 @@ interface CardProps {
   rev: string;
   onShowInFiles: (row: FlowRow) => void;
   target: StoryTarget | null;
+  /** The target has been opened, so a later remount doesn't open it again */
+  onTargetDone: (at: number) => void;
   /** j/k walk the topmost open card's steps */
   navRef: React.MutableRefObject<((delta: number) => boolean) | null>;
   components?: Map<string, ComponentInfo>;

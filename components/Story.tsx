@@ -32,6 +32,7 @@ export function Story({
   onShowFiles,
   onShowYourself,
   target,
+  onTargetDone,
   onShowInFiles,
   navRef,
   components,
@@ -56,6 +57,7 @@ export function Story({
   onShowFiles: () => void;
   onShowYourself: () => void;
   target: StoryTarget | null;
+  onTargetDone: (at: number) => void;
   onShowInFiles: (row: FlowRow) => void;
   navRef: React.MutableRefObject<((delta: number) => boolean) | null>;
   components: Map<string, ComponentInfo>;
@@ -118,6 +120,7 @@ export function Story({
           rev={rev}
           onShowInFiles={onShowInFiles}
           target={target}
+          onTargetDone={onTargetDone}
           navRef={navRef}
           components={components}
           dataFields={dataFields}
