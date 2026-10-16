@@ -157,6 +157,16 @@ export async function getAllResponses(): Promise<
   });
 }
 
+/**
+ * A sha linked twice is one answer, not two. Healing can make two links the
+ * same, when a rebase lands both on one commit.
+ */
+function onePerSha(commits: ResponseCommit[]): ResponseCommit[] {
+  return commits.filter(
+    (c, i) => commits.findIndex((o) => o.sha === c.sha) === i,
+  );
+}
+
 function validate(patch: ResponsePatch): void {
   if (patch.reply != null && patch.reply.length > MAX_REPLY) {
     throw new Error("Invalid reply: too long");
@@ -221,7 +231,9 @@ export async function updateResponses(
         ...(patch.reply !== undefined
           ? { reply: patch.reply === "" ? null : patch.reply }
           : {}),
-        ...(patch.commits !== undefined ? { commits: patch.commits } : {}),
+        ...(patch.commits !== undefined
+          ? { commits: onePerSha(patch.commits) }
+          : {}),
       };
 
       if (patch.addCommit) {
@@ -278,10 +290,7 @@ function normalize(value: Record<string, unknown>): ResponseRecord {
     done: value.done === true,
     doneAt: typeof value.doneAt === "number" ? value.doneAt : null,
     reply,
-    // A sha linked twice is one answer, not two.
-    commits: commits.filter(
-      (c, i) => commits.findIndex((o) => o.sha === c.sha) === i,
-    ),
+    commits: onePerSha(commits),
   };
 }
 

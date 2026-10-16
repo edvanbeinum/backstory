@@ -177,6 +177,18 @@ test("a comment can hold several commits, and drop one without the others", asyn
   );
 });
 
+test("a list that names one commit twice keeps it once", async () => {
+  useTempHome();
+  const commit = { sha: SHA_A, patchId: PATCH_A };
+  const forPr = await updateResponses("o/r#1", {
+    t1: { commits: [commit, { sha: SHA_B, patchId: PATCH_B }, commit] },
+  });
+  assert.deepEqual(
+    forPr.t1.commits.map((c) => c.sha),
+    [SHA_A, SHA_B],
+  );
+});
+
 test("a record stored with the old single `commit` still reads", async () => {
   const home = useTempHome();
   await fs.mkdir(home, { recursive: true });
