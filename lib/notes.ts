@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 
 import { BRANCH_REV, WORKING_REV } from "./constants";
-import { db, KEY, transaction, type Legacy } from "./store";
+import { KEY, reading, transaction, type Legacy } from "./store";
 import type { Note } from "./types";
 
 /**
@@ -127,7 +127,7 @@ function insert(database: DatabaseSync, root: string, note: Note): void {
 }
 
 export async function getNotes(root: string): Promise<Note[]> {
-  return read(db(), root);
+  return reading([], (database) => read(database, root));
 }
 
 export type NotesChange =

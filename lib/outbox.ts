@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 import { writeNotes } from "./notes";
-import { db, KEY, transaction, type Legacy } from "./store";
+import { KEY, reading, transaction, type Legacy } from "./store";
 import type { Note } from "./types";
 
 /**
@@ -159,18 +159,22 @@ function lastSeen(
 }
 
 export async function getOutbox(root: string): Promise<OutboxState> {
-  const database = db();
-  const rows = database
-    .prepare(
-      "SELECT * FROM rounds WHERE root = ? ORDER BY queued_at DESC, rowid",
-    )
-    .all(root) as unknown as RoundRow[];
-  const seen = seenRows(database, root);
-  return {
-    rounds: rows.map(toRound),
-    lastSeen: seen[0] ?? null,
-    seen: Object.fromEntries(seen.map((s) => [s.session, s.at])),
-  };
+  return reading<OutboxState>(
+    { rounds: [], lastSeen: null, seen: {} },
+    (database) => {
+      const rows = database
+        .prepare(
+          "SELECT * FROM rounds WHERE root = ? ORDER BY queued_at DESC, rowid",
+        )
+        .all(root) as unknown as RoundRow[];
+      const seen = seenRows(database, root);
+      return {
+        rounds: rows.map(toRound),
+        lastSeen: seen[0] ?? null,
+        seen: Object.fromEntries(seen.map((s) => [s.session, s.at])),
+      };
+    },
+  );
 }
 
 /*

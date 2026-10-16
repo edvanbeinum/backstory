@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { db, KEY, transaction, type Legacy } from "./store";
+import { KEY, reading, transaction, type Legacy } from "./store";
 
 /**
  * Everything you've done about one review comment, in one record: the
@@ -137,7 +137,7 @@ function write(
 export async function getResponses(
   key: string,
 ): Promise<Record<string, ResponseRecord>> {
-  return read(db(), key);
+  return reading({}, (database) => read(database, key));
 }
 
 /**
@@ -147,12 +147,14 @@ export async function getResponses(
 export async function getAllResponses(): Promise<
   Record<string, Record<string, ResponseRecord>>
 > {
-  const rows = db()
-    .prepare("SELECT * FROM responses")
-    .all() as unknown as ResponseRow[];
-  const out: Record<string, Record<string, ResponseRecord>> = {};
-  for (const row of rows) (out[row.pr] ??= {})[row.thread] = toRecord(row);
-  return out;
+  return reading({}, (database) => {
+    const rows = database
+      .prepare("SELECT * FROM responses")
+      .all() as unknown as ResponseRow[];
+    const out: Record<string, Record<string, ResponseRecord>> = {};
+    for (const row of rows) (out[row.pr] ??= {})[row.thread] = toRecord(row);
+    return out;
+  });
 }
 
 function validate(patch: ResponsePatch): void {

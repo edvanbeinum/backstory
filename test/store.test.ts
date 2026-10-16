@@ -70,6 +70,22 @@ test("a transaction inside another joins it, and rolls back with it", () => {
   assert.equal(count("seen"), 0);
 });
 
+test("a database that won't open reads as empty", async () => {
+  const home = path.join(tempHome(), "not-a-directory");
+  writeFileSync(home, "");
+  process.env.BACKSTORY_HOME = home;
+
+  assert.deepEqual(await getNotes("/repo"), []);
+  assert.deepEqual(await getOutbox("/repo"), {
+    rounds: [],
+    lastSeen: null,
+    seen: {},
+  });
+  assert.deepEqual(await getResponses("o/r#1"), {});
+  assert.deepEqual(await getAllResponses(), {});
+  assert.throws(() => transaction(() => null));
+});
+
 const writeJson = (home: string, name: string, data: unknown) =>
   writeFileSync(path.join(home, `${name}.json`), JSON.stringify(data));
 

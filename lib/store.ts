@@ -206,5 +206,19 @@ export function transaction<T>(fn: (database: DatabaseSync) => T): T {
   }
 }
 
+/**
+ * Run a read, or log why it failed and return `empty`. The store records
+ * what you've done; a database that won't open shows none of that rather than
+ * taking down the inbox or the diff it sits beside.
+ */
+export function reading<T>(empty: T, fn: (database: DatabaseSync) => T): T {
+  try {
+    return fn(db());
+  } catch (err) {
+    console.error("Backstory couldn't read its database:", err);
+    return empty;
+  }
+}
+
 /** GitHub thread node ids are opaque base64-ish strings; be strict anyway. */
 export const KEY = /^[A-Za-z0-9_=-]{1,200}$/;
