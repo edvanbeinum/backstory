@@ -109,8 +109,10 @@ async function fetchFromOrigin(
   base: string | null,
 ): Promise<void> {
   const token = isGitHubHttps(remoteUrl) ? await githubToken() : null;
-  const attempt = (env: GitEnv, branches: string[]) =>
-    git(
+  const attempt = (credentials: GitEnv, branches: string[]) => {
+    // Keeps git's messages in English, which missingOnOrigin matches.
+    const env: GitEnv = { ...credentials, LC_ALL: "C" };
+    return git(
       root,
       [
         "fetch",
@@ -119,9 +121,10 @@ async function fetchFromOrigin(
         "origin",
         ...branches.map(refspec),
       ],
-      // Keeps git's messages in English, which missingOnOrigin matches.
-      { env: { ...env, LC_ALL: "C" }, timeout: FETCH_TIMEOUT_MS },
+      // git() merges process.env underneath, so NODE_ENV is there at runtime.
+      { env: env as NodeJS.ProcessEnv, timeout: FETCH_TIMEOUT_MS },
     );
+  };
 
   let last: unknown = null;
   for (const env of credentialAttempts(remoteUrl, token)) {
