@@ -82,15 +82,15 @@ primitives:
     symbols:
       - loadGitHubDataCached
     use: A branch's PR, threads and reviews, cached, degrading to "unavailable" instead of throwing.
-  - name: store file
+  - name: store
     block: store
     file: lib/store.ts
     symbols:
-      - withStore
-      - readNamespaced
-      - writeNamespaced
+      - db
+      - transaction
       - homeDir
-    use: "Every store file read and write. It keeps the store invariant, validates on read and writes atomically. `homeDir` is the one directory everything on this machine lives in (the store, the flow cache, the data cache, local models)."
+      - KEY
+    use: "Every read and write of notes, rounds and responses, in the SQLite database `~/.backstory/backstory.db`. `db` opens it on first use and makes the schema; `transaction` runs a synchronous write in one transaction, joining one already open, so a module's write can be part of a larger one. `homeDir` is the one directory everything on this machine lives in (the database, the flow cache, the data cache, local models). `KEY` is the shape of an id the store accepts."
   - name: run the AI provider
     block: AI provider
     file: lib/ai/provider.ts

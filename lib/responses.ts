@@ -1,31 +1,21 @@
-import { promises as fs } from "node:fs";
+import type { DatabaseSync } from "node:sqlite";
 
-import {
-  KEY,
-  readNamespaced,
-  storePath,
-  withStore,
-  writeNamespaced,
-} from "./store";
+import { db, KEY, transaction, type Legacy } from "./store";
 
 /**
- * Everything you've done about one review comment, in one record.
+ * Everything you've done about one review comment, in one record: the
+ * `responses` table.
  *
  * Backstory is a TODO tracker built from review comments and a drafting tool for
  * the replies, so a comment has exactly one thing attached to it: your
- * response. That used to be three separate ideas — an "ack", a commit link,
- * and a draft — spread across two files, with two of them doubling as the
- * done signal.
+ * response.
  *
- * Now `done` is the only thing that means handled, and nothing sets it but
- * you. Not linking a commit, not writing a reply, not a reply spotted on
- * GitHub. Working down a list and checking things off is the point; a flag
- * something else can set isn't a checklist.
- *
- * Shape: { "owner/repo#26": { "<threadId>": { done, doneAt, reply, commit } } }
+ * `done` is the only thing that means handled, and nothing sets it but you.
+ * Not linking a commit, not writing a reply, not a reply spotted on GitHub.
+ * Working down a list and checking things off is the point; a flag something
+ * else can set isn't a checklist.
  */
 
-const NAME = "responses";
 const SHA = /^[0-9a-f]{7,40}$/;
 const PATCH_ID = /^[0-9a-f]{40}$/;
 
@@ -81,54 +71,6 @@ export const EMPTY_RESPONSE: ResponseRecord = {
   commits: [],
 };
 
-/** The file is meant to be hand-editable, so nothing in it is trusted. */
-type StoredResponse = Record<string, unknown>;
-
-function isStoredResponse(value: unknown): value is StoredResponse {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-function normalizeCommit(value: unknown): ResponseCommit | null {
-  if (!value || typeof value !== "object") return null;
-  const record = value as Record<string, unknown>;
-  if (typeof record.sha !== "string" || !SHA.test(record.sha)) return null;
-  const patchId =
-    typeof record.patchId === "string" && PATCH_ID.test(record.patchId)
-      ? record.patchId
-      : null;
-  return { sha: record.sha, patchId };
-}
-
-function normalize(value: StoredResponse): ResponseRecord {
-  const reply =
-    typeof value.reply === "string" && value.reply.length <= MAX_REPLY
-      ? value.reply
-      : null;
-
-  // `commit` is the shape this file held when a comment could only have one
-  // answer. Read either; whichever it was, it's written back as a list the
-  // next time this record is touched.
-  const list = Array.isArray(value.commits)
-    ? value.commits
-    : value.commit !== undefined
-      ? [value.commit]
-      : [];
-
-  const commits = list
-    .map(normalizeCommit)
-    .filter((c): c is ResponseCommit => c !== null);
-
-  return {
-    done: value.done === true,
-    doneAt: typeof value.doneAt === "number" ? value.doneAt : null,
-    reply,
-    // A sha linked twice is one answer, not two.
-    commits: commits.filter(
-      (c, i) => commits.findIndex((o) => o.sha === c.sha) === i,
-    ),
-  };
-}
-
 /** A record holding nothing is deleted rather than stored as noise. */
 function isEmpty(record: ResponseRecord): boolean {
   return !record.done && record.reply === null && record.commits.length === 0;
@@ -143,34 +85,74 @@ export function prKey(
   return `${owner}/${name}#${prNumber}`;
 }
 
+interface ResponseRow {
+  pr: string;
+  thread: string;
+  done: number;
+  done_at: number | null;
+  reply: string | null;
+  commits: string;
+}
+
+function toRecord(row: ResponseRow): ResponseRecord {
+  return {
+    done: row.done === 1,
+    doneAt: row.done_at,
+    reply: row.reply,
+    commits: JSON.parse(row.commits) as ResponseCommit[],
+  };
+}
+
+function read(
+  database: DatabaseSync,
+  key: string,
+): Record<string, ResponseRecord> {
+  const rows = database
+    .prepare("SELECT * FROM responses WHERE pr = ?")
+    .all(key) as unknown as ResponseRow[];
+  return Object.fromEntries(rows.map((row) => [row.thread, toRecord(row)]));
+}
+
+function write(
+  database: DatabaseSync,
+  key: string,
+  id: string,
+  record: ResponseRecord,
+): void {
+  database
+    .prepare(
+      `INSERT OR REPLACE INTO responses (pr, thread, done, done_at, reply, commits)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      key,
+      id,
+      record.done ? 1 : 0,
+      record.doneAt,
+      record.reply,
+      JSON.stringify(record.commits),
+    );
+}
+
 export async function getResponses(
   key: string,
 ): Promise<Record<string, ResponseRecord>> {
-  await ensureMigrated();
-  const store = await readNamespaced<StoredResponse>(NAME, isStoredResponse);
-  return mapNamespace(store[key] ?? {});
+  return read(db(), key);
 }
 
 /**
- * Every PR at once. The namespace key carries no filesystem path, so the
- * inbox gets handled-state for every worktree from this single read.
+ * Every PR at once. The PR key has no filesystem path in it, so the inbox
+ * gets handled-state for every worktree from this single read.
  */
 export async function getAllResponses(): Promise<
   Record<string, Record<string, ResponseRecord>>
 > {
-  await ensureMigrated();
-  const store = await readNamespaced<StoredResponse>(NAME, isStoredResponse);
-  return Object.fromEntries(
-    Object.entries(store).map(([key, entries]) => [key, mapNamespace(entries)]),
-  );
-}
-
-function mapNamespace(
-  entries: Record<string, StoredResponse>,
-): Record<string, ResponseRecord> {
-  return Object.fromEntries(
-    Object.entries(entries).map(([id, value]) => [id, normalize(value)]),
-  );
+  const rows = db()
+    .prepare("SELECT * FROM responses")
+    .all() as unknown as ResponseRow[];
+  const out: Record<string, Record<string, ResponseRecord>> = {};
+  for (const row of rows) (out[row.pr] ??= {})[row.thread] = toRecord(row);
+  return out;
 }
 
 function validate(patch: ResponsePatch): void {
@@ -192,12 +174,8 @@ function validate(patch: ResponsePatch): void {
 }
 
 /**
- * The only mutator, and batch-shaped on purpose.
- *
- * Every write is a read-modify-write of the whole file, so a loop of
- * single-record writes makes the last one win and silently drop the rest.
- * That has bitten this codebase before. Patches merge field-wise; `null`
- * deletes the record outright.
+ * The only mutator, and batch-shaped: every patch applies in one transaction,
+ * or none does. Patches merge field-wise; `null` deletes the record outright.
  */
 export async function updateResponses(
   key: string,
@@ -212,15 +190,15 @@ export async function updateResponses(
     if (patch) validate(patch);
   }
 
-  await ensureMigrated();
-
-  return withStore(NAME, async () => {
-    const store = await readNamespaced<StoredResponse>(NAME, isStoredResponse);
-    const forPr = mapNamespace(store[key] ?? {});
+  return transaction((database) => {
+    const forPr = read(database, key);
+    const remove = database.prepare(
+      "DELETE FROM responses WHERE pr = ? AND thread = ?",
+    );
 
     for (const [id, patch] of Object.entries(patches)) {
       if (patch === null) {
-        delete forPr[id];
+        remove.run(key, id);
         continue;
       }
 
@@ -253,146 +231,68 @@ export async function updateResponses(
         next.commits = next.commits.filter((c) => c.sha !== patch.removeCommit);
       }
 
-      if (isEmpty(next)) delete forPr[id];
-      else forPr[id] = next;
+      if (isEmpty(next)) remove.run(key, id);
+      else write(database, key, id, next);
     }
 
-    if (Object.keys(forPr).length === 0) delete store[key];
-    else store[key] = forPr as unknown as Record<string, StoredResponse>;
-
-    await writeNamespaced(NAME, store);
-    return forPr;
+    return read(database, key);
   });
 }
 
-/* --- Migration from links.json + drafts.json -------------------------- */
+/* --- Import from responses.json -------------------------------------- */
 
-/**
- * The two files this replaces, read through the validators they shipped with.
- * `links.json` has held three shapes over its life and the live data is
- * mostly the *middle* one, so this tolerance is the main path, not a courtesy
- * to history.
- */
-type StoredLink =
-  | { kind: "commit"; sha: string; patchId: string | null }
-  | { kind: "ack" }
-  | { sha: string; patchId?: string | null }
-  | string;
+const isObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
-function isStoredLink(value: unknown): value is StoredLink {
-  if (typeof value === "string") return SHA.test(value);
-  if (!value || typeof value !== "object") return false;
-
-  const record = value as Record<string, unknown>;
-  if (record.kind === "ack") return true;
-  if (typeof record.sha !== "string" || !SHA.test(record.sha)) return false;
-  return (
-    record.patchId === null ||
-    record.patchId === undefined ||
-    (typeof record.patchId === "string" && PATCH_ID.test(record.patchId))
-  );
+function normalizeCommit(value: unknown): ResponseCommit | null {
+  if (!isObject(value)) return null;
+  if (typeof value.sha !== "string" || !SHA.test(value.sha)) return null;
+  const patchId =
+    typeof value.patchId === "string" && PATCH_ID.test(value.patchId)
+      ? value.patchId
+      : null;
+  return { sha: value.sha, patchId };
 }
 
-const isDraft = (value: unknown): value is string =>
-  typeof value === "string" && value.length <= MAX_REPLY;
+function normalize(value: Record<string, unknown>): ResponseRecord {
+  const reply =
+    typeof value.reply === "string" && value.reply.length <= MAX_REPLY
+      ? value.reply
+      : null;
 
-/** A link was the old done signal, so it migrates to a tick. */
-function linkToResponse(link: StoredLink, at: number): ResponseRecord {
-  const base = { done: true, doneAt: at, reply: null };
-  if (typeof link === "string") {
-    return { ...base, commits: [{ sha: link, patchId: null }] };
-  }
-  if ("kind" in link && link.kind === "ack") return { ...base, commits: [] };
-  const record = link as { sha: string; patchId?: string | null };
+  // `commit` is the shape the file had when a comment could only have one
+  // answer.
+  const list = Array.isArray(value.commits)
+    ? value.commits
+    : value.commit !== undefined
+      ? [value.commit]
+      : [];
+
+  const commits = list
+    .map(normalizeCommit)
+    .filter((c): c is ResponseCommit => c !== null);
+
   return {
-    ...base,
-    commits: [{ sha: record.sha, patchId: record.patchId ?? null }],
+    done: value.done === true,
+    doneAt: typeof value.doneAt === "number" ? value.doneAt : null,
+    reply,
+    // A sha linked twice is one answer, not two.
+    commits: commits.filter(
+      (c, i) => commits.findIndex((o) => o.sha === c.sha) === i,
+    ),
   };
 }
 
-let migration: Promise<void> | null = null;
-
-export function ensureMigrated(): Promise<void> {
-  migration ??= migrate();
-  return migration;
-}
-
 /**
- * Runs once, lazily, and only when there's nothing to lose: the presence of
- * responses.json ends it immediately, which is what makes a second run
- * harmless and stops it resurrecting records you've since cleared.
- *
- * Not wrapped in withStore — every accessor awaits this before taking the
- * lock, so no other write can be in flight, and taking the lock here would
- * deadlock against the caller that already holds it.
+ * Copy the old `responses.json` in. A record keeps what checks out of it: an
+ * unusable sha is dropped without losing the tick.
  */
-async function migrate(): Promise<void> {
-  try {
-    await fs.access(storePath(NAME));
-    return;
-  } catch {
-    // No responses.json yet — there may be legacy files to carry over.
-  }
-
-  const [links, drafts] = await Promise.all([
-    readNamespaced<StoredLink>("links", isStoredLink),
-    readNamespaced<string>("drafts", isDraft),
-  ]);
-
-  const prKeys = new Set([...Object.keys(links), ...Object.keys(drafts)]);
-  if (prKeys.size === 0) return;
-
-  // The link's file time is the closest honest answer to "when did you
-  // decide this was handled" — better than stamping everything as now.
-  let at = Date.now();
-  try {
-    at = (await fs.stat(storePath("links"))).mtimeMs;
-  } catch {
-    // No links file; drafts-only migration, and doneAt won't be read anyway.
-  }
-
-  const out: Record<string, Record<string, ResponseRecord>> = {};
-  for (const key of prKeys) {
-    const linksForPr = links[key] ?? {};
-    const draftsForPr = drafts[key] ?? {};
-    // Union, not links-driven: a draft with no link is a reply in progress on
-    // a comment you haven't answered yet, and driving from links alone would
-    // drop it. The live data has one.
-    const ids = new Set([
-      ...Object.keys(linksForPr),
-      ...Object.keys(draftsForPr),
-    ]);
-
-    const forPr: Record<string, ResponseRecord> = {};
-    for (const id of ids) {
-      const link = linksForPr[id];
-      const reply = draftsForPr[id] ?? null;
-      const record = link
-        ? { ...linkToResponse(link, at), reply }
-        : { done: false, doneAt: null, reply, commits: [] };
-      if (!isEmpty(record)) forPr[id] = record;
+export function importResponses(database: DatabaseSync, legacy: Legacy): void {
+  for (const [key, entries] of Object.entries(legacy)) {
+    for (const [id, value] of Object.entries(entries)) {
+      if (!isObject(value)) continue;
+      const record = normalize(value);
+      if (!isEmpty(record)) write(database, key, id, record);
     }
-    if (Object.keys(forPr).length > 0) out[key] = forPr;
   }
-
-  await writeNamespaced(NAME, out);
-
-  // Renamed, never deleted: being able to recover a store by hand is the
-  // reason it's plain JSON in the first place.
-  await Promise.all(
-    ["links", "drafts"].map(async (name) => {
-      try {
-        await fs.rename(storePath(name), `${storePath(name)}.migrated`);
-      } catch {
-        // Wasn't there, or already renamed. Either way there's nothing to do.
-      }
-    }),
-  );
 }
-
-/** Test seam: lets a fixture run the migration more than once per process. */
-export function resetMigrationForTests(): void {
-  migration = null;
-}
-
-export const RESPONSES_FILE = storePath(NAME);

@@ -143,11 +143,12 @@ function seenRows(
   database: DatabaseSync,
   root: string,
 ): { session: string; at: number }[] {
-  return database
+  const rows = database
     .prepare(
       "SELECT session, at FROM seen WHERE root = ? ORDER BY at DESC, rowid DESC",
     )
     .all(root) as unknown as { session: string; at: number }[];
+  return rows.map(({ session, at }) => ({ session, at }));
 }
 
 function lastSeen(

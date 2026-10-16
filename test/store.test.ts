@@ -6,7 +6,10 @@ import { test } from "node:test";
 
 import { WORKING_REV } from "../lib/constants";
 import { getNotes } from "../lib/notes";
+import { getOutbox } from "../lib/outbox";
+import { getAllResponses, getResponses } from "../lib/responses";
 import { db, transaction } from "../lib/store";
+import type { Note } from "../lib/types";
 
 /** The store resolves BACKSTORY_HOME per call; never touch the real home. */
 function tempHome(): string {
@@ -115,29 +118,102 @@ test("a home with no JSON files makes an empty database at version 1", () => {
   }
 });
 
-test("a second start neither imports again nor fails", async () => {
-  const home = tempHome();
-  const note = {
-    id: "n1",
-    rev: WORKING_REV,
-    path: null,
-    side: "new",
-    line: null,
-    quote: null,
-    body: "general",
-    createdAt: 1,
-    sentAt: null,
-    done: false,
-    doneAt: null,
-  };
-  writeJson(home, "notes", { "/repo": { n1: note } });
-  assert.equal((await getNotes("/repo")).length, 1);
+const SHA = "76c66deaa060ae3da0ff460e13aabfff3de885c4";
+const PATCH = "5265095d7fd0b28d9cb0360ffa675bdc5f5cd38d";
 
-  writeJson(home, "notes", { "/repo": { n2: { ...note, id: "n2" } } });
+const NOTE: Note = {
+  id: "n1",
+  rev: "a".repeat(40),
+  path: "src/a.ts",
+  side: "old",
+  line: 7,
+  quote: "gone",
+  body: "why?",
+  createdAt: 3,
+  sentAt: 5,
+  done: true,
+  doneAt: 6,
+};
+
+const ROUND = {
+  noteIds: ["n1"],
+  message: "why?",
+  queuedAt: 5,
+  forSession: "s-1",
+  deliveredAt: null,
+  deliveredTo: null,
+  claim: { session: "s-1", until: 99 },
+};
+
+function writeAllThree(home: string): void {
+  writeJson(home, "notes", {
+    "/repo": { n1: NOTE, bad: { ...NOTE, id: "bad", side: "up" } },
+  });
+  writeJson(home, "outbox", {
+    "/repo": {
+      r1: ROUND,
+      seen: { "s-1": 4 },
+      "r-bad": { ...ROUND, noteIds: "n1" },
+    },
+  });
+  writeJson(home, "responses", {
+    "o/r#1": {
+      t1: {
+        done: true,
+        doneAt: 1,
+        reply: "hi",
+        commit: { sha: SHA, patchId: PATCH },
+      },
+      t2: "garbage",
+    },
+  });
+}
+
+test("a first start imports every valid record from the three files, and renames them", async () => {
+  const home = tempHome();
+  writeAllThree(home);
+
+  assert.deepEqual(await getNotes("/repo"), [NOTE]);
+  assert.deepEqual(await getOutbox("/repo"), {
+    rounds: [{ ...ROUND, id: "r1", root: "/repo" }],
+    lastSeen: { session: "s-1", at: 4 },
+    seen: { "s-1": 4 },
+  });
+  assert.deepEqual(await getAllResponses(), {
+    "o/r#1": {
+      t1: {
+        done: true,
+        doneAt: 1,
+        reply: "hi",
+        commits: [{ sha: SHA, patchId: PATCH }],
+      },
+    },
+  });
+  for (const name of ["notes", "outbox", "responses"]) {
+    assert.ok(!existsSync(path.join(home, `${name}.json`)), name);
+    assert.ok(existsSync(path.join(home, `${name}.json.migrated`)), name);
+  }
+
+  // Put the files back: a second start finds the database and leaves them.
+  writeAllThree(home);
+  writeJson(home, "notes", { "/repo": { n2: { ...NOTE, id: "n2" } } });
   reopen(home);
   assert.deepEqual(
     (await getNotes("/repo")).map((n) => n.id),
     ["n1"],
   );
+  assert.equal(count("rounds"), 1);
+  assert.equal(count("responses"), 1);
   assert.ok(existsSync(path.join(home, "notes.json")));
+});
+
+test("a home with only responses.json imports it, and the other tables are empty", async () => {
+  const home = tempHome();
+  writeJson(home, "responses", { "o/r#1": { t1: { done: true, doneAt: 1 } } });
+
+  assert.equal((await getResponses("o/r#1")).t1.done, true);
+  for (const table of ["notes", "rounds", "seen"]) {
+    assert.equal(count(table), 0, table);
+  }
+  assert.ok(existsSync(path.join(home, "responses.json.migrated")));
 });

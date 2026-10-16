@@ -1,10 +1,11 @@
-import { mkdirSync, promises as fs, readFileSync, renameSync } from "node:fs";
+import { mkdirSync, readFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 import { importNotes } from "./notes";
 import { importOutbox } from "./outbox";
+import { importResponses } from "./responses";
 
 /**
  * The SQLite database behind notes, rounds and responses: `backstory.db` in
@@ -18,6 +19,9 @@ import { importOutbox } from "./outbox";
  *
  * The flow cache, the data cache and local models stay files: each is written
  * whole and read by its key, and nothing writes two of them at once.
+ *
+ * A new database imports the JSON files it replaced (`importJson`). Remove the
+ * import in the release after the one that ships the database.
  */
 
 /**
@@ -135,13 +139,13 @@ export type Legacy = Record<string, Record<string, unknown>>;
 
 /**
  * Copy the JSON files this database replaced into a new database, in its
- * first transaction, and return the paths it read. Remove this, and the
- * importers it calls, in the release after the one that ships the database.
+ * first transaction, and return the paths it read.
  */
 function importJson(database: DatabaseSync, home: string): string[] {
   const importers: [string, (d: DatabaseSync, legacy: Legacy) => void][] = [
     ["notes.json", importNotes],
     ["outbox.json", importOutbox],
+    ["responses.json", importResponses],
   ];
   const read: string[] = [];
   for (const [name, importer] of importers) {
@@ -200,87 +204,6 @@ export function transaction<T>(fn: (database: DatabaseSync) => T): T {
     database.exec("ROLLBACK");
     throw err;
   }
-}
-
-export function storePath(name: string): string {
-  return path.join(homeDir(), `${name}.json`);
-}
-
-/**
- * Read a store file as `key -> record`, dropping anything that fails
- * validation. The file lives on disk and is meant to be hand-editable, so
- * it's re-validated on every read rather than trusted.
- */
-export async function readNamespaced<T>(
-  name: string,
-  isValid: (value: unknown) => value is T,
-): Promise<Record<string, Record<string, T>>> {
-  try {
-    const raw = await fs.readFile(storePath(name), "utf8");
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-
-    const out: Record<string, Record<string, T>> = {};
-    for (const [namespace, entries] of Object.entries(parsed)) {
-      if (!entries || typeof entries !== "object" || Array.isArray(entries)) {
-        continue;
-      }
-      const inner: Record<string, T> = {};
-      for (const [key, value] of Object.entries(entries)) {
-        if (KEY.test(key) && isValid(value)) inner[key] = value;
-      }
-      out[namespace] = inner;
-    }
-    return out;
-  } catch {
-    // Missing or unreadable — this store is a convenience, never load-bearing.
-    return {};
-  }
-}
-
-/**
- * Serialise everything that touches one store file.
- *
- * A store operation is read-modify-write, and two of them interleaved lose the
- * first writer's changes. That used to be impossible by accident — pins and
- * drafts lived in separate files, so their writers could never meet. Now that
- * one record holds the tick, the reply and the linked commit, a debounced
- * draft save and a tick click land on the same file, and the collision is
- * real.
- *
- * A promise chain is enough because there is exactly one local server process.
- * A rejection must not poison the chain, so the tail always settles.
- */
-const queues = new Map<string, Promise<unknown>>();
-
-export function withStore<T>(name: string, fn: () => Promise<T>): Promise<T> {
-  const prior = queues.get(name) ?? Promise.resolve();
-  const next = prior.then(fn, fn);
-  queues.set(
-    name,
-    next.catch(() => {}),
-  );
-  return next;
-}
-
-/** Distinguishes concurrent writes within one process. */
-let tmpCounter = 0;
-
-export async function writeNamespaced<T>(
-  name: string,
-  data: Record<string, Record<string, T>>,
-): Promise<void> {
-  await fs.mkdir(homeDir(), { recursive: true });
-  // Write-then-rename, so a crash mid-write can't truncate what's there.
-  // The counter matters: with only the pid in the name, two overlapping
-  // writes to one store share a temp path, and the loser can be renamed into
-  // place half-written — the exact corruption rename is meant to prevent.
-  const target = storePath(name);
-  const tmp = `${target}.${process.pid}.${tmpCounter++}.tmp`;
-  await fs.writeFile(tmp, JSON.stringify(data, null, 2), "utf8");
-  await fs.rename(tmp, target);
 }
 
 /** GitHub thread node ids are opaque base64-ish strings; be strict anyway. */
