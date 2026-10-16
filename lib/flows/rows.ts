@@ -319,6 +319,20 @@ export interface StepMarks {
 const stepNumber = (row: FlowRow) =>
   row.kind === "del" ? row.was : (row.now ?? row.was);
 
+/**
+ * Cache each set's diff-mode rows, so the gutter marks and every comment's
+ * step lookup share one LCS per flow rather than one per thread.
+ */
+const diffRowsCache = new WeakMap<FlowSet, FlowRow[][]>();
+function diffRows(set: FlowSet): FlowRow[][] {
+  let rows = diffRowsCache.get(set);
+  if (!rows) {
+    rows = set.flows.map((flow) => flowRows(flow, "diff", set.hunks));
+    diffRowsCache.set(set, rows);
+  }
+  return rows;
+}
+
 /** A flow's step, by number: flow 1, step 5. */
 export interface StepAt {
   /** 1-based, as the story numbers flows */
@@ -339,8 +353,8 @@ export function stepsAt(
   line: number,
   side: "old" | "new" = "new",
 ): StepAt | null {
-  for (const [i, flow] of set.flows.entries()) {
-    for (const row of flowRows(flow, "diff", set.hunks)) {
+  for (const [i, rows] of diffRows(set).entries()) {
+    for (const row of rows) {
       if (row.side === side && row.step.file === path && row.step.line === line)
         return { flow: i + 1, step: stepNumber(row) ?? 0, row };
     }
@@ -379,8 +393,8 @@ export function fileFlows(
 /** Every flow's steps, by file and by the line each sits on. */
 export function stepMarks(set: FlowSet): Map<string, StepMarks> {
   const out = new Map<string, StepMarks>();
-  set.flows.forEach((flow, i) => {
-    for (const row of flowRows(flow, "diff", set.hunks)) {
+  diffRows(set).forEach((rows, i) => {
+    for (const row of rows) {
       const entry = out.get(row.step.file) ?? {
         old: new Map(),
         new: new Map(),

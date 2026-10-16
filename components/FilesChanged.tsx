@@ -151,6 +151,9 @@ export function FilesChanged({
 
   const grouped =
     !byPath && map?.status === "ok" && map.nodes.length > 0 ? map : null;
+  // The map can name a component it doesn't draw, such as a container
+  // dropped for a changed component inside it, which has nothing to outline.
+  const drawn = new Set(grouped?.nodes.map((n) => n.name));
   const sections: DiffSection[] = grouped
     ? groupByComponent(shownFiles, grouped.fileComponents, grouped.nodes).map(
         (g) => ({
@@ -166,7 +169,7 @@ export function FilesChanged({
                 </span>
               </small>
               <span className="flex-1" />
-              {g.component && (
+              {g.component && drawn.has(g.component) && (
                 <button
                   type="button"
                   onClick={() => onShowOnMap(g.component!)}
