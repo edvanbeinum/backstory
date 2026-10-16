@@ -5,7 +5,7 @@ import picomatch from "picomatch";
 
 import { DslError, readDsl } from "./dsl";
 import { gitTry } from "./exec";
-import { gitCommonDir, repoKey, repoKeyOf } from "./git";
+import { gitCommonDir, repoKeyOf } from "./git";
 import { homeDir } from "./store";
 
 /**
@@ -155,17 +155,6 @@ export async function showFile(
   });
 }
 
-/**
- * A model written by hand on this machine for a repo that doesn't commit one:
- * `~/.backstory/models/<repo key>/workspace.dsl`, so every worktree of a repo
- * finds it and two repos whose checkouts share a folder name don't. One model
- * for every commit, so it can say where a change landed but not what it
- * added or removed.
- */
-export async function localModelDir(root: string): Promise<string> {
-  return path.join(homeDir(), "models", await repoKey(root));
-}
-
 export const exists = (file: string) =>
   fs.access(file).then(
     () => true,
@@ -177,11 +166,16 @@ function unlessMissing(err: NodeJS.ErrnoException) {
 }
 
 /**
- * Returns the local model's file. Moves a model still in the folder named
- * after the main checkout alone, `~/.backstory/models/<folder>/`, the first
- * time it's looked for, rather than reading it there: read in place, two
- * repos with that folder name would go on sharing it, and a Draft wouldn't
- * see it.
+ * Returns the file of a model written by hand on this machine for a repo
+ * that doesn't commit one: `~/.backstory/models/<repo key>/workspace.dsl`, so
+ * every worktree of a repo finds it and two repos whose checkouts share a
+ * folder name don't. One model for every commit, so it can say where a
+ * change landed but not what it added or removed.
+ *
+ * Moves a model still in the folder named after the main checkout alone,
+ * `~/.backstory/models/<folder>/`, the first time it's looked for, rather
+ * than reading it there: read in place, two repos with that folder name
+ * would go on sharing it.
  * Ignores a file that's gone mid-move, so two reads moving it at once don't
  * throw.
  */
