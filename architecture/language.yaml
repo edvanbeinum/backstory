@@ -153,6 +153,7 @@ blocks:
       - lib/dsl.ts
       - lib/model.ts
       - lib/map.ts
+      - lib/mapGroups.ts
       - lib/models/
     summary: Reads the repo's C4 model from its Structurizr DSL and marks the components a change touched, added or removed. Has Claude draft a local model for a repo with none.
     read: "`lib/model.ts` header"

@@ -124,35 +124,6 @@ async function fileStats(
   return out;
 }
 
-export interface ComponentGroup<F> {
-  /** The component's name; null for "Not on the map" */
-  component: string | null;
-  files: F[];
-}
-
-/**
- * Changed files under the components they belong to, in the map's order,
- * with the files no component holds last, so the diff reads in the order
- * the map does. Every file lands in exactly one group.
- */
-export function groupByComponent<F extends { path: string }>(
-  files: F[],
-  fileComponents: Record<string, string>,
-  nodes: Pick<MapNode, "name">[],
-): ComponentGroup<F>[] {
-  const order = new Map(nodes.map((n, i) => [n.name, i]));
-  const groups = new Map<string | null, F[]>();
-  for (const f of files) {
-    const component = fileComponents[f.path] ?? null;
-    groups.set(component, [...(groups.get(component) ?? []), f]);
-  }
-  const rank = (c: string | null) =>
-    c === null ? Infinity : (order.get(c) ?? nodes.length);
-  return [...groups]
-    .sort(([a], [b]) => rank(a) - rank(b))
-    .map(([component, files]) => ({ component, files }));
-}
-
 const leafOf = (model: Model, file: string) => model.match(file);
 
 /** The focused map stays a glance: changed elements plus a few neighbours. */

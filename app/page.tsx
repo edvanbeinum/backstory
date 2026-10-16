@@ -709,6 +709,11 @@ export default function Page() {
     setTab("files");
   }, []);
 
+  const showOnMap = useCallback((name: string) => {
+    setMapHighlight({ name, at: Date.now() });
+    setTab("story");
+  }, []);
+
   const showYourself = useCallback(() => {
     setFilesFilter({ filter: "yourself", at: Date.now() });
     setTab("files");
@@ -1384,11 +1389,13 @@ export default function Page() {
                           focusedThreadId={focusedThreadId}
                           notes={noteRev ? notes : null}
                           noteRev={noteRev}
-                          fileComponents={map?.fileComponents ?? null}
+                          map={map}
+                          flowSet={flowSet}
                           marks={marks}
                           jump={filesJump}
                           onJumped={clearFilesJump}
                           filterAsk={filesFilter}
+                          onShowOnMap={showOnMap}
                         />
                       </div>
                     )}

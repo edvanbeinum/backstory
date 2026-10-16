@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
-import { buildMap, groupByComponent, type MapResponse } from "../lib/map";
+import { buildMap, type MapResponse } from "../lib/map";
+import { groupByComponent } from "../lib/mapGroups";
 import { localModelFile } from "../lib/model";
 
 const dirs: string[] = [];

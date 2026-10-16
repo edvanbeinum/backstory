@@ -1736,6 +1736,74 @@ tr.step-code-target td.diff-num {
   border-radius: 0;
 }
 
+/* --- Files changed ------------------------------------------------------ */
+
+.files-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 2em;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.filter-chip:hover {
+  color: var(--fg);
+}
+.filter-chip.warn {
+  border-color: color-mix(in srgb, var(--attention) 50%, var(--border));
+  color: var(--attention);
+}
+.filter-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+.files-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 14px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.files-group small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+/* A file's flows on its header: "on flow 1 2", or "read yourself". */
+.file-flows {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.file-flows i {
+  padding: 0 5px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 15px;
+}
+.file-flows.yourself {
+  color: var(--attention);
+}
+
 /* --- Comments ----------------------------------------------------------- */
 
 .comments-progress {

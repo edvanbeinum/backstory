@@ -33,6 +33,16 @@ import type { NotesApi } from "./useNotes";
 
 const NO_MARKS: StepMark[] = [];
 
+/** A hunk by its first changed line, as `coverage` names it. */
+export const hunkKey = (side: "old" | "new", line: number) => `${side}:${line}`;
+
+function firstChange(hunk: DiffFileType["hunks"][number]): string | null {
+  const added = hunk.lines.find((l) => l.type === "add");
+  if (added?.newNo != null) return hunkKey("new", added.newNo);
+  const removed = hunk.lines.find((l) => l.type === "del");
+  return removed?.oldNo != null ? hunkKey("old", removed.oldNo) : null;
+}
+
 /** The line a note is being written on. */
 interface NoteTarget {
   side: "old" | "new";
@@ -59,6 +69,8 @@ export function DiffFile({
   fileNotes = [],
   marks = null,
   component = null,
+  flows = null,
+  onlyHunks = null,
 }: {
   file: DiffFileType;
   threads: ReviewThread[];
@@ -75,6 +87,10 @@ export function DiffFile({
   marks?: StepMarks | null;
   /** The C4 component this file belongs to */
   component?: string | null;
+  /** The flows this file is on, or "yourself" when it is app code on none */
+  flows?: number[] | "yourself" | null;
+  /** The only hunks to show, by `hunkKey`; every hunk when null */
+  onlyHunks?: Set<string> | null;
 }) {
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
@@ -86,6 +102,10 @@ export function DiffFile({
   // The whole-file response is just a DiffFile with one enormous hunk, so it
   // drops straight into the same rendering path.
   const shown = showWhole && whole ? whole.file : file;
+  const hunks =
+    onlyHunks && !showWhole
+      ? shown.hunks.filter((h) => onlyHunks.has(firstChange(h) ?? ""))
+      : shown.hunks;
 
   // Anchoring only marks where comments point. The comments themselves live
   // in the spine and the Comments tab; Files changed is the diff.
@@ -265,6 +285,25 @@ export function DiffFile({
           className="!px-1"
         />
 
+        {flows === "yourself" ? (
+          <span
+            className="file-flows yourself"
+            title="App code no flow explains"
+          >
+            read yourself
+          </span>
+        ) : (
+          flows &&
+          flows.length > 0 && (
+            <span className="file-flows">
+              on flow
+              {flows.map((n) => (
+                <i key={n}>{n}</i>
+              ))}
+            </span>
+          )
+        )}
+
         {component && <span className="file-owner">{component}</span>}
 
         <span className={`text-[11px] ${STATUS_TONE[file.status] ?? ""}`}>
@@ -326,7 +365,7 @@ export function DiffFile({
               ) : (
                 <table className="diff-table">
                   <tbody>
-                    {shown.hunks.map((hunk, hunkIndex) => (
+                    {hunks.map((hunk, hunkIndex) => (
                       <HunkRows
                         key={hunkIndex}
                         hunk={hunk}

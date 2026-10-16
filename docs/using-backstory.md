@@ -64,6 +64,13 @@ When the PR has review comments, a checklist spine runs down the left edge.
 Whatever change is selected says how many review comments are on it, which is
 the reverse lookup: given a commit, which review comments does it answer?
 
+In **Files changed**, files are grouped by the map's components, each group
+with an **On the map** link that outlines its component on Story; **By path**
+lists them by path instead. Once the change is traced, each file says which
+flows it is on, or **read yourself** when it is app code no flow explains. The
+filters above the files show only the hunks to read yourself, or the files on
+one flow; **read these yourself** beside the flows on Story opens the first.
+
 **View file** — every file header has a _View file_ toggle that swaps the hunks
 for the entire file at that commit, change still highlighted in place, for when
 three lines of context isn't enough to judge the change. It scrolls you to the

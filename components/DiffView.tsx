@@ -13,7 +13,6 @@ import type {
 } from "@/lib/types";
 import type { StepMarks } from "@/lib/flows/rows";
 import { DiffFile } from "./DiffFile";
-import { FileNav } from "./FileNav";
 import { AlertIcon } from "./icons";
 import { Spinner } from "./ui";
 import type { NotesApi } from "./useNotes";
@@ -62,6 +61,13 @@ function marksFor(
   };
 }
 
+/** Files shown together under one heading. */
+export interface DiffSection {
+  key: string;
+  header?: React.ReactNode;
+  files: DiffFileType[];
+}
+
 /** One shared empty list, so files without notes keep a stable prop. */
 const NO_NOTES: Note[] = [];
 
@@ -77,6 +83,9 @@ export function DiffView({
   noteRev = null,
   marks = null,
   fileComponents = null,
+  sections = null,
+  flows = null,
+  onlyHunks = null,
 }: {
   diff: DiffResponse | null;
   loading: boolean;
@@ -92,6 +101,12 @@ export function DiffView({
   /** Every flow's steps, by file */
   marks?: Map<string, StepMarks> | null;
   fileComponents?: Record<string, string> | null;
+  /** The files to show, under headings; all of them, in order, when null */
+  sections?: DiffSection[] | null;
+  /** Each file's flows, by number, or "yourself" for app code on none */
+  flows?: Map<string, number[] | "yourself"> | null;
+  /** Per file, the only hunks to show, by `hunkKey` */
+  onlyHunks?: Map<string, Set<string>> | null;
 }) {
   const { perFile } = useMemo(
     () => partitionThreads(diff, threads),
@@ -139,32 +154,37 @@ export function DiffView({
         </p>
       )}
 
-      <FileNav files={diff.files} threads={threads} />
-
       {diff.files.length === 0 ? (
         <p className="rounded-md border border-[var(--border)] bg-[var(--canvas)] px-3 py-8 text-center text-[13px] text-[var(--fg-muted)]">
           This commit doesn&apos;t change any files.
         </p>
       ) : (
-        diff.files.map((file) => (
-          <DiffFile
-            key={`${file.oldPath}-${file.newPath}`}
-            file={file}
-            threads={[
-              ...(file.newPath ? (perFile.get(file.newPath) ?? []) : []),
-              ...(file.oldPath && file.oldPath !== file.newPath
-                ? (perFile.get(file.oldPath) ?? [])
-                : []),
-            ]}
-            repo={repo}
-            commit={commit}
-            focusedThreadId={focusedThreadId}
-            notes={notes}
-            noteRev={noteRev}
-            fileNotes={notesPerFile.get(file) ?? NO_NOTES}
-            marks={marksFor(marks, file)}
-            component={fileComponents?.[file.path] ?? null}
-          />
+        (sections ?? [{ key: "all", files: diff.files }]).map((section) => (
+          <div key={section.key} className="space-y-3">
+            {section.header}
+            {section.files.map((file) => (
+              <DiffFile
+                key={`${file.oldPath}-${file.newPath}`}
+                file={file}
+                threads={[
+                  ...(file.newPath ? (perFile.get(file.newPath) ?? []) : []),
+                  ...(file.oldPath && file.oldPath !== file.newPath
+                    ? (perFile.get(file.oldPath) ?? [])
+                    : []),
+                ]}
+                repo={repo}
+                commit={commit}
+                focusedThreadId={focusedThreadId}
+                notes={notes}
+                noteRev={noteRev}
+                fileNotes={notesPerFile.get(file) ?? NO_NOTES}
+                marks={marksFor(marks, file)}
+                component={fileComponents?.[file.path] ?? null}
+                flows={flows?.get(file.path) ?? null}
+                onlyHunks={onlyHunks?.get(file.path) ?? null}
+              />
+            ))}
+          </div>
         ))
       )}
     </div>
