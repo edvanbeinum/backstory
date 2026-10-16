@@ -608,6 +608,13 @@ private final class PageLoad: NSObject, WKNavigationDelegate {
         try await withCheckedThrowingContinuation { continuation in
             finished = continuation
             webView.loadHTMLString(html, baseURL: nil)
+            // Fail the load after ten seconds, so a content process that never
+            // reports back fails the test instead of hanging the suite.
+            Task { [weak self] in
+                try? await Task.sleep(for: .seconds(10))
+                self?.finished?.resume(throwing: URLError(.timedOut))
+                self?.finished = nil
+            }
         }
     }
 
