@@ -61,7 +61,7 @@ timestamp=--timestamp
 # docs. sharp is left out because `images.unoptimized` means the server never
 # loads it, and its native libraries would each need signing. The store makes
 # a new database from lib/schema.sql; copying it from the standalone output
-# fails the build if `outputFileTracingIncludes` stops putting it there.
+# fails the build if the standalone output ever lacks it.
 server="$app/Contents/Resources/server"
 mkdir -p "$server/lib"
 for item in server.js .next node_modules public package.json; do
