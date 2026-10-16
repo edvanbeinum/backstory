@@ -680,6 +680,7 @@ function DraftProgress({ draft }: { draft: DraftApi }) {
 function DraftOffer({ draft }: { draft: DraftApi }) {
   const job = draft.source?.job;
   const idle = !job || job.status === "idle" || job.status === "unavailable";
+  const file = draft.source?.file;
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
@@ -699,6 +700,19 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
           on this machine, never in the repo. It takes a few minutes and uses
           your Claude Code account.
         </span>
+      )}
+      {file && (
+        <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--fg-subtle)]">
+          <code className="mono min-w-0 truncate" title={file}>
+            {file}
+          </code>
+          <CopyButton
+            value={file}
+            variant="invisible"
+            title="Copy the path a local model goes at, to write one by hand"
+            label="Copy path"
+          />
+        </div>
       )}
     </div>
   );

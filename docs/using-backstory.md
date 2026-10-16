@@ -77,10 +77,10 @@ before reading its lines:
   `~/.backstory/models/<folder>-<hash>/workspace.dsl`, where `<folder>` is the
   main checkout's folder and `<hash>` is 8 characters that tell apart repos
   with the same folder name; every worktree of the repo reads it, and the map
-  strip shows its path. The hash is the first 8 characters of the SHA-1 of the
-  path `git rev-parse --path-format=absolute --git-common-dir` prints, so after
-  you move or rename the checkout, rename its folder under
-  `~/.backstory/models/` to match. It shows which components a change touched,
+  strip shows its path, or where it goes when there isn't one yet. The hash
+  comes from where the checkout is on disk, so after you move or rename the
+  checkout, rename its folder under `~/.backstory/models/` to the one the map
+  strip shows. It shows which components a change touched,
   but not what it added or removed. With no model at all, **Draft a
   model** in the map strip has Claude Code read the code at HEAD and write one
   there, never into the repo: a draft, marked as one, for you to correct.

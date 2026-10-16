@@ -62,7 +62,7 @@ export type DraftStatus =
 /** What `/api/model` answers: where the repo's model at HEAD comes from */
 export interface ModelSourceResponse {
   source: "committed" | "local" | "none";
-  /** The local model's path, when there is one */
+  /** The local model's path, or where a draft would write it; null for a committed one */
   file: string | null;
   job: DraftStatus;
 }

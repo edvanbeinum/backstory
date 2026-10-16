@@ -33,8 +33,7 @@ async function sourceOf(root: string): Promise<ModelSourceResponse> {
   if ((await showFile(root, "HEAD", MODEL_DSL)) !== null)
     return { source: "committed", file: null, job };
   const file = await localModelFile(root);
-  const local = await exists(file);
-  return { source: local ? "local" : "none", file: local ? file : null, job };
+  return { source: (await exists(file)) ? "local" : "none", file, job };
 }
 
 export async function GET(request: Request) {

@@ -12,6 +12,7 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
+import * as modelRoute from "../app/api/model/route";
 import type { Runner } from "../lib/ai/provider";
 import { readDsl } from "../lib/dsl";
 import { isAppCode, localModelFile, readModelAt } from "../lib/model";
@@ -20,6 +21,7 @@ import {
   draftStatus,
   startDraft,
   type DraftStatus,
+  type ModelSourceResponse,
 } from "../lib/models/draft";
 import { serializeModel } from "../lib/models/dsl";
 import { checkGlobs } from "../lib/models/globs";
@@ -514,6 +516,20 @@ test("a repo with no model in either folder gets none, and no folder is made", a
   assert.equal(await readModelAt(repo.dir, "HEAD"), null);
   assert.equal(existsSync(path.dirname(await localModelFile(repo.dir))), false);
   assert.equal(existsSync(path.join(home, "models", "bare")), false);
+});
+
+test("a repo with no model is told where a local model goes, and no folder is made", async () => {
+  const repo = namedRepo("unmodelled");
+  const response = await modelRoute.GET(
+    new Request(
+      `http://localhost/api/model?repo=${encodeURIComponent(repo.dir)}`,
+    ),
+  );
+  assert.ok(response);
+  const body = (await response.json()) as ModelSourceResponse;
+  assert.equal(body.source, "none");
+  assert.equal(body.file, await localModelFile(repo.dir));
+  assert.equal(existsSync(path.dirname(await localModelFile(repo.dir))), false);
 });
 
 test("a redraft sent while a refused draft is still being checked still runs", async () => {
