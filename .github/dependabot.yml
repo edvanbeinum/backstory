@@ -23,6 +23,11 @@ updates:
       npm-security:
         applies-to: security-updates
         patterns: ["*"]
+    # @types/node tracks the Node mac/build.sh bundles; a new major arrives
+    # when that pin moves, by hand.
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
