@@ -122,6 +122,8 @@ before reading its lines:
   - On a drafted view, the Data line says what this repo's data models have
     cost, and has **Turn off** for reading automatically, and **Redraft**.
     **Show data** opens the whole model when the change touches none of it.
+  - The Data line's graph opens by itself when the change touches the data
+    model; **Hide data** closes it.
   - Main's data model moves forward when a view's base is on main and past it:
     the read that view's base needed is main's change since, and the base
     becomes main's model. Main is read in full again only when the patch from

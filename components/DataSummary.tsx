@@ -773,8 +773,8 @@ function DraftFootnote({
 
 /**
  * The data model's part of the line under the map. Its parts sit in the
- * line's wrapping row; `Show data` opens the graph on a row of its own
- * beneath it, pushing the flows down.
+ * line's wrapping row; the graph opens on a row of its own beneath it,
+ * pushing the flows down.
  */
 export function DataSummary({
   data: given,
@@ -792,7 +792,13 @@ export function DataSummary({
 }) {
   const draft = useDataDraft(repo, rev, given, onRead);
   const data = draft.data;
-  const [open, setOpen] = useState(false);
+  const shown = useMemo(() => present(data?.entities ?? []), [data]);
+  const changed = shown.filter((p) => p.state !== "same");
+  // Open the graph when the view changes the data model, and keep a click's
+  // open or close only for the view it was made on.
+  const view = `${repo}\n${rev}`;
+  const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
+  const open = toggled?.view === view ? toggled.open : changed.length > 0;
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -806,9 +812,7 @@ export function DataSummary({
     return () => observer.disconnect();
   }, [open]);
 
-  const shown = useMemo(() => present(data?.entities ?? []), [data]);
   if (!data) return null;
-  const changed = shown.filter((p) => p.state !== "same");
   if (data.status === "none") {
     return (
       <span className="part inline-flex min-w-0 items-start gap-1.5">
@@ -843,7 +847,7 @@ export function DataSummary({
           type="button"
           className="story-disclose"
           aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setToggled({ view, open: !open })}
         >
           {open ? "Hide data" : "Show data"}
           <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
