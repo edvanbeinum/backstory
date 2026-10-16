@@ -53,7 +53,7 @@ terms:
     avoid:
       - store
   - name: store
-    means: "`lib/store.ts`: the small click-driven JSON files in `~/.backstory` (`homeDir`), each read and written whole."
+    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes, rounds and responses, one table each, plus `seen`."
     avoid:
       - store, for the flow cache or the data cache
   - name: flow cache
@@ -134,7 +134,7 @@ blocks:
       - lib/drafts.ts
       - lib/notes.ts
       - lib/outbox.ts
-    summary: The JSON files in `~/.backstory` and the modules that keep their records.
+    summary: The SQLite database `~/.backstory/backstory.db` and the modules that keep its records.
     read: "`lib/store.ts` header"
   - name: flow engine
     code:
@@ -201,4 +201,4 @@ blocks:
     read: "`mac/backstory/Backstory/ServerState.swift`, the comment on `ServerState`"
 
 invariants:
-  - rule: Every read-modify-write of a store file runs inside `withStore`, and a batch is one write, not a loop of single-key writes.
+  - rule: Every write that touches more than one row runs inside `transaction`, and a batch is one transaction.

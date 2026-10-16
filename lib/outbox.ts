@@ -1,10 +1,21 @@
 import { EventEmitter } from "node:events";
 import { randomUUID } from "node:crypto";
+import type { DatabaseSync } from "node:sqlite";
 
-import { KEY, readNamespaced, withStore, writeNamespaced } from "./store";
+import { writeNotes } from "./notes";
+import {
+  isObject,
+  isTime,
+  KEY,
+  reading,
+  transaction,
+  type Legacy,
+} from "./store";
+import type { Note } from "./types";
 
 /**
- * Sent rounds on their way to an agent, per checkout.
+ * Sent rounds on their way to an agent, per checkout: the `rounds` and `seen`
+ * tables.
  *
  * `backstory review` only reaches an agent that's sitting waiting on stdout, and
  * that wait lives in memory. This is the other road: Send files the round
@@ -13,18 +24,13 @@ import { KEY, readNamespaced, withStore, writeNamespaced } from "./store";
  * the agent is busy, and survives a restart of either side.
  *
  * A round is aimed at the session last seen stopping in its checkout, so a
- * second session there doesn't walk off with notes meant for the first. Only
- * a round aimed at nobody — none seen yet, or you said "the next one" — goes
- * to whichever stops first.
+ * second session there doesn't collect notes meant for the first. Only a
+ * round aimed at nobody — none seen yet, or you said "the next one" — goes to
+ * whichever stops first.
  *
  * Copied and directly-answered rounds are recorded too, already delivered, so
  * the window can say how every round left.
- *
- * Shape: { "/abs/worktree": { "<roundId>": Round, "seen": { "<session>": at } } }
  */
-
-const NAME = "outbox";
-const SEEN = "seen";
 
 /** Long enough for any real review; a guard against a runaway writer. */
 export const MAX_MESSAGE = 200_000;
@@ -73,114 +79,109 @@ export interface OutboxState {
 export const isSessionId = (value: unknown): value is string =>
   typeof value === "string" && KEY.test(value);
 
-const isTime = (value: unknown) => value === null || typeof value === "number";
-
-const isClaim = (value: unknown) =>
-  value === undefined ||
-  value === null ||
-  (isObject(value) &&
-    isSessionId(value.session) &&
-    typeof value.until === "number");
-
-function isRound(value: unknown): value is Omit<
-  OutboxRound,
-  "id" | "root" | "claim"
-> & {
-  claim?: OutboxRound["claim"];
-} {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  const r = value as Record<string, unknown>;
-  return (
-    Array.isArray(r.noteIds) &&
-    r.noteIds.every((id) => typeof id === "string" && KEY.test(id)) &&
-    typeof r.message === "string" &&
-    r.message.length <= MAX_MESSAGE &&
-    typeof r.queuedAt === "number" &&
-    (r.forSession === null || isSessionId(r.forSession)) &&
-    isTime(r.deliveredAt) &&
-    (r.deliveredTo === null || typeof r.deliveredTo === "string") &&
-    isClaim(r.claim)
-  );
+interface RoundRow {
+  id: string;
+  root: string;
+  note_ids: string;
+  message: string;
+  queued_at: number;
+  for_session: string | null;
+  delivered_at: number | null;
+  delivered_to: string | null;
+  claim_session: string | null;
+  claim_until: number | null;
 }
 
-function isSeen(value: unknown): value is Record<string, number> {
-  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
-  return Object.entries(value).every(
-    ([session, at]) => isSessionId(session) && typeof at === "number",
-  );
-}
-
-/**
- * The file is meant to be hand-editable, so each entry is checked by the key
- * it sits under: "seen" holds sessions, anything else is a round.
- */
-type Stored = Record<string, unknown>;
-const isObject = (value: unknown): value is Stored =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
-
-interface ForRoot {
-  rounds: Map<string, OutboxRound>;
-  seen: Record<string, number>;
-}
-
-function parse(root: string, entries: Record<string, Stored>): ForRoot {
-  const rounds = new Map<string, OutboxRound>();
-  let seen: Record<string, number> = {};
-  for (const [key, value] of Object.entries(entries)) {
-    if (key === SEEN) {
-      if (isSeen(value)) seen = value;
-    } else if (isRound(value)) {
-      rounds.set(key, {
-        id: key,
-        root,
-        noteIds: value.noteIds,
-        message: value.message,
-        queuedAt: value.queuedAt,
-        forSession: value.forSession,
-        deliveredAt: value.deliveredAt,
-        deliveredTo: value.deliveredTo,
-        claim: value.claim ?? null,
-      });
-    }
-  }
-  return { rounds, seen };
-}
-
-function serialize(forRoot: ForRoot): Record<string, Stored> {
-  const out: Record<string, Stored> = {};
-  if (Object.keys(forRoot.seen).length > 0) out[SEEN] = forRoot.seen;
-  for (const round of forRoot.rounds.values()) {
-    const { id, root: _root, ...rest } = round;
-    out[id] = rest as unknown as Stored;
-  }
-  return out;
-}
-
-function lastSeen(seen: Record<string, number>): OutboxState["lastSeen"] {
-  let best: OutboxState["lastSeen"] = null;
-  for (const [session, at] of Object.entries(seen)) {
-    if (!best || at > best.at) best = { session, at };
-  }
-  return best;
-}
-
-function state(forRoot: ForRoot): OutboxState {
+function toRound(row: RoundRow): OutboxRound {
   return {
-    rounds: [...forRoot.rounds.values()].sort(
-      (a, b) => b.queuedAt - a.queuedAt,
-    ),
-    lastSeen: lastSeen(forRoot.seen),
-    seen: forRoot.seen,
+    id: row.id,
+    root: row.root,
+    noteIds: JSON.parse(row.note_ids) as string[],
+    message: row.message,
+    queuedAt: row.queued_at,
+    forSession: row.for_session,
+    deliveredAt: row.delivered_at,
+    deliveredTo: row.delivered_to,
+    claim:
+      row.claim_session !== null && row.claim_until !== null
+        ? { session: row.claim_session, until: row.claim_until }
+        : null,
   };
 }
 
-async function read(): Promise<Record<string, Record<string, Stored>>> {
-  return readNamespaced<Stored>(NAME, isObject);
+function insertRound(database: DatabaseSync, round: OutboxRound): void {
+  database
+    .prepare(
+      `INSERT INTO rounds
+         (root, id, note_ids, message, queued_at, for_session, delivered_at,
+          delivered_to, claim_session, claim_until)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    )
+    .run(
+      round.root,
+      round.id,
+      JSON.stringify(round.noteIds),
+      round.message,
+      round.queuedAt,
+      round.forSession,
+      round.deliveredAt,
+      round.deliveredTo,
+      round.claim?.session ?? null,
+      round.claim?.until ?? null,
+    );
+}
+
+function getRound(
+  database: DatabaseSync,
+  root: string,
+  id: string,
+): OutboxRound | null {
+  const row = database
+    .prepare("SELECT * FROM rounds WHERE root = ? AND id = ?")
+    .get(root, id) as unknown as RoundRow | undefined;
+  return row ? toRound(row) : null;
+}
+
+/**
+ * Newest first. The rowid breaks a tie: a stop recorded later in the same
+ * millisecond is the later one.
+ */
+function seenRows(
+  database: DatabaseSync,
+  root: string,
+): { session: string; at: number }[] {
+  const rows = database
+    .prepare(
+      "SELECT session, at FROM seen WHERE root = ? ORDER BY at DESC, rowid DESC",
+    )
+    .all(root) as unknown as { session: string; at: number }[];
+  return rows.map(({ session, at }) => ({ session, at }));
+}
+
+function lastSeen(
+  database: DatabaseSync,
+  root: string,
+): OutboxState["lastSeen"] {
+  return seenRows(database, root)[0] ?? null;
 }
 
 export async function getOutbox(root: string): Promise<OutboxState> {
-  const store = await read();
-  return state(parse(root, store[root] ?? {}));
+  return reading<OutboxState>(
+    { rounds: [], lastSeen: null, seen: {} },
+    (database) => {
+      const rows = database
+        .prepare(
+          "SELECT * FROM rounds WHERE root = ? ORDER BY queued_at DESC, rowid",
+        )
+        .all(root) as unknown as RoundRow[];
+      const seen = seenRows(database, root);
+      return {
+        rounds: rows.map(toRound),
+        lastSeen: seen[0] ?? null,
+        seen: Object.fromEntries(seen.map((s) => [s.session, s.at])),
+      };
+    },
+  );
 }
 
 /*
@@ -199,36 +200,27 @@ export function onOutboxChange(listener: (root: string) => void): () => void {
 }
 
 /**
- * Read-modify-write one checkout's entries under the store lock. The change
- * returns a value; the write only happens if `fn` says something changed.
+ * Run one checkout's change in a transaction, and tell the watch stream once
+ * it has committed. A change that throws rejects rather than throwing, as an
+ * async write would.
  */
-async function change<T>(
+function change<T>(
   root: string,
-  fn: (forRoot: ForRoot) => { result: T; changed: boolean },
+  fn: (database: DatabaseSync) => { result: T; changed: boolean },
 ): Promise<T> {
-  const outcome = await withStore(NAME, async () => {
-    const store = await read();
-    const forRoot = parse(root, store[root] ?? {});
-    const { result, changed } = fn(forRoot);
-    if (changed) {
-      const now = Date.now();
-      for (const [id, round] of forRoot.rounds) {
-        if (
-          round.deliveredAt !== null &&
-          now - round.deliveredAt > KEEP_DELIVERED_MS
-        ) {
-          forRoot.rounds.delete(id);
-        }
+  return new Promise((resolve) => {
+    const { result, changed } = transaction((database) => {
+      const outcome = fn(database);
+      if (outcome.changed) {
+        database
+          .prepare("DELETE FROM rounds WHERE root = ? AND delivered_at < ?")
+          .run(root, Date.now() - KEEP_DELIVERED_MS);
       }
-      const serialized = serialize(forRoot);
-      if (Object.keys(serialized).length === 0) delete store[root];
-      else store[root] = serialized;
-      await writeNamespaced(NAME, store);
-    }
-    return { result, changed };
+      return outcome;
+    });
+    if (changed) events.emit("change", root);
+    resolve(result);
   });
-  if (outcome.changed) events.emit("change", root);
-  return outcome.result;
 }
 
 export interface NewRound {
@@ -239,69 +231,106 @@ export interface NewRound {
   deliveredTo?: string;
 }
 
-/**
- * File a sent round. Undelivered, it's aimed at the session last seen
- * stopping here — or at nobody, when none has been.
- */
-export function queueRound(
-  root: string,
-  round: NewRound,
-): Promise<OutboxRound> {
+function checkNewRound(round: NewRound): void {
   if (!round.noteIds.every((id) => KEY.test(id)))
     throw new Error("Invalid note id");
   if (round.message.length > MAX_MESSAGE)
     throw new Error("Invalid message: too long");
-
-  return change(root, (forRoot) => {
-    const delivered = round.deliveredTo !== undefined;
-    const entry: OutboxRound = {
-      id: randomUUID(),
-      root,
-      noteIds: round.noteIds,
-      message: round.message,
-      queuedAt: round.at,
-      forSession: delivered ? null : (lastSeen(forRoot.seen)?.session ?? null),
-      deliveredAt: delivered ? Date.now() : null,
-      deliveredTo: round.deliveredTo ?? null,
-      claim: null,
-    };
-    forRoot.rounds.set(entry.id, entry);
-    return { result: entry, changed: true };
-  });
 }
 
 /**
- * A session finished a turn here: note it, and hand it every undelivered round
- * aimed at it or at nobody, claiming them for it — one write, under the lock,
- * so two sessions stopping at once can't both collect a round. They're
- * delivered once the hook confirms with `ack`.
+ * Undelivered, a round is aimed at the session last seen stopping here — or
+ * at nobody, when none has been.
  */
-export function take(root: string, session: string): Promise<OutboxRound[]> {
-  if (!isSessionId(session)) throw new Error("Invalid session id");
+function file(
+  database: DatabaseSync,
+  root: string,
+  round: NewRound,
+): OutboxRound {
+  const delivered = round.deliveredTo !== undefined;
+  const entry: OutboxRound = {
+    id: randomUUID(),
+    root,
+    noteIds: round.noteIds,
+    message: round.message,
+    queuedAt: round.at,
+    forSession: delivered ? null : (lastSeen(database, root)?.session ?? null),
+    deliveredAt: delivered ? Date.now() : null,
+    deliveredTo: round.deliveredTo ?? null,
+    claim: null,
+  };
+  insertRound(database, entry);
+  return entry;
+}
 
-  return change(root, (forRoot) => {
-    const now = Date.now();
-    forRoot.seen[session] = now;
-    const kept = Object.entries(forRoot.seen)
-      .sort(([, a], [, b]) => b - a)
-      .slice(0, KEEP_SESSIONS);
-    forRoot.seen = Object.fromEntries(kept);
-
-    const taken: OutboxRound[] = [];
-    for (const round of forRoot.rounds.values()) {
-      if (round.deliveredAt !== null) continue;
-      if (round.forSession !== null && round.forSession !== session) continue;
-      if (claimed(round, now) && round.claim?.session !== session) continue;
-      round.claim = { session, until: now + CLAIM_MS };
-      taken.push(round);
-    }
-    taken.sort((a, b) => a.queuedAt - b.queuedAt);
-    return { result: taken, changed: true };
+/**
+ * Send: file the round and mark its notes sent at the round's time, in one
+ * transaction, so there's never a round with drafts or sent notes with no
+ * round.
+ */
+export function sendRound(
+  root: string,
+  round: NewRound,
+): Promise<{ round: OutboxRound; notes: Note[] }> {
+  checkNewRound(round);
+  return change(root, (database) => {
+    const filed = file(database, root, round);
+    const notes = writeNotes(root, {
+      op: "send",
+      ids: filed.noteIds,
+      at: round.at,
+    });
+    return { result: { round: filed, notes }, changed: true };
   });
 }
 
 const claimed = (round: OutboxRound, now = Date.now()) =>
   round.claim !== null && round.claim.until > now;
+
+/**
+ * A session finished a turn here: note it, and hand it every undelivered round
+ * aimed at it or at nobody, claiming them for it — one transaction, so two
+ * sessions stopping at once can't both collect a round. They're delivered
+ * once the hook confirms with `ack`.
+ */
+export function take(root: string, session: string): Promise<OutboxRound[]> {
+  if (!isSessionId(session)) throw new Error("Invalid session id");
+
+  return change(root, (database) => {
+    const now = Date.now();
+    database
+      .prepare(
+        "INSERT OR REPLACE INTO seen (root, session, at) VALUES (?, ?, ?)",
+      )
+      .run(root, session, now);
+    const forget = database.prepare(
+      "DELETE FROM seen WHERE root = ? AND session = ?",
+    );
+    for (const old of seenRows(database, root).slice(KEEP_SESSIONS)) {
+      forget.run(root, old.session);
+    }
+
+    const rows = database
+      .prepare(
+        `SELECT * FROM rounds
+         WHERE root = ? AND delivered_at IS NULL
+           AND (for_session IS NULL OR for_session = ?)
+         ORDER BY queued_at, rowid`,
+      )
+      .all(root, session) as unknown as RoundRow[];
+    const claim = database.prepare(
+      "UPDATE rounds SET claim_session = ?, claim_until = ? WHERE root = ? AND id = ?",
+    );
+    const taken: OutboxRound[] = [];
+    for (const round of rows.map(toRound)) {
+      if (claimed(round, now) && round.claim?.session !== session) continue;
+      round.claim = { session, until: now + CLAIM_MS };
+      claim.run(session, round.claim.until, root, round.id);
+      taken.push(round);
+    }
+    return { result: taken, changed: true };
+  });
+}
 
 /**
  * The hook printed what it took: those rounds are delivered. Only rounds this
@@ -314,21 +343,16 @@ export function ack(
 ): Promise<number> {
   if (!isSessionId(session)) throw new Error("Invalid session id");
 
-  return change(root, (forRoot) => {
+  return change(root, (database) => {
+    const deliver = database.prepare(
+      `UPDATE rounds
+       SET delivered_at = ?, delivered_to = ?, claim_session = NULL, claim_until = NULL
+       WHERE root = ? AND id = ? AND delivered_at IS NULL AND claim_session = ?`,
+    );
     const now = Date.now();
     let count = 0;
     for (const id of ids) {
-      const round = forRoot.rounds.get(id);
-      if (
-        !round ||
-        round.deliveredAt !== null ||
-        round.claim?.session !== session
-      )
-        continue;
-      round.deliveredAt = now;
-      round.deliveredTo = session;
-      round.claim = null;
-      count++;
+      count += Number(deliver.run(now, session, root, id, session).changes);
     }
     return { result: count, changed: count > 0 };
   });
@@ -343,43 +367,38 @@ export function retarget(
   if (forSession !== null && !isSessionId(forSession)) {
     throw new Error("Invalid session id");
   }
-  return change(root, (forRoot) => {
-    const round = forRoot.rounds.get(id);
+  return change(root, (database) => {
+    const round = getRound(database, root, id);
     if (!round || round.deliveredAt !== null)
       return { result: null, changed: false };
+    database
+      .prepare("UPDATE rounds SET for_session = ? WHERE root = ? AND id = ?")
+      .run(forSession, root, id);
     round.forSession = forSession;
     return { result: round, changed: true };
   });
 }
 
-/**
- * Withdraw a waiting round. Returns it, so the caller can put its notes back
- * to drafts; null if it's gone or an agent has it, or may be reading it now.
- */
-export function cancel(root: string, id: string): Promise<OutboxRound | null> {
-  return change(root, (forRoot) => {
-    const round = forRoot.rounds.get(id);
-    if (!round || round.deliveredAt !== null || claimed(round)) {
-      return { result: null, changed: false };
-    }
-    forRoot.rounds.delete(id);
-    return { result: round, changed: true };
-  });
+/** Null if the round is gone or an agent has it, or may be reading it now. */
+function withdraw(database: DatabaseSync, root: string, id: string) {
+  const round = getRound(database, root, id);
+  if (!round || round.deliveredAt !== null || claimed(round)) return null;
+  database
+    .prepare("DELETE FROM rounds WHERE root = ? AND id = ?")
+    .run(root, id);
+  return round;
 }
 
 /**
- * Undo a write whose partner failed: drop a round just filed, or put back
- * one just withdrawn, exactly as it was.
+ * Cancel: withdraw a waiting round and return its notes to drafts, in one
+ * transaction. Null, with nothing written, when it's gone or an agent has it.
  */
-export function revert(
-  root: string,
-  id: string,
-  round: OutboxRound | null,
-): Promise<void> {
-  return change(root, (forRoot) => {
-    if (round) forRoot.rounds.set(id, round);
-    else forRoot.rounds.delete(id);
-    return { result: undefined, changed: true };
+export function cancelRound(root: string, id: string): Promise<Note[] | null> {
+  return change(root, (database) => {
+    const round = withdraw(database, root, id);
+    if (!round) return { result: null, changed: false };
+    const notes = writeNotes(root, { op: "unsend", ids: round.noteIds });
+    return { result: notes, changed: true };
   });
 }
 
@@ -388,12 +407,18 @@ export function revert(
  * answered: queue it instead, aimed as Send would have.
  */
 export function requeue(root: string, id: string): Promise<OutboxRound | null> {
-  return change(root, (forRoot) => {
-    const round = forRoot.rounds.get(id);
+  return change(root, (database) => {
+    const round = getRound(database, root, id);
     if (!round) return { result: null, changed: false };
     round.deliveredAt = null;
     round.deliveredTo = null;
-    round.forSession = lastSeen(forRoot.seen)?.session ?? null;
+    round.forSession = lastSeen(database, root)?.session ?? null;
+    database
+      .prepare(
+        `UPDATE rounds SET delivered_at = NULL, delivered_to = NULL, for_session = ?
+         WHERE root = ? AND id = ?`,
+      )
+      .run(round.forSession, root, id);
     return { result: round, changed: true };
   });
 }
@@ -414,4 +439,72 @@ export function formatTaken(rounds: OutboxRound[]): string {
       ...rounds.map((r) => r.message.trimEnd()),
     ].join("\n\n---\n\n") + "\n"
   );
+}
+
+/* --- Import from outbox.json ----------------------------------------- */
+
+const isTimeOrNull = (value: unknown) => value === null || isTime(value);
+
+const isClaim = (value: unknown) =>
+  value === undefined ||
+  value === null ||
+  (isObject(value) && isSessionId(value.session) && isTime(value.until));
+
+function isRound(value: unknown): value is Omit<
+  OutboxRound,
+  "id" | "root" | "claim"
+> & {
+  claim?: OutboxRound["claim"];
+} {
+  if (!isObject(value)) return false;
+  return (
+    Array.isArray(value.noteIds) &&
+    value.noteIds.every((id) => typeof id === "string" && KEY.test(id)) &&
+    typeof value.message === "string" &&
+    value.message.length <= MAX_MESSAGE &&
+    isTime(value.queuedAt) &&
+    (value.forSession === null || isSessionId(value.forSession)) &&
+    isTimeOrNull(value.deliveredAt) &&
+    (value.deliveredTo === null || typeof value.deliveredTo === "string") &&
+    isClaim(value.claim)
+  );
+}
+
+function isSeen(value: unknown): value is Record<string, number> {
+  if (!isObject(value)) return false;
+  return Object.entries(value).every(
+    ([session, at]) => isSessionId(session) && isTime(at),
+  );
+}
+
+/**
+ * Copy the old `outbox.json` in, skipping any entry that doesn't check out.
+ * Under each checkout, "seen" holds sessions and any other key is a round.
+ */
+export function importOutbox(database: DatabaseSync, legacy: Legacy): void {
+  const see = database.prepare(
+    "INSERT OR REPLACE INTO seen (root, session, at) VALUES (?, ?, ?)",
+  );
+  for (const [root, entries] of Object.entries(legacy)) {
+    for (const [key, value] of Object.entries(entries)) {
+      if (key === "seen") {
+        if (!isSeen(value)) continue;
+        for (const [session, at] of Object.entries(value)) {
+          see.run(root, session, at);
+        }
+      } else if (isRound(value)) {
+        insertRound(database, {
+          id: key,
+          root,
+          noteIds: value.noteIds,
+          message: value.message,
+          queuedAt: value.queuedAt,
+          forSession: value.forSession,
+          deliveredAt: value.deliveredAt,
+          deliveredTo: value.deliveredTo,
+          claim: value.claim ?? null,
+        });
+      }
+    }
+  }
 }

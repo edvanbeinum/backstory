@@ -4,20 +4,18 @@ import { NextResponse } from "next/server";
 
 import { crossSite, errorResponse } from "@/lib/api";
 import { resolveRepo } from "@/lib/git";
-import { changeNotes } from "@/lib/notes";
 import {
   ack,
   BACKSTORY_REVIEW,
-  cancel,
+  cancelRound,
   CLIPBOARD,
   formatTaken,
   getOutbox,
   isSessionId,
   MAX_MESSAGE,
-  queueRound,
   requeue,
   retarget,
-  revert,
+  sendRound,
   take,
 } from "@/lib/outbox";
 import { answerReview, waitingReview } from "@/lib/review";
@@ -108,16 +106,12 @@ export async function POST(request: Request) {
     // only once the round and its notes are both written, so it never reads a
     // review the window then reports as failed.
     const waiting = via ? null : waitingReview(root);
-    const round = await queueRound(root, {
+    const { round, notes } = await sendRound(root, {
       noteIds: noteIds as string[],
       message,
       at,
       deliveredTo: via ?? (waiting ? BACKSTORY_REVIEW : undefined),
     });
-    const notes = await undoIfFails(
-      changeNotes(root, { op: "send", ids: round.noteIds, at }),
-      () => revert(root, round.id, null),
-    );
     if (waiting && !answerReview(waiting.id, { answer: message })) {
       // It stopped waiting while the writes happened: queue it for the hook.
       return NextResponse.json(
@@ -128,23 +122,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ round, notes }, NO_STORE);
   } catch (err) {
     return errorResponse(err);
-  }
-}
-
-/**
- * The outbox and the notes are separate files, so a round's two writes can't
- * be one. When the second fails, undo the first rather than leave a round
- * with drafts, or sent notes with no round.
- */
-async function undoIfFails<T>(
-  write: Promise<T>,
-  undo: () => Promise<void>,
-): Promise<T> {
-  try {
-    return await write;
-  } catch (err) {
-    await undo().catch(() => {});
-    throw err;
   }
 }
 
@@ -241,13 +218,9 @@ export async function DELETE(request: Request) {
   if (!root || !id) return bad("`repo` and `id` are required.");
 
   try {
-    const round = await cancel(root, id);
-    if (!round)
+    const notes = await cancelRound(root, id);
+    if (!notes)
       return bad("That round has already been delivered or withdrawn.", 410);
-    const notes = await undoIfFails(
-      changeNotes(root, { op: "unsend", ids: round.noteIds }),
-      () => revert(root, id, round),
-    );
     return NextResponse.json({ notes }, NO_STORE);
   } catch (err) {
     return errorResponse(err);

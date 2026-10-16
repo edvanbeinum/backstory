@@ -4,21 +4,23 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import { WORKING_REV } from "../lib/constants";
+import { changeNotes, getNotes } from "../lib/notes";
 import {
   ack,
   BACKSTORY_REVIEW,
-  cancel,
+  cancelRound,
   CLAIM_MS,
   CLIPBOARD,
   formatTaken,
   getOutbox,
   onOutboxChange,
-  queueRound,
   requeue,
   retarget,
-  revert,
+  sendRound,
   take,
 } from "../lib/outbox";
+import type { Note } from "../lib/types";
 
 /** The store resolves BACKSTORY_HOME per call; never touch the real home. */
 function useTempHome(): void {
@@ -36,7 +38,7 @@ const round = (noteIds: string[], message = "fix it", at = Date.now()) => ({
 
 test("with no session seen, the first to stop takes the round, and only once", async () => {
   useTempHome();
-  const queued = await queueRound(ROOT, round(["n1"]));
+  const { round: queued } = await sendRound(ROOT, round(["n1"]));
   assert.equal(queued.forSession, null);
 
   const [first, second] = await Promise.all([
@@ -56,7 +58,7 @@ test("send aims at the session last seen stopping here", async () => {
   useTempHome();
   assert.deepEqual(await take(ROOT, "s-old"), []);
   assert.deepEqual(await take(ROOT, "s-mine"), []);
-  const queued = await queueRound(ROOT, round(["n1"]));
+  const { round: queued } = await sendRound(ROOT, round(["n1"]));
   assert.equal(queued.forSession, "s-mine");
   assert.equal((await getOutbox(ROOT)).lastSeen?.session, "s-mine");
 
@@ -75,14 +77,17 @@ test("send aims at the session last seen stopping here", async () => {
 test("sessions in other checkouts don't count as seen here", async () => {
   useTempHome();
   await take("/repos/other", "s-elsewhere");
-  assert.equal((await queueRound(ROOT, round(["n1"]))).forSession, null);
+  assert.equal((await sendRound(ROOT, round(["n1"]))).round.forSession, null);
 });
 
 test("a queued round survives a restart", async () => {
   useTempHome();
   await take(ROOT, "s-1");
-  const queued = await queueRound(ROOT, round(["n1", "n2"], "the notes"));
-  // Nothing is held in memory: a fresh read of the file is all a new server has.
+  const { round: queued } = await sendRound(
+    ROOT,
+    round(["n1", "n2"], "the notes"),
+  );
+  // Nothing is held in memory: a fresh read of the database is all a new server has.
   const { rounds, lastSeen } = await getOutbox(ROOT);
   assert.equal(lastSeen?.session, "s-1");
   assert.deepEqual(rounds, [queued]);
@@ -92,7 +97,7 @@ test("a queued round survives a restart", async () => {
 test("retarget hands a waiting round to whichever session stops next", async () => {
   useTempHome();
   await take(ROOT, "s-ended");
-  const queued = await queueRound(ROOT, round(["n1"]));
+  const { round: queued } = await sendRound(ROOT, round(["n1"]));
   assert.deepEqual(await take(ROOT, "s-new"), []);
 
   assert.equal((await retarget(ROOT, queued.id, null))?.forSession, null);
@@ -100,27 +105,26 @@ test("retarget hands a waiting round to whichever session stops next", async () 
   await ack(ROOT, "s-new", [queued.id]);
   // Delivered rounds can't be re-aimed or withdrawn.
   assert.equal(await retarget(ROOT, queued.id, null), null);
-  assert.equal(await cancel(ROOT, queued.id), null);
+  assert.equal(await cancelRound(ROOT, queued.id), null);
 });
 
 test("cancel withdraws a waiting round, so nothing is delivered", async () => {
   useTempHome();
-  const queued = await queueRound(ROOT, round(["n1", "n2"]));
-  const withdrawn = await cancel(ROOT, queued.id);
-  assert.deepEqual(withdrawn?.noteIds, ["n1", "n2"]);
+  const { round: queued } = await sendRound(ROOT, round(["n1", "n2"]));
+  assert.notEqual(await cancelRound(ROOT, queued.id), null);
   assert.deepEqual(await take(ROOT, "s-any"), []);
   assert.deepEqual((await getOutbox(ROOT)).rounds, []);
 });
 
 test("a take that's never confirmed leaves the round to be taken again", async () => {
   useTempHome();
-  const queued = await queueRound(ROOT, round(["n1"]));
+  const { round: queued } = await sendRound(ROOT, round(["n1"]));
   assert.equal((await take(ROOT, "s-a")).length, 1);
   assert.equal((await getOutbox(ROOT)).rounds[0].deliveredAt, null);
 
   // Claimed: no other session gets it, and it can't be withdrawn under the agent.
   assert.deepEqual(await take(ROOT, "s-b"), []);
-  assert.equal(await cancel(ROOT, queued.id), null);
+  assert.equal(await cancelRound(ROOT, queued.id), null);
   // The same session's next stop does — its last hook may never have printed it.
   assert.equal((await take(ROOT, "s-a")).length, 1);
   // Only the holder can confirm it.
@@ -137,22 +141,78 @@ test("a take that's never confirmed leaves the round to be taken again", async (
   assert.equal((await getOutbox(ROOT)).rounds[0].deliveredTo, "s-b");
 });
 
-test("revert undoes a filing or a withdrawal exactly", async () => {
-  useTempHome();
-  const filed = await queueRound(ROOT, round(["n1"]));
-  await revert(ROOT, filed.id, null);
-  assert.deepEqual((await getOutbox(ROOT)).rounds, []);
+const draft = (id: string): Note => ({
+  id,
+  rev: WORKING_REV,
+  path: null,
+  side: "new",
+  line: null,
+  quote: null,
+  body: `note ${id}`,
+  createdAt: 1,
+  sentAt: null,
+  done: false,
+  doneAt: null,
+});
 
-  const queued = await queueRound(ROOT, round(["n2"]));
-  const withdrawn = await cancel(ROOT, queued.id);
-  await revert(ROOT, queued.id, withdrawn);
-  assert.deepEqual((await getOutbox(ROOT)).rounds, [queued]);
+test("Send writes the round and marks its notes sent together; Cancel undoes both", async () => {
+  useTempHome();
+  await changeNotes(ROOT, { op: "save", note: draft("n1") });
+  await changeNotes(ROOT, { op: "save", note: draft("n2") });
+
+  const sent = await sendRound(ROOT, round(["n1", "n2"], "fix it", 5_000));
+  assert.equal(sent.round.queuedAt, 5_000);
+  assert.deepEqual(
+    sent.notes.map((n) => n.sentAt),
+    [5_000, 5_000],
+  );
+  assert.deepEqual((await getOutbox(ROOT)).rounds, [sent.round]);
+
+  const notes = await cancelRound(ROOT, sent.round.id);
+  assert.deepEqual(
+    notes?.map((n) => n.sentAt),
+    [null, null],
+  );
+  assert.deepEqual((await getOutbox(ROOT)).rounds, []);
+  assert.deepEqual(await getNotes(ROOT), notes);
+});
+
+test("Send writes nothing when marking its notes fails", async () => {
+  useTempHome();
+  await changeNotes(ROOT, { op: "save", note: draft("n1") });
+  // A non-number time passes the round's checks but not the notes'.
+  await assert.rejects(
+    sendRound(ROOT, round(["n1"], "fix it", "soon" as unknown as number)),
+    /Invalid send time/,
+  );
+  assert.deepEqual((await getOutbox(ROOT)).rounds, []);
+  assert.equal((await getNotes(ROOT))[0].sentAt, null);
+});
+
+test("Cancel on a claimed or delivered round changes nothing", async () => {
+  useTempHome();
+  await changeNotes(ROOT, { op: "save", note: draft("n1") });
+  await changeNotes(ROOT, { op: "save", note: draft("n2") });
+  const claimed = await sendRound(ROOT, round(["n1"], "one", 1));
+  await take(ROOT, "s-a");
+  const copied = await sendRound(ROOT, {
+    ...round(["n2"], "two", 2),
+    deliveredTo: CLIPBOARD,
+  });
+
+  const before = { outbox: await getOutbox(ROOT), notes: await getNotes(ROOT) };
+  assert.equal(await cancelRound(ROOT, claimed.round.id), null);
+  assert.equal(await cancelRound(ROOT, copied.round.id), null);
+  assert.deepEqual(
+    { outbox: await getOutbox(ROOT), notes: await getNotes(ROOT) },
+    before,
+  );
 });
 
 test("requeue turns a round filed as answered back into a queued one", async () => {
   useTempHome();
   await take(ROOT, "s-1");
-  const answered = await queueRound(ROOT, {
+  const { round: answered } = await sendRound(ROOT, {
     ...round(["n1"]),
     deliveredTo: BACKSTORY_REVIEW,
   });
@@ -164,7 +224,7 @@ test("requeue turns a round filed as answered back into a queued one", async () 
 
 test("a copied round is recorded as delivered and never taken", async () => {
   useTempHome();
-  const copied = await queueRound(ROOT, {
+  const { round: copied } = await sendRound(ROOT, {
     ...round(["n1"]),
     deliveredTo: CLIPBOARD,
   });
@@ -175,8 +235,8 @@ test("a copied round is recorded as delivered and never taken", async () => {
 
 test("several rounds are taken together, oldest first", async () => {
   useTempHome();
-  await queueRound(ROOT, round(["n2"], "second", 2));
-  await queueRound(ROOT, round(["n1"], "first", 1));
+  await sendRound(ROOT, round(["n2"], "second", 2));
+  await sendRound(ROOT, round(["n1"], "first", 1));
   const text = formatTaken(await take(ROOT, "s-1"));
   assert.ok(text.indexOf("first") < text.indexOf("second"));
 });
@@ -185,9 +245,9 @@ test("every write tells the watch stream", async () => {
   useTempHome();
   const seen: string[] = [];
   const stop = onOutboxChange((root) => seen.push(root));
-  const queued = await queueRound(ROOT, round(["n1"]));
+  const { round: queued } = await sendRound(ROOT, round(["n1"]));
   await take(ROOT, "s-1");
-  await cancel(ROOT, queued.id); // already delivered: no change, no event
+  await cancelRound(ROOT, queued.id); // already delivered: no change, no event
   stop();
   assert.deepEqual(seen, [ROOT, ROOT]);
 });
@@ -195,5 +255,15 @@ test("every write tells the watch stream", async () => {
 test("bad ids are refused", async () => {
   useTempHome();
   assert.throws(() => take(ROOT, "not a session"), /Invalid session/);
-  assert.throws(() => queueRound(ROOT, round(["../x"])), /Invalid note/);
+  assert.throws(() => sendRound(ROOT, round(["../x"])), /Invalid note/);
+});
+
+test("re-aiming a round keeps its place among rounds sent in the same millisecond", async () => {
+  useTempHome();
+  const { round: first } = await sendRound(ROOT, round(["n1"], "first", 1));
+  await sendRound(ROOT, round(["n2"], "second", 1));
+  await retarget(ROOT, first.id, null);
+  await requeue(ROOT, first.id);
+  const text = formatTaken(await take(ROOT, "s-1"));
+  assert.ok(text.indexOf("first") < text.indexOf("second"));
 });

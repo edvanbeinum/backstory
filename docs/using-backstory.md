@@ -170,7 +170,7 @@ edit moves it. When they can't be sure where it went, they say so.
 
 **Send to agent** sends them as one markdown message, each note under the
 `path:line` it refers to with the line quoted. If the agent is busy, the round
-is queued in `~/.backstory/outbox.json` and the agent's Claude Code Stop hook
+is queued in `~/.backstory/backstory.db` and the agent's Claude Code Stop hook
 collects it the next time it finishes a turn, then continues with your notes.
 **Copy** puts the same message on the clipboard instead.
 
@@ -276,9 +276,9 @@ The server logs to `~/.backstory/server.log`.
 
 ## What Backstory keeps
 
-Its own state lives under `~/.backstory`: traced flows, drafted models and data
-models, notes, ticks and drafted replies, and the outbox. Nothing Backstory
-writes is inside your repos.
+Its own state lives under `~/.backstory`. Notes, ticks, drafted replies and the
+outbox are in one database, `backstory.db`. Traced flows, drafted models and
+data models are files beside it. Nothing Backstory writes is inside your repos.
 
 If you connected GitHub, its token is in your login Keychain, under
 `dev.backstory.github`.
