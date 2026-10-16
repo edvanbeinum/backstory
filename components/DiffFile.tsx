@@ -71,6 +71,9 @@ export function DiffFile({
   component = null,
   flows = null,
   onlyHunks = null,
+  commentNumbers = null,
+  onStep,
+  onComment,
 }: {
   file: DiffFileType;
   threads: ReviewThread[];
@@ -91,7 +94,18 @@ export function DiffFile({
   flows?: number[] | "yourself" | null;
   /** The only hunks to show, by `hunkKey`; every hunk when null */
   onlyHunks?: Set<string> | null;
+  /** Each thread's number, for its gutter mark */
+  commentNumbers?: Map<string, number> | null;
+  /** A step's gutter mark was clicked */
+  onStep?: (mark: StepMark) => void;
+  /** A comment's gutter mark was clicked */
+  onComment?: (threadId: string) => void;
 }) {
+  // The gutter is drawn only where there is something to mark, so a file
+  // with no flow steps and no comments keeps the full width for its code.
+  const gutter =
+    Boolean(marks && (marks.old.size > 0 || marks.new.size > 0)) ||
+    threads.some((t) => commentNumbers?.has(t.id));
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
   const [wholeLoading, setWholeLoading] = useState(false);
@@ -206,7 +220,7 @@ export function DiffFile({
   }, [showWhole, whole, wholeLoading]);
 
   // A flow step outside the hunks on screen asks for its line: open the whole
-  // file. The flow view scrolls to the line once its anchor renders.
+  // file. Files changed scrolls to the line once it renders.
   useEffect(() => {
     const onReveal = (event: Event) => {
       const { path } = (event as CustomEvent<{ path: string }>).detail;
@@ -386,6 +400,10 @@ export function DiffFile({
                         onDraft={setDrafting}
                         onSaveNew={saveNew}
                         marks={marks}
+                        gutter={gutter}
+                        commentNumbers={commentNumbers}
+                        onStep={onStep}
+                        onComment={onComment}
                       />
                     ))}
                   </tbody>
@@ -469,6 +487,10 @@ function HunkRows({
   onDraft,
   onSaveNew,
   marks,
+  gutter,
+  commentNumbers,
+  onStep,
+  onComment,
 }: {
   hunk: DiffFileType["hunks"][number];
   hunkIndex: number;
@@ -486,6 +508,11 @@ function HunkRows({
   onDraft: (target: NoteTarget | null) => void;
   onSaveNew: (target: NoteTarget, body: string) => void;
   marks: StepMarks | null | undefined;
+  /** Draw the gutter mark column */
+  gutter: boolean;
+  commentNumbers: Map<string, number> | null;
+  onStep?: (mark: StepMark) => void;
+  onComment?: (threadId: string) => void;
 }) {
   // Clicking a line number copies the editor-style "path:line" reference —
   // the thing you paste into a terminal, an editor, or a review reply. The
@@ -507,7 +534,7 @@ function HunkRows({
     <>
       {showHunkHeader && (
         <tr className="line-hunk">
-          <td colSpan={4} className="mono">
+          <td colSpan={gutter ? 5 : 4} className="mono">
             @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines}{" "}
             @@ {hunk.header}
           </td>
@@ -571,11 +598,6 @@ function HunkRows({
               }`}
               data-old-line={line.oldNo ?? undefined}
               data-new-line={line.newNo ?? undefined}
-              data-flow-steps={
-                lineMarks.length > 0
-                  ? lineMarks.map((m) => m.key).join(" ")
-                  : undefined
-              }
             >
               {numCell(line.oldNo, "old")}
               {numCell(line.newNo, "new")}
@@ -595,29 +617,43 @@ function HunkRows({
                   </button>
                 )}
               </td>
-              {lineMarks.length > 0 ? (
-                <td className="diff-code">
-                  <span dangerouslySetInnerHTML={{ __html: line.html ?? "" }} />
+              {gutter && (
+                <td className="diff-gutter">
                   {lineMarks.map((m) => (
-                    <em
+                    <button
                       key={m.key}
-                      className={`flow-chip ${m.was ? "was" : ""}`}
+                      type="button"
+                      className={`mark ${m.was ? "was" : ""}`}
+                      title={`Flow ${m.chip.replace("·", ", step ")}${m.was ? ", as it was" : ""}: open it in the story`}
+                      onClick={() => onStep?.(m)}
                     >
-                      {m.chip}
-                    </em>
+                      ⇄ {m.chip}
+                    </button>
                   ))}
+                  {threads.map((t) =>
+                    commentNumbers?.has(t.id) ? (
+                      <button
+                        key={t.id}
+                        type="button"
+                        className={`mark c ${t.response.done ? "done" : ""}`}
+                        title={`Review comment ${commentNumbers.get(t.id)}${t.response.done ? ", handled" : ""}: open it in Comments`}
+                        onClick={() => onComment?.(t.id)}
+                      >
+                        💬 {commentNumbers.get(t.id)}
+                      </button>
+                    ) : null,
+                  )}
                 </td>
-              ) : (
-                <td
-                  className="diff-code"
-                  dangerouslySetInnerHTML={{ __html: line.html ?? "" }}
-                />
               )}
+              <td
+                className="diff-code"
+                dangerouslySetInnerHTML={{ __html: line.html ?? "" }}
+              />
             </tr>
 
             {notes && (lineNotes.length > 0 || isDrafting) && (
               <tr className="note-row">
-                <td colSpan={4}>
+                <td colSpan={gutter ? 5 : 4}>
                   <div className="space-y-2">
                     {lineNotes.map((note) => (
                       <NoteCard

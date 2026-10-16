@@ -70,6 +70,8 @@ lists them by path instead. Once the change is traced, each file says which
 flows it is on, or **read yourself** when it is app code no flow explains. The
 filters above the files show only the hunks to read yourself, or the files on
 one flow; **read these yourself** beside the flows on Story opens the first.
+Marks in the gutter beside a line open what is there: `⇄ 1·7` opens flow 1, step
+7 in the story, and `💬 2` opens review comment 2 in Comments.
 
 **View file** — every file header has a _View file_ toggle that swaps the hunks
 for the entire file at that commit, change still highlighted in place, for when

@@ -11,7 +11,7 @@ import type {
   RepoInfo,
   ReviewThread,
 } from "@/lib/types";
-import type { StepMarks } from "@/lib/flows/rows";
+import type { StepMark, StepMarks } from "@/lib/flows/rows";
 import { DiffFile } from "./DiffFile";
 import { AlertIcon } from "./icons";
 import { Spinner } from "./ui";
@@ -86,6 +86,9 @@ export function DiffView({
   sections = null,
   flows = null,
   onlyHunks = null,
+  commentNumbers = null,
+  onStep,
+  onComment,
 }: {
   diff: DiffResponse | null;
   loading: boolean;
@@ -107,6 +110,10 @@ export function DiffView({
   flows?: Map<string, number[] | "yourself"> | null;
   /** Per file, the only hunks to show, by `hunkKey` */
   onlyHunks?: Map<string, Set<string>> | null;
+  /** Each thread's number, in the spine's order, for its gutter mark */
+  commentNumbers?: Map<string, number> | null;
+  onStep?: (mark: StepMark) => void;
+  onComment?: (threadId: string) => void;
 }) {
   const { perFile } = useMemo(
     () => partitionThreads(diff, threads),
@@ -182,6 +189,9 @@ export function DiffView({
                 component={fileComponents?.[file.path] ?? null}
                 flows={flows?.get(file.path) ?? null}
                 onlyHunks={onlyHunks?.get(file.path) ?? null}
+                commentNumbers={commentNumbers}
+                onStep={onStep}
+                onComment={onComment}
               />
             ))}
           </div>

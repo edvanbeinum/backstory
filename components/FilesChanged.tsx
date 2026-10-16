@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { coverage } from "@/lib/flows/coverage";
-import { fileFlows, type StepMarks } from "@/lib/flows/rows";
+import { fileFlows, type StepMark, type StepMarks } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
 import type { MapResponse } from "@/lib/map";
 import { groupByComponent } from "@/lib/mapGroups";
@@ -68,6 +68,9 @@ export function FilesChanged({
   onJumped,
   filterAsk = null,
   onShowOnMap,
+  commentNumbers,
+  onStep,
+  onComment,
 }: {
   diff: DiffResponse | null;
   loading: boolean;
@@ -88,6 +91,12 @@ export function FilesChanged({
   filterAsk?: { filter: "yourself"; at: number } | null;
   /** Outline a component on the story's map */
   onShowOnMap: (component: string) => void;
+  /** Each thread's number, in the spine's order, for its gutter mark */
+  commentNumbers: Map<string, number>;
+  /** Open a step's gutter mark in the story */
+  onStep: (mark: StepMark) => void;
+  /** Open a comment's gutter mark in Comments */
+  onComment: (threadId: string) => void;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [byPath, setByPath] = useState(false);
@@ -277,6 +286,9 @@ export function FilesChanged({
         sections={sections}
         flows={flows}
         onlyHunks={active === "yourself" ? yours : null}
+        commentNumbers={commentNumbers}
+        onStep={onStep}
+        onComment={onComment}
       />
     </div>
   );

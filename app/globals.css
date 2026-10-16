@@ -900,27 +900,52 @@ tr.note-row td {
   background: var(--accent);
 }
 
-/* A flow step on a diff line. */
-.flow-chip {
-  display: inline-block;
-  margin-left: 10px;
-  padding: 0 6px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  border-radius: 2em;
+/* Gutter marks: a flow's step (`⇄ 1·7`) or a review comment (`💬 2`) on a
+   diff line, each opening where it belongs. */
+.diff-gutter {
+  width: 1%;
+  padding: 0 6px 0 2px;
+  white-space: nowrap;
+  vertical-align: top;
+  /* Copying code shouldn't copy "⇄ 1·3" with it. */
+  user-select: none;
+}
+tr.line-add .diff-gutter {
+  background: var(--diff-add-bg);
+}
+tr.line-del .diff-gutter {
+  background: var(--diff-del-bg);
+}
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-right: 3px;
+  padding: 0 5px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--canvas);
   color: var(--accent);
   font:
     600 10px/16px -apple-system,
     BlinkMacSystemFont,
     sans-serif;
-  font-style: normal;
   vertical-align: 1px;
-  white-space: nowrap;
-  /* Copying code shouldn't copy "step 3" with it. */
-  user-select: none;
 }
-.flow-chip.was {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+.mark:hover {
+  background: var(--accent-subtle);
+}
+.mark.was {
+  border-color: var(--danger);
   color: var(--danger);
+}
+.mark.c {
+  border-color: var(--attention);
+  color: var(--attention);
+}
+.mark.c.done {
+  border-color: var(--done);
+  color: var(--done);
 }
 
 @media (prefers-reduced-motion: reduce) {

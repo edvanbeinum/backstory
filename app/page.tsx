@@ -17,7 +17,7 @@ import { useFlows } from "@/components/useFlows";
 import { useNotes, type NotesApi } from "@/components/useNotes";
 import { useOutbox, type OutboxApi } from "@/components/useOutbox";
 import { useReview, type ReviewApi } from "@/components/useReview";
-import { stepMarks, type FlowRow } from "@/lib/flows/rows";
+import { stepMarks, type FlowRow, type StepMark } from "@/lib/flows/rows";
 import { AlertIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
@@ -709,6 +709,11 @@ export default function Page() {
     setTab("files");
   }, []);
 
+  const openStep = useCallback((mark: StepMark) => {
+    setStoryTarget({ flow: mark.flow, row: mark.row, at: Date.now() });
+    setTab("story");
+  }, []);
+
   const showOnMap = useCallback((name: string) => {
     setMapHighlight({ name, at: Date.now() });
     setTab("story");
@@ -789,6 +794,12 @@ export default function Page() {
       ...(session?.history ?? []).slice(0, 15),
     ],
     [session],
+  );
+
+  /** Each thread's number, in the spine's order, for the marks that name it. */
+  const commentNumbers = useMemo(
+    () => new Map(threads.map((t, i) => [t.id, i + 1])),
+    [threads],
   );
 
   const selectedThread = useMemo(
@@ -1396,6 +1407,9 @@ export default function Page() {
                           onJumped={clearFilesJump}
                           filterAsk={filesFilter}
                           onShowOnMap={showOnMap}
+                          commentNumbers={commentNumbers}
+                          onStep={openStep}
+                          onComment={selectComment}
                         />
                       </div>
                     )}

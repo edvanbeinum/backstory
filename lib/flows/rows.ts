@@ -299,7 +299,7 @@ export function componentPath(flow: Flow, rows: FlowRow[]): string[] {
 
 /** A flow step on a diff line: `1·7` is flow 1, step 7. */
 export interface StepMark {
-  /** Unique across flows; the diff's anchor for the step */
+  /** Unique across flows */
   key: string;
   /** The flow's index in the set */
   flow: number;
