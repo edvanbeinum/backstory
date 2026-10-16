@@ -316,7 +316,7 @@ const ALTER_TABLE = new RegExp(
   "i",
 );
 const UNIQUE_INDEX = new RegExp(
-  String.raw`^create\s+unique\s+index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?(?:${QUALIFIED}\s+)?on\s+(?:only\s+)?(${QUALIFIED})\s*(?:using\s+\w+\s*)?\(`,
+  String.raw`^create\s+unique\s+(?:(?:non)?clustered\s+)?index\s+(?:concurrently\s+)?(?:if\s+not\s+exists\s+)?(?:${QUALIFIED}\s+)?on\s+(?:only\s+)?(${QUALIFIED})\s*(?:using\s+\w+\s*)?\(`,
   "i",
 );
 const ENUM_TYPE = new RegExp(

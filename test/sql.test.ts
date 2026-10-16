@@ -212,12 +212,12 @@ CREATE UNIQUE INDEX users_c ON users (c);
   ]);
 });
 
-test("a SQL Server filtered index's condition stops before WITH and ON", () => {
+test("a SQL Server clustered or nonclustered filtered index's condition stops before WITH and ON", () => {
   const entities = read({
     "db/schema.sql": `
 CREATE TABLE [dbo].[users] ([email] nvarchar(255), [name] nvarchar(255));
-CREATE UNIQUE INDEX [ux_email] ON [dbo].[users] ([email]) WHERE [email] IS NOT NULL WITH (FILLFACTOR = 80) ON [PRIMARY];
-CREATE UNIQUE INDEX [ux_name] ON [dbo].[users] ([name]) WHERE [name] <> '' ON [PRIMARY];
+CREATE UNIQUE NONCLUSTERED INDEX [ux_email] ON [dbo].[users] ([email]) WHERE [email] IS NOT NULL WITH (FILLFACTOR = 80) ON [PRIMARY];
+CREATE UNIQUE CLUSTERED INDEX [ux_name] ON [dbo].[users] ([name]) WHERE [name] <> '' ON [PRIMARY];
 `,
   });
   assert.deepEqual(entities.get("User")!.constraints, [
