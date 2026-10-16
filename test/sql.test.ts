@@ -226,6 +226,18 @@ CREATE UNIQUE INDEX [ux_name] ON [dbo].[users] ([name]) WHERE [name] <> '' ON [P
   ]);
 });
 
+test("an ON inside a condition's string literal stays in the condition", () => {
+  const entities = read({
+    "db/schema.sql": `
+CREATE TABLE notes (id integer, note text);
+CREATE UNIQUE INDEX ux ON notes (id) WHERE note <> 'turned on today';
+`,
+  });
+  assert.deepEqual(entities.get("Note")!.constraints, [
+    { kind: "unique", fields: ["id"], condition: "note <> 'turned on today'" },
+  ]);
+});
+
 test("a foreign key keeps the columns it references, wherever it's written", () => {
   const entities = read({
     "db/schema.sql": `

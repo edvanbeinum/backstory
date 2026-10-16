@@ -380,9 +380,10 @@ export function readSql(files: Map<string, string>): DataModel {
       if (index) {
         const { inner, rest } = parenthesised(s, index[0].length - 1);
         // Take what follows WHERE as the condition, up to the WITH (…) or
-        // ON <filegroup> that SQL Server puts after it.
+        // ON <filegroup> that SQL Server puts after it. Match those only at
+        // the end, so an "on" inside a string literal stays in the condition.
         const where = rest.match(
-          /\bwhere\s+([\s\S]+?)(?:\s+(?:with\s*\(|on\s)[\s\S]*)?$/i,
+          /\bwhere\s+([\s\S]+?)(?:\s+with\s*\([^()]*\))?(?:\s+on\s+(?:\[[^\]]+\]|"[^"]+"|\w+)(?:\s*\([^()]*\))?)?\s*$/i,
         )?.[1];
         later.push({
           table: qualified(index[1]),
