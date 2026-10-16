@@ -451,7 +451,7 @@ async function readView(
       c,
       { tree: files.base, rev: view.base },
       start,
-      { delta: PHASES.base, full: start ? PHASES.base : PHASES.baseInFull },
+      { delta: PHASES.base, full: PHASES.baseInFull },
     );
     base = { tree: files.base, model };
     const past =
