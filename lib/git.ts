@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
@@ -39,6 +40,26 @@ export function expandPath(input: string): string {
   if (p === "~") p = homedir();
   else if (p.startsWith("~/")) p = path.join(homedir(), p.slice(2));
   return path.resolve(p);
+}
+
+/**
+ * The folder the flow cache, the data cache and local models give a repo:
+ * the main checkout's folder plus a hash of the common git dir, so every
+ * worktree of a repo shares one folder and two repos whose checkouts share
+ * a name don't.
+ */
+export async function repoKey(root: string): Promise<string> {
+  const common =
+    (await gitLine(root, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+    ])) ?? root;
+  const name = path
+    .basename(path.dirname(common))
+    .replace(/[^A-Za-z0-9._-]/g, "_");
+  const hash = createHash("sha1").update(common).digest("hex").slice(0, 8);
+  return `${name}-${hash}`;
 }
 
 // Common flags for every patch we parse. --no-ext-diff and --no-textconv keep

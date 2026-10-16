@@ -25,6 +25,12 @@ primitives:
     symbols:
       - resolveRepo
     use: "Turns a path into a `RepoInfo`, throwing a typed `RepoError` the routes can report."
+  - name: a repo's key
+    block: git reader
+    file: lib/git.ts
+    symbols:
+      - repoKey
+    use: "The folder name a repo gets under `~/.backstory/flows/`, `data/` and `models/`: the main checkout's folder plus a hash of the common git dir, the same from every worktree and different for two repos with the same folder name."
   - name: a view's commits
     block: git reader
     file: lib/view.ts

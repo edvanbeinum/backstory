@@ -1,10 +1,9 @@
-import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
 import { aiProvider, providerGap, type ProviderStatus } from "../ai/provider";
-import { gitLine } from "../exec";
+import { repoKey } from "../git";
 import { homeDir } from "../store";
 import { attachComponents } from "./components";
 import { generateFlows, traceHunk } from "./generate";
@@ -54,24 +53,6 @@ const registry: Registry = (g.__backstoryFlows ??= {
   claude: null,
   events: new EventEmitter().setMaxListeners(0),
 });
-
-/**
- * Worktrees of one repo share their flows and drafted data models: the key
- * is the common git dir.
- */
-export async function repoKey(root: string): Promise<string> {
-  const common =
-    (await gitLine(root, [
-      "rev-parse",
-      "--path-format=absolute",
-      "--git-common-dir",
-    ])) ?? root;
-  const name = path
-    .basename(path.dirname(common))
-    .replace(/[^A-Za-z0-9._-]/g, "_");
-  const hash = createHash("sha1").update(common).digest("hex").slice(0, 8);
-  return `${name}-${hash}`;
-}
 
 async function repoDir(root: string): Promise<string> {
   return path.join(homeDir(), "flows", await repoKey(root));
