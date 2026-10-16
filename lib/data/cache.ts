@@ -9,8 +9,8 @@ import {
   type ProviderStatus,
   type Runner,
 } from "../ai/provider";
-import { gitLine, gitTry } from "../exec";
-import { repoKey, resolveRepo } from "../git";
+import { gitLine } from "../exec";
+import { isOnBranch, repoKey, resolveRepo } from "../git";
 import { readModelAt } from "../model";
 import { homeDir, setSetting, setting } from "../store";
 import {
@@ -315,9 +315,6 @@ async function mainTip(root: string): Promise<string | null> {
   return null;
 }
 
-const isAncestor = async (root: string, a: string, b: string) =>
-  (await gitTry(root, ["merge-base", "--is-ancestor", a, b])) !== null;
-
 /** One job's reads: where they go, how they run, and what they made. */
 interface Chain {
   root: string;
@@ -457,8 +454,8 @@ async function readView(
     const past =
       !trunk ||
       (trunk.pointer.commit !== view.base &&
-        (await isAncestor(c.root, trunk.pointer.commit, view.base)));
-    if (main && past && (await isAncestor(c.root, view.base, main))) {
+        (await isOnBranch(c.root, trunk.pointer.commit, view.base)));
+    if (main && past && (await isOnBranch(c.root, view.base, main))) {
       moved = { tree: files.base, commit: view.base, files: c.files };
       if (!c.fresh) await writeJson(trunkPath(c.dir), moved);
     }
