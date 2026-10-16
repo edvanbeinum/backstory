@@ -49,14 +49,25 @@ export function expandPath(input: string): string {
  * a name don't.
  */
 export async function repoKey(root: string): Promise<string> {
-  return repoKeyOf((await gitCommonDir(root)) ?? root);
+  return repoKeyOf(await gitCommonDir(root));
 }
 
-/** The absolute git dir every worktree of a repo shares, or null. */
-export const gitCommonDir = (root: string) =>
-  gitLine(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+/**
+ * Returns the absolute git dir every worktree of a repo shares. Falls back to
+ * `<root>/.git` when git can't say, which is the right answer for a main
+ * checkout, so a failed call still finds the repo's folder.
+ */
+export async function gitCommonDir(root: string): Promise<string> {
+  return (
+    (await gitLine(root, [
+      "rev-parse",
+      "--path-format=absolute",
+      "--git-common-dir",
+    ])) ?? path.join(root, ".git")
+  );
+}
 
-/** `repoKey` for a common git dir already in hand. */
+/** Builds `repoKey` from a common git dir already in hand. */
 export function repoKeyOf(common: string): string {
   const name = path
     .basename(path.dirname(common))

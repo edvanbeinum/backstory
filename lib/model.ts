@@ -184,13 +184,13 @@ function unlessMissing(err: NodeJS.ErrnoException) {
  */
 export async function localModelFile(root: string): Promise<string> {
   const common = await gitCommonDir(root);
-  const dir = path.join(homeDir(), "models", repoKeyOf(common ?? root));
+  const dir = path.join(homeDir(), "models", repoKeyOf(common));
   const file = path.join(dir, "workspace.dsl");
   if (await exists(file)) return file;
   const old = path.join(
     homeDir(),
     "models",
-    path.basename(path.dirname(common ?? path.join(root, ".git"))),
+    path.basename(path.dirname(common)),
   );
   if (!(await exists(path.join(old, "workspace.dsl")))) return file;
   await fs.mkdir(dir, { recursive: true });
