@@ -89,7 +89,7 @@ test("Claude Code's row tells not installed, logged out and ready apart", async 
   );
 });
 
-test("the Data models row shows once Claude Code is ready, and is ready once reading is turned on", async () => {
+test("the Maps and data models row shows once Claude Code is ready, and is ready once reading is turned on", async () => {
   process.env.BACKSTORY_HOME = mkdtempSync(
     path.join(os.tmpdir(), "backstory-setup-"),
   );
@@ -117,7 +117,7 @@ test("the Data models row shows once Claude Code is ready, and is ready once rea
   assert.equal(await data(), "missing");
   assert.match(
     SETUP_DETAILS.data,
-    /once for main .* then only what each change differs by/,
+    /map and data model .* once for main .* then only what each change differs by/,
   );
 });
 

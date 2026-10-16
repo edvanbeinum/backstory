@@ -12,17 +12,18 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
-import * as modelRoute from "../app/api/model/route";
+import * as mapRoute from "../app/api/map/route";
 import type { Runner } from "../lib/ai/provider";
 import { readDsl } from "../lib/dsl";
-import { isAppCode, localModelFile, readModelAt } from "../lib/model";
+import type { MapResponse } from "../lib/map";
 import {
-  draftSettled,
-  draftStatus,
-  startDraft,
-  type DraftStatus,
-  type ModelSourceResponse,
-} from "../lib/models/draft";
+  buildModel,
+  isAppCode,
+  localModelFile,
+  readModelAt,
+} from "../lib/model";
+import { startMapRead } from "../lib/models/cache";
+import { draftModel } from "../lib/models/draft";
 import { serializeModel } from "../lib/models/dsl";
 import { checkGlobs } from "../lib/models/globs";
 import type { DraftOutput, GlobFixOutput } from "../lib/models/prompts";
@@ -143,51 +144,31 @@ function recorded(answers: (object | Error)[]) {
 
 const ready = async () => "ready" as const;
 
-async function draft(
-  root: string,
-  answers: (object | Error)[],
-  redraft = false,
-): Promise<{ status: DraftStatus; prompts: string[] }> {
-  const { runner, prompts } = recorded(answers);
-  const started = await startDraft(root, { runner, status: ready, redraft });
-  assert.equal(started.status, "running");
-  await draftSettled(root);
-  return { status: await draftStatus(root), prompts };
-}
-
-test("a repo with no model gets a draft on this machine, and the repo is untouched", async () => {
+test("a full draft reads the commit it's given, places every app file once, and writes nothing", async () => {
   const repo = gitRepo();
-  const { status, prompts } = await draft(repo.dir, [CLEAN]);
+  const first = repo.sh("rev-parse", "HEAD");
+  writeFileSync(path.join(repo.dir, "src/app/later.ts"), "1\n");
+  repo.sh("add", ".");
+  repo.sh("commit", "-qm", "later");
+  const { runner, prompts } = recorded([CLEAN]);
+  const result = await draftModel({ root: repo.dir, rev: first, runner });
 
-  assert.equal(status.status, "done", JSON.stringify(status));
   assert.equal(prompts.length, 1);
-  const file = await localModelFile(repo.dir);
-  assert.ok(file.startsWith(path.join(home, "models") + path.sep));
-  assert.ok(existsSync(file));
-
-  const read = await readModelAt(repo.dir, "HEAD");
-  assert.ok(read?.model, read?.error ?? "no model");
-  assert.equal(read.local, true);
-  assert.equal(read.file, file);
-  assert.match(read.drafted ?? "", /^\d{4}-\d{2}-\d{2}$/);
-
-  const model = read.model;
-  const appFiles = repo
-    .sh("ls-files")
-    .split("\n")
-    .filter((f) => isAppCode(model, f));
+  assert.match(prompts[0], new RegExp(`at commit ${first.slice(0, 7)}`));
+  assert.equal(result.costUsd, 0.5);
+  assert.equal(result.model, "claude-test");
+  const model = buildModel(result.workspace);
+  const appFiles = Object.keys(FILES).filter((f) => isAppCode(model, f));
   assert.deepEqual(appFiles, [
     "src/app/main.ts",
     "src/app/util.ts",
     "src/sync/engine.ts",
   ]);
   for (const f of appFiles) assert.equal(model.match(f).length, 1, f);
+  assert.equal(result.workspace.properties["backstory.drafted"], undefined);
 
   assert.equal(repo.sh("status", "--porcelain", "--ignored"), "");
-  assert.match(
-    readFileSync(file, "utf8"),
-    /^\/\/ Drafted by Claude[\s\S]*Every app file at \w{7} matches exactly one component\./,
-  );
+  assert.equal(existsSync(path.join(home, "models")), false);
 });
 
 test("a draft reads back as it was written, whatever its strings and ids", () => {
@@ -299,7 +280,8 @@ test("files the first answer misplaces get one more call, whose globs are used",
       { id: "shop.web.sync", globs: ["src/sync/**"] },
     ],
   };
-  const { status, prompts } = await draft(repo.dir, [MESSY, fix]);
+  const { runner, prompts } = recorded([MESSY, fix]);
+  const result = await draftModel({ root: repo.dir, rev: "HEAD", runner });
 
   assert.equal(prompts.length, 2);
   assert.match(prompts[1], /src\/sync\/engine\.ts/);
@@ -308,151 +290,60 @@ test("files the first answer misplaces get one more call, whose globs are used",
     /src\/app\/util\.ts ← shop\.web\.app, shop\.web\.util/,
   );
   assert.ok(!prompts[1].includes("main.test.ts"));
-  assert.equal(status.status, "done");
-  if (status.status !== "done") return;
-  assert.equal(status.unmatched, 0);
-  assert.equal(status.ambiguous, 0);
-  assert.equal(status.costUsd, 1);
+  assert.equal(result.costUsd, 1);
+  const model = buildModel(result.workspace);
+  assert.deepEqual(model.match("src/sync/engine.ts"), ["shop.web.sync"]);
+  assert.deepEqual(model.match("src/app/util.ts"), ["shop.web.util"]);
 });
 
-test("what the fix-up leaves is listed in the file and counted", async () => {
+test("a failed run says why", async () => {
   const repo = gitRepo();
-  const fix: GlobFixOutput = {
-    components: [{ id: "shop.web.app", globs: ["src/app/main.ts"] }],
-  };
-  const { status, prompts } = await draft(repo.dir, [MESSY, fix]);
-
-  assert.equal(prompts.length, 2);
-  assert.equal(status.status, "done");
-  if (status.status !== "done") return;
-  assert.equal(status.unmatched, 1);
-  assert.equal(status.ambiguous, 0);
-  const text = readFileSync(await localModelFile(repo.dir), "utf8");
-  assert.match(
-    text,
-    /\/\/ 1 app file matches no component:\n\/\/ {3}src\/sync\/engine\.ts\n/,
-  );
-});
-
-test("a failed run says why and writes nothing", async () => {
-  const repo = gitRepo();
-  const { status } = await draft(repo.dir, [
-    new Error("Claude Code failed: out of credit"),
-  ]);
-  assert.deepEqual(status, {
-    status: "failed",
-    error: "Claude Code failed: out of credit",
+  const { runner } = recorded([new Error("Claude Code failed: out of credit")]);
+  await assert.rejects(draftModel({ root: repo.dir, rev: "HEAD", runner }), {
+    message: "Claude Code failed: out of credit",
   });
-  assert.equal(existsSync(await localModelFile(repo.dir)), false);
 });
 
-test("without Claude Code, no draft starts", async () => {
-  const repo = gitRepo();
-  const { runner, prompts } = recorded([CLEAN]);
-  const status = await startDraft(repo.dir, {
-    runner,
-    status: async () => "missing",
-  });
-  assert.deepEqual(status, { status: "unavailable", reason: "no-claude" });
-  assert.deepEqual(await draftStatus(repo.dir), status);
-  assert.equal(prompts.length, 0);
-});
-
-test("with Claude Code logged out, no draft starts", async () => {
-  const repo = gitRepo();
-  const { runner, prompts } = recorded([CLEAN]);
-  const status = await startDraft(repo.dir, {
-    runner,
-    status: async () => "logged-out",
-  });
-  assert.deepEqual(status, { status: "unavailable", reason: "logged-out" });
-  assert.equal(prompts.length, 0);
-});
-
-test("a repo that commits a model is never drafted", async () => {
-  const repo = gitRepo({
-    "architecture/workspace.dsl": "workspace {\n    model {\n    }\n}\n",
-  });
-  const { runner, prompts } = recorded([CLEAN]);
-  const status = await startDraft(repo.dir, { runner, status: ready });
-  assert.deepEqual(status, { status: "refused", reason: "committed" });
-  assert.deepEqual(await draftStatus(repo.dir), { status: "idle" });
-  assert.equal(prompts.length, 0);
-});
-
-test("a local model is only replaced by a redraft, which keeps the old one", async () => {
-  const repo = gitRepo();
-  await draft(repo.dir, [CLEAN]);
-  const file = await localModelFile(repo.dir);
-  const first = readFileSync(file, "utf8");
-
-  const { runner, prompts } = recorded([CLEAN]);
-  assert.deepEqual(await startDraft(repo.dir, { runner, status: ready }), {
-    status: "refused",
-    reason: "exists",
-  });
-  assert.equal(prompts.length, 0);
-  assert.equal((await draftStatus(repo.dir)).status, "done");
-
-  const renamed = structuredClone(CLEAN);
-  renamed.system.name = "Shop, redrafted";
-  const { status } = await draft(repo.dir, [renamed], true);
-  assert.equal(status.status, "done");
-  const second = readFileSync(file, "utf8");
-  assert.equal(readFileSync(`${file}.bak`, "utf8"), first);
-  assert.match(second, /"Shop, redrafted"/);
-
-  const failed = await draft(repo.dir, [new Error("timed out")], true);
-  assert.equal(failed.status.status, "failed");
-  assert.equal(readFileSync(file, "utf8"), second);
-  assert.equal(readFileSync(`${file}.bak`, "utf8"), first);
-});
+/** Writes a hand-written local model for the repo, and returns its path. */
+async function handWrite(root: string, output: DraftOutput = CLEAN) {
+  const file = await localModelFile(root);
+  mkdirSync(path.dirname(file), { recursive: true });
+  writeFileSync(file, serializeModel(output));
+  return file;
+}
 
 const systemName = async (root: string) =>
   (await readModelAt(root, "HEAD"))?.model?.elements.get("shop")?.name;
 
-test("two repos with the same folder name each get their own model, and a redraft on one leaves the other alone", async () => {
+test("two repos with the same folder name each have their own hand-written model", async () => {
   const one = namedRepo("api");
   const two = namedRepo("api", { "src/app/extra.ts": "export const x = 1;\n" });
   const renamed = structuredClone(CLEAN);
   renamed.system.name = "Other shop";
-  assert.equal((await draft(one.dir, [CLEAN])).status.status, "done");
-  assert.equal((await draft(two.dir, [renamed])).status.status, "done");
+  const oneFile = await handWrite(one.dir);
+  const twoFile = await handWrite(two.dir, renamed);
 
-  const oneFile = await localModelFile(one.dir);
-  const twoFile = await localModelFile(two.dir);
   assert.notEqual(oneFile, twoFile);
-  assert.ok(existsSync(oneFile));
-  assert.ok(existsSync(twoFile));
   assert.equal(await systemName(one.dir), "Shop");
   assert.equal(await systemName(two.dir), "Other shop");
-
-  const before = readFileSync(twoFile);
-  const redrafted = structuredClone(CLEAN);
-  redrafted.system.name = "Shop, redrafted";
-  assert.equal((await draft(one.dir, [redrafted], true)).status.status, "done");
-  assert.equal(await systemName(one.dir), "Shop, redrafted");
-  assert.deepEqual(readFileSync(twoFile), before);
-  assert.equal(existsSync(`${twoFile}.bak`), false);
 });
 
-test("every worktree of a repo reads the same model", async () => {
+test("every worktree of a repo reads the same hand-written model", async () => {
   const repo = gitRepo();
   const parent = mkdtempSync(path.join(os.tmpdir(), "backstory-worktree-"));
   dirs.push(parent);
   const worktree = path.join(parent, "second");
   repo.sh("worktree", "add", "-q", "--detach", worktree);
-  await draft(repo.dir, [CLEAN]);
+  const file = await handWrite(repo.dir);
 
-  const file = await localModelFile(repo.dir);
   assert.equal(await localModelFile(worktree), file);
   const read = await readModelAt(worktree, "HEAD");
   assert.ok(read?.model, read?.error ?? "no model");
-  assert.equal(read.local, true);
+  assert.equal(read.source, "local");
   assert.equal(read.file, file);
 });
 
-test("a model in the folder named after the checkout alone is moved, and never silently redrafted", async () => {
+test("a model in the folder named after the checkout alone is moved, and never drafted over", async () => {
   const repo = namedRepo("legacy");
   const old = path.join(home, "models", "legacy");
   mkdirSync(old, { recursive: true });
@@ -473,24 +364,32 @@ test("a model in the folder named after the checkout alone is moved, and never s
   assert.equal(existsSync(old), false);
 
   const { runner, prompts } = recorded([CLEAN]);
-  assert.deepEqual(await startDraft(repo.dir, { runner, status: ready }), {
-    status: "refused",
-    reason: "exists",
-  });
+  const head = repo.sh("rev-parse", "HEAD");
+  assert.deepEqual(
+    await startMapRead(
+      { root: repo.dir, base: null, head },
+      { runner, status: ready },
+    ),
+    { status: "refused", reason: "local" },
+  );
   assert.equal(prompts.length, 0);
 });
 
-test("a Draft finds a model in the folder named after the checkout alone before checking for one", async () => {
+test("a map read finds a model in the folder named after the checkout alone before checking for one", async () => {
   const repo = namedRepo("unread");
   const old = path.join(home, "models", "unread");
   mkdirSync(old, { recursive: true });
   writeFileSync(path.join(old, "workspace.dsl"), serializeModel(CLEAN));
 
   const { runner, prompts } = recorded([CLEAN]);
-  assert.deepEqual(await startDraft(repo.dir, { runner, status: ready }), {
-    status: "refused",
-    reason: "exists",
-  });
+  const head = repo.sh("rev-parse", "HEAD");
+  assert.deepEqual(
+    await startMapRead(
+      { root: repo.dir, base: null, head },
+      { runner, status: ready },
+    ),
+    { status: "refused", reason: "local" },
+  );
   assert.equal(prompts.length, 0);
   assert.ok(existsSync(await localModelFile(repo.dir)));
   assert.equal(existsSync(old), false);
@@ -498,7 +397,7 @@ test("a Draft finds a model in the folder named after the checkout alone before 
 
 test("when both folders have a model, the repo key's wins and the other is left alone", async () => {
   const repo = namedRepo("both");
-  await draft(repo.dir, [CLEAN]);
+  await handWrite(repo.dir);
   const old = path.join(home, "models", "both", "workspace.dsl");
   mkdirSync(path.dirname(old), { recursive: true });
   const stale = structuredClone(CLEAN);
@@ -518,48 +417,16 @@ test("a repo with no model in either folder gets none, and no folder is made", a
   assert.equal(existsSync(path.join(home, "models", "bare")), false);
 });
 
-test("a repo with no model is told where a local model goes, and no folder is made", async () => {
+test("a repo with no model is told where a hand-written model goes, and no folder is made", async () => {
   const repo = namedRepo("unmodelled");
-  const response = await modelRoute.GET(
+  const head = repo.sh("rev-parse", "HEAD");
+  const response = await mapRoute.GET(
     new Request(
-      `http://localhost/api/model?repo=${encodeURIComponent(repo.dir)}`,
+      `http://localhost/api/map?repo=${encodeURIComponent(repo.dir)}&rev=${head}`,
     ),
   );
-  assert.ok(response);
-  const body = (await response.json()) as ModelSourceResponse;
-  assert.equal(body.source, "none");
-  assert.equal(body.file, await localModelFile(repo.dir));
+  const body = (await response.json()) as MapResponse;
+  assert.equal(body.status, "none");
+  assert.equal(body.handFile, await localModelFile(repo.dir));
   assert.equal(existsSync(path.dirname(await localModelFile(repo.dir))), false);
-});
-
-test("a redraft sent while a refused draft is still being checked still runs", async () => {
-  const repo = gitRepo();
-  await draft(repo.dir, [CLEAN]);
-  const file = await localModelFile(repo.dir);
-
-  const renamed = structuredClone(CLEAN);
-  renamed.system.name = "Shop, redrafted";
-  const { runner, prompts } = recorded([renamed]);
-  // Let the stale draft claim the repo before the redraft arrives: both
-  // resolve the model directory first, and that ordering isn't promised.
-  // Stop waiting once the stale draft has settled too, since its claim can
-  // come and go between two polls and would otherwise leave this spinning.
-  const stale = startDraft(repo.dir, { runner, status: ready });
-  let settled = false;
-  const markSettled = () => (settled = true);
-  stale.then(markSettled, markSettled);
-  while (!settled && (await draftStatus(repo.dir)).status !== "running") {
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-  const redraft = await startDraft(repo.dir, {
-    runner,
-    status: ready,
-    redraft: true,
-  });
-  assert.deepEqual(await stale, { status: "refused", reason: "exists" });
-  assert.equal(redraft.status, "running");
-  await draftSettled(repo.dir);
-  assert.equal((await draftStatus(repo.dir)).status, "done");
-  assert.equal(prompts.length, 1);
-  assert.match(readFileSync(file, "utf8"), /"Shop, redrafted"/);
 });

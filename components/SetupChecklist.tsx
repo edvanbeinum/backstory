@@ -16,7 +16,7 @@ const NAMES: Record<SetupId, string> = {
   git: "git",
   github: "GitHub",
   claude: "Claude Code",
-  data: "Data models",
+  data: "Maps and data models",
   reviews: "Notes to your agent",
 };
 
@@ -333,7 +333,11 @@ function ConnectGitHub({
   );
 }
 
-/** Turns on reading data models as repos and views open, as Read automatically on an undrafted view does; Turn off is on each drafted view's Data line. */
+/**
+ * Turns on reading maps and data models as repos and views open, as Read
+ * automatically on Story does; Turn off is on each drafted map's and data
+ * model's footnote. Main's reads start as the next repo opens.
+ */
 function ReadDataModels({ onChanged }: { onChanged: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -353,7 +357,7 @@ function ReadDataModels({ onChanged }: { onChanged: () => Promise<void> }) {
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
       <Button size="sm" disabled={busy} onClick={run}>
-        Read data models automatically
+        Read automatically
       </Button>
       {error && (
         <span className="flex items-center gap-1.5 text-[var(--attention)]">

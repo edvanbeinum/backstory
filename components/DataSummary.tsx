@@ -21,7 +21,7 @@ import type {
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { Elapsed } from "./SystemMap";
+import { Elapsed, setAutoReading } from "./SystemMap";
 import { Badge, Button, Spinner } from "./ui";
 
 /**
@@ -577,21 +577,10 @@ function useDataDraft(
     void request("POST");
   }, [autoStart, repo, rev, request]);
 
-  // Turning reading on starts main's read before the page reads the view
-  // again, so the view's own read waits behind it instead of reading its base
-  // in full.
   const setAuto = useCallback(
     async (on: boolean) => {
       try {
-        const response = await fetch(`/api/data?auto=${on ? 1 : 0}`, {
-          method: "POST",
-        });
-        if (!response.ok)
-          throw new Error(`Backstory answered ${response.status}.`);
-        if (on)
-          await fetch(`/api/data?repo=${encodeURIComponent(repo)}&trunk=1`, {
-            method: "POST",
-          });
+        await setAutoReading(repo, on);
         onReadRef.current();
       } catch (err) {
         setError({

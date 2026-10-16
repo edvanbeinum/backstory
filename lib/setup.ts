@@ -11,9 +11,10 @@ import { gh, githubTokenWorks } from "./github";
 /**
  * The setup checklist's checks: what Backstory needs on this machine, and
  * what each piece unlocks. Each one only looks, and changes nothing, except
- * that a saved GitHub token GitHub refuses is forgotten. The Data models row
- * is the user's permission to spend on reading data models, so it shows only
- * once Claude Code, which does the reading, is ready.
+ * that a saved GitHub token GitHub refuses is forgotten. The Maps and data
+ * models row is the user's permission to spend on reading maps and data
+ * models, so it shows only once Claude Code, which does the reading, is
+ * ready.
  */
 
 export type SetupId = "git" | "github" | "claude" | "data" | "reviews";
@@ -32,7 +33,7 @@ export const SETUP_DETAILS: Record<SetupId, string> = {
     "Bring your pull request's review comments in beside the code they're about.",
   claude:
     "Have a change explained: how it runs, step by step, and a map of the system and data it touches.",
-  data: "Read each repo's data model with Claude Code as you open it: once for main (about a dollar and a few minutes on a large repo, cents on a small one), then only what each change differs by (cents, well under a minute).",
+  data: "Read each repo's map and data model with Claude Code as you open it: once for main (each about a dollar and a few minutes on a large repo, cents on a small one), then only what each change differs by (cents, well under a minute).",
   reviews:
     "Comment on what your coding agent wrote and send the notes straight to it, even while it's still working.",
 };

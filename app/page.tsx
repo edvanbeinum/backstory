@@ -482,14 +482,14 @@ export default function Page() {
     // nothing else.
   }, [ready, repoPath, ref, loadSession]);
 
-  // Start reading main's data model as a repo opens, while a pull request is
-  // still being chosen. The server starts it only when reading data models
-  // automatically is on and main has no model yet.
+  // Start reading main's data model and map as a repo opens, while a pull
+  // request is still being chosen. The server starts each only when reading
+  // automatically is on and main has no model of that kind yet.
   useEffect(() => {
     if (!ready || !repoPath) return;
-    void fetch(`/api/data?repo=${encodeURIComponent(repoPath)}&trunk=1`, {
-      method: "POST",
-    }).catch(() => {});
+    const trunk = `repo=${encodeURIComponent(repoPath)}&trunk=1`;
+    for (const api of ["data", "map"])
+      void fetch(`/api/${api}?${trunk}`, { method: "POST" }).catch(() => {});
   }, [ready, repoPath]);
 
   // Catch up on focus, the Cmd-Tab-into-the-window moment, on anything that

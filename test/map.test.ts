@@ -220,7 +220,7 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
   }
 });
 
-test("a drafted local model says so and where it is; a committed one says neither", async () => {
+test("the old drafted local model is skipped, and the map says where a hand-written one goes; a committed one says neither", async () => {
   const repo = gitRepo();
   const home = tempDir("backstory-home-");
   const base = repo.commit({ README: "x\n" }, "base");
@@ -232,16 +232,22 @@ test("a drafted local model says so and where it is; a committed one says neithe
     const file = await localModelFile(repo.dir);
     write(path.dirname(file), "workspace.dsl", draftedDsl("backstory.drafted"));
     const map = await buildMap(repo.dir, base, head);
-    assert.equal(map.drafted, "2026-10-05");
-    assert.equal(map.modelFile, file);
+    assert.equal(map.status, "none");
+    assert.equal(map.drafted, null);
+    assert.equal(map.modelFile, null);
+    assert.equal(map.handFile, file);
+    assert.equal(map.draft?.status, "idle");
 
     const committed = await buildMap(
       changeRepo.dir,
       changeRepo.base,
       changeRepo.head,
     );
+    assert.equal(committed.source, "committed");
     assert.equal(committed.drafted, null);
     assert.equal(committed.modelFile, null);
+    assert.equal(committed.handFile, undefined);
+    assert.equal(committed.draft, undefined);
   } finally {
     if (previousHome === undefined) delete process.env.BACKSTORY_HOME;
     else process.env.BACKSTORY_HOME = previousHome;

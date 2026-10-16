@@ -70,7 +70,7 @@ export function quote(text: string): string {
 }
 
 /** Globs are split on whitespace when read, so a space inside one becomes `?`. */
-const globList = (globs: string[]) =>
+export const globList = (globs: string[]) =>
   globs
     .map((g) => g.trim().replace(/\s/g, "?"))
     .filter(Boolean)
