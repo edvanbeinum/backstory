@@ -548,8 +548,7 @@ private final class FindWindow {
 
     private var barIsDown: Bool {
         page.layoutSubtreeIfNeeded()
-        return !page.isFindBarVisible && (bar == nil || bar?.isHiddenOrHasHiddenAncestor == true)
-            && webView.frame.height == page.bounds.height && !focusIsInBar && focusIsInPage
+        return !page.isFindBarVisible && bar == nil && webView.frame.height == page.bounds.height && !focusIsInBar && focusIsInPage
     }
 
     // Polls rather than sleeping a fixed time, because the finder finishes
@@ -589,9 +588,7 @@ private final class FindWindow {
     func expectBarHidden(_ step: String, sourceLocation: SourceLocation = #_sourceLocation) async {
         await settle { barIsDown }
         #expect(!page.isFindBarVisible, "\(step): container hides the bar", sourceLocation: sourceLocation)
-        #expect(
-            bar == nil || bar?.isHiddenOrHasHiddenAncestor == true, "\(step): bar hidden",
-            sourceLocation: sourceLocation)
+        #expect(bar == nil, "\(step): container dropped the bar", sourceLocation: sourceLocation)
         #expect(webView.frame.height == page.bounds.height, "\(step): page has its height back", sourceLocation: sourceLocation)
         #expect(
             !focusIsInBar, "\(step): focus left the bar, still \(String(describing: window.firstResponder))",
