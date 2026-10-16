@@ -8,8 +8,8 @@ import { importOutbox } from "./outbox";
 import { importResponses } from "./responses";
 
 /**
- * The SQLite database behind notes, rounds and responses: `backstory.db` in
- * `homeDir`.
+ * The SQLite database behind notes, rounds, responses and settings:
+ * `backstory.db` in `homeDir`.
  *
  * One database, so a write that touches two kinds of record commits or fails
  * as one (Send files a round and marks its notes sent), and so the schema is
@@ -36,7 +36,14 @@ export function homeDir(): string {
 }
 
 const FILE = "backstory.db";
-const VERSION = 1;
+const VERSION = 2;
+
+const SETTINGS = `
+  CREATE TABLE settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+`;
 
 const SCHEMA = `
   CREATE TABLE notes (
@@ -121,8 +128,10 @@ export function db(): DatabaseSync {
     if (user_version === 0) {
       database.exec(SCHEMA);
       imported = importJson(database, home);
-      database.exec(`PRAGMA user_version = ${VERSION}`);
     }
+    if (user_version < 2) database.exec(SETTINGS);
+    if (user_version < VERSION)
+      database.exec(`PRAGMA user_version = ${VERSION}`);
     database.exec("COMMIT");
   } catch (err) {
     // SQLite may already have rolled back, after a full disk or an I/O error.
@@ -243,6 +252,26 @@ export function reading<T>(empty: T, fn: (database: DatabaseSync) => T): T {
     console.error("Backstory couldn't read its database:", err);
     return empty;
   }
+}
+
+/** A setting's value, or null when it was never set or the database can't be read. */
+export function setting(key: string): string | null {
+  return reading(null, (database) => {
+    const row = database
+      .prepare("SELECT value FROM settings WHERE key = ?")
+      .get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+  });
+}
+
+export function setSetting(key: string, value: string): void {
+  transaction((database) =>
+    database
+      .prepare(
+        "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+      )
+      .run(key, value),
+  );
 }
 
 /** GitHub thread node ids are opaque base64-ish strings; be strict anyway. */

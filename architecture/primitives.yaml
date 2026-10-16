@@ -99,7 +99,9 @@ primitives:
       - reading
       - homeDir
       - KEY
-    use: "Every read and write of notes, rounds and responses, in the SQLite database `~/.backstory/backstory.db`. `db` opens it on first use and makes the schema; `transaction` runs a synchronous write in one transaction, joining one already open, so a module's write can be part of a larger one; `reading` runs a read and returns an empty result when the database can't be opened or read. `homeDir` is the one directory everything on this machine lives in (the database, the flow cache, the data cache, local models). `KEY` is the shape of an id the store accepts."
+      - setting
+      - setSetting
+    use: "Every read and write of notes, rounds, responses and settings, in the SQLite database `~/.backstory/backstory.db`. `db` opens it on first use and makes the schema; `transaction` runs a synchronous write in one transaction, joining one already open, so a module's write can be part of a larger one; `reading` runs a read and returns an empty result when the database can't be opened or read. `homeDir` is the one directory everything on this machine lives in (the database, the flow cache, the data cache, local models). `KEY` is the shape of an id the store accepts. `setting` and `setSetting` read and write one setting, such as `data.auto`."
   - name: run the AI provider
     block: AI provider
     file: lib/ai/provider.ts

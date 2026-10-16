@@ -55,7 +55,7 @@ terms:
     avoid:
       - store
   - name: store
-    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes, rounds and responses, one table each, plus `seen`."
+    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes, rounds and responses, one table each, plus `seen` and `settings`."
     avoid:
       - store, for the flow cache or the data cache
   - name: flow cache
