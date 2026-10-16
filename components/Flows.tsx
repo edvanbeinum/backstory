@@ -6,7 +6,7 @@ import { summarise, type FlowRow } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { FlowCard, type StoryTarget } from "./FlowCard";
-import type { ComponentInfo, DataField } from "./FlowSequence";
+import type { ComponentInfo, DataField, StepBadge } from "./FlowSequence";
 import { AlertIcon, SyncIcon } from "./icons";
 import { Button, Spinner } from "./ui";
 import type { FlowsApi } from "./useFlows";
@@ -22,6 +22,9 @@ interface CardProps {
   dataFields?: DataField[];
   /** "Worth a look" notes pinned on flows, by flow index */
   flowNotes?: Map<number, string[]>;
+  /** Review comments on steps, by flow index */
+  badges?: Map<number, Map<string, StepBadge[]>>;
+  onBadge?: (threadId: string) => void;
 }
 
 /**
@@ -153,6 +156,7 @@ function ReadyFlows({
   target,
   navRef,
   flowNotes,
+  badges,
   ...card
 }: CardProps & {
   set: FlowSet;
@@ -216,6 +220,7 @@ function ReadyFlows({
           target={target?.flow === i ? target : null}
           navRef={i === top ? navRef : null}
           notes={flowNotes?.get(i)}
+          badges={badges?.get(i)}
           {...card}
         />
       ))}

@@ -9,7 +9,7 @@ import { DataSummary } from "./DataSummary";
 import type { StoryTarget } from "./FlowCard";
 import { FlowCoverage } from "./FlowCoverage";
 import { Flows } from "./Flows";
-import type { ComponentInfo, DataField } from "./FlowSequence";
+import type { ComponentInfo, DataField, StepBadge } from "./FlowSequence";
 import { SystemMap } from "./SystemMap";
 import type { FlowsApi } from "./useFlows";
 
@@ -37,6 +37,8 @@ export function Story({
   components,
   dataFields,
   flowNotes,
+  badges,
+  onBadge,
 }: {
   repo: string;
   rev: string;
@@ -59,6 +61,10 @@ export function Story({
   components: Map<string, ComponentInfo>;
   dataFields: DataField[];
   flowNotes: Map<number, string[]>;
+  /** Review comments on steps, by flow index */
+  badges: Map<number, Map<string, StepBadge[]>>;
+  /** Open a badge's comment in Comments */
+  onBadge: (threadId: string) => void;
 }) {
   const status = flows.status;
   const set = status?.status === "ready" ? status.flows : null;
@@ -116,6 +122,8 @@ export function Story({
           components={components}
           dataFields={dataFields}
           flowNotes={flowNotes}
+          badges={badges}
+          onBadge={onBadge}
         />
       </section>
     </div>

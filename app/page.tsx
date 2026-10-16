@@ -7,7 +7,12 @@ import { Comments } from "@/components/Comments";
 import { FeedbackBar } from "@/components/FeedbackBar";
 import { FilesChanged, type FilesJump } from "@/components/FilesChanged";
 import type { StoryTarget } from "@/components/FlowCard";
-import type { ComponentInfo, DataField } from "@/components/FlowSequence";
+import {
+  badgeKey,
+  type ComponentInfo,
+  type DataField,
+  type StepBadge,
+} from "@/components/FlowSequence";
 import { Story } from "@/components/Story";
 import { Tabs } from "@/components/Tabs";
 import { findings as designQuestions } from "@/lib/findings";
@@ -17,7 +22,13 @@ import { useFlows } from "@/components/useFlows";
 import { useNotes, type NotesApi } from "@/components/useNotes";
 import { useOutbox, type OutboxApi } from "@/components/useOutbox";
 import { useReview, type ReviewApi } from "@/components/useReview";
-import { stepMarks, type FlowRow, type StepMark } from "@/lib/flows/rows";
+import {
+  stepMarks,
+  stepsAt,
+  type FlowRow,
+  type StepAt,
+  type StepMark,
+} from "@/lib/flows/rows";
 import { AlertIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
@@ -709,7 +720,7 @@ export default function Page() {
     setTab("files");
   }, []);
 
-  const openStep = useCallback((mark: StepMark) => {
+  const openStep = useCallback((mark: Pick<StepMark, "flow" | "row">) => {
     setStoryTarget({ flow: mark.flow, row: mark.row, at: Date.now() });
     setTab("story");
   }, []);
@@ -801,6 +812,45 @@ export default function Page() {
     () => new Map(threads.map((t, i) => [t.id, i + 1])),
     [threads],
   );
+
+  /** The flow step each thread's line is on, where one is. */
+  const threadSteps = useMemo(() => {
+    const out = new Map<string, StepAt>();
+    if (!flowSet) return out;
+    for (const t of threads) {
+      const line = t.line ?? t.originalLine;
+      if (!t.path || line == null) continue;
+      const at = stepsAt(
+        flowSet,
+        t.path,
+        line,
+        t.side === "LEFT" ? "old" : "new",
+      );
+      if (at) out.set(t.id, at);
+    }
+    return out;
+  }, [flowSet, threads]);
+
+  /** Each flow's comment badges, by step. */
+  const badges = useMemo(() => {
+    const out = new Map<number, Map<string, StepBadge[]>>();
+    for (const t of threads) {
+      const at = threadSteps.get(t.id);
+      if (!at) continue;
+      const flow = out.get(at.flow - 1) ?? new Map<string, StepBadge[]>();
+      const key = badgeKey(at.row);
+      flow.set(key, [
+        ...(flow.get(key) ?? []),
+        {
+          id: t.id,
+          n: commentNumbers.get(t.id) ?? 0,
+          done: t.response.done,
+        },
+      ]);
+      out.set(at.flow - 1, flow);
+    }
+    return out;
+  }, [threads, threadSteps, commentNumbers]);
 
   const selectedThread = useMemo(
     () => threads.find((t) => t.id === commentId) ?? null,
@@ -1385,6 +1435,8 @@ export default function Page() {
                           components={componentInfo}
                           dataFields={dataFields}
                           flowNotes={flowNotes}
+                          badges={badges}
+                          onBadge={selectComment}
                         />
                       </div>
                     )}
@@ -1424,6 +1476,10 @@ export default function Page() {
                             setFocusedThreadId(id);
                           }}
                           fileComponents={map?.fileComponents ?? null}
+                          threadSteps={threadSteps}
+                          onOpenStep={(at) =>
+                            openStep({ flow: at.flow - 1, row: at.row.key })
+                          }
                           repo={session.repo}
                           pr={session.github.pr}
                           commit={commitForRev}

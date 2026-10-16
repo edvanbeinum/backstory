@@ -15,6 +15,7 @@ import {
   FlowSequence,
   type ComponentInfo,
   type DataField,
+  type StepBadge,
 } from "./FlowSequence";
 import { StepCode } from "./StepCode";
 import { ChevronDownIcon, ChevronRightIcon } from "./icons";
@@ -66,6 +67,8 @@ export function FlowCard({
   components,
   dataFields,
   notes = [],
+  badges,
+  onBadge,
 }: {
   flow: Flow;
   index: number;
@@ -84,6 +87,9 @@ export function FlowCard({
   dataFields?: DataField[];
   /** "Worth a look" notes pinned on this flow */
   notes?: string[];
+  /** Review comments on this flow's steps */
+  badges?: Map<string, StepBadge[]>;
+  onBadge?: (threadId: string) => void;
 }) {
   const [mode, setMode] = useState<FlowMode>("diff");
   const shownMode = flow.before === null && mode === "before" ? "diff" : mode;
@@ -269,6 +275,8 @@ export function FlowCard({
           open={steps}
           components={components}
           dataFields={dataFields}
+          badges={badges}
+          onBadge={onBadge}
           renderCode={(row) => (
             <StepCode
               repo={repo}

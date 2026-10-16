@@ -26,6 +26,20 @@ const BOX_PAD = 16;
 const NONE_OPEN = new Set<string>();
 const NO_FIELDS: DataField[] = [];
 
+/** A review comment on a step's line, drawn at the row's right edge. */
+export interface StepBadge {
+  /** The thread's id */
+  id: string;
+  /** Its number, in the spine's order */
+  n: number;
+  /** Ticked as handled */
+  done: boolean;
+}
+
+/** A step by side and id, the same in every flow mode. */
+export const badgeKey = (row: Pick<FlowRow, "side" | "step">) =>
+  `${row.side}:${row.step.id}`;
+
 export interface DataField {
   entity: string;
   field: string;
@@ -64,6 +78,8 @@ export function FlowSequence({
   renderCode,
   components,
   dataFields = NO_FIELDS,
+  badges,
+  onBadge,
 }: {
   rows: FlowRow[];
   participants: FlowParticipant[];
@@ -80,6 +96,10 @@ export function FlowSequence({
   components?: Map<string, ComponentInfo>;
   /** Fields the change added, removed or changed, for chips on the steps that use them */
   dataFields?: DataField[];
+  /** Review comments on steps' lines, by `badgeKey` */
+  badges?: Map<string, StepBadge[]>;
+  /** A badge was clicked: open its comment */
+  onBadge?: (threadId: string) => void;
 }) {
   const id = useId().replace(/:/g, "");
   const measure = useRef<HTMLDivElement>(null);
@@ -385,6 +405,24 @@ export function FlowSequence({
                           </span>
                         )}
                       </span>
+                      {(badges?.get(badgeKey(row)) ?? []).length > 0 && (
+                        <span className="row-badges">
+                          {badges?.get(badgeKey(row))?.map((b) => (
+                            <button
+                              key={b.id}
+                              type="button"
+                              className={`mark c ${b.done ? "done" : ""}`}
+                              title={`Review comment ${b.n}${b.done ? ", handled" : ""}: open it in Comments`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onBadge?.(b.id);
+                              }}
+                            >
+                              💬 {b.n}
+                            </button>
+                          ))}
+                        </span>
+                      )}
                     </span>
                   </div>
                   {open.has(row.key) && (

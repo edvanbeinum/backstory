@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 
+import type { StepAt } from "@/lib/flows/rows";
 import type {
   CommitSummary,
   PullRequestInfo,
@@ -24,6 +25,8 @@ export function Comments({
   focusAsk,
   onFocus,
   fileComponents,
+  threadSteps,
+  onOpenStep,
   repo,
   pr,
   commit,
@@ -42,6 +45,10 @@ export function Comments({
   onFocus: (id: string) => void;
   /** Each changed file's component, from the map */
   fileComponents: Record<string, string> | null;
+  /** The flow step each thread's line is on, where one is */
+  threadSteps: Map<string, StepAt>;
+  /** Open a step in the story */
+  onOpenStep: (at: StepAt) => void;
   repo: RepoInfo;
   pr: PullRequestInfo | null;
   /** The change on screen — what a link would point at */
@@ -95,6 +102,7 @@ export function Comments({
           ? (fileComponents?.[thread.path] ?? null)
           : null;
         const done = thread.response.done;
+        const at = threadSteps.get(thread.id);
         return (
           <section
             key={thread.id}
@@ -130,6 +138,18 @@ export function Comments({
                 highlighted={thread.id === focusedId}
                 hideComposer
               />
+              {at && (
+                <p className="comment-story">
+                  ⇄ On flow {at.flow}, step {at.step} ·{" "}
+                  <button
+                    type="button"
+                    className="text-[var(--accent)] hover:underline"
+                    onClick={() => onOpenStep(at)}
+                  >
+                    open in the story
+                  </button>
+                </p>
+              )}
               <ResponsePanel
                 key={thread.id}
                 thread={thread}
