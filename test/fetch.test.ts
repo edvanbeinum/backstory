@@ -168,6 +168,10 @@ test("a branch a linked worktree has checked out is left to that worktree", asyn
   run(mine, "worktree", "add", "-q", linked, "feature");
   writeFileSync(path.join(linked, "wip.txt"), "uncommitted\n");
   const before = checkout(linked);
+  assert.deepEqual(await fetchBranch(mine, "feature"), {
+    outcome: "unchanged",
+    sha: first,
+  });
 
   const next = commit(teammate, "f.txt", "more\n");
   run(teammate, "push", "-q", "origin", "feature");
@@ -325,6 +329,6 @@ test("with a token saved, a fetch from a non-GitHub origin never reads it and ne
   }
   assert.equal(existsSync(path.join(dir, "security.log")), false);
   const argv = readFileSync(path.join(dir, "git.log"), "utf8");
-  assert.match(argv, /fetch --no-tags origin/);
+  assert.match(argv, /fetch --no-tags --no-recurse-submodules origin/);
   assert.doesNotMatch(argv, /gho_saved1/);
 });
