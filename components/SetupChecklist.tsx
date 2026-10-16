@@ -16,6 +16,7 @@ const NAMES: Record<SetupId, string> = {
   git: "git",
   github: "GitHub",
   claude: "Claude Code",
+  data: "Data models",
   reviews: "Notes to your agent",
 };
 
@@ -182,6 +183,8 @@ function Fix({
           reason={row.state === "logged-out" ? "logged-out" : "no-claude"}
         />
       );
+    case "data":
+      return <ReadDataModels onChanged={onChanged} />;
     case "reviews":
       return inMacApp ? (
         <ClaudeCodeSetup ready={row.state === "ready"} onChanged={onChanged} />
@@ -327,6 +330,37 @@ function ConnectGitHub({
         )}
       </span>
     </div>
+  );
+}
+
+/** Turns on reading data models as repos and views open, as Read automatically on an undrafted view does; Turn off is on each drafted view's Data line. */
+function ReadDataModels({ onChanged }: { onChanged: () => Promise<void> }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true);
+    try {
+      const response = await fetch("/api/data?auto=1", { method: "POST" });
+      if (!response.ok)
+        throw new Error(`Backstory answered ${response.status}.`);
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+    await onChanged();
+    setBusy(false);
+  };
+  return (
+    <span className="inline-flex flex-wrap items-center gap-2">
+      <Button size="sm" disabled={busy} onClick={run}>
+        Read data models automatically
+      </Button>
+      {error && (
+        <span className="flex items-center gap-1.5 text-[var(--attention)]">
+          <AlertIcon size={12} /> {error}
+        </span>
+      )}
+    </span>
   );
 }
 

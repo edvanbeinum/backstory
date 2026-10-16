@@ -323,7 +323,10 @@ test("this repo's data model reads from lib/schema.sql", async () => {
   });
   assert.equal(model?.source, "sql");
   const entities = model?.entities ?? new Map<string, Entity>();
-  assert.deepEqual([...entities.keys()], ["Note", "Round", "Seen", "Response"]);
+  assert.deepEqual(
+    [...entities.keys()],
+    ["Note", "Round", "Seen", "Response", "Setting"],
+  );
   for (const entity of entities.values()) {
     assert.equal(entity.file, "lib/schema.sql", entity.name);
   }

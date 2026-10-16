@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
@@ -10,21 +18,26 @@ import { buildData } from "../lib/data/build";
 import {
   dataReadSettled,
   dataStatus,
+  PHASES,
+  setAutoRead,
   startDataRead,
+  startTrunkRead,
+  trunkReadSettled,
   type DataView,
 } from "../lib/data/cache";
 import { readCoreData } from "../lib/data/coredata";
 import { diffModels } from "../lib/data/diff";
 import {
   mergeDelta,
-  TOO_LARGE,
   type DraftedDelta,
   type DraftedHead,
 } from "../lib/data/drafted";
 import { readRails, tableFor } from "../lib/data/rails";
 import { DATA_READERS } from "../lib/data/readers";
 import type { Constraint, DataModel, Entity } from "../lib/data/types";
+import { repoKey } from "../lib/git";
 import { localModelFile } from "../lib/model";
+import { homeDir } from "../lib/store";
 
 const repos: string[] = [];
 after(() => {
@@ -801,32 +814,44 @@ const entity = (name: string, fields: string[]): Entity => ({
   relationships: [],
   constraints: [],
 });
+/** A read in full finds the Note before `rev`; a delta from it adds `rev`. */
 const noteHead: DraftedHead = {
   storage: "JSON files in the home directory",
-  entities: [entity("Note", ["id", "body", "rev"])],
+  entities: [entity("Note", ["id", "body"])],
 };
 const noteDelta: DraftedDelta = {
-  changed: [entity("Note", ["id", "body"])],
+  changed: [entity("Note", ["id", "body", "rev"])],
   absent: [],
 };
 
 /**
- * A stand-in for the AI provider: the recorded head model and delta, after
- * failing `failures` times. `calls` says which reads it was asked for.
+ * A stand-in for the AI provider: the recorded head model and deltas, after
+ * failing `failures` times, or on every delta with `failDeltas`. `deltas`
+ * answers delta reads in turn. `calls` says which reads it was asked for.
  */
 function recorder(
-  opts: { head?: DraftedHead; delta?: DraftedDelta; failures?: number } = {},
+  opts: {
+    head?: DraftedHead;
+    delta?: DraftedDelta;
+    deltas?: DraftedDelta[];
+    failures?: number;
+    failDeltas?: boolean;
+  } = {},
 ) {
   const calls: ("head" | "delta")[] = [];
   const prompts: string[] = [];
   let failures = opts.failures ?? 0;
+  const deltas = [...(opts.deltas ?? [])];
   const runner: Runner = async <T>(prompt: string) => {
     const kind = prompt.includes("The patch:") ? "delta" : "head";
     calls.push(kind);
     prompts.push(prompt);
-    if (failures-- > 0) throw new Error("Claude Code failed: blocked");
+    if (failures-- > 0 || (kind === "delta" && opts.failDeltas))
+      throw new Error("Claude Code failed: blocked");
     const output =
-      kind === "head" ? (opts.head ?? noteHead) : (opts.delta ?? noteDelta);
+      kind === "head"
+        ? (opts.head ?? noteHead)
+        : (deltas.shift() ?? opts.delta ?? noteDelta);
     return { output: output as T, costUsd: 0.1, model: "test-model" };
   };
   return { runner, calls, prompts };
@@ -857,6 +882,56 @@ async function read(view: DataView, opts: Parameters<typeof startDataRead>[1]) {
   return started;
 }
 
+async function readMain(root: string, runner: Runner) {
+  const started = await startTrunkRead(root, { runner, status: ready });
+  await trunkReadSettled(root);
+  return started;
+}
+
+const notes = (fields: string[]) =>
+  `export interface Note {\n${fields.map((f) => `  ${f}: string;\n`).join("")}}\n`;
+const notesWith = (fields: string[]): DraftedDelta => ({
+  changed: [entity("Note", fields)],
+  absent: [],
+});
+
+/**
+ * A repo whose `main` has the notes, with `feature` checked out from it.
+ * `on` commits a Note with these fields to the branch checked out.
+ */
+function mainRepo() {
+  const repo = tempRepo();
+  repo.write("lib/notes.ts", notes(["id", "body"]));
+  const main = repo.commit("Add notes");
+  repo.git("branch", "-M", "main");
+  repo.git("checkout", "-q", "-b", "feature");
+  const on = (fields: string[], message = fields.join(" ")) => {
+    repo.write("lib/notes.ts", notes(fields));
+    return repo.commit(message);
+  };
+  const tree = (rev: string) => repo.git("rev-parse", `${rev}^{tree}`);
+  return { ...repo, main, on, tree };
+}
+
+async function dataFolder(root: string) {
+  return path.join(homeDir(), "data", await repoKey(root));
+}
+
+const readModelFile = async (root: string, tree: string) =>
+  JSON.parse(
+    readFileSync(path.join(await dataFolder(root), `${tree}.json`), "utf8"),
+  ) as { from?: string | null; readAt: number };
+
+const readTrunk = async (root: string) =>
+  JSON.parse(
+    readFileSync(path.join(await dataFolder(root), "trunk.json"), "utf8"),
+  ) as { tree: string; commit: string };
+
+const changedFields = (data: Awaited<ReturnType<typeof buildData>>) =>
+  data.entities.flatMap((e) =>
+    e.fields.filter((f) => f.state !== "same").map((f) => f.item.name),
+  );
+
 test("a repo no reader knows shows its data model change once the AI provider drafts it", async () => {
   const repo = notesRepo();
   const before = await buildData(repo.root, repo.base, repo.head);
@@ -865,7 +940,11 @@ test("a repo no reader knows shows its data model change once the AI provider dr
     before.readers,
     DATA_READERS.map((r) => r.label),
   );
-  assert.deepEqual(before.draft, { status: "idle", provider: "Claude Code" });
+  assert.deepEqual(before.draft, {
+    status: "idle",
+    provider: "Claude Code",
+    auto: false,
+  });
 
   const ai = recorder();
   const started = await read(repo.view, { runner: ai.runner });
@@ -894,7 +973,7 @@ test("a repo no reader knows shows its data model change once the AI provider dr
   );
 });
 
-test("an empty change reads only the head, and its base is the head", async () => {
+test("an empty change reads once, its head is its base's model, and every entity shows unchanged", async () => {
   const repo = notesRepo();
   repo.git("commit", "--allow-empty", "-qm", "Nothing");
   const view: DataView = {
@@ -910,10 +989,13 @@ test("an empty change reads only the head, and its base is the head", async () =
   const data = await buildData(repo.root, view.base, view.head);
   assert.equal(data.status, "ok");
   assert.equal(data.baseModel, true);
-  assert.deepEqual(data.entities, []);
+  assert.deepEqual(
+    data.entities.map((e) => [e.name, e.state]),
+    [["Note", "same"]],
+  );
 });
 
-test("a delta merges onto the head: changed replaces, absent removes, new ones join", () => {
+test("a forward delta merges onto its start: changed replaces and adds, absent removes", () => {
   const head = [
     entity("Note", ["id", "rev"]),
     entity("Round", ["id"]),
@@ -948,7 +1030,7 @@ test("the drafted model is cached by tree, so a reworded head reads nothing agai
   assert.equal(data.source, "drafted");
 });
 
-test("a view whose head is cached reads only the delta", async () => {
+test("a view whose head is cached reads only its base", async () => {
   const repo = notesRepo();
   repo.write("README.md", "notes\n");
   const tip = repo.commit("Say what notes are");
@@ -1015,18 +1097,20 @@ test("a logged-out provider says so, and reads nothing", async () => {
   assert.deepEqual(ai.calls, []);
 });
 
-test("a patch past the cap fails as too large and reads nothing", async () => {
+test("a patch past the cap reads that tree in full rather than failing", async () => {
   const repo = notesRepo();
   repo.write("big.txt", `${"x".repeat(99)}\n`.repeat(5000));
   const head = repo.commit("Add a big file");
   const view = { root: repo.root, base: repo.head, head };
   const ai = recorder();
   await read(view, { runner: ai.runner });
-  assert.deepEqual(ai.calls, []);
-  assert.deepEqual(await dataStatus(view), {
-    status: "failed",
-    error: TOO_LARGE,
-  });
+  assert.deepEqual(ai.calls, ["head", "head"]);
+  assert.equal((await dataStatus(view)).status, "done");
+  assert.equal(
+    (await readModelFile(repo.root, repo.git("rev-parse", `${head}^{tree}`)))
+      .from,
+    null,
+  );
 });
 
 test("a root commit reads only the head, with no base model", async () => {
@@ -1057,11 +1141,14 @@ test("redraft reads again and replaces the files, and a failed redraft keeps the
     ["rev"],
   );
 
+  // Main's tip is the view's head here: main is read in full, then the base
+  // derived back from it.
   const again = recorder({
     head: {
       ...noteHead,
       entities: [entity("Note", ["id", "body", "rev", "author"])],
     },
+    delta: { changed: [entity("Note", ["id", "body"])], absent: [] },
   });
   await read(repo.view, { runner: again.runner, redraft: true });
   assert.deepEqual(again.calls, ["head", "delta"]);
@@ -1097,7 +1184,11 @@ test("data.files tells the drafted read where the model is, and a changed steer 
     steer("lib/notes.ts");
     const stale = await buildData(repo.root, repo.base, repo.head);
     assert.equal(stale.status, "none");
-    assert.deepEqual(stale.draft, { status: "idle", provider: "Claude Code" });
+    assert.deepEqual(stale.draft, {
+      status: "idle",
+      provider: "Claude Code",
+      auto: false,
+    });
 
     const again = recorder();
     await read(
@@ -1112,4 +1203,288 @@ test("data.files tells the drafted read where the model is, and a changed steer 
   } finally {
     rmSync(file);
   }
+});
+
+test("once main is read, a new branch reads two deltas and never its head in full", async () => {
+  const repo = mainRepo();
+  const first = repo.on(["id", "body", "rev"]);
+  const second = repo.on(["id", "body", "rev", "author"]);
+
+  const main = recorder();
+  assert.equal(await readMain(repo.root, main.runner), true);
+  assert.deepEqual(main.calls, ["head"]);
+  assert.equal((await readTrunk(repo.root)).commit, repo.main);
+
+  const ai = recorder({
+    deltas: [
+      notesWith(["id", "body", "rev"]),
+      notesWith(["id", "body", "rev", "author"]),
+    ],
+  });
+  await read({ root: repo.root, base: first, head: second }, ai);
+  assert.deepEqual(ai.calls, ["delta", "delta"]);
+  const data = await buildData(repo.root, first, second);
+  assert.equal(data.source, "drafted");
+  assert.deepEqual(changedFields(data), ["author"]);
+  assert.equal(
+    (await readModelFile(repo.root, repo.tree(second))).from,
+    repo.tree(first),
+  );
+  // A base off main leaves main's model where it was.
+  assert.equal((await readTrunk(repo.root)).commit, repo.main);
+  assert.equal(Math.round((data.spentUsd ?? 0) * 100) / 100, 0.3);
+
+  // A second branch from the same point finds the base's model.
+  repo.git("checkout", "-q", "-b", "other", first);
+  const other = repo.on(["id", "body", "rev", "colour"]);
+  const next = recorder();
+  await read({ root: repo.root, base: first, head: other }, next);
+  assert.deepEqual(next.calls, ["delta"]);
+
+  // A branch rebased onto main's tip: its base is main's model.
+  repo.git("checkout", "-q", "-b", "rebased", repo.main);
+  const rebased = repo.on(["id", "body", "pinned"]);
+  const onMain = recorder();
+  await read({ root: repo.root, base: repo.main, head: rebased }, onMain);
+  assert.deepEqual(onMain.calls, ["delta"]);
+});
+
+test("with no default branch, the base is read in full and the head from it", async () => {
+  const repo = notesRepo();
+  repo.git("branch", "-M", "no-default-here");
+  assert.equal(await readMain(repo.root, recorder().runner), false);
+  const ai = recorder();
+  await read(repo.view, ai);
+  assert.deepEqual(ai.calls, ["head", "delta"]);
+  assert.equal(
+    existsSync(path.join(await dataFolder(repo.root), "trunk.json")),
+    false,
+  );
+});
+
+test("a base on main past main's model is one delta, and main's model moves to it", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  repo.git("checkout", "-q", "main");
+  const moved = repo.on(["id", "body", "rev"]);
+  repo.git("checkout", "-q", "-b", "later");
+  const head = repo.on(["id", "body", "rev", "author"]);
+
+  const ai = recorder();
+  await read({ root: repo.root, base: moved, head }, ai);
+  assert.deepEqual(ai.calls, ["delta", "delta"]);
+  assert.deepEqual(await readTrunk(repo.root), {
+    tree: repo.tree(moved),
+    commit: moved,
+    files: null,
+  });
+});
+
+test("a view read with other data.files leaves main's model where it was", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  repo.git("checkout", "-q", "main");
+  const later = repo.on(["id", "body", "rev"]);
+  repo.git("checkout", "-q", "-b", "steered");
+  const head = repo.on(["id", "body", "rev", "author"]);
+
+  await read(
+    { root: repo.root, base: later, head, files: ["lib/**/*.ts"] },
+    recorder(),
+  );
+  assert.equal((await readTrunk(repo.root)).commit, repo.main);
+});
+
+test("once main's data.files changes, a base on main with the new steer moves main's model", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  const file = await localModelFile(repo.root);
+  mkdirSync(path.dirname(file), { recursive: true });
+  try {
+    writeFileSync(file, workspace({ "data.files": "lib/**/*.ts" }));
+    repo.git("checkout", "-q", "main");
+    const later = repo.on(["id", "body", "rev"]);
+    repo.git("checkout", "-q", "-b", "after");
+    const head = repo.on(["id", "body", "rev", "author"]);
+
+    const files = ["lib/**/*.ts"];
+    await read({ root: repo.root, base: later, head, files }, recorder());
+    assert.deepEqual(await readTrunk(repo.root), {
+      tree: repo.tree(later),
+      commit: later,
+      files,
+    });
+
+    repo.git("checkout", "-q", "-b", "second", later);
+    const second = repo.on(["id", "body", "colour"]);
+    const ai = recorder();
+    await read({ root: repo.root, base: later, head: second, files }, ai);
+    assert.deepEqual(ai.calls, ["delta"]);
+  } finally {
+    rmSync(file);
+  }
+});
+
+test("after main is rewritten, a base on main moves main's model", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  repo.git("checkout", "-q", "main");
+  repo.git("commit", "-q", "--amend", "-m", "Add notes, reworded");
+  const later = repo.on(["id", "body", "rev"]);
+  repo.git("checkout", "-q", "-b", "after");
+  const head = repo.on(["id", "body", "rev", "author"]);
+
+  await read({ root: repo.root, base: later, head }, recorder());
+  assert.equal((await readTrunk(repo.root)).commit, later);
+});
+
+test("a patch from main's model past the cap reads that commit in full, and it becomes main's model", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  repo.git("checkout", "-q", "main");
+  repo.write("big.txt", `${"x".repeat(99)}\n`.repeat(5000));
+  const big = repo.commit("Add a big file");
+  repo.git("checkout", "-q", "-b", "later");
+  const head = repo.on(["id", "body", "rev"]);
+
+  const ai = recorder();
+  await read({ root: repo.root, base: big, head }, ai);
+  assert.deepEqual(ai.calls, ["head", "delta"]);
+  assert.equal((await readModelFile(repo.root, repo.tree(big))).from, null);
+  assert.equal((await readTrunk(repo.root)).commit, big);
+});
+
+test("a view queued behind main's read shows main's phase, and fails with it", async () => {
+  const repo = mainRepo();
+  const head = repo.on(["id", "body", "rev"]);
+  const view = { root: repo.root, base: repo.main, head };
+
+  let open = () => {};
+  const gate = new Promise<void>((resolve) => (open = resolve));
+  let entered = () => {};
+  const reading = new Promise<void>((resolve) => (entered = resolve));
+  const failing = recorder({ failures: Infinity });
+  const gated: Runner = async <T>(
+    prompt: string,
+    schema: object,
+    cwd: string,
+  ) => {
+    entered();
+    await gate;
+    return failing.runner<T>(prompt, schema, cwd);
+  };
+
+  assert.equal(
+    await startTrunkRead(repo.root, { runner: gated, status: ready }),
+    true,
+  );
+  await startDataRead(view, { runner: failing.runner, status: ready });
+  await reading;
+  const waiting = await dataStatus(view);
+  assert.equal(waiting.status, "running");
+  assert.equal(waiting.status === "running" && waiting.phase, PHASES.firstMain);
+
+  open();
+  await trunkReadSettled(repo.root);
+  await dataReadSettled(view);
+  assert.deepEqual(failing.calls, ["head"]);
+  assert.deepEqual(await dataStatus(view), {
+    status: "failed",
+    error: "Claude Code failed: blocked",
+  });
+  const dir = await dataFolder(repo.root);
+  assert.deepEqual(existsSync(dir) ? readdirSync(dir) : [], []);
+});
+
+test("a failed read of main isn't started again when the repo opens again", async () => {
+  const repo = mainRepo();
+  const failing = recorder({ failures: Infinity });
+  assert.equal(await readMain(repo.root, failing.runner), true);
+  assert.equal(await readMain(repo.root, failing.runner), false);
+  assert.deepEqual(failing.calls, ["head"]);
+});
+
+test("a failed head read keeps the base's model, and Try again reads only the head", async () => {
+  const repo = notesRepo();
+  const failing = recorder({ failDeltas: true });
+  await read(repo.view, failing);
+  assert.deepEqual(failing.calls, ["head", "delta"]);
+  assert.equal((await dataStatus(repo.view)).status, "failed");
+
+  const again = recorder();
+  await read(repo.view, again);
+  assert.deepEqual(again.calls, ["delta"]);
+  assert.equal((await dataStatus(repo.view)).status, "done");
+});
+
+test("Redraft reads main again, removes the repo's derived models, and a view derives again", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  const feature = repo.on(["id", "body", "rev"]);
+  repo.git("checkout", "-q", "-b", "other", repo.main);
+  const other = repo.on(["id", "body", "colour"]);
+  const otherView = { root: repo.root, base: repo.main, head: other };
+  await read(otherView, recorder());
+
+  const redraft = recorder();
+  await read(
+    { root: repo.root, base: repo.main, head: feature },
+    { runner: redraft.runner, redraft: true },
+  );
+  assert.deepEqual(redraft.calls, ["head", "delta"]);
+  assert.equal(
+    existsSync(
+      path.join(await dataFolder(repo.root), `${repo.tree(other)}.json`),
+    ),
+    false,
+  );
+
+  const derived = recorder();
+  await read(otherView, derived);
+  assert.deepEqual(derived.calls, ["delta"]);
+});
+
+test("a data folder in the old shape still uses its head model", async () => {
+  const repo = notesRepo();
+  const dir = await dataFolder(repo.root);
+  const base = repo.git("rev-parse", `${repo.base}^{tree}`);
+  const head = repo.git("rev-parse", `${repo.head}^{tree}`);
+  mkdirSync(dir, { recursive: true });
+  const old = {
+    ...noteHead,
+    provider: "claude",
+    model: "test-model",
+    costUsd: 1,
+    readAt: 1,
+  };
+  writeFileSync(path.join(dir, `${head}.json`), JSON.stringify(old));
+  writeFileSync(
+    path.join(dir, `${base}..${head}.json`),
+    JSON.stringify({ ...noteDelta, headReadAt: 1, costUsd: 0.5 }),
+  );
+
+  const ai = recorder();
+  await read(repo.view, ai);
+  // The one read is the base's; the head's old file stands.
+  assert.deepEqual(ai.calls, ["head"]);
+  assert.equal((await readModelFile(repo.root, head)).readAt, 1);
+  const data = await buildData(repo.root, repo.base, repo.head);
+  assert.equal(data.source, "drafted");
+  assert.equal(Math.round((data.spentUsd ?? 0) * 100) / 100, 1.6);
+});
+
+test("with reading turned on, the idle status says so and nothing starts by itself", async () => {
+  const repo = notesRepo();
+  setAutoRead(true);
+  try {
+    const data = await buildData(repo.root, repo.base, repo.head);
+    assert.deepEqual(data.draft, {
+      status: "idle",
+      provider: "Claude Code",
+      auto: true,
+    });
+  } finally {
+    setAutoRead(false);
+  }
+  assert.equal((await dataStatus(repo.view)).status, "idle");
 });

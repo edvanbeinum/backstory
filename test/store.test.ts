@@ -15,7 +15,7 @@ import { WORKING_REV } from "../lib/constants";
 import { changeNotes, getNotes } from "../lib/notes";
 import { getOutbox } from "../lib/outbox";
 import { getAllResponses, getResponses } from "../lib/responses";
-import { db, transaction } from "../lib/store";
+import { db, setSetting, setting, transaction } from "../lib/store";
 import type { Note } from "../lib/types";
 
 /** The store resolves BACKSTORY_HOME per call; never touch the real home. */
@@ -130,15 +130,45 @@ test("a note saved before rounds existed imports as a draft on uncommitted work"
   assert.ok(!existsSync(path.join(home, "notes.json")));
 });
 
-test("a home with no JSON files makes an empty database at version 1", () => {
+const version = () =>
+  (
+    db().prepare("PRAGMA user_version").get() as {
+      user_version: number;
+    }
+  ).user_version;
+
+test("a home with no JSON files makes an empty database at version 2", () => {
   tempHome();
-  const { user_version } = db().prepare("PRAGMA user_version").get() as {
-    user_version: number;
-  };
-  assert.equal(user_version, 1);
-  for (const table of ["notes", "rounds", "seen", "responses"]) {
+  assert.equal(version(), 2);
+  for (const table of ["notes", "rounds", "seen", "responses", "settings"]) {
     assert.equal(count(table), 0, table);
   }
+});
+
+test("a setting reads back as it was set, and null when never set", () => {
+  tempHome();
+  assert.equal(setting("data.auto"), null);
+  setSetting("data.auto", "1");
+  assert.equal(setting("data.auto"), "1");
+  setSetting("data.auto", "0");
+  assert.equal(setting("data.auto"), "0");
+  assert.equal(count("settings"), 1);
+});
+
+test("a database at version 1 opens at version 2 with a settings table, its rows intact", () => {
+  const home = tempHome();
+  db()
+    .prepare(`INSERT INTO seen (root, session, at) VALUES ('/repo', 's-1', 1)`)
+    .run();
+  db().exec("DROP TABLE settings; PRAGMA user_version = 1;");
+  // Opening another home closes this one, so the next open runs the upgrade.
+  tempHome();
+  db();
+  process.env.BACKSTORY_HOME = home;
+  assert.equal(version(), 2);
+  assert.equal(count("seen"), 1);
+  setSetting("data.auto", "1");
+  assert.equal(setting("data.auto"), "1");
 });
 
 const SHA = "76c66deaa060ae3da0ff460e13aabfff3de885c4";
@@ -339,7 +369,7 @@ test("a new database has the tables, keys and checks in lib/schema.sql", () => {
   const { user_version } = db().prepare("PRAGMA user_version").get() as {
     user_version: number;
   };
-  assert.equal(user_version, 1);
+  assert.equal(user_version, 2);
 
   const rejects = (sql: string) =>
     assert.throws(() => db().prepare(sql).run(), /CHECK constraint failed/);

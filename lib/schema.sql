@@ -1,6 +1,7 @@
--- Run only when `db()` in lib/store.ts makes a new database. An existing
--- database never reads this file again, so a change here reaches only new
--- databases until `db()` has a migration step, which it doesn't yet.
+-- Run only when `db()` in lib/store.ts makes a new database, at its latest
+-- version. An existing database never reads this file again, so a change here
+-- also needs a lib/upgrades/<version>.sql that makes the same change, and
+-- `VERSION` in lib/store.ts raised to match.
 CREATE TABLE notes (
   root TEXT NOT NULL,
   id TEXT NOT NULL,
@@ -46,4 +47,8 @@ CREATE TABLE responses (
   reply TEXT,
   commits TEXT NOT NULL CHECK (json_valid(commits)),
   PRIMARY KEY (pr, thread)
+);
+CREATE TABLE settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
 );

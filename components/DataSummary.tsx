@@ -253,7 +253,11 @@ interface DataEdge {
  * it), and many-to-many. A has-many is the other end of a belongs-to, so
  * drawing both would be one link twice.
  */
-function dataEdges(entities: EntityDiff[], changed: Set<string>): DataEdge[] {
+function dataEdges(
+  entities: EntityDiff[],
+  changed: Set<string>,
+  whole: boolean,
+): DataEdge[] {
   const shown = new Set(entities.map((e) => e.name));
   const out: DataEdge[] = [];
   for (const e of entities) {
@@ -268,8 +272,13 @@ function dataEdges(entities: EntityDiff[], changed: Set<string>): DataEdge[] {
       for (const t of targets) {
         if (!shown.has(t) || t === e.name) continue;
         // An unchanged link is drawn only between two changed entities: the
-        // rest is context that the cards' grey neighbours don't need.
-        if (d.state === "same" && !(changed.has(e.name) && changed.has(t)))
+        // rest is context that the cards' grey neighbours don't need. With
+        // nothing changed, the whole model is the point, links and all.
+        if (
+          d.state === "same" &&
+          !whole &&
+          !(changed.has(e.name) && changed.has(t))
+        )
           continue;
         out.push({
           key: `${e.name}.${r.name}→${t}`,
@@ -300,21 +309,23 @@ function DataGraph({
       ),
     [shown],
   );
+  const whole = changedNames.size === 0;
   const edges = useMemo(
     () =>
       dataEdges(
         shown.map((p) => p.entity),
         changedNames,
+        whole,
       ),
-    [shown, changedNames],
+    [shown, changedNames, whole],
   );
   // Changed entities, and only the neighbours a changed one links to.
   const nodes = useMemo(() => {
     const linked = new Set(edges.flatMap((e) => [e.source, e.destination]));
     return shown
-      .filter((p) => p.state !== "same" || linked.has(p.entity.name))
+      .filter((p) => whole || p.state !== "same" || linked.has(p.entity.name))
       .map((p) => ({ ...p, id: p.entity.name }));
-  }, [shown, edges]);
+  }, [shown, edges, whole]);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const [hover, setHover] = useState<string | null>(null);
@@ -554,10 +565,50 @@ function useDataDraft(
     return () => clearInterval(timer);
   }, [running, request]);
 
+  // With reading turned on, a view with no model yet starts its read on
+  // open, once per view: a read that fails or can't run doesn't start again.
+  const autoStart =
+    data?.status === "none" && data.draft?.status === "idle" && data.draft.auto;
+  const autoStarted = useRef<string | null>(null);
+  useEffect(() => {
+    const view = `${repo}\n${rev}`;
+    if (!autoStart || autoStarted.current === view) return;
+    autoStarted.current = view;
+    void request("POST");
+  }, [autoStart, repo, rev, request]);
+
+  // Turning reading on starts main's read before the page reads the view
+  // again, so the view's own read waits behind it instead of reading its base
+  // in full.
+  const setAuto = useCallback(
+    async (on: boolean) => {
+      try {
+        const response = await fetch(`/api/data?auto=${on ? 1 : 0}`, {
+          method: "POST",
+        });
+        if (!response.ok)
+          throw new Error(`Backstory answered ${response.status}.`);
+        if (on)
+          await fetch(`/api/data?repo=${encodeURIComponent(repo)}&trunk=1`, {
+            method: "POST",
+          });
+        onReadRef.current();
+      } catch (err) {
+        setError({
+          over: given,
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
+    },
+    [repo, given],
+  );
+
   return {
     data,
     error: error?.over === given ? error.message : null,
     start: (redraft = false) => void request("POST", redraft),
+    turnOn: () => void setAuto(true),
+    turnOff: () => void setAuto(false),
   };
 }
 
@@ -623,6 +674,7 @@ function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
     job.status === "unavailable" ||
     job.status === "done";
   const provider = job?.status === "idle" ? job.provider : null;
+  const offerAuto = job?.status === "idle" && !job.auto;
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
       <div className="flex flex-wrap items-center gap-2">
@@ -638,13 +690,19 @@ function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
             Draft the data model
           </Button>
         )}
+        {offerAuto && (
+          <Button size="sm" onClick={draft.turnOn}>
+            Read automatically
+          </Button>
+        )}
         <DraftProgress data={data} draft={draft} />
       </div>
       {provider && (
         <span className="text-[11px] text-[var(--fg-subtle)]">
-          {provider} reads the code at the head, read-only, and works out the
-          base from the change. It can take a few minutes and uses your{" "}
-          {provider} account. The result is kept on this machine.
+          {provider} reads the code, read-only: main&apos;s data model once,
+          then only what each change differs by. The first read can take a few
+          minutes and uses your {provider} account. The result is kept on this
+          machine.
         </span>
       )}
     </div>
@@ -662,7 +720,7 @@ function Redraft({ data, draft }: { data: DataResponse; draft: DraftApi }) {
           onClick={() => {
             if (
               window.confirm(
-                `Redraft the data model? ${data.drafted?.provider ?? "The AI provider"} reads the code again, which can take a few minutes on your account. The current reading is kept if it fails.`,
+                `Redraft the data model? ${data.drafted?.provider ?? "The AI provider"} reads main's data model again in full and works out this view from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current reading is kept if it fails.`,
               )
             )
               draft.start(true);
@@ -676,10 +734,47 @@ function Redraft({ data, draft }: { data: DataResponse; draft: DraftApi }) {
   );
 }
 
+/** A drafted view's footnote: whether reads start by themselves, what the repo's models cost, Turn off and Redraft. */
+function DraftFootnote({
+  data,
+  draft,
+}: {
+  data: DataResponse;
+  draft: DraftApi;
+}) {
+  const parts: React.ReactNode[] = [];
+  if (data.auto) parts.push("Read automatically");
+  if (data.spentUsd !== undefined)
+    parts.push(`$${data.spentUsd.toFixed(2)} spent on this repo's data model`);
+  if (data.auto)
+    parts.push(
+      <button
+        type="button"
+        className="text-[var(--accent)] hover:underline"
+        onClick={draft.turnOff}
+      >
+        Turn off
+      </button>,
+    );
+  return (
+    <span className="inline-flex flex-wrap items-center gap-1.5">
+      <span className="text-[11px] text-[var(--fg-subtle)]">
+        {parts.map((part, i) => (
+          <span key={i}>
+            {i > 0 && " · "}
+            {part}
+          </span>
+        ))}
+      </span>
+      <Redraft data={data} draft={draft} />
+    </span>
+  );
+}
+
 /**
  * The data model's part of the line under the map. Its parts sit in the
- * line's wrapping row; `Show data` opens the graph on a row of its own
- * beneath it, pushing the flows down.
+ * line's wrapping row; the graph opens on a row of its own beneath it,
+ * pushing the flows down.
  */
 export function DataSummary({
   data: given,
@@ -697,7 +792,13 @@ export function DataSummary({
 }) {
   const draft = useDataDraft(repo, rev, given, onRead);
   const data = draft.data;
-  const [open, setOpen] = useState(false);
+  const shown = useMemo(() => present(data?.entities ?? []), [data]);
+  const changed = shown.filter((p) => p.state !== "same");
+  // Open the graph when the view changes the data model, and keep a click's
+  // open or close only for the view it was made on.
+  const view = `${repo}\n${rev}`;
+  const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
+  const open = toggled?.view === view ? toggled.open : changed.length > 0;
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -711,9 +812,7 @@ export function DataSummary({
     return () => observer.disconnect();
   }, [open]);
 
-  const shown = useMemo(() => present(data?.entities ?? []), [data]);
   if (!data) return null;
-  const changed = shown.filter((p) => p.state !== "same");
   if (data.status === "none") {
     return (
       <span className="part inline-flex min-w-0 items-start gap-1.5">
@@ -722,34 +821,38 @@ export function DataSummary({
       </span>
     );
   }
-  if (changed.length === 0) {
+  const noChange = data.baseModel
+    ? "no data model change"
+    : "no data model at base to compare with";
+  // A drafted view with no change still has its whole model to look at.
+  if (changed.length === 0 && !(data.drafted && shown.length > 0)) {
     return (
       <span className="part inline-flex flex-wrap items-center gap-1.5">
         <b>Data</b>
         {data.drafted && <DraftedBadge />}
-        {data.baseModel
-          ? "no data model change"
-          : "no data model at base to compare with"}
-        {data.drafted && <Redraft data={data} draft={draft} />}
+        {noChange}
+        {data.drafted && <DraftFootnote data={data} draft={draft} />}
       </span>
     );
   }
 
+  const whole = changed.length === 0;
   return (
     <>
       <span className="part inline-flex min-w-0 flex-wrap items-center gap-1.5">
         <b>Data</b>
         {data.drafted && <DraftedBadge />}
-        <span>{summary(shown)}</span>
+        <span>{whole ? noChange : summary(shown)}</span>
         <button
           type="button"
           className="story-disclose"
           aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
+          onClick={() => setToggled({ view, open: !open })}
         >
           {open ? "Hide data" : "Show data"}
           <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
         </button>
+        {whole && !open && <DraftFootnote data={data} draft={draft} />}
       </span>
       {open && (
         <div ref={boxRef} className="basis-full pt-1">
@@ -760,15 +863,15 @@ export function DataSummary({
           </div>
           <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
             {data.drafted
-              ? `Drafted by ${data.drafted.provider} from the code at the head, with the base worked out from the change. It may be wrong.`
+              ? `Drafted by ${data.drafted.provider}: a model read once in full, then updated from what each change differs by. It may be wrong.`
               : `From ${data.label}, at the base and the head.`}{" "}
-            Click an entity for its fields. Arrows point from the entity holding
-            a link to the one it links to; grey boxes are unchanged entities a
-            changed one links to.
+            {whole
+              ? `Every entity at the head; ${data.baseModel ? "this change touches none of them" : "there is no model at the base to compare with"}. Arrows point from the entity that has a link to the one it links to.`
+              : "Click an entity for its fields. Arrows point from the entity that has a link to the one it links to; grey boxes are unchanged entities a changed one links to."}
           </p>
           {data.drafted && (
             <div className="px-1">
-              <Redraft data={data} draft={draft} />
+              <DraftFootnote data={data} draft={draft} />
             </div>
           )}
         </div>

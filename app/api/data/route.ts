@@ -2,7 +2,12 @@ import { NextResponse } from "next/server";
 
 import { crossSite, errorResponse } from "@/lib/api";
 import { buildData, noDataModel } from "@/lib/data/build";
-import { startDataRead } from "@/lib/data/cache";
+import {
+  autoRead,
+  setAutoRead,
+  startDataRead,
+  startTrunkRead,
+} from "@/lib/data/cache";
 import { dataSteer, readDataModel, steerError } from "@/lib/data/readers";
 import { resolveRepo } from "@/lib/git";
 import { readModelAt } from "@/lib/model";
@@ -33,7 +38,7 @@ async function resolve(request: Request) {
 export async function GET(request: Request) {
   try {
     const r = await resolve(request);
-    if ("error" in r) return r.error;
+    if (r.error) return r.error;
     if (!r.range) return NextResponse.json(noDataModel());
     return NextResponse.json(
       await buildData(r.root, r.range.base, r.range.head),
@@ -44,14 +49,37 @@ export async function GET(request: Request) {
   }
 }
 
-/** Starts the AI provider's read of the view's data model; `redraft=1` reads it again. */
+/**
+ * Starts the AI provider's read of the view's data model; `redraft=1` reads it
+ * again. `trunk=1` starts reading main's data model for `repo`, when reading
+ * automatically is on. `auto=1` and `auto=0` turn reading automatically on
+ * and off.
+ */
 export async function POST(request: Request) {
   // A read costs money and sends code to the AI provider: only Backstory's own page asks.
   const refused = crossSite(request);
   if (refused) return refused;
   try {
+    const { searchParams } = new URL(request.url);
+    const auto = searchParams.get("auto");
+    if (auto === "1" || auto === "0") {
+      setAutoRead(auto === "1");
+      return NextResponse.json({ auto: autoRead() });
+    }
+    if (searchParams.get("trunk") === "1") {
+      const repoPath = searchParams.get("repo");
+      if (!repoPath)
+        return NextResponse.json<ApiError>(
+          { error: "`repo` is required.", kind: "missing-path" },
+          { status: 400 },
+        );
+      const { root } = await resolveRepo(repoPath);
+      return NextResponse.json({
+        started: autoRead() && (await startTrunkRead(root)),
+      });
+    }
     const r = await resolve(request);
-    if ("error" in r) return r.error;
+    if (r.error) return r.error;
     if (!r.range)
       return NextResponse.json<ApiError>(
         { error: "There's no commit here to read.", kind: "internal" },

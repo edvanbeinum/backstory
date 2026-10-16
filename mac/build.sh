@@ -60,8 +60,9 @@ timestamp=--timestamp
 # the project, so the standalone output also holds the sources, tests and
 # docs. sharp is left out because `images.unoptimized` means the server never
 # loads it, and its native libraries would each need signing. The store makes
-# a new database from lib/schema.sql; copying it from the standalone output
-# fails the build if the standalone output ever lacks it.
+# a new database from lib/schema.sql and upgrades an old one from
+# lib/upgrades/; copying them from the standalone output fails the build if
+# the standalone output ever lacks them.
 server="$app/Contents/Resources/server"
 mkdir -p "$server/lib"
 for item in server.js .next node_modules public package.json; do
@@ -69,6 +70,7 @@ for item in server.js .next node_modules public package.json; do
     "$standalone/$item" "$server/"
 done
 cp "$standalone/lib/schema.sql" "$server/lib/schema.sql"
+cp -R "$standalone/lib/upgrades" "$server/lib/"
 cp mac/server-exit-with-parent.cjs "$app/Contents/Resources/"
 
 # The `backstory` command, which the Claude Code hook runs by its path in

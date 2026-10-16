@@ -48,14 +48,18 @@ terms:
     means: "`data.files` and `data.format` in a workspace's properties: which files hold the data model, and which data reader reads them. Read at the head and used at both ends of a view."
     avoid: []
   - name: drafted data model
-    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Read on a click and marked drafted wherever it's shown."
+    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read on a click, or as repos and views open once the setup checklist's Data models row turns that on, and marked drafted wherever it's shown."
     avoid: []
+  - name: main's data model
+    means: "The drafted data model of the repo's default branch that every view's base is derived from, pointed at by `trunk.json` in the repo's data folder (`lib/data/cache.ts`). Read in full once, and moved forward when a view's base is on main past it."
+    avoid:
+      - trunk, in copy
   - name: data cache
-    means: "`lib/data/cache.ts`: the drafted data models in `~/.backstory/data/`, one file per head tree and one per base..head delta, plus the queue of reads that make them."
+    means: "`lib/data/cache.ts`: the drafted data models in `~/.backstory/data/`, one file per tree with the tree it was derived from, plus `trunk.json` for main's data model and the queue of reads that make them."
     avoid:
       - store
   - name: store
-    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes, rounds and responses, one table each, plus `seen`."
+    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes, rounds and responses, one table each, plus `seen` and `settings`."
     avoid:
       - store, for the flow cache or the data cache
   - name: flow cache
@@ -85,7 +89,7 @@ terms:
       - dev mode
       - override
   - name: setup checklist
-    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`, and so does the Connect GitHub link on a repo or inbox notice. The GitHub row offers Connect GitHub, with `gh auth login` as the alternative. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
+    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, data models, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Data models row, shown once Claude Code is ready, states what reading data models costs, and its Read data models automatically button turns that on, as does Read automatically beside Draft the data model on Story. The Mac app's Set Up Backstory… brings it back at `/?setup=1`, and so does the Connect GitHub link on a repo or inbox notice. The GitHub row offers Connect GitHub, with `gh auth login` as the alternative. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
     avoid:
       - onboarding
       - wizard
@@ -133,6 +137,7 @@ blocks:
     code:
       - lib/store.ts
       - lib/schema.sql
+      - lib/upgrades/
       - lib/responses.ts
       - lib/drafts.ts
       - lib/notes.ts

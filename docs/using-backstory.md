@@ -105,12 +105,32 @@ before reading its lines:
   relationships and rules. It reads `db/schema.rb` and the models (Rails), the
   `.xcdatamodeld` (Core Data), or SQL schema files: the `CREATE TABLE`
   statements in a `schema.sql`, a `structure.sql` or a `schema/` folder, outside
-  migrations and tests. Any other repo can have its data model drafted on
-  demand: **Draft the data model** under the map on Story has Claude Code read the
-  code at the head, and work out the base from the change. The result is marked
-  as a draft and kept in `~/.backstory/data/`, so a view is read once. A head
-  read costs about $0.15 on a small repo and over $1 and a few minutes on a
-  large one.
+  migrations and tests. Any other repo can have its data model drafted by
+  Claude Code. It reads main's data model in full once per repo, about $0.15 on
+  a small repo and over $1 and a few minutes on a large one. Every other
+  commit's model is worked out from the nearest model already read, by reading
+  only the patch between them: cents, and well under a minute. A view's base is
+  worked out from main's model, and its head from its base, so a second branch
+  from the same point, or a branch rebased onto main, reads only its own
+  change. The result is marked as a draft and kept in `~/.backstory/data/`.
+  - **Data models** in the setup checklist, once Claude Code is ready, has
+    **Read data models automatically**. With it on, opening a repo starts the
+    read of main's data model, and opening a view on Story starts the view's
+    read, with its progress on the Data line. With it off, **Draft the data
+    model** under the map on Story reads one view, and **Read automatically**
+    beside it turns reading on and starts this view's read.
+  - On a drafted view, the Data line says what this repo's data models have
+    cost, and has **Turn off** for reading automatically, and **Redraft**.
+    **Show data** opens the whole model when the change touches none of it.
+  - The Data line's graph opens by itself when the change touches the data
+    model; **Hide data** closes it.
+  - Main's data model moves forward when a view's base is on main and past it:
+    the read that view's base needed is main's change since, and the base
+    becomes main's model. Main is read in full again only when the patch from
+    its model to a commit on main is too large to send, which reads that
+    commit in full, or when you press **Redraft**. Redraft reads main in full
+    again and removes every model worked out from the old one, since a mistake
+    in main's model is copied into each of them.
 - **Flows** are sequence diagrams of what the code does for each user action the
   change touches, before and after, beside the code they come from.
 
