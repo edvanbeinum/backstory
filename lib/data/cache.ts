@@ -315,6 +315,9 @@ async function mainTip(root: string): Promise<string | null> {
   return null;
 }
 
+const mainSteer = async (root: string, tip: string) =>
+  dataSteer((await readModelAt(root, tip))?.model?.properties);
+
 /** One job's reads: where they go, how they run, and what they made. */
 interface Chain {
   root: string;
@@ -451,15 +454,16 @@ async function readView(
       { delta: PHASES.base, full: PHASES.baseInFull },
     );
     base = { tree: files.base, model };
-    // Leave a pointer read with other `data.files` alone: a branch that edits
-    // the steer would otherwise take it over, and main's views would take it
-    // back, a full read each way. Replace a commit main no longer reaches, as
-    // after a force-push, or main's model would never move again.
+    // Move a pointer read with other `data.files` only for a view with main's
+    // own steer: a branch that edits the steer would otherwise take it over,
+    // and once main edits it, main's views must take it, or every base is read
+    // in full. Replace a commit main no longer reaches, as after a force-push,
+    // or main's model would never move again.
     const pointer = trunk?.pointer ?? (await readJson<Trunk>(trunkPath(c.dir)));
     const past = !pointer
       ? true
       : !trunk
-        ? sameSteer(pointer.files, c.files)
+        ? !!main && sameSteer((await mainSteer(c.root, main)).files, c.files)
         : trunk.pointer.commit !== view.base &&
           ((await isOnBranch(c.root, trunk.pointer.commit, view.base)) ||
             (!!main &&
@@ -573,7 +577,7 @@ async function trunkToRead(
 ): Promise<{ tip: string; files: string[] | null } | null> {
   const tip = await mainTip(root);
   if (!tip || (await readJson<Trunk>(trunkPath(dir)))) return null;
-  const steer = dataSteer((await readModelAt(root, tip))?.model?.properties);
+  const steer = await mainSteer(root, tip);
   if (steerError(steer) || (await readDataModel(root, tip, steer))) return null;
   if (providerGap(await (status ?? aiProvider().status)())) return null;
   return { tip, files: steer.files };
