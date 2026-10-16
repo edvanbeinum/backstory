@@ -195,6 +195,69 @@ CREATE UNIQUE INDEX users_lower_email ON users (lower(email), username DESC);
   ]);
 });
 
+test("a partial unique index keeps its condition; a full one has none", () => {
+  const entities = read({
+    "db/schema.sql": `
+CREATE TABLE users (a text, b text, c text, deleted_at timestamp, active boolean);
+CREATE UNIQUE INDEX users_a ON users (a) WHERE deleted_at IS NULL;
+CREATE UNIQUE INDEX users_b ON users (b) INCLUDE (c) WHERE
+  active;
+CREATE UNIQUE INDEX users_c ON users (c);
+`,
+  });
+  assert.deepEqual(entities.get("User")!.constraints, [
+    { kind: "unique", fields: ["a"], condition: "deleted_at IS NULL" },
+    { kind: "unique", fields: ["b"], condition: "active" },
+    { kind: "unique", fields: ["c"] },
+  ]);
+});
+
+test("a foreign key keeps the columns it references, wherever it's written", () => {
+  const entities = read({
+    "db/schema.sql": `
+CREATE TABLE public.users (id serial PRIMARY KEY, external_id text, uuid uuid);
+CREATE TABLE posts (
+  id serial,
+  user_id integer,
+  owner_id integer REFERENCES users(external_id) ON DELETE CASCADE,
+  editor_id integer REFERENCES users,
+  author_id integer,
+  FOREIGN KEY (user_id) REFERENCES users (external_id)
+);
+ALTER TABLE ONLY public.posts
+  ADD CONSTRAINT posts_author FOREIGN KEY (author_id) REFERENCES public.users(uuid);
+`,
+  });
+  const post = entities.get("Post")!;
+  assert.deepEqual(post.constraints, [
+    {
+      kind: "foreign key",
+      fields: ["owner_id"],
+      target: "User",
+      targetFields: ["external_id"],
+    },
+    { kind: "foreign key", fields: ["editor_id"], target: "User" },
+    {
+      kind: "foreign key",
+      fields: ["user_id"],
+      target: "User",
+      targetFields: ["external_id"],
+    },
+    {
+      kind: "foreign key",
+      fields: ["author_id"],
+      target: "User",
+      targetFields: ["uuid"],
+    },
+  ]);
+  assert.deepEqual(links(post), [
+    ["owner", "belongs to", "User", "owner_id"],
+    ["editor", "belongs to", "User", "editor_id"],
+    ["user", "belongs to", "User", "user_id"],
+    ["author", "belongs to", "User", "author_id"],
+  ]);
+});
+
 test("a table-level primary key makes its fields required, wherever it's declared", () => {
   const entities = read({
     "db/schema.sql": `

@@ -42,6 +42,10 @@ export interface Constraint {
   fields: string[];
   /** For a foreign key, the entity it points at */
   target?: string;
+  /** For a foreign key, the target's columns it points at, when written */
+  targetFields?: string[];
+  /** For a unique rule, the condition limiting which rows it covers, as written */
+  condition?: string;
 }
 
 export interface Entity {

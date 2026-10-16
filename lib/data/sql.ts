@@ -134,14 +134,25 @@ interface Table {
   name: string;
   file: string;
   fields: Field[];
-  /** Columns that hold a reference, and the table each points at */
-  foreignKeys: { fields: string[]; table: string }[];
-  unique: string[][];
+  foreignKeys: ForeignKey[];
+  unique: Unique[];
+}
+
+/** Columns that hold a reference, the table they point at, and its columns when written */
+interface ForeignKey {
+  fields: string[];
+  table: string;
+  targetFields?: string[];
+}
+
+interface Unique {
+  fields: string[];
+  condition?: string;
 }
 
 type Rule =
-  | { kind: "unique"; fields: string[] }
-  | { kind: "foreign key"; fields: string[]; table: string }
+  | ({ kind: "unique" } & Unique)
+  | ({ kind: "foreign key" } & ForeignKey)
   /** Not shown as a rule, but its fields can't be null */
   | { kind: "primary key"; fields: string[] }
   /** A plain index, a check: nothing the data view shows */
@@ -184,10 +195,18 @@ function rule(item: string): Rule | null {
   );
   if (foreign) {
     const { inner, rest } = parenthesised(text, foreign[0].length - 1);
-    const to = rest.match(new RegExp(`^\\s*references\\s+(${QUALIFIED})`, "i"));
-    return to
-      ? { kind: "foreign key", fields: columns(inner), table: qualified(to[1]) }
-      : { kind: "skip" };
+    const to = rest.match(
+      new RegExp(`^\\s*references\\s+(${QUALIFIED})\\s*`, "i"),
+    );
+    if (!to) return { kind: "skip" };
+    return {
+      kind: "foreign key",
+      fields: columns(inner),
+      table: qualified(to[1]),
+      ...(rest[to[0].length] === "("
+        ? { targetFields: columns(parenthesised(rest, to[0].length).inner) }
+        : {}),
+    };
   }
   const primary = text.match(/^primary\s+key\s*\(/i);
   if (primary) {
@@ -259,18 +278,33 @@ function column(
   }
   table.fields.push(field);
 
-  if (/\bunique\b/i.test(options)) table.unique.push([name]);
-  const to = options.match(new RegExp(`\\breferences\\s+(${QUALIFIED})`, "i"));
-  if (to) table.foreignKeys.push({ fields: [name], table: qualified(to[1]) });
+  if (/\bunique\b/i.test(options)) table.unique.push({ fields: [name] });
+  const to = options.match(
+    new RegExp(`\\breferences\\s+(${QUALIFIED})(?:\\s*\\(([^)]*)\\))?`, "i"),
+  );
+  if (to)
+    table.foreignKeys.push({
+      fields: [name],
+      table: qualified(to[1]),
+      ...(to[2] !== undefined ? { targetFields: columns(to[2]) } : {}),
+    });
 }
 
 function apply(table: Table, r: Rule) {
   if (r.kind === "primary key")
     for (const f of table.fields)
       if (r.fields.includes(f.name)) f.required = true;
-  if (r.kind === "unique") table.unique.push(r.fields);
+  if (r.kind === "unique")
+    table.unique.push({
+      fields: r.fields,
+      ...(r.condition ? { condition: r.condition } : {}),
+    });
   if (r.kind === "foreign key")
-    table.foreignKeys.push({ fields: r.fields, table: r.table });
+    table.foreignKeys.push({
+      fields: r.fields,
+      table: r.table,
+      ...(r.targetFields ? { targetFields: r.targetFields } : {}),
+    });
 }
 
 const CREATE_TABLE = new RegExp(
@@ -344,10 +378,16 @@ export function readSql(files: Map<string, string>): DataModel {
       }
       const index = s.match(UNIQUE_INDEX);
       if (index) {
-        const { inner } = parenthesised(s, index[0].length - 1);
+        const { inner, rest } = parenthesised(s, index[0].length - 1);
+        // Postgres and SQLite put WHERE last, so all that follows it is the condition.
+        const where = rest.match(/\bwhere\s+([\s\S]+)$/i)?.[1];
         later.push({
           table: qualified(index[1]),
-          rule: { kind: "unique", fields: columns(inner) },
+          rule: {
+            kind: "unique",
+            fields: columns(inner),
+            ...(where ? { condition: where.trim().replace(/\s+/g, " ") } : {}),
+          },
         });
       }
     }
@@ -376,11 +416,12 @@ export function readSql(files: Map<string, string>): DataModel {
   const entities = new Map<string, Entity>();
   for (const [t, name] of names) {
     const constraints: Constraint[] = [
-      ...t.unique.map((fields) => ({ kind: "unique" as const, fields })),
+      ...t.unique.map((u) => ({ kind: "unique" as const, ...u })),
       ...t.foreignKeys.map((fk) => ({
         kind: "foreign key" as const,
         fields: fk.fields,
         target: target(fk.table),
+        ...(fk.targetFields ? { targetFields: fk.targetFields } : {}),
       })),
     ];
     entities.set(name, {
