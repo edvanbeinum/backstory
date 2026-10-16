@@ -124,6 +124,16 @@ test("a run within clearance of a card's edge steps aside too", () => {
   assert.deepEqual(runs(d), [194]);
 });
 
+test("a run on the edge of a card's clearance, give or take rounding, keeps its line", () => {
+  const a = box(100, 0);
+  const next = box(211 - 1e-12, 124);
+  const { d } = edgePath(a, box(300, 248), 0, 1, 0, 1, {
+    boxes: [next],
+    clearance: 11,
+  });
+  assert.deepEqual(runs(d), [200]);
+});
+
 test("the jog goes to the side of the card nearer the destination", () => {
   const a = box(100, 0);
   const mid = box(100, 124);

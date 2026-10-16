@@ -175,9 +175,12 @@ function descend(
   };
 
   for (const c of inWay) {
-    if (c.y < y || x <= c.x - clearance || x >= c.x + c.w + clearance) continue;
     const left = c.x - clearance;
     const right = c.x + c.w + clearance;
+    // Treat a run on the edge of a card's clearance, give or take rounding, as
+    // clear of it: the middle of a column gap is that edge for the cards on
+    // both sides, and a run stepped into one row's gap lands on it in the next.
+    if (c.y < y || x <= left + 1e-6 || x >= right - 1e-6) continue;
     curve(Math.abs(left - bx) <= Math.abs(right - bx) ? left : right, c.y, c.y);
     y = c.y + c.h;
     d += ` L${at(x, y)}`;
