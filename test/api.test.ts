@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import * as fetchRoute from "../app/api/fetch/route";
 import * as githubLogin from "../app/api/github/login/route";
 import * as notes from "../app/api/notes/route";
 import * as outbox from "../app/api/outbox/route";
@@ -170,6 +171,12 @@ test("a cross-site request to a route that writes is refused and writes nothing"
     [
       "review DELETE",
       review.DELETE(send(at("review", "id=r1"), "DELETE", EVIL)),
+    ],
+    [
+      "fetch POST",
+      fetchRoute.POST(
+        send(at("fetch", ""), "POST", EVIL, { repo: REPO, branch: "main" }),
+      ),
     ],
     [
       "github login POST",

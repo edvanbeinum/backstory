@@ -98,6 +98,11 @@ terms:
     means: "A commit you link to a review comment as one that answers it, kept in the comment's response beside the tick and the drafted reply (`commits` in `lib/responses.ts`). It stores the commit's patch-id as well as its sha, so a rebase re-matches it (`healed`); when nothing matches it's `missing` and you choose another. It never ticks the comment."
     avoid:
       - link, as a noun (link stays the verb, as in "Link another…")
+  - name: Fetch
+    means: "Bringing a reviewed branch up to date with origin into a local branch of the same name (`lib/fetch.ts`, `POST /api/fetch`)."
+    avoid:
+      - pull (that merges into a checkout, which Fetch never touches)
+      - sync
   - name: primitive
     means: A named capability Backstory exposes for reuse, listed in `architecture/primitives.yaml`.
     avoid:
@@ -111,7 +116,9 @@ blocks:
       - lib/browse.ts
       - lib/pushed.ts
       - lib/view.ts
-    summary: Reads repos, commits, patches and the working tree through git, and works out what counts as not yet pushed.
+      - lib/fetch.ts
+      - app/api/fetch/
+    summary: Reads repos, commits, patches and the working tree through git, works out what counts as not yet pushed, and fetches a branch from origin into a local branch.
     read: '`lib/git.ts` header, then docs/how-it-works.md "How "not yet pushed" is decided"'
   - name: diff and anchors
     code:
