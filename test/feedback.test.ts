@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { promises as fs, mkdtempSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
@@ -8,6 +8,7 @@ import { parseUnifiedDiff } from "../lib/diff";
 import { BRANCH_REV, WORKING_REV } from "../lib/constants";
 import { anchorNotes, formatFeedback, locateNote } from "../lib/feedback";
 import { changeNotes, getNotes, parseChange } from "../lib/notes";
+import { db } from "../lib/store";
 import type { DiffFile, Note } from "../lib/types";
 
 /** Everything left on uncommitted work, with its diff loaded. */
@@ -168,13 +169,11 @@ test("notes persist per checkout, and edits keep their original time", async () 
   assert.deepEqual(await getNotes("/repo/a"), []);
   assert.equal((await getNotes("/repo/b")).length, 1);
 
-  const raw = JSON.parse(
-    await fs.readFile(
-      path.join(process.env.BACKSTORY_HOME, "notes.json"),
-      "utf8",
-    ),
+  const roots = db().prepare("SELECT DISTINCT root FROM notes").all();
+  assert.deepEqual(
+    roots.map((r) => r.root),
+    ["/repo/b"],
   );
-  assert.deepEqual(Object.keys(raw), ["/repo/b"]);
 
   await assert.rejects(
     changeNotes("/repo/b", {
@@ -258,27 +257,6 @@ test("a withdrawn round's notes are drafts again, and editable", async () => {
   assert.equal(a.done, false);
   await changeNotes(root, { op: "save", note: { ...a, body: "reworded" } });
   assert.equal((await getNotes(root))[0].body, "reworded");
-});
-
-test("notes saved before rounds existed read as drafts", async () => {
-  const home = mkdtempSync(path.join(tmpdir(), "backstory-test-"));
-  process.env.BACKSTORY_HOME = home;
-  const legacy = note({ id: "old" }) as Partial<Note>;
-  delete legacy.rev;
-  delete legacy.sentAt;
-  delete legacy.done;
-  delete legacy.doneAt;
-  await fs.writeFile(
-    path.join(home, "notes.json"),
-    JSON.stringify({ "/repo/legacy": { old: legacy } }),
-  );
-
-  const [read] = await getNotes("/repo/legacy");
-  assert.equal(read.id, "old");
-  // Before notes could go on commits, uncommitted work was the only place.
-  assert.equal(read.rev, WORKING_REV);
-  assert.equal(read.sentAt, null);
-  assert.equal(read.done, false);
 });
 
 test("a change with an unknown op is refused", () => {

@@ -1,7 +1,9 @@
-import { mkdirSync, promises as fs } from "node:fs";
+import { mkdirSync, promises as fs, readFileSync, renameSync } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
+
+import { importNotes } from "./notes";
 
 /**
  * The SQLite database behind notes, rounds and responses: `backstory.db` in
@@ -103,6 +105,7 @@ export function db(): DatabaseSync {
   // the other writes, and the timeout makes a writer wait rather than fail.
   database.exec("PRAGMA busy_timeout = 5000; PRAGMA journal_mode = WAL;");
 
+  let imported: string[] = [];
   database.exec("BEGIN IMMEDIATE");
   try {
     const { user_version } = database.prepare("PRAGMA user_version").get() as {
@@ -110,6 +113,7 @@ export function db(): DatabaseSync {
     };
     if (user_version === 0) {
       database.exec(SCHEMA);
+      imported = importJson(database, home);
       database.exec(`PRAGMA user_version = ${VERSION}`);
     }
     database.exec("COMMIT");
@@ -118,9 +122,62 @@ export function db(): DatabaseSync {
     database.close();
     throw err;
   }
+  // Renamed, never deleted, so a user can put a file back by hand.
+  for (const name of imported) renameSync(name, `${name}.migrated`);
 
   open = { file, database };
   return database;
+}
+
+/** A JSON store file as it was: `namespace -> key -> record`, unchecked. */
+export type Legacy = Record<string, Record<string, unknown>>;
+
+/**
+ * Copy the JSON files this database replaced into a new database, in its
+ * first transaction, and return the paths it read. Remove this, and the
+ * importers it calls, in the release after the one that ships the database.
+ */
+function importJson(database: DatabaseSync, home: string): string[] {
+  const importers: [string, (d: DatabaseSync, legacy: Legacy) => void][] = [
+    ["notes.json", importNotes],
+  ];
+  const read: string[] = [];
+  for (const [name, importer] of importers) {
+    const file = path.join(home, name);
+    const legacy = readLegacy(file);
+    if (legacy === null) continue;
+    importer(database, legacy);
+    read.push(file);
+  }
+  return read;
+}
+
+/** Null when the file isn't there; a file that won't parse reads as empty. */
+function readLegacy(file: string): Legacy | null {
+  let raw: string;
+  try {
+    raw = readFileSync(file, "utf8");
+  } catch {
+    return null;
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return {};
+  }
+  const isObject = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  if (!isObject(parsed)) return {};
+
+  const out: Legacy = {};
+  for (const [namespace, entries] of Object.entries(parsed)) {
+    if (!isObject(entries)) continue;
+    out[namespace] = Object.fromEntries(
+      Object.entries(entries).filter(([key]) => KEY.test(key)),
+    );
+  }
+  return out;
 }
 
 /**
