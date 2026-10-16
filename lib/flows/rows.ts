@@ -319,6 +319,63 @@ export interface StepMarks {
 const stepNumber = (row: FlowRow) =>
   row.kind === "del" ? row.was : (row.now ?? row.was);
 
+/** A flow's step, by number: flow 1, step 5. */
+export interface StepAt {
+  /** 1-based, as the story numbers flows */
+  flow: number;
+  step: number;
+  /** The step's row in the flow's diff mode */
+  row: FlowRow;
+}
+
+/**
+ * The step a line is on, for a comment's badge and its "On flow 1, step 5".
+ * One step only: a line two flows share names the first flow's, so a comment
+ * gets one badge, not two.
+ */
+export function stepsAt(
+  set: FlowSet,
+  path: string,
+  line: number,
+  side: "old" | "new" = "new",
+): StepAt | null {
+  for (const [i, flow] of set.flows.entries()) {
+    for (const row of flowRows(flow, "diff", set.hunks)) {
+      if (row.side === side && row.step.file === path && row.step.line === line)
+        return { flow: i + 1, step: stepNumber(row) ?? 0, row };
+    }
+  }
+  return null;
+}
+
+/**
+ * Which flows each changed file is on, by number, from the hunks Claude
+ * placed: "yourself" for app code on none. A file outside the app's code,
+ * such as a test, is left out.
+ */
+export function fileFlows(
+  set: FlowSet,
+  files: { path: string }[],
+): Map<string, number[] | "yourself"> {
+  const app = new Set(set.appFiles);
+  const index = new Map(set.flows.map((f, i) => [f.id, i + 1]));
+  const out = new Map<string, number[] | "yourself">();
+  for (const { path } of files) {
+    if (!app.has(path)) continue;
+    const hunks = set.hunks.filter((h) => h.file === path);
+    if (hunks.length === 0) continue;
+    const flows = [
+      ...new Set(
+        hunks.flatMap((h) =>
+          h.flows.flatMap((id) => (index.has(id) ? [index.get(id)!] : [])),
+        ),
+      ),
+    ].sort((a, b) => a - b);
+    out.set(path, flows.length > 0 ? flows : "yourself");
+  }
+  return out;
+}
+
 /** Every flow's steps, by file and by the line each sits on. */
 export function stepMarks(set: FlowSet): Map<string, StepMarks> {
   const out = new Map<string, StepMarks>();

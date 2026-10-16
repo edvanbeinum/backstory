@@ -3,10 +3,12 @@ import { test } from "node:test";
 
 import {
   componentPath,
+  fileFlows,
   flowRows,
   groupParticipants,
   shortLabels,
   stepMarks,
+  stepsAt,
   summarise,
 } from "../lib/flows/rows";
 import type { Flow, FlowHunk, FlowSet, FlowStep } from "../lib/flows/types";
@@ -327,4 +329,52 @@ test("stepMarks marks every flow's steps on their lines", () => {
   assert.deepEqual(chips("b.ts", "new", 5), ["2·1"]);
   assert.deepEqual(chips("b.ts", "old", 9), ["2·1 was"]);
   assert.deepEqual([...marks.keys()].sort(), ["a.ts", "b.ts"]);
+});
+
+test("stepsAt finds a comment's step, and names only one", () => {
+  const draft = "lib/models/draft.ts";
+  const set = flowSet([
+    flow(null, [
+      step("s1", 1),
+      step("s2", 2),
+      step("s3", 4),
+      step("s4", 5),
+      step("s5", 78, { file: draft }),
+    ]),
+    flow(null, [step("t1", 78, { file: draft })]),
+  ]);
+  const at = stepsAt(set, draft, 78);
+  assert.equal(at?.flow, 1, "the first flow, not the second");
+  assert.equal(at?.step, 5);
+  assert.equal(stepsAt(set, draft, 79), null);
+});
+
+test("fileFlows names each file's flows, or says to read it yourself", () => {
+  const zero = (file: string, flows: string[]): FlowHunk => ({
+    id: `H-${file}`,
+    file,
+    oldStart: 1,
+    oldLines: 0,
+    newStart: 1,
+    newLines: 1,
+    flows,
+  });
+  const set = flowSet(
+    [
+      { ...flow(null, [step("a", 1)]), id: "f1" },
+      { ...flow(null, [step("b", 1)]), id: "f2" },
+    ],
+    {
+      hunks: [zero("a.ts", ["f2"]), zero("b.ts", []), zero("t.test.ts", [])],
+      appFiles: ["a.ts", "b.ts"],
+    },
+  );
+  const out = fileFlows(set, [
+    { path: "a.ts" },
+    { path: "b.ts" },
+    { path: "t.test.ts" },
+  ]);
+  assert.deepEqual(out.get("a.ts"), [2]);
+  assert.equal(out.get("b.ts"), "yourself");
+  assert.equal(out.has("t.test.ts"), false, "a test is neither");
 });

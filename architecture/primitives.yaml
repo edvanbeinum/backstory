@@ -119,7 +119,9 @@ primitives:
     file: lib/flows/rows.ts
     symbols:
       - stepMarks
-    use: "Every flow's steps by file and line, as `1·7` marks for the diff's gutter."
+      - stepsAt
+      - fileFlows
+    use: 'Where flows meet the diff''s lines. `stepMarks` is every flow''s steps by file and line, as `1·7` marks for the gutter; `stepsAt` is the one step a line is on, for a comment''s badge and its place in the story; `fileFlows` is each file''s flows, or "read yourself" for app code on none.'
   - name: read the C4 model
     block: model reader (the map)
     file: lib/model.ts
