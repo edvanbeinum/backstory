@@ -10,7 +10,13 @@ import {
 } from "../ai/provider";
 import { git, gitLine } from "../exec";
 import { withSnapshot } from "../flows/generate";
-import { DRAFTED_PROPERTY, localModelDir, MODEL_DSL, showFile } from "../model";
+import {
+  DRAFTED_PROPERTY,
+  localModelDir,
+  localModelFile,
+  MODEL_DSL,
+  showFile,
+} from "../model";
 import { assignIds, serializeModel, type DraftIds } from "./dsl";
 import { checkGlobs, type GlobCheck } from "./globs";
 import {
@@ -25,7 +31,7 @@ import {
 /**
  * Drafting a C4 model for a repo that has none: Claude reads the code at
  * HEAD and Backstory writes the result to the local model file the map
- * already reads, `~/.backstory/models/<repo>/workspace.dsl`. Never into the
+ * already reads, `~/.backstory/models/<repo key>/workspace.dsl`. Never into the
  * repo.
  *
  * One job per repo, in memory on globalThis, as `lib/flows/cache.ts` keeps
@@ -302,7 +308,8 @@ export async function startDraft(
       release();
       return { status: "refused", reason: "committed" };
     }
-    if (!opts.redraft && (await exists(path.join(dir, "workspace.dsl")))) {
+    const file = await localModelFile(root);
+    if (!opts.redraft && (await exists(file))) {
       release();
       return { status: "refused", reason: "exists" };
     }

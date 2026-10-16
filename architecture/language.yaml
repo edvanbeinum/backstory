@@ -61,9 +61,12 @@ terms:
     avoid:
       - store
   - name: local model
-    means: "A C4 model kept on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo>/workspace.dsl` (`localModelDir` in `lib/model.ts`). Claude can draft one (`lib/models/draft.ts`)."
+    means: "A C4 model kept on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo key>/workspace.dsl` (`localModelDir` in `lib/model.ts`). Claude can draft one (`lib/models/draft.ts`)."
     avoid:
       - draft alone, for the model (reply drafts are `lib/drafts.ts`)
+  - name: repo key
+    means: "The folder a repo gets under `~/.backstory/flows/`, `data/` and `models/` (`repoKey` in `lib/git.ts`): the main checkout's folder plus the first 8 hex characters of a hash of the common git dir. Every worktree of a repo has the same key; two repos whose checkouts share a folder name don't."
+    avoid: []
   - name: AI provider
     means: "The tool Backstory asks to read code and answer in a JSON schema; Claude Code for now (`lib/ai/provider.ts`)."
     avoid:

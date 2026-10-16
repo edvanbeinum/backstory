@@ -45,9 +45,11 @@ const FILES: Record<string, string> = {
   "test/main.test.ts": "it('runs', () => {});\n",
 };
 
-function gitRepo(extra: Record<string, string> = {}) {
-  const dir = mkdtempSync(path.join(os.tmpdir(), "backstory-draft-test-"));
-  dirs.push(dir);
+function gitRepo(extra: Record<string, string> = {}, at?: string) {
+  const dir =
+    at ?? mkdtempSync(path.join(os.tmpdir(), "backstory-draft-test-"));
+  if (at) mkdirSync(dir);
+  else dirs.push(dir);
   const sh = (...args: string[]) =>
     execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" }).trim();
   sh("init", "-q");
@@ -60,6 +62,13 @@ function gitRepo(extra: Record<string, string> = {}) {
   sh("add", ".");
   sh("commit", "-qm", "init");
   return { dir, sh };
+}
+
+/** A repo in its own temp parent, so two can share a folder name. */
+function namedRepo(name: string, extra: Record<string, string> = {}) {
+  const parent = mkdtempSync(path.join(os.tmpdir(), "backstory-parent-"));
+  dirs.push(parent);
+  return gitRepo(extra, path.join(parent, name));
 }
 
 const component = (id: string, globs: string[]) => ({
@@ -395,6 +404,116 @@ test("a local model is only replaced by a redraft, which keeps the old one", asy
   assert.equal(failed.status.status, "failed");
   assert.equal(readFileSync(file, "utf8"), second);
   assert.equal(readFileSync(`${file}.bak`, "utf8"), first);
+});
+
+const systemName = async (root: string) =>
+  (await readModelAt(root, "HEAD"))?.model?.elements.get("shop")?.name;
+
+test("two repos with the same folder name each get their own model, and a redraft on one leaves the other alone", async () => {
+  const one = namedRepo("api");
+  const two = namedRepo("api", { "src/app/extra.ts": "export const x = 1;\n" });
+  const renamed = structuredClone(CLEAN);
+  renamed.system.name = "Other shop";
+  assert.equal((await draft(one.dir, [CLEAN])).status.status, "done");
+  assert.equal((await draft(two.dir, [renamed])).status.status, "done");
+
+  const oneFile = await localModelFile(one.dir);
+  const twoFile = await localModelFile(two.dir);
+  assert.notEqual(oneFile, twoFile);
+  assert.ok(existsSync(oneFile));
+  assert.ok(existsSync(twoFile));
+  assert.equal(await systemName(one.dir), "Shop");
+  assert.equal(await systemName(two.dir), "Other shop");
+
+  const before = readFileSync(twoFile);
+  const redrafted = structuredClone(CLEAN);
+  redrafted.system.name = "Shop, redrafted";
+  assert.equal((await draft(one.dir, [redrafted], true)).status.status, "done");
+  assert.equal(await systemName(one.dir), "Shop, redrafted");
+  assert.deepEqual(readFileSync(twoFile), before);
+  assert.equal(existsSync(`${twoFile}.bak`), false);
+});
+
+test("every worktree of a repo reads the same model", async () => {
+  const repo = gitRepo();
+  const parent = mkdtempSync(path.join(os.tmpdir(), "backstory-worktree-"));
+  dirs.push(parent);
+  const worktree = path.join(parent, "second");
+  repo.sh("worktree", "add", "-q", "--detach", worktree);
+  await draft(repo.dir, [CLEAN]);
+
+  const file = await localModelFile(repo.dir);
+  assert.equal(await localModelFile(worktree), file);
+  const read = await readModelAt(worktree, "HEAD");
+  assert.ok(read?.model, read?.error ?? "no model");
+  assert.equal(read.local, true);
+  assert.equal(read.file, file);
+});
+
+test("a model in the folder named after the checkout alone is moved, and never silently redrafted", async () => {
+  const repo = namedRepo("legacy");
+  const old = path.join(home, "models", "legacy");
+  mkdirSync(old, { recursive: true });
+  const dsl = serializeModel(CLEAN);
+  writeFileSync(path.join(old, "workspace.dsl"), dsl);
+  writeFileSync(path.join(old, "workspace.dsl.bak"), "the backup\n");
+
+  const read = await readModelAt(repo.dir, "HEAD");
+  assert.ok(read?.model, read?.error ?? "no model");
+  assert.ok(read.file);
+  const dir = path.dirname(read.file);
+  assert.match(path.basename(dir), /^legacy-[0-9a-f]{8}$/);
+  assert.equal(readFileSync(path.join(dir, "workspace.dsl"), "utf8"), dsl);
+  assert.equal(
+    readFileSync(path.join(dir, "workspace.dsl.bak"), "utf8"),
+    "the backup\n",
+  );
+  assert.equal(existsSync(old), false);
+
+  const { runner, prompts } = recorded([CLEAN]);
+  assert.deepEqual(await startDraft(repo.dir, { runner, status: ready }), {
+    status: "refused",
+    reason: "exists",
+  });
+  assert.equal(prompts.length, 0);
+});
+
+test("a Draft finds a model in the folder named after the checkout alone before checking for one", async () => {
+  const repo = namedRepo("unread");
+  const old = path.join(home, "models", "unread");
+  mkdirSync(old, { recursive: true });
+  writeFileSync(path.join(old, "workspace.dsl"), serializeModel(CLEAN));
+
+  const { runner, prompts } = recorded([CLEAN]);
+  assert.deepEqual(await startDraft(repo.dir, { runner, status: ready }), {
+    status: "refused",
+    reason: "exists",
+  });
+  assert.equal(prompts.length, 0);
+  assert.ok(existsSync(await localModelFile(repo.dir)));
+  assert.equal(existsSync(old), false);
+});
+
+test("when both folders have a model, the repo key's wins and the other is left alone", async () => {
+  const repo = namedRepo("both");
+  await draft(repo.dir, [CLEAN]);
+  const old = path.join(home, "models", "both", "workspace.dsl");
+  mkdirSync(path.dirname(old), { recursive: true });
+  const stale = structuredClone(CLEAN);
+  stale.system.name = "Stale shop";
+  writeFileSync(old, serializeModel(stale));
+
+  const read = await readModelAt(repo.dir, "HEAD");
+  assert.equal(read?.file, await localModelFile(repo.dir));
+  assert.equal(await systemName(repo.dir), "Shop");
+  assert.ok(existsSync(old));
+});
+
+test("a repo with no model in either folder gets none, and no folder is made", async () => {
+  const repo = namedRepo("bare");
+  assert.equal(await readModelAt(repo.dir, "HEAD"), null);
+  assert.equal(existsSync(path.dirname(await localModelFile(repo.dir))), false);
+  assert.equal(existsSync(path.join(home, "models", "bare")), false);
 });
 
 test("a redraft sent while a refused draft is still being checked still runs", async () => {
