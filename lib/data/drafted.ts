@@ -140,7 +140,7 @@ export const deltaPrompt = (
 
 Below is the data model of the commit that comes after this one, and the patch between the two. Work out how THIS commit's data model differs from it, by undoing what the patch changed in stored records. Return only the difference:
 
-- changed: for every entity the patch changed, its full version as it is in THIS commit. Include an entity that exists here but the patch removed. Write each one in the same style as the model below, keeping everything the patch does not touch word for word.
+- changed: for every entity the patch changed, its full version as it is in THIS commit. Include an entity that exists here but the patch removed. Write each one in the same style as the model below, keeping everything the patch does not touch word for word, a required of null included.
 - absent: the names of entities in the model below that the patch added, so they don't exist here.
 
 An entity the patch does not touch goes in neither list. If the patch changes no stored records, both lists are empty. Check the code here when the patch is unclear.
