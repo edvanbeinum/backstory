@@ -15,6 +15,8 @@ interface CardProps {
   repo: string;
   rev: string;
   onShowInFiles: (row: FlowRow) => void;
+  /** Paths the diff shows, old and new; null until it loads */
+  filesInDiff: Set<string> | null;
   target: StoryTarget | null;
   /** The target has been opened, so a later remount doesn't open it again */
   onTargetDone: (at: number) => void;

@@ -62,6 +62,7 @@ export function FlowCard({
   repo,
   rev,
   onShowInFiles,
+  filesInDiff,
   target,
   onTargetDone,
   navRef,
@@ -80,6 +81,8 @@ export function FlowCard({
   repo: string;
   rev: string;
   onShowInFiles: (row: FlowRow) => void;
+  /** Paths the diff shows, old and new; null until it loads */
+  filesInDiff: Set<string> | null;
   /** A step to open, asked for from elsewhere; this card is already open */
   target: StoryTarget | null;
   onTargetDone: (at: number) => void;
@@ -293,6 +296,9 @@ export function FlowCard({
               side={row.side}
               line={row.step.line}
               onShowInFiles={() => onShowInFiles(row)}
+              notInDiff={
+                filesInDiff !== null && !filesInDiff.has(row.step.file)
+              }
             />
           )}
           footer={

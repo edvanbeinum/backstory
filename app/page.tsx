@@ -69,6 +69,7 @@ import type {
   ApiError,
   CommitSummary,
   DiffResponse,
+  Note,
   SessionResponse,
 } from "@/lib/types";
 
@@ -700,7 +701,7 @@ export default function Page() {
   if (shownView !== viewKey) {
     setShownView(viewKey);
     setStoryTarget(null);
-    setFilesJump(null);
+    if (filesJump?.view !== viewKey) setFilesJump(null);
     setMapHighlight(null);
     setFilesFilter(null);
   }
@@ -1176,6 +1177,23 @@ export default function Page() {
     return /^[0-9a-f]{40}$/.test(rev) ? rev : null;
   }, [diff, rev, commitForRev]);
 
+  const openNote = useCallback(
+    (note: Note) => {
+      if (note.rev !== noteRev) pickRev(note.rev);
+      if (note.path)
+        setFilesJump({
+          path: note.path,
+          side: note.side,
+          line: note.line ?? undefined,
+          note: note.id,
+          view: `${repoPath}@${note.rev}`,
+          at: Date.now(),
+        });
+      setTab("files");
+    },
+    [noteRev, pickRev, repoPath],
+  );
+
   // j/k move through a list the way they would in a TUI, the open tab's:
   // flow steps on Story, comments on Comments, changes on Files changed.
   useEffect(() => {
@@ -1522,7 +1540,7 @@ export default function Page() {
                           session={session}
                           review={review}
                           outbox={outbox}
-                          onRevChange={pickRev}
+                          onOpenNote={openNote}
                         />
                       </div>
                     )}

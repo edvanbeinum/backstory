@@ -1,5 +1,8 @@
 "use client";
 
+import { useMemo } from "react";
+
+import { filePaths } from "@/lib/anchor";
 import { WORKING_REV } from "@/lib/constants";
 import type { DataResponse } from "@/lib/data/types";
 import type { FlowRow } from "@/lib/flows/rows";
@@ -68,6 +71,10 @@ export function Story({
   /** Open a badge's comment in Comments */
   onBadge: (threadId: string) => void;
 }) {
+  const filesInDiff = useMemo(
+    () => (diff ? new Set(diff.files.flatMap(filePaths)) : null),
+    [diff],
+  );
   const status = flows.status;
   const set = status?.status === "ready" ? status.flows : null;
 
@@ -119,6 +126,7 @@ export function Story({
           repo={repo}
           rev={rev}
           onShowInFiles={onShowInFiles}
+          filesInDiff={filesInDiff}
           target={target}
           onTargetDone={onTargetDone}
           navRef={navRef}

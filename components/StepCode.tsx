@@ -19,6 +19,7 @@ export function StepCode({
   side,
   line,
   onShowInFiles,
+  notInDiff = false,
   height = STEP_CODE_H,
 }: {
   repo: string;
@@ -27,6 +28,8 @@ export function StepCode({
   side: "old" | "new";
   line: number;
   onShowInFiles?: () => void;
+  /** The file isn't one the change touches, so Files changed can't show it */
+  notInDiff?: boolean;
   height?: number;
 }) {
   const [data, setData] = useState<Snippet | null>(null);
@@ -76,14 +79,18 @@ export function StepCode({
         )}
         {side === "old" && <span className="hint">as it was before</span>}
         <span className="flex-1" />
-        {onShowInFiles && (
-          <button
-            type="button"
-            onClick={onShowInFiles}
-            className="text-[var(--accent)] hover:underline"
-          >
-            Show in Files changed
-          </button>
+        {notInDiff ? (
+          <span className="hint">not in this diff</span>
+        ) : (
+          onShowInFiles && (
+            <button
+              type="button"
+              onClick={onShowInFiles}
+              className="text-[var(--accent)] hover:underline"
+            >
+              Show in Files changed
+            </button>
+          )
         )}
       </div>
       <div className="thin-scroll step-code-body">

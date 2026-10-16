@@ -23,6 +23,10 @@ export interface FilesJump {
   path: string;
   side?: "old" | "new";
   line?: number;
+  /** A note to bring up, before its line */
+  note?: string;
+  /** The view it was asked for, when that's a change still to open */
+  view?: string;
   /** When it was asked for, so asking twice jumps twice */
   at: number;
 }
@@ -212,9 +216,13 @@ export function FilesChanged({
     let tries = 0;
     let revealed = false;
     const poll = setInterval(() => {
-      const { path, side, line } = jump;
+      const { path, side, line, note } = jump;
       let done = false;
-      if (side && line !== undefined) {
+      const noteEl = note ? document.getElementById(`note-${note}`) : null;
+      if (noteEl) {
+        noteEl.scrollIntoView({ block: "center" });
+        done = true;
+      } else if (side && line !== undefined) {
         const row = rowFor(path, side, line);
         if (row) {
           row.scrollIntoView({ block: "center" });
