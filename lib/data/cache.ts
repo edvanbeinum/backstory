@@ -453,14 +453,17 @@ async function readView(
     base = { tree: files.base, model };
     // Leave a pointer read with other `data.files` alone: a branch that edits
     // the steer would otherwise take it over, and main's views would take it
-    // back, a full read each way.
+    // back, a full read each way. Replace a commit main no longer reaches, as
+    // after a force-push, or main's model would never move again.
     const pointer = trunk?.pointer ?? (await readJson<Trunk>(trunkPath(c.dir)));
     const past = !pointer
       ? true
       : !trunk
         ? sameSteer(pointer.files, c.files)
         : trunk.pointer.commit !== view.base &&
-          (await isOnBranch(c.root, trunk.pointer.commit, view.base));
+          ((await isOnBranch(c.root, trunk.pointer.commit, view.base)) ||
+            (!!main &&
+              !(await isOnBranch(c.root, trunk.pointer.commit, main))));
     if (main && past && (await isOnBranch(c.root, view.base, main))) {
       moved = { tree: files.base, commit: view.base, files: c.files };
       if (!c.fresh) await writeJson(trunkPath(c.dir), moved);

@@ -1295,6 +1295,19 @@ test("a view read with other data.files leaves main's model where it was", async
   assert.equal((await readTrunk(repo.root)).commit, repo.main);
 });
 
+test("after main is rewritten, a base on main moves main's model", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  repo.git("checkout", "-q", "main");
+  repo.git("commit", "-q", "--amend", "-m", "Add notes, reworded");
+  const later = repo.on(["id", "body", "rev"]);
+  repo.git("checkout", "-q", "-b", "after");
+  const head = repo.on(["id", "body", "rev", "author"]);
+
+  await read({ root: repo.root, base: later, head }, recorder());
+  assert.equal((await readTrunk(repo.root)).commit, later);
+});
+
 test("a patch from main's model past the cap reads that commit in full, and it becomes main's model", async () => {
   const repo = mainRepo();
   await readMain(repo.root, recorder().runner);
