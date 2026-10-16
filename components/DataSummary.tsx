@@ -701,7 +701,7 @@ function Redraft({ data, draft }: { data: DataResponse; draft: DraftApi }) {
           onClick={() => {
             if (
               window.confirm(
-                `Redraft the data model? ${data.drafted?.provider ?? "The AI provider"} reads the code again, which can take a few minutes on your account. The current reading is kept if it fails.`,
+                `Redraft the data model? ${data.drafted?.provider ?? "The AI provider"} reads main's data model again in full and works out this view from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current reading is kept if it fails.`,
               )
             )
               draft.start(true);
