@@ -16,11 +16,14 @@ import {
 import { readCoreData } from "../lib/data/coredata";
 import { diffModels } from "../lib/data/diff";
 import {
+  deltaSchema,
+  headSchema,
   mergeDelta,
   TOO_LARGE,
   type DraftedDelta,
   type DraftedHead,
 } from "../lib/data/drafted";
+import { fieldLabel } from "../lib/data/present";
 import { readRails, tableFor } from "../lib/data/rails";
 import { DATA_READERS } from "../lib/data/readers";
 import type { Constraint, DataModel, Entity } from "../lib/data/types";
@@ -122,6 +125,8 @@ test("Rails: fields from schema.rb, relationships and enums from the models", ()
       ["foreign key", "space_id", "Space"],
     ],
   );
+  for (const e of model.entities.values())
+    for (const f of e.fields) assert.equal(typeof f.required, "boolean");
 });
 
 test("table names follow Rails's conventions", () => {
@@ -251,6 +256,8 @@ test("Core Data: entities, attributes, relationships and uniqueness", () => {
     model.entities.get("Exercise")!.relationships[0].kind,
     "belongs to",
   );
+  for (const e of model.entities.values())
+    for (const f of e.fields) assert.equal(typeof f.required, "boolean");
 });
 
 test("present: a link is said once, and bookkeeping waits for details", async () => {
@@ -596,6 +603,8 @@ test("a repo with only SQL schema files shows its data model change, with nothin
       .map((f) => [f.state, f.item.name, f.item.type]),
     [["added", "prefix", "varchar(8)"]],
   );
+  for (const f of data.entities[0].fields)
+    assert.equal(typeof f.item.required, "boolean");
 });
 
 test("a widened SQL column reads as a changed field", async () => {
@@ -932,6 +941,114 @@ test("a delta merges onto the head: changed replaces, absent removes, new ones j
     ],
   );
   assert.equal(merged[1], head[2]);
+});
+
+/** `entity`, with the named fields' required answered unknown */
+const unsure = (name: string, fields: string[], unknown: string[]): Entity => {
+  const e = entity(name, fields);
+  for (const f of e.fields) if (unknown.includes(f.name)) f.required = null;
+  return e;
+};
+const drafted = (...entities: Entity[]): DataModel => ({
+  source: "drafted",
+  entities: new Map(entities.map((e) => [e.name, e])),
+});
+
+test("a field the drafted head can't call optional or not reaches the view as unknown", async () => {
+  const repo = notesRepo();
+  const ai = recorder({
+    head: {
+      ...noteHead,
+      entities: [unsure("Note", ["id", "body", "rev"], ["rev"])],
+    },
+  });
+  await read(repo.view, { runner: ai.runner });
+  const data = await buildData(repo.root, repo.base, repo.head);
+  const rev = data.entities[0].fields.find((f) => f.item.name === "rev")!;
+  assert.equal(rev.state, "added");
+  assert.equal(rev.item.required, null);
+  assert.equal(fieldLabel(rev.item), "string, unknown if optional");
+});
+
+test("a delta's unknown field merges into the base, and unknown at both ends is no change", () => {
+  const head = [unsure("Note", ["id", "body", "rev"], ["body"])];
+  const base = mergeDelta(head, {
+    changed: [unsure("Note", ["id", "body"], ["body"])],
+    absent: [],
+  });
+  assert.equal(base[0].fields.find((f) => f.name === "body")?.required, null);
+  const diff = diffModels(drafted(...base), drafted(...head));
+  assert.equal(
+    diff[0].fields.find((f) => f.item.name === "body")?.state,
+    "same",
+  );
+});
+
+test("unknown to known is a changed field; unknown to unknown is none", () => {
+  const before = drafted(unsure("Note", ["id", "body"], ["body"]));
+  const known = diffModels(before, drafted(entity("Note", ["id", "body"])));
+  const moved = known[0].fields.filter((f) => f.state !== "same");
+  assert.deepEqual(
+    moved.map((f) => [f.state, f.item.name]),
+    [["changed", "body"]],
+  );
+  assert.equal(moved[0].before?.required, null);
+  assert.deepEqual(
+    diffModels(before, drafted(unsure("Note", ["id", "body"], ["body"]))),
+    [],
+  );
+});
+
+test("fieldLabel marks optional with ? and unknown in words, after an enum's values", () => {
+  assert.equal(
+    fieldLabel({ name: "a", type: "string", required: true }),
+    "string",
+  );
+  assert.equal(
+    fieldLabel({ name: "a", type: "string", required: false }),
+    "string?",
+  );
+  assert.equal(
+    fieldLabel({ name: "a", type: "string", required: null }),
+    "string, unknown if optional",
+  );
+  assert.equal(
+    fieldLabel({
+      name: "a",
+      type: "string",
+      required: null,
+      values: ["x", "y"],
+    }),
+    "enum (x, y), unknown if optional",
+  );
+});
+
+test("both drafted reads may answer null for required, and are told to rather than guess", async () => {
+  const requiredType = (
+    schema: { properties: Record<string, unknown> },
+    key: string,
+  ) =>
+    (
+      schema.properties[key] as {
+        items: {
+          properties: {
+            fields: { items: { properties: { required: { type: unknown } } } };
+          };
+        };
+      }
+    ).items.properties.fields.items.properties.required.type;
+  assert.deepEqual(requiredType(headSchema(), "entities"), ["boolean", "null"]);
+  assert.deepEqual(requiredType(deltaSchema(), "changed"), ["boolean", "null"]);
+
+  const repo = notesRepo();
+  const ai = recorder();
+  await read(repo.view, { runner: ai.runner });
+  assert.deepEqual(ai.calls, ["head", "delta"]);
+  for (const prompt of ai.prompts)
+    assert.match(
+      prompt,
+      /required is null when the code doesn't say[^\n]*rather than guess/,
+    );
 });
 
 test("the drafted model is cached by tree, so a reworded head reads nothing again", async () => {

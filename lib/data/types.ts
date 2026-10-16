@@ -10,7 +10,11 @@ export interface Field {
   name: string;
   /** The stack's own type name, e.g. "string", "integer 64" */
   type: string;
-  required: boolean;
+  /**
+   * Null when the source doesn't say whether the key is always present.
+   * Only a drafted model answers null; a reader always knows.
+   */
+  required: boolean | null;
   /** An enum's values, in order */
   values?: string[];
 }

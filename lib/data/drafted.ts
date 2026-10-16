@@ -37,7 +37,10 @@ const fieldSchema = {
   properties: {
     name: { type: "string" },
     type: { type: "string" },
-    required: { type: "boolean" },
+    required: {
+      type: ["boolean", "null"],
+      description: "true, false, or null when the code doesn't say",
+    },
     values: { type: "array", items: { type: "string" } },
   },
 };
@@ -105,7 +108,7 @@ export const deltaSchema = () => ({
 });
 
 const RULES = `- An entity is a kind of record that is stored and read back. Leave out types that only travel (API request and response shapes, props, view models, in-memory caches that are rebuilt) unless they are themselves written to storage.
-- Fields are the stored properties, with the language's own type name ("string", "number", "string[]", a union written out, including "| null" when it can be null). required is false only when the key itself may be missing from a stored record (an optional property, or an older record written before the field existed); a field that is always present but may be null is required, with "| null" in its type.
+- Fields are the stored properties, with the language's own type name ("string", "number", "string[]", a union written out, including "| null" when it can be null). required is false only when the key itself may be missing from a stored record (an optional property, or an older record written before the field existed); a field that is always present but may be null is required, with "| null" in its type. required is null when the code doesn't say whether the key is always present (a store with no schema, a default or migration you can't see); say so rather than guess.
 - A field whose values are a fixed set of literals is an enum: put them in values.
 - A relationship is a stored reference from one entity to another (an id, a list of ids, an embedded record of another entity). "belongs to" for a reference this entity holds, "has many" or "has one" for the other end. target is the entity's name. fields lists this entity's fields that hold it.
 - A constraint is a rule the code enforces on stored data: "unique" for a key that identifies a record, "foreign key" for a reference that must resolve.

@@ -9,13 +9,12 @@ import {
   useState,
 } from "react";
 
-import { present, type Presented } from "@/lib/data/present";
+import { fieldLabel, present, type Presented } from "@/lib/data/present";
 import type {
   Constraint,
   DataResponse,
   Diffed,
   EntityDiff,
-  Field,
   Relationship,
 } from "@/lib/data/types";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
@@ -69,10 +68,6 @@ function summary(shown: Presented[]) {
     </span>
   ));
 }
-
-const fieldType = (f: Field) =>
-  (f.values ? `enum (${f.values.join(", ")})` : f.type) +
-  (f.required ? "" : "?");
 
 function relText(r: Relationship) {
   const target = r.polymorphic
@@ -186,10 +181,10 @@ function EntityCard({
                 <Row
                   key={f.item.name}
                   state={f.state}
-                  was={f.before ? fieldType(f.before) : undefined}
+                  was={f.before ? fieldLabel(f.before) : undefined}
                 >
                   <span className="mono">{f.item.name}</span>{" "}
-                  <span className="type">{fieldType(f.item)}</span>
+                  <span className="type">{fieldLabel(f.item)}</span>
                 </Row>
               ))}
             </div>
@@ -228,7 +223,7 @@ function EntityCard({
               {[...d.linkFields, ...d.timestamps].map((f) => (
                 <Row key={f.item.name} state={f.state}>
                   <span className="mono">{f.item.name}</span>{" "}
-                  <span className="type">{fieldType(f.item)}</span>
+                  <span className="type">{fieldLabel(f.item)}</span>
                 </Row>
               ))}
             </div>

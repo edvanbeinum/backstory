@@ -108,7 +108,9 @@ before reading its lines:
   migrations and tests. Any other repo can have its data model drafted on
   demand: **Draft the data model** under the map on Story has Claude Code read the
   code at the head, and work out the base from the change. The result is marked
-  as a draft and kept in `~/.backstory/data/`, so a view is read once. A head
+  as a draft and kept in `~/.backstory/data/`, so a view is read once. A drafted
+  field the code doesn't say is always present shows as "unknown if optional"
+  after its type. A head
   read costs about $0.15 on a small repo and over $1 and a few minutes on a
   large one.
 - **Flows** are sequence diagrams of what the code does for each user action the

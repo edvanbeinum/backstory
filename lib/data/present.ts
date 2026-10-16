@@ -47,6 +47,11 @@ export interface Presented {
   };
 }
 
+/** A field's type as the card shows it: `?` for optional, words for unknown. */
+export const fieldLabel = (f: Field) =>
+  (f.values ? `enum (${f.values.join(", ")})` : f.type) +
+  (f.required === null ? ", unknown if optional" : f.required ? "" : "?");
+
 const changed = <T>(list: Diffed<T>[]) =>
   list.filter((d) => d.state !== "same");
 
