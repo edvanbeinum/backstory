@@ -455,6 +455,38 @@ test("an explicit class_name wins over a target guessed from source:", () => {
   assert.equal(model.entities.get("Space")!.relationships[0].target, "User");
 });
 
+test("Rails: where: on a unique index and primary_key: on a foreign key", () => {
+  const model = readRails({
+    schema: `ActiveRecord::Schema[8.1].define(version: 1) do
+  create_table "items", force: :cascade do |t|
+    t.string "email"
+    t.string "handle"
+    t.uuid "space_uuid"
+    t.index ["email"], name: "x", unique: true, where: "status = 'active'"
+    t.index ["handle"], name: "y", unique: true
+  end
+  create_table "spaces", force: :cascade do |t|
+    t.uuid "uuid"
+  end
+  add_foreign_key "items", "spaces", primary_key: "uuid", column: "space_uuid"
+  add_foreign_key "items", "spaces"
+end
+`,
+    models: new Map(),
+  });
+  assert.deepEqual(model.entities.get("Item")!.constraints, [
+    { kind: "unique", fields: ["email"], condition: "status = 'active'" },
+    { kind: "unique", fields: ["handle"] },
+    {
+      kind: "foreign key",
+      fields: ["space_uuid"],
+      target: "Space",
+      targetFields: ["uuid"],
+    },
+    { kind: "foreign key", fields: ["space_id"], target: "Space" },
+  ]);
+});
+
 test("present: tightening a link that stays is a change, not plumbing", async () => {
   const { present } = await import("../lib/data/present");
   const schema = (spaceId: string, fk: string) => `

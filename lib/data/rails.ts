@@ -68,7 +68,12 @@ function parseSchema(schema: string) {
     string,
     { fields: Field[]; constraints: Constraint[] }
   >();
-  const foreignKeys: { from: string; to: string; column: string }[] = [];
+  const foreignKeys: {
+    from: string;
+    to: string;
+    column?: string;
+    primaryKey?: string;
+  }[] = [];
   let current: { fields: Field[]; constraints: Constraint[] } | null = null;
 
   for (const raw of schema.split("\n")) {
@@ -83,11 +88,14 @@ function parseSchema(schema: string) {
       current = null;
       continue;
     }
-    const fk = line.match(
-      /^add_foreign_key "([^"]+)", "([^"]+)"(?:.*column: "([^"]+)")?/,
-    );
+    const fk = line.match(/^add_foreign_key "([^"]+)", "([^"]+)"(.*)$/);
     if (fk) {
-      foreignKeys.push({ from: fk[1], to: fk[2], column: fk[3] ?? "" });
+      foreignKeys.push({
+        from: fk[1],
+        to: fk[2],
+        column: quoted(fk[3], "column"),
+        primaryKey: quoted(fk[3], "primary_key"),
+      });
       continue;
     }
     if (!current) continue;
@@ -110,9 +118,16 @@ function parseSchema(schema: string) {
       unique &&
       (/unique: true/.test(unique[2]) || line.startsWith("t.unique_constraint"))
     ) {
+      // Read where: with its own match: `quoted` stops at the first inner
+      // quote in where: "status = 'active'".
+      const where = unique[2].match(
+        /\bwhere:\s*(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)')/,
+      );
+      const condition = (where?.[1] ?? where?.[2])?.replace(/\\(.)/g, "$1");
       current.constraints.push({
         kind: "unique",
         fields: unique[1].split(",").map((f) => f.trim().replace(/"/g, "")),
+        ...(condition ? { condition } : {}),
       });
     }
   }
@@ -263,8 +278,9 @@ export function readRails(src: RailsSources): DataModel {
         .filter((fk) => fk.from === table)
         .map((fk) => ({
           kind: "foreign key" as const,
-          fields: [fk.column || `${singular(fk.to)}_id`],
+          fields: [fk.column ?? `${singular(fk.to)}_id`],
           target: byTable.get(fk.to)?.name ?? classify(singular(fk.to)),
+          ...(fk.primaryKey ? { targetFields: [fk.primaryKey] } : {}),
         })),
     ];
     entities.set(name, {
