@@ -534,6 +534,10 @@ private final class FindWindow {
         return focus.isDescendant(of: bar)
     }
 
+    private var focusIsInPage: Bool {
+        (window.firstResponder as? NSView)?.isDescendant(of: webView) == true
+    }
+
     private var barIsUp: Bool {
         page.layoutSubtreeIfNeeded()
         guard page.isFindBarVisible, let bar else { return false }
@@ -545,7 +549,7 @@ private final class FindWindow {
     private var barIsDown: Bool {
         page.layoutSubtreeIfNeeded()
         return !page.isFindBarVisible && (bar == nil || bar?.isHiddenOrHasHiddenAncestor == true)
-            && webView.frame.height == page.bounds.height && !focusIsInBar
+            && webView.frame.height == page.bounds.height && !focusIsInBar && focusIsInPage
     }
 
     // Polls rather than sleeping a fixed time, because the finder finishes
@@ -591,6 +595,9 @@ private final class FindWindow {
         #expect(webView.frame.height == page.bounds.height, "\(step): page has its height back", sourceLocation: sourceLocation)
         #expect(
             !focusIsInBar, "\(step): focus left the bar, still \(String(describing: window.firstResponder))",
+            sourceLocation: sourceLocation)
+        #expect(
+            focusIsInPage, "\(step): focus back in the page, not \(String(describing: window.firstResponder))",
             sourceLocation: sourceLocation)
     }
 }

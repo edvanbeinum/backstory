@@ -20,7 +20,19 @@ final class FindBarContainer: NSView, NSTextFinderBarContainer {
     // it never shows it again.
     var isFindBarVisible: Bool {
         get { findBarView != nil }
-        set { if !newValue { findBarView = nil } }
+        set {
+            guard !newValue, let bar = findBarView else { return }
+            handFocusToContent(from: bar)
+            findBarView = nil
+        }
+    }
+
+    // Move focus to the page before the bar leaves, because removing the view
+    // that has focus leaves the window itself as first responder, and the page
+    // then stops getting arrow keys and space.
+    private func handFocusToContent(from bar: NSView) {
+        guard let window, let focus = window.firstResponder as? NSView, focus.isDescendant(of: bar) else { return }
+        window.makeFirstResponder(content)
     }
 
     init(content: NSView) {
