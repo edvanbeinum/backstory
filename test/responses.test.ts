@@ -124,6 +124,15 @@ test("invalid input is rejected before anything is written", async () => {
     () => updateResponses("o/r#1", { t1: { reply: "x".repeat(20_001) } }),
     /too long/,
   );
+  for (const reply of [123, {}, true]) {
+    await assert.rejects(
+      () =>
+        updateResponses("o/r#1", {
+          t1: { reply: reply as unknown as string },
+        }),
+      /Invalid reply/,
+    );
+  }
   await assert.rejects(
     () => updateResponses("o/r#1", { "bad id!": { done: true } }),
     /Invalid thread id/,

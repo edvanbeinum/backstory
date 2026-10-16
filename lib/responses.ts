@@ -168,8 +168,10 @@ function onePerSha(commits: ResponseCommit[]): ResponseCommit[] {
 }
 
 function validate(patch: ResponsePatch): void {
-  if (patch.reply != null && patch.reply.length > MAX_REPLY) {
-    throw new Error("Invalid reply: too long");
+  if (patch.reply != null) {
+    if (typeof patch.reply !== "string") throw new Error("Invalid reply");
+    if (patch.reply.length > MAX_REPLY)
+      throw new Error("Invalid reply: too long");
   }
   if (patch.removeCommit && !SHA.test(patch.removeCommit)) {
     throw new Error("Invalid commit sha");
