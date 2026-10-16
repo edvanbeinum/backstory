@@ -473,6 +473,12 @@ test("an empty change reads nothing past its base, and its map is its base's", a
   assert.equal(map.source, "drafted");
   assert.equal(map.baseModel, true);
   assert.deepEqual(map.nodes, []);
+  assert.deepEqual(map.whole?.nodes.map((n) => n.id).sort(), [
+    "payments",
+    "shop.web.app",
+    "shop.web.sync",
+    "shopper",
+  ]);
 });
 
 test("a patch past the cap reads that commit in full, at that commit, and it becomes main's map", async () => {

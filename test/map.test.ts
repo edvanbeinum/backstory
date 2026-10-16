@@ -189,6 +189,59 @@ test("a base DSL that can't be read counts as no base model, and says why", asyn
   assert.ok(map.nodes.every((n) => n.state !== "added"));
 });
 
+test("a change that touches no component has the whole system for Show map, unchanged; one that touches one doesn't", async () => {
+  const repo = gitRepo();
+  const model = `workspace {
+    !identifiers hierarchical
+    model {
+        shopper = person "Shopper"
+        payments = softwareSystem "Payments"
+        app = softwareSystem "App" {
+            web = container "Web" {
+                a = component "Alpha" {
+                    properties {
+                        "code.globs" "src/a/**"
+                    }
+                }
+                b = component "Beta"
+            }
+        }
+        shopper -> app.web.a "Uses"
+        app.web.a -> app.web.b "Calls"
+        app.web.b -> payments "Charges"
+        shopper -> app "Visits"
+    }
+}
+`;
+  const base = repo.commit(
+    { "src/a/one.ts": "1\n", "architecture/workspace.dsl": model },
+    "base",
+  );
+  const docs = repo.commit({ "README.md": "x\n" }, "docs");
+  const map = await buildMap(repo.dir, base, docs);
+  assert.equal(map.status, "ok");
+  assert.deepEqual(map.nodes, []);
+  assert.deepEqual(
+    map.whole?.nodes.map((n) => [n.id, n.state, n.files.length]).sort(),
+    [
+      ["app.web.a", "neighbour", 0],
+      ["app.web.b", "neighbour", 0],
+      ["payments", "neighbour", 0],
+      ["shopper", "neighbour", 0],
+    ],
+  );
+  assert.deepEqual(map.whole?.edges.map((e) => [e.key, e.state]).sort(), [
+    ["app.web.a → app.web.b", "same"],
+    ["app.web.b → payments", "same"],
+    ["shopper → app.web.a", "same"],
+  ]);
+
+  const touched = repo.commit({ "src/a/one.ts": "2\n" }, "touch");
+  const focused = await buildMap(repo.dir, docs, touched);
+  assert.equal(focused.nodes.length > 0, true);
+  assert.equal(focused.whole, undefined);
+});
+
 test("a base with no model adds nothing", async () => {
   const map = await buildMap(changeRepo.dir, null, changeRepo.base);
   assert.equal(map.baseModel, false);

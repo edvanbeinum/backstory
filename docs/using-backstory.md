@@ -114,6 +114,10 @@ before reading its lines:
     view's read, with its progress where the map goes. With it off, **Draft a
     model** reads one view, and **Read automatically** beside it turns reading
     on for maps and data models.
+  - The map opens by itself when the change touches a component. When it
+    touches none, the line under the map says so and has **Show map**, which
+    opens the whole system: every component, person and external system, with
+    the arrows between them. **Hide map** closes it.
   - Under a drafted map, the line says what this repo's maps have cost, and
     has **Turn off** for reading automatically, and **Redraft**, which reads
     main's map in full again and removes every map worked out from the old

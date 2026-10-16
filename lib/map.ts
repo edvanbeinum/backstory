@@ -77,6 +77,8 @@ export interface MapResponse {
   handFile?: string;
   nodes: MapNode[];
   edges: MapEdge[];
+  /** Every component, person and external system, unchanged, when the change touches none */
+  whole?: { nodes: MapNode[]; edges: MapEdge[] };
   /** Elements in the model that the focused map leaves out */
   hidden: number;
   /** Each changed file's component, by name, for the diff's file headers */
@@ -144,6 +146,42 @@ async function fileStats(
 }
 
 const leafOf = (model: Model, file: string) => model.match(file);
+
+/**
+ * The whole system, for Show map: every element nothing sits inside (each
+ * component, person and external system), unchanged, with every explicit
+ * arrow between them.
+ */
+function wholeMap(model: Model): { nodes: MapNode[]; edges: MapEdge[] } {
+  const parents = new Set(
+    [...model.elements.values()].map((e) => e.parent).filter(Boolean),
+  );
+  const nodes: MapNode[] = [...model.elements.values()]
+    .filter((e) => !parents.has(e.id))
+    .map((e) => ({
+      id: e.id,
+      name: e.name,
+      description: e.description,
+      type: e.type,
+      state: "neighbour",
+      files: [],
+      fileStats: [],
+      additions: 0,
+      deletions: 0,
+      newFiles: 0,
+    }));
+  const shown = new Set(nodes.map((n) => n.id));
+  const edges: MapEdge[] = [...model.relationships.values()]
+    .filter((r) => shown.has(r.source) && shown.has(r.destination))
+    .map((r) => ({
+      key: r.key,
+      source: r.source,
+      destination: r.destination,
+      description: r.description,
+      state: "same",
+    }));
+  return { nodes, edges };
+}
 
 /** The focused map stays a glance: changed elements plus a few neighbours. */
 const MAX_NODES = 7;
@@ -365,6 +403,7 @@ export async function buildMap(
     edges: [...edges.values()].filter(
       (e) => shown.has(e.source) && shown.has(e.destination),
     ),
+    ...(nodes.length === 0 ? { whole: wholeMap(model) } : {}),
     hidden: Math.max(
       0,
       leaves - nodes.filter((n) => n.state !== "removed").length,

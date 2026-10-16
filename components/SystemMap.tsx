@@ -12,7 +12,7 @@ import {
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
-import { AlertIcon } from "./icons";
+import { AlertIcon, ChevronDownIcon } from "./icons";
 import { Badge, Button, CopyButton, Spinner } from "./ui";
 
 /**
@@ -97,12 +97,14 @@ export function jumpToFile(path: string): boolean {
 const fileName = (path: string) => path.split("/").pop() ?? path;
 
 function MapCanvas({
-  map,
+  nodes,
+  edges,
   width,
   highlight,
   onJump,
 }: {
-  map: MapResponse;
+  nodes: MapNode[];
+  edges: MapEdge[];
   width: number;
   /** A component's name, outlined as hovering it would */
   highlight: string | null;
@@ -110,8 +112,8 @@ function MapCanvas({
 }) {
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const { placed, height } = useMemo(
-    () => layout(map.nodes, map.edges, width, heights),
-    [map, width, heights],
+    () => layout(nodes, edges, width, heights),
+    [nodes, edges, width, heights],
   );
   const boxes = useRef(new Map<string, HTMLDivElement>());
 
@@ -134,7 +136,7 @@ function MapCanvas({
   const ends = useMemo(() => {
     const out = new Map<string, string[]>();
     const inn = new Map<string, string[]>();
-    const sorted = [...map.edges].sort(
+    const sorted = [...edges].sort(
       (a, b) =>
         (placed.get(a.destination)?.x ?? 0) -
         (placed.get(b.destination)?.x ?? 0),
@@ -144,7 +146,7 @@ function MapCanvas({
       inn.set(e.destination, [...(inn.get(e.destination) ?? []), e.key]);
     }
     return { out, inn };
-  }, [map.edges, placed]);
+  }, [edges, placed]);
 
   return (
     <div className="map-canvas" style={{ height }}>
@@ -175,7 +177,7 @@ function MapCanvas({
             </marker>
           ))}
         </defs>
-        {map.edges.map((e) => {
+        {edges.map((e) => {
           const a = placed.get(e.source);
           const b = placed.get(e.destination);
           if (!a || !b || a === b) return null;
@@ -215,7 +217,7 @@ function MapCanvas({
         })}
       </svg>
 
-      {map.edges.map((e) => {
+      {edges.map((e) => {
         const a = placed.get(e.source);
         const b = placed.get(e.destination);
         if (!a || !b || a === b) return null;
@@ -792,6 +794,10 @@ export function SystemMap({
   const draft = useMapDraft(repo, rev, given, onModelChange);
   const map = draft.map;
   const drafted = map?.source === "drafted";
+  // Keep a click's Show map or Hide map only for the view it was made on.
+  const view = `${repo}\n${rev}`;
+  const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
+  const showWhole = toggled?.view === view && toggled.open;
   const boxRef = useRef<HTMLElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -803,8 +809,9 @@ export function SystemMap({
     );
     observer.observe(el);
     return () => observer.disconnect();
-    // Again once the map arrives: before it does, the section isn't rendered.
-  }, [map]);
+    // Again once the map arrives or the whole map opens: before then, the
+    // section isn't rendered.
+  }, [map, showWhole]);
 
   useEffect(() => {
     if (highlight)
@@ -833,8 +840,37 @@ export function SystemMap({
                   : "This change touches no mapped component"}
               </span>
             )}
+            {map.whole && (
+              <button
+                type="button"
+                className="story-disclose"
+                aria-expanded={showWhole}
+                onClick={() => setToggled({ view, open: !showWhole })}
+              >
+                {showWhole ? "Hide map" : "Show map"}
+                <ChevronDownIcon
+                  size={12}
+                  className={showWhole ? "rotate-180" : ""}
+                />
+              </button>
+            )}
             {drafted && <DraftFootnote map={map} draft={draft} />}
           </div>
+        )}
+        {showWhole && map.whole && (
+          <section ref={boxRef} className="story-map">
+            <div className="map-card">
+              {width > 0 && (
+                <MapCanvas
+                  nodes={map.whole.nodes}
+                  edges={map.whole.edges}
+                  width={width - 2}
+                  highlight={highlight?.name ?? null}
+                  onJump={onOpenFile}
+                />
+              )}
+            </div>
+          </section>
         )}
         {map.local && (
           <div className="story-line">
@@ -853,7 +889,8 @@ export function SystemMap({
       <div className="map-card">
         {width > 0 && (
           <MapCanvas
-            map={map}
+            nodes={map.nodes}
+            edges={map.edges}
             width={width - 2}
             highlight={highlight?.name ?? null}
             onJump={onOpenFile}
