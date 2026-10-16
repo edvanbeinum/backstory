@@ -175,8 +175,7 @@ function descend(
   };
 
   for (const c of inWay) {
-    if (c.y < y || x <= c.x - clearance || x >= c.x + c.w + clearance)
-      continue;
+    if (c.y < y || x <= c.x - clearance || x >= c.x + c.w + clearance) continue;
     const left = c.x - clearance;
     const right = c.x + c.w + clearance;
     curve(Math.abs(left - bx) <= Math.abs(right - bx) ? left : right, c.y, c.y);
