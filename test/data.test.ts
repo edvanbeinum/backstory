@@ -470,6 +470,7 @@ test("Rails: where: on a unique index and primary_key: on a foreign key", () => 
   end
   add_foreign_key "items", "spaces", primary_key: "uuid", column: "space_uuid"
   add_foreign_key "items", "spaces"
+  add_foreign_key "items", "spaces", column: ["shop_id", "space_id"], primary_key: ["shop_id", "id"]
 end
 `,
     models: new Map(),
@@ -484,6 +485,12 @@ end
       targetFields: ["uuid"],
     },
     { kind: "foreign key", fields: ["space_id"], target: "Space" },
+    {
+      kind: "foreign key",
+      fields: ["shop_id", "space_id"],
+      target: "Space",
+      targetFields: ["shop_id", "id"],
+    },
   ]);
 });
 

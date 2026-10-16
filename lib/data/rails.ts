@@ -71,8 +71,8 @@ function parseSchema(schema: string) {
   const foreignKeys: {
     from: string;
     to: string;
-    column?: string;
-    primaryKey?: string;
+    columns?: string[];
+    primaryKey?: string[];
   }[] = [];
   let current: { fields: Field[]; constraints: Constraint[] } | null = null;
 
@@ -93,8 +93,8 @@ function parseSchema(schema: string) {
       foreignKeys.push({
         from: fk[1],
         to: fk[2],
-        column: quoted(fk[3], "column"),
-        primaryKey: quoted(fk[3], "primary_key"),
+        columns: columnList(fk[3], "column"),
+        primaryKey: columnList(fk[3], "primary_key"),
       });
       continue;
     }
@@ -176,6 +176,14 @@ function singularWord(word: string) {
 /** An option's string value, in either quote style: class_name: 'User'. */
 const quoted = (opts: string, key: string) =>
   opts.match(new RegExp(`${key}:\\s*["']([^"']+)["']`))?.[1];
+
+/** An option's column names, one or a composite key's list: column: ["a", "b"]. */
+const columnList = (opts: string, key: string) => {
+  const value = opts.match(
+    new RegExp(`${key}:\\s*(\\[[^\\]]*\\]|["'][^"']+["'])`),
+  )?.[1];
+  return value?.match(/[^"',\s[\]]+/g) ?? undefined;
+};
 
 function parseModel(file: string, text: string): ModelDecl | null {
   // The file's record class: `class Zoom::Recording < ApplicationRecord`, or
@@ -278,9 +286,9 @@ export function readRails(src: RailsSources): DataModel {
         .filter((fk) => fk.from === table)
         .map((fk) => ({
           kind: "foreign key" as const,
-          fields: [fk.column ?? `${singular(fk.to)}_id`],
+          fields: fk.columns ?? [`${singular(fk.to)}_id`],
           target: byTable.get(fk.to)?.name ?? classify(singular(fk.to)),
-          ...(fk.primaryKey ? { targetFields: [fk.primaryKey] } : {}),
+          ...(fk.primaryKey ? { targetFields: fk.primaryKey } : {}),
         })),
     ];
     entities.set(name, {
