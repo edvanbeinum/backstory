@@ -144,6 +144,10 @@ export function db(): DatabaseSync {
 /** A JSON store file as it was: `namespace -> key -> record`, unchecked. */
 export type Legacy = Record<string, Record<string, unknown>>;
 
+/** A JSON object, as opposed to an array, null or a scalar. */
+export const isObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
 /**
  * Copy the JSON files this database replaced into a new database, in its
  * first transaction, and return the paths it read.
@@ -179,8 +183,6 @@ function readLegacy(file: string): Legacy | null {
   } catch {
     return {};
   }
-  const isObject = (value: unknown): value is Record<string, unknown> =>
-    Boolean(value) && typeof value === "object" && !Array.isArray(value);
   if (!isObject(parsed)) return {};
 
   const out: Legacy = {};

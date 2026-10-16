@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { KEY, reading, transaction, type Legacy } from "./store";
+import { isObject, KEY, reading, transaction, type Legacy } from "./store";
 
 /**
  * Everything you've done about one review comment, in one record: the
@@ -256,9 +256,6 @@ export async function updateResponses(
 }
 
 /* --- Import from responses.json -------------------------------------- */
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 function normalizeCommit(value: unknown): ResponseCommit | null {
   if (!isObject(value)) return null;

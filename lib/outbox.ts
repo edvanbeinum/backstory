@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
 
 import { writeNotes } from "./notes";
-import { KEY, reading, transaction, type Legacy } from "./store";
+import { isObject, KEY, reading, transaction, type Legacy } from "./store";
 import type { Note } from "./types";
 
 /**
@@ -430,9 +430,6 @@ export function formatTaken(rounds: OutboxRound[]): string {
 /* --- Import from outbox.json ----------------------------------------- */
 
 const isTime = (value: unknown) => value === null || typeof value === "number";
-
-const isObject = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 const isClaim = (value: unknown) =>
   value === undefined ||
