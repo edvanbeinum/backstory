@@ -154,8 +154,9 @@ function toElement(
  * This commit's map: the start's, with `changed` replacing or adding
  * elements, `absent` gone with every arrow that touches them, and each named
  * pair's arrows replaced by `arrows` or dropped by `absentArrows`. Then, as
- * the DSL writer does, drops an element whose parent is missing and an arrow
- * whose end is, or that joins an element to itself or its parent.
+ * the DSL writer does, drops an element whose parent is missing or that sits
+ * inside itself, and an arrow with a missing end or that joins an element to
+ * itself or its parent.
  */
 export function mergeMapDelta(from: Workspace, delta: MapDelta): Workspace {
   const absent = new Set(delta.absent);
@@ -163,18 +164,25 @@ export function mergeMapDelta(from: Workspace, delta: MapDelta): Workspace {
   const changed = new Map(
     delta.changed.map((e) => [e.id, toElement(e, before.get(e.id))]),
   );
-  let elements = [
+  const merged = [
     ...from.elements
       .filter((e) => !absent.has(e.id))
       .map((e) => changed.get(e.id) ?? e),
     ...[...changed.values()].filter((e) => !before.has(e.id)),
   ];
-  for (;;) {
-    const ids = new Set(elements.map((e) => e.id));
-    const kept = elements.filter((e) => e.parent === null || ids.has(e.parent));
-    if (kept.length === elements.length) break;
-    elements = kept;
-  }
+  // Keep only elements whose parents lead to a top-level one: a parent cycle
+  // from the provider would otherwise survive and hang `buildMap`'s walk up.
+  const byId = new Map(merged.map((e) => [e.id, e]));
+  const elements = merged.filter((e) => {
+    const seen = new Set([e.id]);
+    for (let p = e.parent; p !== null;) {
+      const parent = byId.get(p);
+      if (!parent || seen.has(p)) return false;
+      seen.add(p);
+      p = parent.parent;
+    }
+    return true;
+  });
 
   const replaced = new Set([...delta.arrows, ...delta.absentArrows].map(pair));
   const ids = new Set(elements.map((e) => e.id));

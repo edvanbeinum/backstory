@@ -458,6 +458,30 @@ test("a forward read's difference merges onto its start", () => {
   );
 });
 
+test("a forward read's elements that sit inside themselves are dropped", () => {
+  const merged = mergeMapDelta(
+    { properties: {}, elements: [], relationships: [] },
+    delta({
+      changed: [
+        { ...element("shop"), parent: "" },
+        { ...element("shop.web"), parent: "shop.web" },
+        { ...element("shop.a"), parent: "shop.b" },
+        { ...element("shop.b"), parent: "shop.a" },
+        { ...element("shop.c"), parent: "shop.a" },
+        element("shop.d"),
+      ],
+      arrows: [
+        { source: "shop.d", destination: "shop.a", description: "Loops" },
+      ],
+    }),
+  );
+  assert.deepEqual(
+    merged.elements.map((e) => e.id),
+    ["shop", "shop.d"],
+  );
+  assert.deepEqual(merged.relationships, []);
+});
+
 test("an empty change reads nothing past its base, and its map is its base's", async () => {
   const repo = mainRepo();
   repo.git("commit", "--allow-empty", "-qm", "Nothing");
