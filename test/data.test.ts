@@ -538,6 +538,32 @@ end
   )!;
   assert.equal(constrained.state, "changed");
   assert.equal(constrained.summary, "+1 rule");
+
+  const repointed = present(
+    diffModels(
+      withFk,
+      readRails({
+        schema: schema(
+          `t.bigint "space_id"`,
+          `add_foreign_key "items", "spaces", primary_key: "uuid"`,
+        ),
+        models,
+      }),
+    ),
+  ).find((p) => p.entity.name === "Item")!;
+  assert.equal(repointed.state, "changed");
+  assert.equal(repointed.summary, "+1 −1 rules");
+  assert.deepEqual(
+    repointed.details.rules
+      .filter((r) => r.state !== "same")
+      .map((r) => [r.state, r.item.targetFields]),
+    [
+      ["added", ["uuid"]],
+      ["removed", undefined],
+    ],
+  );
+  assert.deepEqual(repointed.fields, []);
+  assert.deepEqual(repointed.relationships, []);
 });
 
 test("a unique rule's column order is no change; a foreign key's still is", () => {
@@ -573,6 +599,122 @@ test("a unique rule's column order is no change; a foreign key's still is", () =
     ),
     ["changed"],
   );
+
+  const ruleStates = (before: Constraint[], after: Constraint[]) =>
+    diffModels(model(before), model(after)).flatMap((e) =>
+      e.constraints.map((c) => [
+        c.state,
+        c.item.condition ?? c.item.targetFields,
+      ]),
+    );
+  const active: Constraint = {
+    kind: "unique",
+    fields: ["email", "name"],
+    condition: "active",
+  };
+  assert.deepEqual(
+    ruleStates(
+      [active],
+      [
+        active,
+        { kind: "unique", fields: ["email", "name"], condition: "archived" },
+      ],
+    ),
+    [
+      ["same", "active"],
+      ["added", "archived"],
+    ],
+  );
+  assert.deepEqual(
+    ruleStates(
+      [active],
+      [{ kind: "unique", fields: ["name", "email"], condition: "active" }],
+    ),
+    [],
+  );
+  assert.deepEqual(
+    ruleStates(
+      [active],
+      [{ kind: "unique", fields: ["email", "name"], condition: "archived" }],
+    ),
+    [
+      ["added", "archived"],
+      ["removed", "active"],
+    ],
+  );
+  assert.deepEqual(
+    ruleStates(
+      [
+        {
+          kind: "foreign key",
+          fields: ["a"],
+          target: "T",
+          targetFields: ["id"],
+        },
+      ],
+      [
+        {
+          kind: "foreign key",
+          fields: ["a"],
+          target: "T",
+          targetFields: ["uuid"],
+        },
+      ],
+    ),
+    [
+      ["added", ["uuid"]],
+      ["removed", ["id"]],
+    ],
+  );
+});
+
+test("a change to a unique rule's condition, or to the column a foreign key points at, is a data model change", async () => {
+  const repo = tempRepo();
+  const tables = (where: string, references: string) => `
+CREATE TABLE users (id bigint PRIMARY KEY, external_id text, email text, active boolean);
+CREATE TABLE posts (id bigint PRIMARY KEY, user_id bigint REFERENCES ${references});
+CREATE UNIQUE INDEX users_email ON users (email)${where};
+`;
+  repo.write("db/schema.sql", tables("", "users(id)"));
+  const base = repo.commit("full rule");
+  repo.write("db/schema.sql", tables(" WHERE active", "users(external_id)"));
+  const head = repo.commit("partial rule, repointed key");
+  const data = await buildData(repo.root, base, head);
+  assert.deepEqual(
+    data.entities.map((e) => [e.name, e.state]),
+    [
+      ["User", "changed"],
+      ["Post", "changed"],
+    ],
+  );
+  const rules = (name: string) =>
+    data.entities
+      .find((e) => e.name === name)!
+      .constraints.map((c) => [c.state, c.item]);
+  assert.deepEqual(rules("User"), [
+    ["added", { kind: "unique", fields: ["email"], condition: "active" }],
+    ["removed", { kind: "unique", fields: ["email"] }],
+  ]);
+  assert.deepEqual(rules("Post"), [
+    [
+      "added",
+      {
+        kind: "foreign key",
+        fields: ["user_id"],
+        target: "User",
+        targetFields: ["external_id"],
+      },
+    ],
+    [
+      "removed",
+      {
+        kind: "foreign key",
+        fields: ["user_id"],
+        target: "User",
+        targetFields: ["id"],
+      },
+    ],
+  ]);
 });
 
 const coreData = `<model>

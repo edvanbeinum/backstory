@@ -48,8 +48,17 @@ const relSame = (a: Relationship, b: Relationship) =>
   (a.candidates ?? []).join() === (b.candidates ?? []).join();
 // A unique rule's columns are a set, so reordering them changes no rule; a
 // foreign key's order pairs each column with the target's, so it stays.
+// Key a rule by its condition and referenced columns too, so two rules on the
+// same columns with different conditions stay two, and changing either one
+// reads as the old rule removed and the new one added.
 const constraintKey = (c: Constraint) =>
-  `${c.kind}:${(c.kind === "unique" ? [...c.fields].sort() : c.fields).join(",")}:${c.target ?? ""}`;
+  [
+    c.kind,
+    (c.kind === "unique" ? [...c.fields].sort() : c.fields).join(","),
+    c.target ?? "",
+    (c.targetFields ?? []).join(","),
+    c.condition ?? "",
+  ].join(":");
 
 function diffEntity(
   name: string,

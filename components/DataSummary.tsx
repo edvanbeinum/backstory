@@ -83,8 +83,8 @@ function relText(r: Relationship) {
 
 function ruleText(c: Constraint) {
   return c.kind === "unique"
-    ? `unique (${c.fields.join(", ")})`
-    : `${c.fields.join(", ")} → ${c.target ?? "?"}`;
+    ? `unique (${c.fields.join(", ")})${c.condition ? ` where ${c.condition}` : ""}`
+    : `${c.fields.join(", ")} → ${c.target ?? "?"}${c.targetFields ? ` (${c.targetFields.join(", ")})` : ""}`;
 }
 
 function Row({
