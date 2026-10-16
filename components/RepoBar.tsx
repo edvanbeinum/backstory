@@ -14,9 +14,11 @@ import {
   SyncIcon,
   XIcon,
 } from "./icons";
+import { requestFetch } from "./fetchBranch";
 import { RepoBrowser } from "./RepoBrowser";
 import { ConnectGitHubLink } from "./SetupChecklist";
 import { Badge, Button, CopyButton, Spinner } from "./ui";
+import type { FetchResult } from "@/lib/fetch";
 import type { RecentRepo } from "@/lib/recents";
 import type { SessionResponse } from "@/lib/types";
 
@@ -251,6 +253,15 @@ export function RepoBar({
             {session.repo.branch ?? "detached HEAD"}
           </span>
 
+          {session.repo.ref && session.repo.remoteUrl && (
+            <FetchButton
+              root={session.repo.root}
+              branch={session.repo.ref}
+              base={pr?.baseRefName ?? null}
+              onFetched={onRefresh}
+            />
+          )}
+
           <span className="text-[var(--fg-subtle)]">
             {session.commits.length}{" "}
             {session.commits.length === 1 ? "commit" : "commits"}{" "}
@@ -310,4 +321,73 @@ export function RepoBar({
       )}
     </header>
   );
+}
+
+/**
+ * Brings the branch under review up to date with origin. Shown only for a
+ * branch this worktree doesn't have checked out: a checkout's own branch is
+ * its owner's to pull.
+ */
+function FetchButton({
+  root,
+  branch,
+  base,
+  onFetched,
+}: {
+  root: string;
+  branch: string;
+  base: string | null;
+  onFetched: () => void;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [said, setSaid] = useState<{ branch: string; text: string } | null>(
+    null,
+  );
+
+  const run = async () => {
+    setBusy(true);
+    setSaid(null);
+    try {
+      const result = await requestFetch(root, branch, base);
+      setSaid({ branch, text: outcomeLine(branch, result) });
+      onFetched();
+    } catch (err) {
+      setSaid({
+        branch,
+        text: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        size="sm"
+        onClick={() => void run()}
+        disabled={busy}
+        title={`Bring in new pushes to ${branch} from origin`}
+      >
+        {busy ? <Spinner className="!h-3 !w-3" /> : <SyncIcon size={12} />}
+        Fetch
+      </Button>
+      {said?.branch === branch && said.text && (
+        <span className="text-[var(--fg-subtle)]">{said.text}</span>
+      )}
+    </>
+  );
+}
+
+function outcomeLine(branch: string, result: FetchResult): string {
+  switch (result.outcome) {
+    case "kept":
+      return `Your ${branch} has commits origin doesn't, so it was left as it is.`;
+    case "checked-out":
+      return `${branch} is checked out in ${result.worktree?.split("/").pop() ?? "another worktree"}, so it was left for that worktree to pull.`;
+    case "unchanged":
+      return "Already up to date.";
+    default:
+      return "";
+  }
 }
