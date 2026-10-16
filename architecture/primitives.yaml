@@ -179,4 +179,4 @@ primitives:
     symbols:
       - layeredLayout
       - edgePath
-    use: Lays out and draws the map and data diagrams.
+    use: Lays out and draws the map and data diagrams; edgePath routes an arrow around the boxes between its ends.
