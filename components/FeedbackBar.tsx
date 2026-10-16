@@ -48,7 +48,7 @@ export function FeedbackBar({
   session,
   review,
   outbox,
-  onRevChange,
+  onOpenNote,
 }: {
   notes: NotesApi;
   /** The change on screen, as notes record it; null while it loads */
@@ -58,7 +58,8 @@ export function FeedbackBar({
   session: SessionResponse;
   review: ReviewApi;
   outbox: OutboxApi;
-  onRevChange: (rev: string) => void;
+  /** Show a note in Files changed, switching to the change it was left on */
+  onOpenNote: (note: Note) => void;
 }) {
   const [writing, setWriting] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
@@ -172,21 +173,6 @@ export function FeedbackBar({
     const timer = setTimeout(() => setConfirmingClear(false), 4000);
     return () => clearTimeout(timer);
   }, [confirmingClear]);
-
-  /** Scroll to a note on screen, or switch to the change it was left on. */
-  const jumpTo = (note: Note) => {
-    if (note.rev !== noteRev) {
-      onRevChange(note.rev);
-      return;
-    }
-    const file = fileForNote(files, note);
-    const target =
-      document.getElementById(`note-${note.id}`) ??
-      (file
-        ? document.getElementById(`file-${encodeURIComponent(file.path)}`)
-        : null);
-    target?.scrollIntoView({ block: "center", behavior: "smooth" });
-  };
 
   return (
     <div
@@ -337,7 +323,7 @@ export function FeedbackBar({
                   <div className="min-w-0 flex-1">
                     <button
                       type="button"
-                      onClick={() => jumpTo(note)}
+                      onClick={() => onOpenNote(note)}
                       title={`Show ${label(note.rev)}`}
                       className="mono mr-1.5 text-[11px] text-[var(--accent)] hover:underline"
                     >
@@ -404,7 +390,7 @@ export function FeedbackBar({
                 onCancel={(id) => void outbox.cancel(id)}
                 label={label}
                 noteRev={noteRev}
-                onJump={jumpTo}
+                onJump={onOpenNote}
                 onTick={notes.tick}
               />
             ))}

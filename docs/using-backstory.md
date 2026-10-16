@@ -47,15 +47,32 @@ ACME-APP ───────────────────────�
 ```
 
 **The workspace** is one branch. Its header picks the change: the whole branch,
-your uncommitted work, or any one commit on it. Once a change has been traced,
-the **Diagrams** layout leads: the map and the data model, then flows and review
-comments as tabs, with the diff a click away from any step. **Code** puts that
-column beside the diff instead, and is what you see before anything is traced.
+your uncommitted work, or any one commit on it. It opens on your uncommitted
+work when there is some, and on the whole branch otherwise. Under the header are
+three tabs, as on a pull request, and every change opens on the first:
+
+- **Story** shows the map at full width, a line under it saying what it shows,
+  then each flow as a card. Before a change is traced, one card in place of the
+  flows offers **Trace this change**. Click a step to open its code under it;
+  click it again or press `Esc` to close it, and **Show in Files changed** opens
+  the diff at the same lines.
+- **Files changed** is the diff.
+- **Comments** lists the pull request's review comments, when it has any.
+
+The tab is in the address bar, so a link opens on the tab it was copied from.
 When the PR has review comments, a checklist spine runs down the left edge.
 
 Whatever change is selected says how many review comments are on it, which is
 the reverse lookup: given a commit, which review comments does it answer?
-Threads anchor inline on the line they were written against.
+
+In **Files changed**, files are grouped by the map's components, each group
+with an **On the map** link that outlines its component on Story; **By path**
+lists them by path instead. Once the change is traced, each file says which
+flows it is on, or **read yourself** when it is app code no flow explains. The
+filters above the files show only the hunks to read yourself, or the files on
+one flow; **read these yourself** beside the flows on Story opens the first.
+Marks in the gutter beside a line open what is there: `⇄ 1·7` opens flow 1, step
+7 in the story, and `💬 2` opens review comment 2 in Comments.
 
 **View file** — every file header has a _View file_ toggle that swaps the hunks
 for the entire file at that commit, change still highlighted in place, for when
@@ -76,20 +93,20 @@ before reading its lines:
   change's base and head. A repo that doesn't commit a model can keep one at
   `~/.backstory/models/<folder>-<hash>/workspace.dsl`, where `<folder>` is the
   main checkout's folder and `<hash>` is 8 characters that tell apart repos
-  with the same folder name; every worktree of the repo reads it, and the map
-  strip shows its path, or where it goes when there isn't one yet. The hash
-  comes from where the checkout is on disk, so after you move or rename the
-  checkout, rename its folder under `~/.backstory/models/` to the one the map
-  strip shows. It shows which components a change touched,
+  with the same folder name; every worktree of the repo reads it, and the line
+  under the map on Story shows its path, or where it goes when there isn't one
+  yet. The hash comes from where the checkout is on disk, so after you move or
+  rename the checkout, rename its folder under `~/.backstory/models/` to the
+  one that line shows. It shows which components a change touched,
   but not what it added or removed. With no model at all, **Draft a
-  model** in the map strip has Claude Code read the code at HEAD and write one
+  model** under the map on Story has Claude Code read the code at HEAD and write one
   there, never into the repo: a draft, marked as one, for you to correct.
 - **The data model** shows the entities the change touched: new fields,
   relationships and rules. It reads `db/schema.rb` and the models (Rails), the
   `.xcdatamodeld` (Core Data), or SQL schema files: the `CREATE TABLE`
   statements in a `schema.sql`, a `structure.sql` or a `schema/` folder, outside
   migrations and tests. Any other repo can have its data model drafted on
-  demand: **Draft the data model** in the data strip has Claude Code read the
+  demand: **Draft the data model** under the map on Story has Claude Code read the
   code at the head, and work out the base from the change. The result is marked
   as a draft and kept in `~/.backstory/data/`, so a view is read once. A head
   read costs about $0.15 on a small repo and over $1 and a few minutes on a
@@ -117,8 +134,8 @@ Backstory reads the part of the DSL that describes elements and arrows:
 `views`, `styles`, `configuration` and other blocks at the workspace's top level
 are skipped. Anything else in the model, any `!` directive other than
 `!identifiers`, and `workspace extends` stop the map: `group`,
-`deploymentEnvironment` or `!include`, for example. The strip names what it met
-and its line.
+`deploymentEnvironment` or `!include`, for example. The line under the map on
+Story names what it met and its line.
 
 Flows are traced by **Claude Code**, through your own `claude` login: Backstory
 runs `claude -p` over a copy of the commit, with read-only tools. That means:
@@ -159,7 +176,8 @@ opens it in Backstory. If you move the app, choose it again to fix the link.
 
 When an agent is making the change, you review what it made — uncommitted work,
 or the commits it made on its own if you let it run. Notes go on any change:
-hover a line of **Uncommitted**, **All changes**, or any one commit, and press
+in Files changed, hover a line of **Uncommitted**, **All changes**, or any one
+commit, and press
 **+**; **Add a general note** covers the work as a whole. When you review a
 stack of commits one at a time, the notes on each commit are kept to send
 together, and the bar lists the ones on other changes.
@@ -210,16 +228,16 @@ When a branch has a PR with review comments, Backstory turns them into a
 checklist to work through.
 
 The **spine** is the checklist: one square per comment, filled when handled. It
-shows how far through you are and jumps to any comment in one click. A square
-selects; `j`/`k` move; `x` ticks. In a narrow window it becomes a strip under
-the header.
+shows how far through you are, and a square opens Comments on that comment. In a
+narrow window it runs across the top instead.
 
-The **response** is what you're doing about the comment on screen: the tick, a
-drafted reply, and optionally its **answering commits**, the commits you link to
-the comment as the ones that answer it. All three are independent.
+**Comments** shows every comment as a card: its file and line, its component,
+whether it's handled, the lines it was written against, and the comment. On the
+Comments tab `j`/`k` move between comments and `x` ticks the one outlined.
 
-A thread that isn't on a line in the current change is counted rather than shown
-as a card.
+The **response** sits under each comment: the tick, a drafted reply, and
+optionally its **answering commits**, the commits you link to the comment as the
+ones that answer it. All three are independent.
 
 Only you decide when a comment is handled: you tick it. An answering commit, a
 drafted reply or a reply on GitHub never ticks it for you.
@@ -247,13 +265,14 @@ the comment stays handled and Backstory offers to link another.
 
 ## Shareable URLs
 
-The repo and the selected commit live in the address bar, so a view can be
-bookmarked, reopened after a restart, or pasted to another machine with the same
-checkout. A copy button in the header copies the current one.
+The repo, the selected commit and the open tab live in the address bar, so a
+view can be bookmarked, reopened after a restart, or pasted to another machine
+with the same checkout. A copy button in the header copies the current one.
 
 ```text
 /?repo=/Users/you/code/your-repo
 /?repo=/Users/you/code/your-repo&rev=1e61946e49974e250cf688eda4c158132e12be83
+/?repo=/Users/you/code/your-repo&rev=1e61946&tab=files
 ```
 
 `rev` is optional and accepts a short sha, which is normalised to the full one.

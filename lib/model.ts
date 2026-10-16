@@ -250,7 +250,7 @@ function read(text: string, file: string | null): ModelRead {
  * fails to read gives its error and no model, so flows filter files as in a
  * repo with no model: a change the model would mark as tests or ignored can
  * still cost a `claude -p` trace. That's the cost any repo without a model
- * already pays, and the map strip shows the error so it gets fixed.
+ * already pays, and the line under the map shows the error so it gets fixed.
  */
 export async function readModelAt(
   root: string,

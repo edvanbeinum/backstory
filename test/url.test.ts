@@ -8,6 +8,7 @@ import {
   parseUrlState,
   resolveComment,
   resolveRev,
+  resolveTab,
 } from "../lib/url";
 
 function commit(sha: string): CommitSummary {
@@ -101,6 +102,48 @@ test("Set Up Backstory's address round-trips, and other links leave it out", () 
   assert.doesNotMatch(buildUrl({ repo: "/r", setup: false }), /setup/);
 });
 
+test("every view opens on Story", () => {
+  // A commit, and a bare repo (uncommitted work): nothing in the URL asks for
+  // the diff, so it is never the first screen.
+  assert.equal(resolveTab(parseUrlState("?repo=/r&rev=abc")), "story");
+  assert.equal(resolveTab(parseUrlState("?repo=/r")), "story");
+});
+
+test("the tab is in the URL, and Story alone is left out", () => {
+  const files = buildUrl({ repo: "/r", rev: "abc", tab: "files" });
+  assert.match(files, /tab=files/);
+  assert.equal(parseUrlState(new URL(files, "http://x").search).tab, "files");
+
+  assert.equal(
+    buildUrl({ repo: "/r", rev: "abc", tab: "story" }),
+    "/?repo=/r&rev=abc",
+  );
+
+  const story = buildUrl({
+    repo: "/r",
+    rev: "abc",
+    tab: "story",
+    comment: "PRRT_x",
+  });
+  assert.match(story, /tab=story&comment=PRRT_x/);
+  assert.equal(
+    resolveTab(parseUrlState(new URL(story, "http://x").search)),
+    "story",
+  );
+
+  assert.equal(parseUrlState("?repo=/r&tab=diagrams").tab, undefined);
+});
+
+test("a ?comment= link opens Comments, unless it names another tab", () => {
+  assert.equal(
+    resolveTab(parseUrlState("?repo=/r&comment=PRRT_x")),
+    "comments",
+  );
+  const parsed = parseUrlState("?repo=/r&tab=files&comment=PRRT_x");
+  assert.equal(resolveTab(parsed), "files");
+  assert.equal(parsed.comment, "PRRT_x");
+});
+
 test("a comment id resolves, falling back to the first OPEN thread", () => {
   const threads = [
     { id: "resolved-one", isResolved: true },
@@ -160,6 +203,21 @@ test("a rev that is no longer unpushed falls back and says so", () => {
 
   assert.equal(rev, NEWEST, "falls back to the newest unpushed commit");
   assert.equal(notice, "deadbee", "and reports what was asked for");
+});
+
+test("a clean tree opens on the whole branch when there is one", () => {
+  assert.deepEqual(resolveRev(WORKING_REV, COMMITS, false, true), {
+    rev: "branch",
+    notice: null,
+  });
+  assert.deepEqual(resolveRev(WORKING_REV, COMMITS, true, true), {
+    rev: WORKING_REV,
+    notice: null,
+  });
+  assert.deepEqual(resolveRev("deadbee", COMMITS, false, true), {
+    rev: "branch",
+    notice: "deadbee",
+  });
 });
 
 test("working falls back to a commit when the tree is clean", () => {

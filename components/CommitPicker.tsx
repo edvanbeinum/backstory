@@ -9,7 +9,7 @@ import { ChevronDownIcon } from "./icons";
  * Choose a commit — by scrolling, by filtering, or by pasting its sha.
  *
  * One component for both places that offer commits (linking one to a comment,
- * and picking what the diff column shows) because they were drifting: one
+ * and picking the change on screen) because they were drifting: one
  * grew a filter box and the other didn't, so "search for a commit" worked or
  * didn't depending on which dropdown you happened to open.
  *

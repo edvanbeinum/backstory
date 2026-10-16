@@ -1,5 +1,5 @@
 import { isAddedLine } from "./hunks";
-import type { Flow, FlowHunk, FlowStep } from "./types";
+import type { Flow, FlowHunk, FlowSet, FlowStep } from "./types";
 
 /**
  * A flow as rows to draw, diffed like lines: a step is kept, added or
@@ -295,4 +295,123 @@ export function componentPath(flow: Flow, rows: FlowRow[]): string[] {
     }
   }
   return path;
+}
+
+/** A flow step on a diff line: `1·7` is flow 1, step 7. */
+export interface StepMark {
+  /** Unique across flows */
+  key: string;
+  /** The flow's index in the set */
+  flow: number;
+  /** The step's row key in the flow's diff mode */
+  row: string;
+  chip: string;
+  /** A removed step, on the line as it was */
+  was: boolean;
+}
+
+export interface StepMarks {
+  old: Map<number, StepMark[]>;
+  new: Map<number, StepMark[]>;
+}
+
+/** The number a row shows: a removed step by its old one. */
+const stepNumber = (row: FlowRow) =>
+  row.kind === "del" ? row.was : (row.now ?? row.was);
+
+/**
+ * Cache each set's diff-mode rows, so the gutter marks and every comment's
+ * step lookup share one LCS per flow rather than one per thread.
+ */
+const diffRowsCache = new WeakMap<FlowSet, FlowRow[][]>();
+function diffRows(set: FlowSet): FlowRow[][] {
+  let rows = diffRowsCache.get(set);
+  if (!rows) {
+    rows = set.flows.map((flow) => flowRows(flow, "diff", set.hunks));
+    diffRowsCache.set(set, rows);
+  }
+  return rows;
+}
+
+/** A flow's step, by number: flow 1, step 5. */
+export interface StepAt {
+  /** 1-based, as the story numbers flows */
+  flow: number;
+  step: number;
+  /** The step's row in the flow's diff mode */
+  row: FlowRow;
+}
+
+/**
+ * The step a line is on, for a comment's badge and its "On flow 1, step 5".
+ * One step only: a line two flows share names the first flow's, so a comment
+ * gets one badge, not two.
+ */
+export function stepsAt(
+  set: FlowSet,
+  path: string,
+  line: number,
+  side: "old" | "new" = "new",
+): StepAt | null {
+  for (const [i, rows] of diffRows(set).entries()) {
+    for (const row of rows) {
+      if (row.side === side && row.step.file === path && row.step.line === line)
+        return { flow: i + 1, step: stepNumber(row) ?? 0, row };
+    }
+  }
+  return null;
+}
+
+/**
+ * Which flows each changed file is on, by number, from the hunks Claude
+ * placed: "yourself" for app code on none. A file outside the app's code,
+ * such as a test, is left out.
+ */
+export function fileFlows(
+  set: FlowSet,
+  files: { path: string }[],
+): Map<string, number[] | "yourself"> {
+  const app = new Set(set.appFiles);
+  const index = new Map(set.flows.map((f, i) => [f.id, i + 1]));
+  const out = new Map<string, number[] | "yourself">();
+  for (const { path } of files) {
+    if (!app.has(path)) continue;
+    const hunks = set.hunks.filter((h) => h.file === path);
+    if (hunks.length === 0) continue;
+    const flows = [
+      ...new Set(
+        hunks.flatMap((h) =>
+          h.flows.flatMap((id) => (index.has(id) ? [index.get(id)!] : [])),
+        ),
+      ),
+    ].sort((a, b) => a - b);
+    out.set(path, flows.length > 0 ? flows : "yourself");
+  }
+  return out;
+}
+
+/** Every flow's steps, by file and by the line each sits on. */
+export function stepMarks(set: FlowSet): Map<string, StepMarks> {
+  const out = new Map<string, StepMarks>();
+  diffRows(set).forEach((rows, i) => {
+    for (const row of rows) {
+      const entry = out.get(row.step.file) ?? {
+        old: new Map(),
+        new: new Map(),
+      };
+      const side = entry[row.side];
+      side.set(row.step.line, [
+        ...(side.get(row.step.line) ?? []),
+        {
+          key: `${i}/${row.key}`,
+          flow: i,
+          row: row.key,
+          chip: `${i + 1}·${stepNumber(row)}`,
+          was: row.kind === "del",
+        },
+      ]);
+      out.set(row.step.file, entry);
+    }
+  });
+  return out;
 }

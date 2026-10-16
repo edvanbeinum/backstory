@@ -21,17 +21,17 @@ import type {
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { Elapsed } from "./MapStrip";
+import { Elapsed } from "./SystemMap";
 import { Badge, Button, Spinner } from "./ui";
 
 /**
- * The data model's change: a one-line strip under the map, opening the
- * changed entities as cards that diff like code. Between the components,
- * which are too coarse to show a field moving, and the flows, where a new
- * column is only a word in a step.
+ * The data model's change: a phrase on the line under the map, opening the
+ * changed entities beneath it as cards that diff like code. Between the
+ * components, which are too coarse to show a field moving, and the flows,
+ * where a new column is only a word in a step.
  */
 
-/** Level 1, the strip: which entities changed, in a phrase each. */
+/** Level 1, the phrase: which entities changed, in a phrase each. */
 function summary(shown: Presented[]) {
   const changed = shown.filter((p) => p.state !== "same");
   if (changed.length === 0) return <>no data model change</>;
@@ -631,9 +631,7 @@ function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
             <AlertIcon size={11} /> {data.error}
           </span>
         ) : (
-          <span className="text-[12px] text-[var(--fg-muted)]">
-            · no data model found ({data.readers.join(", ")})
-          </span>
+          <span>no data model found ({data.readers.join(", ")})</span>
         )}
         {job && idle && (
           <Button size="sm" variant="primary" onClick={() => draft.start()}>
@@ -678,7 +676,12 @@ function Redraft({ data, draft }: { data: DataResponse; draft: DraftApi }) {
   );
 }
 
-export function DataStrip({
+/**
+ * The data model's part of the line under the map. Its parts sit in the
+ * line's wrapping row; `Show data` opens the graph on a row of its own
+ * beneath it, pushing the flows down.
+ */
+export function DataSummary({
   data: given,
   notes,
   repo,
@@ -696,30 +699,16 @@ export function DataStrip({
   const data = draft.data;
   const [open, setOpen] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(600);
+  const [width, setWidth] = useState(0);
 
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
     const observer = new ResizeObserver(([entry]) =>
-      setWidth(Math.max(320, entry.contentRect.width - 22)),
+      setWidth(entry.contentRect.width),
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [data]);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    const onDown = (e: MouseEvent) => {
-      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("mousedown", onDown);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("mousedown", onDown);
-    };
   }, [open]);
 
   const shown = useMemo(() => present(data?.entities ?? []), [data]);
@@ -727,65 +716,47 @@ export function DataStrip({
   const changed = shown.filter((p) => p.state !== "same");
   if (data.status === "none") {
     return (
-      <div className="map-strip quiet flex-wrap">
-        <span className="text-[13px] font-semibold">Data</span>
+      <span className="part inline-flex min-w-0 items-start gap-1.5">
+        <b>Data</b>
         <DraftOffer data={data} draft={draft} />
-      </div>
+      </span>
     );
   }
   if (changed.length === 0) {
     return (
-      <div className="map-strip quiet flex-wrap">
-        <span className="text-[13px] font-semibold">Data</span>
+      <span className="part inline-flex flex-wrap items-center gap-1.5">
+        <b>Data</b>
         {data.drafted && <DraftedBadge />}
-        <span className="text-[12px] text-[var(--fg-muted)]">
-          ·{" "}
-          {data.baseModel
-            ? "no data model change"
-            : "no data model at base to compare with"}
-        </span>
+        {data.baseModel
+          ? "no data model change"
+          : "no data model at base to compare with"}
         {data.drafted && <Redraft data={data} draft={draft} />}
-      </div>
+      </span>
     );
   }
 
   return (
-    <div ref={boxRef} className="map-strip">
-      <div className="data-glyph" aria-hidden="true">
-        <svg
-          width="28"
-          height="28"
-          viewBox="0 0 16 16"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="1.2"
+    <>
+      <span className="part inline-flex min-w-0 flex-wrap items-center gap-1.5">
+        <b>Data</b>
+        {data.drafted && <DraftedBadge />}
+        <span>{summary(shown)}</span>
+        <button
+          type="button"
+          className="story-disclose"
+          aria-expanded={open}
+          onClick={() => setOpen((v) => !v)}
         >
-          <ellipse cx="8" cy="3.5" rx="5.5" ry="2" />
-          <path d="M2.5 3.5v9c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2v-9M2.5 8c0 1.1 2.5 2 5.5 2s5.5-.9 5.5-2" />
-        </svg>
-      </div>
-      <div className="min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 text-[14px] font-semibold">
-          Data
-          {data.drafted && <DraftedBadge />}
-        </div>
-        <div className="truncate text-[12px] text-[var(--fg-muted)]">
-          {summary(shown)}
-        </div>
-      </div>
-      <button
-        type="button"
-        className="map-btn"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {open ? "Hide data" : "Show data"}
-        <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
-      </button>
+          {open ? "Hide data" : "Show data"}
+          <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
+        </button>
+      </span>
       {open && (
-        <div className="map-overlay">
+        <div ref={boxRef} className="basis-full pt-1">
           <div className="map-card">
-            <DataGraph shown={shown} width={width} notes={notes} />
+            {width > 0 && (
+              <DataGraph shown={shown} width={width - 2} notes={notes} />
+            )}
           </div>
           <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
             {data.drafted
@@ -802,6 +773,6 @@ export function DataStrip({
           )}
         </div>
       )}
-    </div>
+    </>
   );
 }

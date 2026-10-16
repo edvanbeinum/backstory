@@ -13,13 +13,12 @@ import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
 import type { DraftStatus, ModelSourceResponse } from "@/lib/models/draft";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
-import { AlertIcon, ChevronDownIcon } from "./icons";
+import { AlertIcon } from "./icons";
 import { Badge, Button, CopyButton, Spinner } from "./ui";
 
 /**
- * The map: a one-line strip at the top of the column, read once to orient,
- * that opens the focused C4 view as an overlay over the column. It never
- * pushes the flow down.
+ * The map: the focused C4 view, open at the top of the story at the column's
+ * width, with one line under it saying what it shows.
  */
 
 const ROW_GAP = 56;
@@ -101,12 +100,13 @@ const fileName = (path: string) => path.split("/").pop() ?? path;
 function MapCanvas({
   map,
   width,
-  onHover,
+  highlight,
   onJump,
 }: {
   map: MapResponse;
   width: number;
-  onHover: (component: string | null) => void;
+  /** A component's name, outlined as hovering it would */
+  highlight: string | null;
   onJump: (path: string) => void;
 }) {
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
@@ -262,12 +262,8 @@ function MapCanvas({
               if (el) boxes.current.set(n.id, el);
               else boxes.current.delete(n.id);
             }}
-            className={`map-node ${n.state} ${n.files.length ? "jumps" : ""}`}
+            className={`map-node ${n.state} ${n.files.length ? "jumps" : ""} ${highlight === n.name ? "highlight" : ""}`}
             style={{ left: n.x, top: n.y, width: n.w }}
-            onMouseEnter={() =>
-              onHover(n.state === "neighbour" ? null : n.name)
-            }
-            onMouseLeave={() => onHover(null)}
             onClick={() => n.files[0] && onJump(n.files[0])}
           >
             <h4>
@@ -284,7 +280,7 @@ function MapCanvas({
                   <li key={f.path}>
                     <button
                       type="button"
-                      title={`${f.path} — show it in the diff`}
+                      title={`${f.path}: show it in Files changed`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onJump(f.path);
@@ -349,84 +345,6 @@ function MapCanvas({
         );
       })}
     </div>
-  );
-}
-
-/** A thumbnail of the focused map: boxes only, coloured by what happened. */
-function Thumb({ map }: { map: MapResponse }) {
-  const W = 112;
-  const H = 56;
-  const { placed, height } = useMemo(
-    () => layout(map.nodes, map.edges, 600),
-    [map],
-  );
-  const scale = Math.min(W / 600, H / height);
-  const ox = (W - 600 * scale) / 2;
-  const oy = (H - height * scale) / 2;
-  return (
-    <svg
-      className="map-thumb"
-      width={W}
-      height={H}
-      viewBox={`0 0 ${W} ${H}`}
-      aria-hidden="true"
-    >
-      {map.edges
-        .filter((e) => e.state !== "same")
-        .map((e) => {
-          const a = placed.get(e.source);
-          const b = placed.get(e.destination);
-          if (!a || !b) return null;
-          return (
-            <line
-              key={e.key}
-              x1={ox + (a.x + a.w / 2) * scale}
-              y1={oy + (a.y + a.h) * scale}
-              x2={ox + (b.x + b.w / 2) * scale}
-              y2={oy + b.y * scale}
-              strokeWidth="1.2"
-              style={{
-                stroke:
-                  e.state === "removed"
-                    ? "var(--danger)"
-                    : e.state === "changed"
-                      ? "var(--attention)"
-                      : "var(--success)",
-              }}
-            />
-          );
-        })}
-      {[...placed.values()].map((n) => (
-        <rect
-          key={n.id}
-          x={ox + n.x * scale}
-          y={oy + n.y * scale}
-          width={n.w * scale}
-          height={n.h * scale}
-          rx="3"
-          strokeWidth="1.2"
-          strokeDasharray={n.state === "removed" ? "2 2" : undefined}
-          style={{
-            fill:
-              n.state === "added"
-                ? "var(--diff-add-num-bg)"
-                : n.state === "removed"
-                  ? "var(--diff-del-bg)"
-                  : n.state === "neighbour"
-                    ? "var(--canvas-subtle)"
-                    : "var(--canvas)",
-            stroke:
-              n.state === "added"
-                ? "var(--success)"
-                : n.state === "removed"
-                  ? "var(--danger)"
-                  : n.state === "neighbour"
-                    ? "var(--border)"
-                    : "var(--fg-muted)",
-          }}
-        />
-      ))}
-    </svg>
   );
 }
 
@@ -682,37 +600,41 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
   const idle = !job || job.status === "idle" || job.status === "unavailable";
   const file = draft.source?.file;
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[12px] text-[var(--fg-muted)]">
-          · no model in this repo
-        </span>
-        {idle && (
-          <Button size="sm" variant="primary" onClick={() => draft.start()}>
-            Draft a model
-          </Button>
-        )}
-        <DraftProgress draft={draft} />
-      </div>
+    <div className="story-card">
+      <h3>This repo has no map yet</h3>
+      <p>
+        Backstory draws the map from a C4 model of the system. Claude Code reads
+        the code at HEAD, read-only, and drafts one that stays on this machine,
+        never in the repo.
+      </p>
       {idle && (
-        <span className="text-[11px] text-[var(--fg-subtle)]">
-          Claude reads the code at HEAD, read-only, and drafts a C4 model kept
-          on this machine, never in the repo. It takes a few minutes and uses
-          your Claude Code account.
+        <Button variant="primary" onClick={() => draft.start()}>
+          Draft a model
+        </Button>
+      )}
+      <span className="mt-2 flex justify-center">
+        <DraftProgress draft={draft} />
+      </span>
+      {idle && (
+        <span className="est">
+          Claude Code · a few minutes · uses your Claude Code account
         </span>
       )}
       {file && (
-        <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--fg-subtle)]">
+        <span className="est flex min-w-0 items-center justify-center gap-1.5">
+          <span className="shrink-0">Or write one by hand at</span>
           <code className="mono min-w-0 truncate" title={file}>
             {file}
           </code>
-          <CopyButton
-            value={file}
-            variant="invisible"
-            title="Copy the path a local model goes at, to write one by hand"
-            label="Copy path"
-          />
-        </div>
+          <span className="shrink-0">
+            <CopyButton
+              value={file}
+              variant="invisible"
+              title="Copy the path a local model goes at, to write one by hand"
+              label="Copy path"
+            />
+          </span>
+        </span>
       )}
     </div>
   );
@@ -758,98 +680,160 @@ function LocalModel({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   );
 }
 
-export function MapStrip({
+/** The component with the most changed lines, as the line under the map names it. */
+function mostWork(map: MapResponse): React.ReactNode {
+  const busiest = map.nodes
+    .filter((n) => n.files.length > 0)
+    .sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions))[0];
+  if (!busiest) return null;
+  const files = busiest.files.length;
+  return (
+    <>
+      <b>{busiest.name}</b> does most of the work: {files}{" "}
+      {files === 1 ? "file" : "files"}
+      {busiest.newFiles > 0 && `, ${busiest.newFiles} new`}
+    </>
+  );
+}
+
+export function SystemMap({
   map,
   repo,
-  onHover,
+  highlight = null,
   onOpenFile,
   onModelChange,
+  children,
 }: {
   map: MapResponse | null;
   repo: string;
-  onHover: (component: string | null) => void;
-  /** Bring a file into view; the page knows whether there's a diff to show it in */
+  /** A component to outline, asked for from Files changed */
+  highlight?: { name: string; at: number } | null;
+  /** Show a file in Files changed */
   onOpenFile: (path: string) => void;
   /** A draft was written: read the map again */
   onModelChange: () => void;
+  /** The rest of the line under the map: the data model's summary */
+  children?: React.ReactNode;
 }) {
   const draft = useModelDraft(
     repo,
     Boolean(map && (map.local || (map.status === "none" && !map.error))),
     onModelChange,
   );
-  const [open, setOpen] = useState(false);
-  const boxRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(560);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
-    const onDown = (e: MouseEvent) => {
-      if (!boxRef.current?.contains(e.target as Node)) setOpen(false);
-    };
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("mousedown", onDown);
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("mousedown", onDown);
-    };
-  }, [open]);
+  const boxRef = useRef<HTMLElement>(null);
+  const [width, setWidth] = useState(0);
 
   useEffect(() => {
     const el = boxRef.current;
     if (!el) return;
     const observer = new ResizeObserver(([entry]) =>
-      setWidth(Math.max(320, entry.contentRect.width - 22)),
+      setWidth(entry.contentRect.width),
     );
     observer.observe(el);
     return () => observer.disconnect();
-    // Again once the map arrives: before it does, the strip isn't rendered.
+    // Again once the map arrives: before it does, the section isn't rendered.
   }, [map]);
 
-  if (!map) return null;
+  useEffect(() => {
+    if (highlight)
+      boxRef.current?.scrollIntoView({ block: "start", behavior: "smooth" });
+  }, [highlight]);
+
+  if (!map)
+    return children ? <div className="story-line">{children}</div> : null;
   if (map.status === "none" || map.nodes.length === 0) {
     const offer =
       map.status === "none" && !map.error && draft.source?.source === "none";
     return (
-      <div className="map-strip quiet flex-wrap">
-        <span className="text-[13px] font-semibold">Map</span>
-        {map.error ? (
-          <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
-            <AlertIcon size={11} /> Couldn&apos;t read the model:{" "}
-            <Ticked text={map.error} />
-          </span>
-        ) : offer ? (
+      <>
+        {offer ? (
           <DraftOffer draft={draft} />
         ) : (
-          <span className="text-[12px] text-[var(--fg-muted)]">
-            {map.status === "none"
-              ? "· no architecture/workspace.dsl in this repo, and no local model"
-              : "· this change touches no mapped component"}
-          </span>
+          <div className="story-line">
+            {map.error ? (
+              <span className="flex items-center gap-1 text-[var(--attention)]">
+                <AlertIcon size={11} /> Couldn&apos;t read the model:{" "}
+                <Ticked text={map.error} />
+              </span>
+            ) : (
+              <span>
+                {map.status === "none"
+                  ? "No architecture/workspace.dsl in this repo, and no local model"
+                  : "This change touches no mapped component"}
+              </span>
+            )}
+          </div>
         )}
-        {map.local && <LocalModel map={map} draft={draft} />}
-      </div>
+        {map.local && (
+          <div className="story-line">
+            <LocalModel map={map} draft={draft} />
+          </div>
+        )}
+        {children && <div className="story-line">{children}</div>}
+      </>
     );
   }
 
-  const parts = summary(map);
+  const work = mostWork(map);
+  const parts = [...(work ? [work] : []), ...summary(map)];
   return (
-    <div ref={boxRef} className="map-strip">
-      <Thumb map={map} />
-      <div className="min-w-0 flex-1">
-        <div className="text-[14px] font-semibold">Map</div>
-        <div className="truncate text-[12px] text-[var(--fg-muted)]">
-          {parts.map((p, i) => (
-            <span key={i}>
-              {i > 0 && " · "}
-              {p}
+    <section ref={boxRef} className="story-map">
+      <div className="map-card">
+        {width > 0 && (
+          <MapCanvas
+            map={map}
+            width={width - 2}
+            highlight={highlight?.name ?? null}
+            onJump={onOpenFile}
+          />
+        )}
+        <div className="map-foot">
+          {map.hidden > 0 && (
+            <span className="map-chip">
+              <b>+{map.hidden}</b> unchanged{" "}
+              {map.hidden === 1 ? "component" : "components"}
             </span>
-          ))}
+          )}
+          <span className="flex-1" />
+          <span>Unchanged arrows label on hover</span>
         </div>
+      </div>
+      <div className="map-key">
+        <span>
+          <i className="box touched" />
+          Touched
+        </span>
+        <span>
+          <i className="box added" />
+          New
+        </span>
+        <span>
+          <i className="box removed" />
+          Removed
+        </span>
+        <span>
+          <i className="box neighbour" />
+          Unchanged
+        </span>
+        <span>
+          <span className="text-[var(--success)]">—</span> new arrow
+        </span>
+        <span>
+          <span className="text-[var(--attention)]">—</span> relabelled
+        </span>
+        <span>
+          <span className="text-[var(--danger)]">- -</span> removed arrow
+        </span>
+      </div>
+      <div className="story-line">
+        {parts.map((p, i) => (
+          <span key={i} className="part">
+            {p}
+          </span>
+        ))}
         {(map.unmapped.length > 0 || map.ambiguous.length > 0) && (
-          <div
-            className="text-[11px] text-[var(--fg-subtle)]"
+          <span
+            className="part"
             title={[
               ...map.unmapped,
               ...map.ambiguous.map((a) => `${a.file} ← ${a.ids.join(", ")}`),
@@ -861,73 +845,11 @@ export function MapStrip({
                 : `${map.unmapped.length} unmapped`)}
             {map.unmapped.length > 0 && map.ambiguous.length > 0 && " · "}
             {map.ambiguous.length > 0 && `${map.ambiguous.length} ambiguous`}
-          </div>
+          </span>
         )}
+        {children}
         {map.local && <LocalModel map={map} draft={draft} />}
       </div>
-      <button
-        type="button"
-        className="map-btn"
-        aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {open ? "Hide map" : "Show map"}
-        <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
-      </button>
-
-      {open && (
-        <div className="map-overlay">
-          <div className="map-card">
-            <MapCanvas
-              map={map}
-              width={width}
-              onHover={onHover}
-              onJump={(path) => {
-                setOpen(false);
-                onHover(null);
-                onOpenFile(path);
-              }}
-            />
-            <div className="map-foot">
-              {map.hidden > 0 && (
-                <span className="map-chip">
-                  <b>+{map.hidden}</b> unchanged{" "}
-                  {map.hidden === 1 ? "component" : "components"}
-                </span>
-              )}
-              <span className="flex-1" />
-              <span>Unchanged arrows label on hover</span>
-            </div>
-          </div>
-          <div className="map-key">
-            <span>
-              <i className="box touched" />
-              Touched
-            </span>
-            <span>
-              <i className="box added" />
-              New
-            </span>
-            <span>
-              <i className="box removed" />
-              Removed
-            </span>
-            <span>
-              <i className="box neighbour" />
-              Unchanged
-            </span>
-            <span>
-              <span className="text-[var(--success)]">—</span> new arrow
-            </span>
-            <span>
-              <span className="text-[var(--attention)]">—</span> relabelled
-            </span>
-            <span>
-              <span className="text-[var(--danger)]">- -</span> removed arrow
-            </span>
-          </div>
-        </div>
-      )}
-    </div>
+    </section>
   );
 }

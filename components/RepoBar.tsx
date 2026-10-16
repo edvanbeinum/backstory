@@ -56,7 +56,7 @@ export function RepoBar({
     setDraft(repoPath);
   }
 
-  // Publish the header's real height so the side column and the sticky file
+  // Publish the header's real height so the spine and the sticky file
   // headers can sit directly beneath it. This bar wraps to two or three rows
   // depending on branch name and PR title, so a hard-coded offset would leave
   // content either overlapped or floating.

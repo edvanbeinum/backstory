@@ -574,7 +574,12 @@ tr.note-row td {
  * Lanes, lifelines and arrows are one SVG laid over the rows.
  */
 
-.flow-tab {
+.tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 1px solid var(--border-muted);
+}
+.tab {
   position: relative;
   display: flex;
   align-items: center;
@@ -583,13 +588,15 @@ tr.note-row td {
   font-size: 14px;
   color: var(--fg);
 }
-.flow-tab svg {
+.tab-note {
+  font-size: 12px;
+  font-weight: 400;
   color: var(--fg-muted);
 }
-.flow-tab[aria-selected="true"] {
+.tab[aria-selected="true"] {
   font-weight: 600;
 }
-.flow-tab[aria-selected="true"]::after {
+.tab[aria-selected="true"]::after {
   content: "";
   position: absolute;
   left: 0;
@@ -893,72 +900,52 @@ tr.note-row td {
   background: var(--accent);
 }
 
-/* The diff's side of the sync: a chip on each anchored line, and the line
-   nearest the reading line lit. */
-.flow-chip {
-  display: inline-block;
-  margin-left: 10px;
-  padding: 0 6px;
-  border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent);
-  border-radius: 2em;
+/* Gutter marks: a flow's step (`⇄ 1·7`) or a review comment (`💬 2`) on a
+   diff line, each opening where it belongs. */
+.diff-gutter {
+  width: 1%;
+  padding: 0 6px 0 2px;
+  white-space: nowrap;
+  vertical-align: top;
+  /* Copying code shouldn't copy "⇄ 1·3" with it. */
+  user-select: none;
+}
+tr.line-add .diff-gutter {
+  background: var(--diff-add-bg);
+}
+tr.line-del .diff-gutter {
+  background: var(--diff-del-bg);
+}
+.mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-right: 3px;
+  padding: 0 5px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--canvas);
   color: var(--accent);
   font:
     600 10px/16px -apple-system,
     BlinkMacSystemFont,
     sans-serif;
-  font-style: normal;
   vertical-align: 1px;
-  white-space: nowrap;
-  /* Copying code shouldn't copy "step 3" with it. */
-  user-select: none;
 }
-.flow-chip.was {
-  border-color: color-mix(in srgb, var(--danger) 45%, transparent);
+.mark:hover {
+  background: var(--accent-subtle);
+}
+.mark.was {
+  border-color: var(--danger);
   color: var(--danger);
 }
-tr.flow-inview td {
-  background: color-mix(
-    in srgb,
-    var(--accent-subtle) 80%,
-    var(--canvas)
-  ) !important;
+.mark.c {
+  border-color: var(--attention);
+  color: var(--attention);
 }
-tr.line-add.flow-inview td {
-  background: color-mix(
-    in srgb,
-    var(--accent-subtle) 80%,
-    var(--diff-add-bg)
-  ) !important;
-}
-tr.line-del.flow-inview td {
-  background: color-mix(
-    in srgb,
-    var(--accent-subtle) 70%,
-    var(--diff-del-bg)
-  ) !important;
-}
-tr.flow-inview td.diff-num {
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-
-.col-resizer {
-  width: 16px;
-  align-self: stretch;
-  flex-shrink: 0;
-  display: flex;
-  justify-content: center;
-  cursor: col-resize;
-  touch-action: none;
-}
-.col-resizer::before {
-  content: "";
-  width: 1px;
-  background: transparent;
-  transition: background-color 120ms ease;
-}
-.col-resizer:hover::before,
-.col-resizer[data-dragging="true"]::before {
-  background: var(--accent);
+.mark.c.done {
+  border-color: var(--done);
+  color: var(--done);
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -970,59 +957,6 @@ tr.flow-inview td.diff-num {
 
 /* --- The map ----------------------------------------------------------- */
 
-.map-strip {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--canvas);
-}
-.map-strip.quiet {
-  gap: 6px;
-  padding: 8px 12px;
-  background: var(--canvas-subtle);
-}
-.map-thumb {
-  flex-shrink: 0;
-  border-radius: 4px;
-  background-image: radial-gradient(
-    circle,
-    var(--border-muted) 1px,
-    transparent 1.2px
-  );
-  background-size: 8px 8px;
-}
-.map-btn {
-  display: inline-flex;
-  flex-shrink: 0;
-  align-items: center;
-  gap: 4px;
-  padding: 3px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--canvas-subtle);
-  font-size: 12px;
-  font-weight: 500;
-  white-space: nowrap;
-}
-.map-btn:hover {
-  border-color: var(--fg-subtle);
-}
-.map-overlay {
-  position: absolute;
-  left: -1px;
-  right: -1px;
-  top: calc(100% + 6px);
-  z-index: 30;
-  padding: 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--canvas);
-  box-shadow: var(--overlay-shadow);
-}
 .map-card {
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -1316,7 +1250,7 @@ tr.flow-inview td.diff-num {
   background: var(--canvas-subtle);
 }
 
-/* A file's component, on its header; outlined while its box is hovered. */
+/* A file's component, on its header. */
 .file-owner {
   flex-shrink: 0;
   padding: 0 8px;
@@ -1326,14 +1260,6 @@ tr.flow-inview td.diff-num {
   font-size: 11px;
   line-height: 18px;
   color: var(--fg-muted);
-}
-section.file-linked {
-  border-color: var(--accent) !important;
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
-}
-section.file-linked .file-owner {
-  border-color: var(--accent);
-  color: var(--accent);
 }
 
 /* Components on a flow: a band over each component's lanes, a line where
@@ -1470,13 +1396,6 @@ tr.step-code-target td.diff-num {
 
 /* --- The data model -------------------------------------------------- */
 
-.data-glyph {
-  display: flex;
-  width: 112px;
-  flex-shrink: 0;
-  justify-content: center;
-  color: var(--fg-subtle);
-}
 .data-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1707,4 +1626,274 @@ tr.step-code-target td.diff-num {
 }
 .data-card .pinned-note {
   padding: 0 10px 8px;
+}
+
+/* --- The story ---------------------------------------------------------- */
+
+/* A section's heading, with whatever sits beside it: a count, the flows'
+   coverage. Its row wraps, so a list opened from it takes a row of its own. */
+.story-h {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.story-h h3 {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.story-map .map-card {
+  background: var(--canvas);
+}
+.story-map .map-key {
+  margin-top: 8px;
+}
+.map-node.highlight {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+/* The line under the map: its parts, a dot between each, wrapping; the data
+   graph opens on a row of its own beneath it. */
+.story-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+  margin-top: 8px;
+  padding: 0 2px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.story-line b {
+  font-weight: 600;
+  color: var(--fg);
+}
+.story-line > * + .part::before {
+  content: "·";
+  margin: 0 8px;
+  color: var(--fg-subtle);
+}
+.story-disclose {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--accent);
+}
+.story-disclose:hover {
+  text-decoration: underline;
+}
+
+.flow-cover {
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.flow-cover b {
+  font-weight: 600;
+  color: var(--fg);
+}
+
+/* The card in place of the flows, before tracing or for uncommitted work. */
+.story-card {
+  padding: 32px 30px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+  text-align: center;
+}
+.story-card h3 {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 600;
+}
+.story-card p {
+  max-width: 64ch;
+  margin: 0 auto 16px;
+  font-size: 13px;
+  color: var(--fg-muted);
+}
+.story-card p:last-child {
+  margin-bottom: 0;
+}
+.story-card .est {
+  display: block;
+  margin-top: 10px;
+  font-size: 12px;
+  color: var(--fg-subtle);
+}
+
+.flow-card {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+}
+.flow-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+}
+.flow-card.open .flow-card-head {
+  border-bottom: 1px solid var(--border);
+  background: var(--canvas-subtle);
+}
+.flow-card-toggle {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: flex-start;
+  gap: 12px;
+  text-align: left;
+}
+.flow-card-toggle .chev {
+  flex-shrink: 0;
+  align-self: center;
+  color: var(--fg-muted);
+}
+/* A step's review comments, at its row's right edge. */
+.row-badges {
+  position: absolute;
+  z-index: 3;
+  top: 10px;
+  right: 8px;
+  display: flex;
+}
+.flow-card .flow-seq {
+  border: 0;
+  border-radius: 0;
+}
+
+/* --- Files changed ------------------------------------------------------ */
+
+.files-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 2em;
+  font-weight: 500;
+  color: var(--fg-muted);
+}
+.filter-chip:hover {
+  color: var(--fg);
+}
+.filter-chip.warn {
+  border-color: color-mix(in srgb, var(--attention) 50%, var(--border));
+  color: var(--attention);
+}
+.filter-chip[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+  color: var(--accent);
+}
+.files-group {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 14px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+.files-group small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--fg-muted);
+}
+/* A file's flows on its header: "on flow 1 2", or "read yourself". */
+.file-flows {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--fg-muted);
+}
+.file-flows i {
+  padding: 0 5px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent-subtle);
+  color: var(--accent);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  line-height: 15px;
+}
+.file-flows.yourself {
+  color: var(--attention);
+}
+
+/* --- Comments ----------------------------------------------------------- */
+
+.comments-progress {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 13px;
+}
+.comments-progress b {
+  font-weight: 600;
+}
+.comments-progress .bar {
+  width: 160px;
+  height: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-muted);
+  border-radius: 3px;
+  background: var(--canvas-subtle);
+}
+.comments-progress .bar i {
+  display: block;
+  height: 100%;
+  background: var(--done);
+}
+.comments-progress > span:last-child {
+  font-size: 12px;
+}
+.comment-card {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--canvas);
+  scroll-margin-top: calc(var(--header-height, 0px) + 8px);
+}
+.comment-card > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  border-radius: 6px 6px 0 0;
+  background: var(--canvas-subtle);
+  font-size: 12px;
+}
+.comment-story {
+  margin: 0;
+  padding: 0 4px;
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+.comment-card .state {
+  flex-shrink: 0;
+  font-weight: 600;
+}
+.comment-card .state.done {
+  color: var(--done);
+}
+.comment-card .state.open {
+  color: var(--attention);
 }

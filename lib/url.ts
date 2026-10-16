@@ -21,9 +21,14 @@ export interface UrlState {
   rev: string | null;
   /** Selected review thread id */
   comment: string | null;
+  /** The workspace tab; absent when the URL doesn't ask for one */
+  tab?: Tab;
   /** The inbox shows the setup checklist, as the Mac app's Set Up Backstory… asks */
   setup?: boolean;
 }
+
+export type Tab = "story" | "files" | "comments";
+const TABS: readonly Tab[] = ["story", "files", "comments"];
 
 /** Pure half of readUrlState, so it can be tested without a DOM. */
 export function parseUrlState(search: string): UrlState {
@@ -31,13 +36,23 @@ export function parseUrlState(search: string): UrlState {
   const repo = params.get("repo")?.trim();
   const rev = params.get("rev")?.trim();
   const comment = params.get("comment")?.trim();
+  const tab = TABS.find((t) => t === params.get("tab")?.trim());
 
   return {
     repo: repo ? repo : null,
     rev: rev ? rev : null,
     comment: comment ? comment : null,
+    ...(tab && { tab }),
     ...(params.get("setup") === "1" && { setup: true }),
   };
+}
+
+/**
+ * The tab a URL opens on. Story unless the URL names another, so the diff is
+ * never the first screen; a `?comment=` link from before tabs opens Comments.
+ */
+export function resolveTab(state: Pick<UrlState, "tab" | "comment">): Tab {
+  return state.tab ?? (state.comment ? "comments" : "story");
 }
 
 export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
@@ -47,6 +62,10 @@ export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
   // `working` is the default landing spot; leaving it out keeps the common
   // URL short, and a missing rev falls back to it anyway.
   if (state.rev && state.rev !== WORKING_REV) params.set("rev", state.rev);
+  // Story is where every view lands, so it is left out unless a comment is
+  // there too: a comment alone would reopen on Comments.
+  if (state.tab && (state.tab !== "story" || state.comment))
+    params.set("tab", state.tab);
   if (state.comment) params.set("comment", state.comment);
   if (state.setup) params.set("setup", "1");
 
@@ -149,9 +168,13 @@ export function resolveRev(
    */
   pinned: string[] = [],
 ): RevResolution {
+  // Open on uncommitted work while there is some, as that's what an agent
+  // waiting on review has just written; otherwise on the whole branch.
   const fallback = hasWorkingChanges
     ? WORKING_REV
-    : (commits[0]?.sha ?? WORKING_REV);
+    : hasBranchDiff
+      ? BRANCH_REV
+      : (commits[0]?.sha ?? WORKING_REV);
 
   if (requested === WORKING_REV) {
     return hasWorkingChanges

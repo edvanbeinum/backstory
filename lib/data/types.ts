@@ -101,7 +101,7 @@ export interface DataResponse {
   error?: string;
 }
 
-/** A drafted data model's read for one view, as the data strip shows it */
+/** A drafted data model's read for one view, as the story shows it */
 export type DataDraftStatus =
   /** Nothing read yet: the provider's name, for the offer's copy */
   | { status: "idle"; provider: string }

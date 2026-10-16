@@ -51,17 +51,18 @@ You need:
    folder on the window. The workspace opens on its branch.
 2. In the header, pick the change to review: the whole branch, your uncommitted
    work, or one commit.
-3. Press **Trace this change**. Claude Code reads the change through your own
-   `claude` login, the same way it does when you use Claude Code in that repo.
-   It takes about a minute and usually costs $0.10–0.40 on your Claude account.
-   When it finishes, the view leads with the map, the data model and the flows.
+3. The change opens on **Story**, with the map at the top. Press **Trace this
+   change** under it. Claude Code reads the change through your own `claude`
+   login, the same way it does when you use Claude Code in that repo. It takes
+   about a minute and usually costs $0.10–0.40 on your Claude account. When it
+   finishes, each flow appears as a card under the map.
 4. Check the map for the components the change touched. If the repo has no C4
    model, press **Draft a model** and Claude Code writes one for you to correct,
    outside the repo.
-5. Open a flow and step through it. Press **Show in diff** on a step to see the
-   code behind it.
-6. To ask the agent for a fix, hover a line in the diff, press **+** and write a
-   note. Then press **Send … to agent**, or **Copy** to paste the notes into the
+5. Click a step in a flow to open its code under it. Press **Show in Files
+   changed** to see the same lines in the diff.
+6. To ask the agent for a fix, hover a line in **Files changed**, press **+** and
+   write a note. Then press **Send … to agent**, or **Copy** to paste the notes into the
    agent's session yourself.
 
 [Using Backstory](docs/using-backstory.md) covers the rest, including how notes
@@ -77,7 +78,8 @@ again**.
 connected. Press **Connect GitHub** in the banner and approve the code on
 github.com, or run `gh auth login` and refresh the window.
 
-**The map strip names a line instead of drawing the map.** The repo's
+**The map's line on Story says it couldn't read the model, instead of drawing
+the map.** The repo's
 `architecture/workspace.dsl` uses something Backstory doesn't read, such as
 `group` or `!include`.
 [The map, flows and the data model](docs/using-backstory.md#the-map-flows-and-the-data-model)

@@ -10,7 +10,7 @@ export const STEP_CODE_H = 268;
 
 /**
  * The code under a flow step: a few lines around its call, coloured as the
- * diff colours them. Code on demand, for the flow-first layout.
+ * diff colours them. Code on demand, under a step in the story.
  */
 export function StepCode({
   repo,
@@ -18,7 +18,8 @@ export function StepCode({
   path,
   side,
   line,
-  onShowInDiff,
+  onShowInFiles,
+  notInDiff = false,
   height = STEP_CODE_H,
 }: {
   repo: string;
@@ -26,7 +27,9 @@ export function StepCode({
   path: string;
   side: "old" | "new";
   line: number;
-  onShowInDiff?: () => void;
+  onShowInFiles?: () => void;
+  /** The file isn't one the change touches, so Files changed can't show it */
+  notInDiff?: boolean;
   height?: number;
 }) {
   const [data, setData] = useState<Snippet | null>(null);
@@ -76,14 +79,18 @@ export function StepCode({
         )}
         {side === "old" && <span className="hint">as it was before</span>}
         <span className="flex-1" />
-        {onShowInDiff && (
-          <button
-            type="button"
-            onClick={onShowInDiff}
-            className="text-[var(--accent)] hover:underline"
-          >
-            Show in diff
-          </button>
+        {notInDiff ? (
+          <span className="hint">not in this diff</span>
+        ) : (
+          onShowInFiles && (
+            <button
+              type="button"
+              onClick={onShowInFiles}
+              className="text-[var(--accent)] hover:underline"
+            >
+              Show in Files changed
+            </button>
+          )
         )}
       </div>
       <div className="thin-scroll step-code-body">

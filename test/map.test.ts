@@ -6,6 +6,7 @@ import path from "node:path";
 import { after, test } from "node:test";
 
 import { buildMap, type MapResponse } from "../lib/map";
+import { groupByComponent } from "../lib/mapGroups";
 import { localModelFile } from "../lib/model";
 
 const dirs: string[] = [];
@@ -260,4 +261,26 @@ test("a model that lists no tests or ignores keeps the built-in ones", async () 
   assert.equal(model.isTest("test/models/item_test.rb"), true);
   assert.equal(model.isIgnored("package-lock.json"), true);
   assert.equal(model.isTest("app/models/item.rb"), false);
+});
+
+test("groupByComponent groups in the map's order and keeps every file", () => {
+  const files = ["web/b.ts", "test/x.ts", "api/a.ts", "web/c.ts", "README"].map(
+    (path) => ({ path }),
+  );
+  const groups = groupByComponent(
+    files,
+    { "web/b.ts": "Web", "web/c.ts": "Web", "api/a.ts": "API" },
+    [{ name: "API" }, { name: "Web" }],
+  );
+  assert.deepEqual(
+    groups.map((g) => [g.component, g.files.map((f) => f.path)]),
+    [
+      ["API", ["api/a.ts"]],
+      ["Web", ["web/b.ts", "web/c.ts"]],
+      [null, ["test/x.ts", "README"]],
+    ],
+  );
+  const out = groups.flatMap((g) => g.files.map((f) => f.path));
+  assert.equal(out.length, files.length);
+  assert.equal(new Set(out).size, files.length);
 });
