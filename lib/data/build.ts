@@ -1,5 +1,5 @@
 import { readModelAt, type Model } from "../model";
-import { dataStatus, providerName, readDrafted } from "./cache";
+import { autoRead, dataStatus, providerName, readDrafted } from "./cache";
 import { diffModels } from "./diff";
 import { DATA_READERS, dataSteer, readDataModel, steerError } from "./readers";
 import type { DataResponse, EntityDiff } from "./types";
@@ -7,7 +7,8 @@ import type { DataResponse, EntityDiff } from "./types";
 /**
  * Reads the data model at both ends of a view, with the first reader in
  * `DATA_READERS` that finds one at the head, and diffs it. When none does,
- * the AI provider's drafted model stands in, once a click has read it.
+ * the AI provider's drafted model stands in, once it has been read: derived
+ * from main's model, or read on a click.
  * `data.files` and `data.format` in the C4 model at the head steer both
  * ends.
  */
@@ -58,8 +59,13 @@ export async function buildData(
         model: drafted.model,
       },
       draft,
+      spentUsd: drafted.spentUsd,
+      auto: autoRead(),
       baseModel: drafted.base !== null,
-      entities: withComponents(c4, diffModels(drafted.base, drafted.head)),
+      entities: withComponents(
+        c4,
+        diffModels(drafted.base, drafted.head, { whole: true }),
+      ),
     };
   }
   const before = base ? await readDataModel(root, base, steer) : null;
