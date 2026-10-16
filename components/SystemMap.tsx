@@ -600,37 +600,41 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
   const idle = !job || job.status === "idle" || job.status === "unavailable";
   const file = draft.source?.file;
   return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-[12px] text-[var(--fg-muted)]">
-          · no model in this repo
-        </span>
-        {idle && (
-          <Button size="sm" variant="primary" onClick={() => draft.start()}>
-            Draft a model
-          </Button>
-        )}
-        <DraftProgress draft={draft} />
-      </div>
+    <div className="story-card">
+      <h3>This repo has no map yet</h3>
+      <p>
+        Backstory draws the map from a C4 model of the system. Claude Code reads
+        the code at HEAD, read-only, and drafts one that stays on this machine,
+        never in the repo.
+      </p>
       {idle && (
-        <span className="text-[11px] text-[var(--fg-subtle)]">
-          Claude reads the code at HEAD, read-only, and drafts a C4 model kept
-          on this machine, never in the repo. It takes a few minutes and uses
-          your Claude Code account.
+        <Button variant="primary" onClick={() => draft.start()}>
+          Draft a model
+        </Button>
+      )}
+      <span className="mt-2 flex justify-center">
+        <DraftProgress draft={draft} />
+      </span>
+      {idle && (
+        <span className="est">
+          Claude Code · a few minutes · uses your Claude Code account
         </span>
       )}
       {file && (
-        <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-[var(--fg-subtle)]">
+        <span className="est flex min-w-0 items-center justify-center gap-1.5">
+          <span className="shrink-0">Or write one by hand at</span>
           <code className="mono min-w-0 truncate" title={file}>
             {file}
           </code>
-          <CopyButton
-            value={file}
-            variant="invisible"
-            title="Copy the path a local model goes at, to write one by hand"
-            label="Copy path"
-          />
-        </div>
+          <span className="shrink-0">
+            <CopyButton
+              value={file}
+              variant="invisible"
+              title="Copy the path a local model goes at, to write one by hand"
+              label="Copy path"
+            />
+          </span>
+        </span>
       )}
     </div>
   );
@@ -741,25 +745,32 @@ export function SystemMap({
     const offer =
       map.status === "none" && !map.error && draft.source?.source === "none";
     return (
-      <div className="story-line">
-        <span className="text-[13px] font-semibold">Map</span>
-        {map.error ? (
-          <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
-            <AlertIcon size={11} /> Couldn&apos;t read the model:{" "}
-            <Ticked text={map.error} />
-          </span>
-        ) : offer ? (
+      <>
+        {offer ? (
           <DraftOffer draft={draft} />
         ) : (
-          <span className="text-[12px] text-[var(--fg-muted)]">
-            {map.status === "none"
-              ? "· no architecture/workspace.dsl in this repo, and no local model"
-              : "· this change touches no mapped component"}
-          </span>
+          <div className="story-line">
+            {map.error ? (
+              <span className="flex items-center gap-1 text-[var(--attention)]">
+                <AlertIcon size={11} /> Couldn&apos;t read the model:{" "}
+                <Ticked text={map.error} />
+              </span>
+            ) : (
+              <span>
+                {map.status === "none"
+                  ? "No architecture/workspace.dsl in this repo, and no local model"
+                  : "This change touches no mapped component"}
+              </span>
+            )}
+          </div>
         )}
-        {map.local && <LocalModel map={map} draft={draft} />}
-        {children}
-      </div>
+        {map.local && (
+          <div className="story-line">
+            <LocalModel map={map} draft={draft} />
+          </div>
+        )}
+        {children && <div className="story-line">{children}</div>}
+      </>
     );
   }
 
