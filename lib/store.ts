@@ -4,6 +4,7 @@ import path from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 
 import { importNotes } from "./notes";
+import { importOutbox } from "./outbox";
 
 /**
  * The SQLite database behind notes, rounds and responses: `backstory.db` in
@@ -140,6 +141,7 @@ export type Legacy = Record<string, Record<string, unknown>>;
 function importJson(database: DatabaseSync, home: string): string[] {
   const importers: [string, (d: DatabaseSync, legacy: Legacy) => void][] = [
     ["notes.json", importNotes],
+    ["outbox.json", importOutbox],
   ];
   const read: string[] = [];
   for (const [name, importer] of importers) {

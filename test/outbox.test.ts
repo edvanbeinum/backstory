@@ -4,10 +4,13 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import { WORKING_REV } from "../lib/constants";
+import { changeNotes, getNotes } from "../lib/notes";
 import {
   ack,
   BACKSTORY_REVIEW,
   cancel,
+  cancelRound,
   CLAIM_MS,
   CLIPBOARD,
   formatTaken,
@@ -16,9 +19,10 @@ import {
   queueRound,
   requeue,
   retarget,
-  revert,
+  sendRound,
   take,
 } from "../lib/outbox";
+import type { Note } from "../lib/types";
 
 /** The store resolves BACKSTORY_HOME per call; never touch the real home. */
 function useTempHome(): void {
@@ -82,7 +86,7 @@ test("a queued round survives a restart", async () => {
   useTempHome();
   await take(ROOT, "s-1");
   const queued = await queueRound(ROOT, round(["n1", "n2"], "the notes"));
-  // Nothing is held in memory: a fresh read of the file is all a new server has.
+  // Nothing is held in memory: a fresh read of the database is all a new server has.
   const { rounds, lastSeen } = await getOutbox(ROOT);
   assert.equal(lastSeen?.session, "s-1");
   assert.deepEqual(rounds, [queued]);
@@ -137,16 +141,72 @@ test("a take that's never confirmed leaves the round to be taken again", async (
   assert.equal((await getOutbox(ROOT)).rounds[0].deliveredTo, "s-b");
 });
 
-test("revert undoes a filing or a withdrawal exactly", async () => {
-  useTempHome();
-  const filed = await queueRound(ROOT, round(["n1"]));
-  await revert(ROOT, filed.id, null);
-  assert.deepEqual((await getOutbox(ROOT)).rounds, []);
+const draft = (id: string): Note => ({
+  id,
+  rev: WORKING_REV,
+  path: null,
+  side: "new",
+  line: null,
+  quote: null,
+  body: `note ${id}`,
+  createdAt: 1,
+  sentAt: null,
+  done: false,
+  doneAt: null,
+});
 
-  const queued = await queueRound(ROOT, round(["n2"]));
-  const withdrawn = await cancel(ROOT, queued.id);
-  await revert(ROOT, queued.id, withdrawn);
-  assert.deepEqual((await getOutbox(ROOT)).rounds, [queued]);
+test("Send writes the round and marks its notes sent together; Cancel undoes both", async () => {
+  useTempHome();
+  await changeNotes(ROOT, { op: "save", note: draft("n1") });
+  await changeNotes(ROOT, { op: "save", note: draft("n2") });
+
+  const sent = await sendRound(ROOT, round(["n1", "n2"], "fix it", 5_000));
+  assert.equal(sent.round.queuedAt, 5_000);
+  assert.deepEqual(
+    sent.notes.map((n) => n.sentAt),
+    [5_000, 5_000],
+  );
+  assert.deepEqual((await getOutbox(ROOT)).rounds, [sent.round]);
+
+  const notes = await cancelRound(ROOT, sent.round.id);
+  assert.deepEqual(
+    notes?.map((n) => n.sentAt),
+    [null, null],
+  );
+  assert.deepEqual((await getOutbox(ROOT)).rounds, []);
+  assert.deepEqual(await getNotes(ROOT), notes);
+});
+
+test("Send writes nothing when marking its notes fails", async () => {
+  useTempHome();
+  await changeNotes(ROOT, { op: "save", note: draft("n1") });
+  // A non-number time passes the round's checks but not the notes'.
+  await assert.rejects(
+    sendRound(ROOT, round(["n1"], "fix it", "soon" as unknown as number)),
+    /Invalid send time/,
+  );
+  assert.deepEqual((await getOutbox(ROOT)).rounds, []);
+  assert.equal((await getNotes(ROOT))[0].sentAt, null);
+});
+
+test("Cancel on a claimed or delivered round changes nothing", async () => {
+  useTempHome();
+  await changeNotes(ROOT, { op: "save", note: draft("n1") });
+  await changeNotes(ROOT, { op: "save", note: draft("n2") });
+  const claimed = await sendRound(ROOT, round(["n1"], "one", 1));
+  await take(ROOT, "s-a");
+  const copied = await sendRound(ROOT, {
+    ...round(["n2"], "two", 2),
+    deliveredTo: CLIPBOARD,
+  });
+
+  const before = { outbox: await getOutbox(ROOT), notes: await getNotes(ROOT) };
+  assert.equal(await cancelRound(ROOT, claimed.round.id), null);
+  assert.equal(await cancelRound(ROOT, copied.round.id), null);
+  assert.deepEqual(
+    { outbox: await getOutbox(ROOT), notes: await getNotes(ROOT) },
+    before,
+  );
 });
 
 test("requeue turns a round filed as answered back into a queued one", async () => {
