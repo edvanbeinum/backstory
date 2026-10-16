@@ -4,12 +4,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import * as data from "../app/api/data/route";
 import * as githubLogin from "../app/api/github/login/route";
 import * as notes from "../app/api/notes/route";
 import * as outbox from "../app/api/outbox/route";
 import * as responses from "../app/api/responses/route";
 import * as review from "../app/api/review/route";
 import { crossSite } from "../lib/api";
+import { autoRead } from "../lib/data/cache";
 import { waitingReview } from "../lib/review";
 import { SECURITY, standIns } from "./standins";
 import { readText, root } from "./yaml";
@@ -179,6 +181,12 @@ test("a cross-site request to a route that writes is refused and writes nothing"
       "github login DELETE",
       githubLogin.DELETE(send(at("github/login", ""), "DELETE", EVIL)),
     ],
+    [
+      "data trunk",
+      data.POST(send(at("data", `repo=${repo}&trunk=1`), "POST", EVIL)),
+    ],
+    ["data auto on", data.POST(send(at("data", "auto=1"), "POST", EVIL))],
+    ["data auto off", data.POST(send(at("data", "auto=0"), "POST", EVIL))],
   ];
 
   for (const [name, call] of calls) {
@@ -186,6 +194,19 @@ test("a cross-site request to a route that writes is refused and writes nothing"
   }
   assert.deepEqual(readdirSync(home), []);
   assert.equal(waitingReview(REPO), null);
+});
+
+test("auto=1 turns reading data models automatically on, and auto=0 turns it off", async () => {
+  process.env.BACKSTORY_HOME = mkdtempSync(
+    path.join(tmpdir(), "backstory-api-"),
+  );
+  const auto = async (value: string) =>
+    (await data.POST(send(at("data", `auto=${value}`), "POST", {}))).json();
+  assert.equal(autoRead(), false);
+  assert.deepEqual(await auto("1"), { auto: true });
+  assert.equal(autoRead(), true);
+  assert.deepEqual(await auto("0"), { auto: false });
+  assert.equal(autoRead(), false);
 });
 
 test("Disconnect GitHub deletes the saved token, and does nothing with none saved", async () => {
