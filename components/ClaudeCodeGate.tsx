@@ -20,6 +20,7 @@ type Check = { status: ProviderStatus } | { error: string };
  */
 export function ClaudeCodeGate({ children }: { children: React.ReactNode }) {
   const [check, setCheck] = useState<Check | null>(null);
+  const [opened, setOpened] = useState(false);
   // Skips a check while one is running: coming back to the window fires both
   // focus and visibilitychange, and each check runs `claude` twice.
   const checking = useRef(false);
@@ -37,6 +38,7 @@ export function ClaudeCodeGate({ children }: { children: React.ReactNode }) {
             `Backstory answered ${response.status}.`,
         );
       setCheck({ status: body.status });
+      if (body.status === "ready") setOpened(true);
     } catch (err) {
       // Keeps an open review open when a later check fails, as it does while
       // the server restarts: unmounting it would lose unsaved notes.
@@ -67,7 +69,21 @@ export function ClaudeCodeGate({ children }: { children: React.ReactNode }) {
   // Renders nothing until the first answer, so a returning user never sees
   // the card flash.
   if (!check) return null;
-  if ("status" in check && check.status === "ready") return <>{children}</>;
+  const ready = "status" in check && check.status === "ready";
+  // Hides an open review behind the card rather than unmounting it, so a
+  // check that answers missing mid-review, as one does while Claude Code
+  // updates itself, keeps unsaved notes and drafts.
+  if (opened)
+    return (
+      <>
+        <div hidden={!ready}>{children}</div>
+        {!ready && card(check, load)}
+      </>
+    );
+  return card(check, load);
+}
+
+function card(check: Check, load: () => Promise<void>) {
   return (
     <div className="mx-auto max-w-2xl p-6 pt-16">
       {"error" in check ? (
