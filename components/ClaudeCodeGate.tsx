@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { ProviderStatus } from "@/lib/ai/provider";
 import { AI_API, DRAWS_WITH_CLAUDE_CODE } from "@/lib/constants";
@@ -20,8 +20,13 @@ type Check = { status: ProviderStatus } | { error: string };
  */
 export function ClaudeCodeGate({ children }: { children: React.ReactNode }) {
   const [check, setCheck] = useState<Check | null>(null);
+  // Skips a check while one is running: coming back to the window fires both
+  // focus and visibilitychange, and each check runs `claude` twice.
+  const checking = useRef(false);
 
   const load = useCallback(async () => {
+    if (checking.current) return;
+    checking.current = true;
     try {
       const response = await fetch(AI_API, { cache: "no-store" });
       const body = (await response.json().catch(() => null)) as
@@ -34,6 +39,8 @@ export function ClaudeCodeGate({ children }: { children: React.ReactNode }) {
       setCheck({ status: body.status });
     } catch (err) {
       setCheck({ error: err instanceof Error ? err.message : String(err) });
+    } finally {
+      checking.current = false;
     }
   }, []);
 
