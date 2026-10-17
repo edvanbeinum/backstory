@@ -727,7 +727,7 @@ function LocalModel({ map }: { map: MapResponse }) {
   );
 }
 
-/** A drafted map's footnote: the Draft badge, whether reads start by themselves, Turn off and Redraft. */
+/** A drafted map's footnote: the Draft badge, whether reads start by themselves, Turn off or Read automatically, and Redraft. */
 function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   const running = map.draft?.status === "running";
   const parts: React.ReactNode[] = [];
@@ -740,6 +740,16 @@ function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
         onClick={draft.turnOff}
       >
         Turn off
+      </button>,
+    );
+  else
+    parts.push(
+      <button
+        type="button"
+        className="text-[var(--accent)] hover:underline"
+        onClick={draft.turnOn}
+      >
+        Read automatically
       </button>,
     );
   return (

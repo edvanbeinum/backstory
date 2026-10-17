@@ -127,7 +127,8 @@ before reading its lines:
   - Under a drafted map, the line has **Turn off**, which stops reading this
     repo's maps and data models as it opens, and **Redraft**, which reads
     main's map in full again and removes every map worked out from the old
-    one.
+    one. Once the repo is turned off, **Read automatically** takes the place of
+    **Turn off** and turns reading back on.
 - **The data model** shows the entities the change touched: new fields,
   relationships and rules. It reads `db/schema.rb` and the models (Rails), the
   `.xcdatamodeld` (Core Data), or SQL schema files: the `CREATE TABLE`
@@ -148,7 +149,8 @@ before reading its lines:
     you turned off, **Draft the data model** under the map on Story reads one
     view, and **Read automatically** beside it turns reading back on and starts
     this view's read.
-  - On a drafted view, the Data line has **Turn off** and **Redraft**. **Show
+  - On a drafted view, the Data line has **Turn off**, or **Read automatically**
+    for a repo you turned off, and **Redraft**. **Show
     data** opens the whole model when the change touches none of it.
   - The Data line's graph opens by itself when the change touches the data
     model; **Hide data** closes it.
