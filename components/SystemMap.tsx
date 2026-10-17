@@ -488,6 +488,14 @@ function useMapDraft(
   useEffect(() => {
     onReadRef.current = onRead;
   }, [onRead]);
+  // Tags an answer with the page's latest read of the view when it arrives,
+  // not the read it was sent over: a page read that lands while a read starts
+  // says idle, and would hide the answer that says running, so nothing would
+  // poll. A page read that lands after the answer still replaces it.
+  const latest = useRef({ view: `${repo}\n${rev}`, given });
+  useEffect(() => {
+    latest.current = { view: `${repo}\n${rev}`, given };
+  }, [repo, rev, given]);
   // Try again repeats the last read: a Redraft only when that was a Redraft,
   // since one reads main in full and removes every derived map.
   const lastRedraft = useRef(false);
@@ -495,8 +503,12 @@ function useMapDraft(
   const request = useCallback(
     async (method: "GET" | "POST", redraft = false) => {
       if (method === "POST") lastRedraft.current = redraft;
+      const view = `${repo}\n${rev}`;
       const params = new URLSearchParams({ repo, rev });
       if (redraft) params.set("redraft", "1");
+      // Drops the answer for a view the page has left.
+      const over = () =>
+        latest.current.view === view ? latest.current.given : undefined;
       try {
         const response = await fetch(`/api/map?${params}`, {
           method,
@@ -507,25 +519,28 @@ function useMapDraft(
         const body = (await response.json()) as
           MapResponse | { error?: string };
         if (!response.ok || !("nodes" in body)) {
-          setError({
-            over: given,
-            message: body.error ?? response.statusText,
-          });
+          const at = over();
+          if (at !== undefined)
+            setError({ over: at, message: body.error ?? response.statusText });
           return;
         }
+        const at = over();
+        if (at === undefined) return;
         setError(null);
-        setAnswer({ over: given, map: body });
+        setAnswer({ over: at, map: body });
         // The page reads the map again once a read ends, so the flows and
         // the data model see the drafted map too.
         if (body.draft?.status !== "running") onReadRef.current();
       } catch (err) {
-        setError({
-          over: given,
-          message: err instanceof Error ? err.message : String(err),
-        });
+        const at = over();
+        if (at !== undefined)
+          setError({
+            over: at,
+            message: err instanceof Error ? err.message : String(err),
+          });
       }
     },
-    [repo, rev, given],
+    [repo, rev],
   );
 
   const map = answer?.over === given ? answer.map : given;
