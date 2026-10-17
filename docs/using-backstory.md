@@ -191,8 +191,8 @@ Flows are traced by **Claude Code**, through your own `claude` login: Backstory
 runs `claude -p` over a copy of the commit, with read-only tools. That means:
 
 - **Your code is read by Claude** the same way it is when you use Claude Code in
-  that repo. Think about that before tracing a repo you couldn't use Claude Code
-  on.
+  that repo. Its map and data model are read as the repo opens, so think about
+  that before opening a repo you couldn't use Claude Code on.
 - **It runs on a click.** Tracing a change takes about a minute, and only
   happens when you press "Trace this change". The result is kept in
   `~/.backstory/flows/`, so a view is traced once.
