@@ -189,7 +189,7 @@ test("a base DSL that can't be read counts as no base model, and says why", asyn
   assert.ok(map.nodes.every((n) => n.state !== "added"));
 });
 
-test("a change that touches no component has the whole system for Show map, unchanged; one that touches one doesn't", async () => {
+test("a change that touches no component has the whole system for Show map as containers, unchanged; one that touches one doesn't", async () => {
   const repo = gitRepo();
   const model = `workspace {
     !identifiers hierarchical
@@ -205,10 +205,13 @@ test("a change that touches no component has the whole system for Show map, unch
                 }
                 b = component "Beta"
             }
+            db = container "Db"
         }
         shopper -> app.web.a "Uses"
+        shopper -> app.web "Opens"
         app.web.a -> app.web.b "Calls"
         app.web.b -> payments "Charges"
+        app.web.b -> app.db "Reads"
         shopper -> app "Visits"
     }
 }
@@ -224,17 +227,20 @@ test("a change that touches no component has the whole system for Show map, unch
   assert.deepEqual(
     map.whole?.nodes.map((n) => [n.id, n.state, n.files.length]).sort(),
     [
-      ["app.web.a", "neighbour", 0],
-      ["app.web.b", "neighbour", 0],
+      ["app.db", "neighbour", 0],
+      ["app.web", "neighbour", 0],
       ["payments", "neighbour", 0],
       ["shopper", "neighbour", 0],
     ],
   );
-  assert.deepEqual(map.whole?.edges.map((e) => [e.key, e.state]).sort(), [
-    ["app.web.a → app.web.b", "same"],
-    ["app.web.b → payments", "same"],
-    ["shopper → app.web.a", "same"],
-  ]);
+  assert.deepEqual(
+    map.whole?.edges.map((e) => [e.key, e.description, e.state]).sort(),
+    [
+      ["app.web → app.db", "Reads", "same"],
+      ["app.web → payments", "Charges", "same"],
+      ["shopper → app.web", "Uses; Opens", "same"],
+    ],
+  );
 
   const touched = repo.commit({ "src/a/one.ts": "2\n" }, "touch");
   const focused = await buildMap(repo.dir, docs, touched);

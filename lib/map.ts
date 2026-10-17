@@ -5,6 +5,7 @@ import {
   localModelFile,
   readModelAt,
   type Model,
+  type ModelElement,
   type ModelSource,
 } from "./model";
 import { mapSpentUsd, mapStatus, type MapDraftStatus } from "./models/cache";
@@ -146,16 +147,27 @@ async function fileStats(
 const leafOf = (model: Model, file: string) => model.match(file);
 
 /**
- * The whole system, for Show map: every element nothing sits inside (each
- * component, person and external system), unchanged, with every explicit
- * arrow between them.
+ * The whole system, for Show map, as a container view: each container,
+ * person, and software system with no containers inside, unchanged. Each
+ * arrow is drawn between the boxes its ends sit in, so a component's arrow
+ * becomes its container's; arrows within one box, and arrows to a system
+ * drawn as its containers, are left out.
  */
 function wholeMap(model: Model): { nodes: MapNode[]; edges: MapEdge[] } {
   const parents = new Set(
     [...model.elements.values()].map((e) => e.parent).filter(Boolean),
   );
+  const drawn = (e: ModelElement) =>
+    e.type === "container" || (e.type !== "component" && !parents.has(e.id));
+  const boxOf = (id: string): string | null => {
+    for (let e = model.elements.get(id); e;) {
+      if (drawn(e)) return e.id;
+      e = e.parent ? model.elements.get(e.parent) : undefined;
+    }
+    return null;
+  };
   const nodes: MapNode[] = [...model.elements.values()]
-    .filter((e) => !parents.has(e.id))
+    .filter(drawn)
     .map((e) => ({
       id: e.id,
       name: e.name,
@@ -168,17 +180,25 @@ function wholeMap(model: Model): { nodes: MapNode[]; edges: MapEdge[] } {
       deletions: 0,
       newFiles: 0,
     }));
-  const shown = new Set(nodes.map((n) => n.id));
-  const edges: MapEdge[] = [...model.relationships.values()]
-    .filter((r) => shown.has(r.source) && shown.has(r.destination))
-    .map((r) => ({
-      key: r.key,
-      source: r.source,
-      destination: r.destination,
-      description: r.description,
-      state: "same",
-    }));
-  return { nodes, edges };
+  const between = new Map<string, MapEdge>();
+  for (const r of model.relationships.values()) {
+    const source = boxOf(r.source);
+    const destination = boxOf(r.destination);
+    if (!source || !destination || source === destination) continue;
+    const key = `${source} → ${destination}`;
+    const edge = between.get(key);
+    if (!edge)
+      between.set(key, {
+        key,
+        source,
+        destination,
+        description: r.description,
+        state: "same",
+      });
+    else if (!edge.description.split("; ").includes(r.description))
+      edge.description = `${edge.description}; ${r.description}`;
+  }
+  return { nodes, edges: [...between.values()] };
 }
 
 /** The focused map stays a glance: changed elements plus a few neighbours. */

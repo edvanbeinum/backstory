@@ -519,8 +519,7 @@ test("an empty change reads nothing past its base, and its map is its base's", a
   assert.deepEqual(map.nodes, []);
   assert.deepEqual(map.whole?.nodes.map((n) => n.id).sort(), [
     "payments",
-    "shop.web.app",
-    "shop.web.sync",
+    "shop.web",
     "shopper",
   ]);
 });

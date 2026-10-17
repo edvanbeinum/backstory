@@ -116,8 +116,9 @@ before reading its lines:
     on for maps and data models.
   - The map opens by itself when the change touches a component. When it
     touches none, the line under the map says so and has **Show map**, which
-    opens the whole system: every component, person and external system, with
-    the arrows between them. **Hide map** closes it.
+    opens the whole system at the level of its containers: every container,
+    person and external system, with the arrows between them. A component's
+    arrow is drawn from or to its container. **Hide map** closes it.
   - Under a drafted map, the line says what this repo's maps have cost, and
     has **Turn off** for reading automatically, and **Redraft**, which reads
     main's map in full again and removes every map worked out from the old
