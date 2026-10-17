@@ -14,8 +14,8 @@ type Check = { status: ProviderStatus } | { error: string };
 /**
  * Shows its children only once Claude Code is installed and signed in, and
  * otherwise a card with the fix. Checks again whenever the window comes back,
- * so signing in in a terminal opens Backstory on the way back. A check that
- * fails blocks too, with Try again: Backstory can't draw anything without
+ * so signing in in a terminal opens Backstory on the way back. A first check
+ * that fails blocks too, with Try again: Backstory can't draw anything without
  * Claude Code, so it never guesses that it's there.
  */
 export function ClaudeCodeGate({ children }: { children: React.ReactNode }) {
@@ -38,7 +38,12 @@ export function ClaudeCodeGate({ children }: { children: React.ReactNode }) {
         );
       setCheck({ status: body.status });
     } catch (err) {
-      setCheck({ error: err instanceof Error ? err.message : String(err) });
+      // Keeps an open review open when a later check fails, as it does while
+      // the server restarts: unmounting it would lose unsaved notes.
+      const error = err instanceof Error ? err.message : String(err);
+      setCheck((was) =>
+        was && "status" in was && was.status === "ready" ? was : { error },
+      );
     } finally {
       checking.current = false;
     }
