@@ -17,10 +17,15 @@ see the [README](../README.md).
 
 ## Adding a repo
 
+Backstory draws your code with Claude Code. Until Claude Code is installed and
+signed in, Backstory shows only a card that says so, with **Get Claude Code** or
+**Copy: claude**, and checks again when you come back to the window.
+
 The first time, the inbox opens with **Set up Backstory**: a row each for git,
-GitHub, Claude Code and notes to your agent, saying what each one adds, with a
-button for whatever is missing. It checks again when you come back to the
-window. **Backstory → Set Up Backstory…** brings it back.
+Claude Code, GitHub and notes to your agent, saying what each one adds, with a
+button for whatever is missing. Git and Claude Code are marked needed. It checks
+again when you come back to the window. **Backstory → Set Up Backstory…** brings
+it back.
 
 **Open Repo…** picks a checkout, and so does a folder dropped on the window or
 its Dock icon. Or use **Browse**, which finds them for you, or type a path. From
@@ -102,25 +107,25 @@ before reading its lines:
     every commit, so the map shows which components a change touched, but not
     what it added or removed.
   - Any other repo can have its map drafted by Claude Code, the same way as
-    the data model. It reads main's map in full once per repo, about $0.35 and
-    a minute or two on a small repo and more on a large one. Every other
-    commit's map is worked out from the nearest map already read, by reading
-    only the patch between them: cents, and well under a minute. The map marks
+    the data model. It reads main's map in full once per repo, a minute or two
+    on a small repo and more on a large one. Every other commit's map is worked
+    out from the nearest map already read, by reading only the patch between
+    them, well under a minute. The map marks
     the components and arrows a branch added or removed, is marked as a draft,
     and is kept in `~/.backstory/maps/`, a cache you can delete. Nothing is
     written into the repo, or to `~/.backstory/models/`.
-  - With reading automatically on (see the data model below), opening a repo
-    starts the read of main's map, and opening a view on Story starts the
-    view's read, with its progress where the map goes. With it off, **Draft a
-    model** reads one view, and **Read automatically** beside it turns reading
-    on for maps and data models.
+  - Opening a repo starts the read of main's map, and opening a view on Story
+    starts the view's read, with its progress where the map goes. For a repo
+    you turned off (see **Turn off** below), **Draft a model** reads one view,
+    and **Read automatically** beside it turns reading back on for the repo's
+    maps and data models.
   - The map opens by itself when the change touches a component. When it
     touches none, the line under the map says so and has **Show map**, which
     opens the whole system at the level of its containers: every container,
     person and external system, with the arrows between them. A component's
     arrow is drawn from or to its container. **Hide map** closes it.
-  - Under a drafted map, the line says what this repo's maps have cost, and
-    has **Turn off** for reading automatically, and **Redraft**, which reads
+  - Under a drafted map, the line has **Turn off**, which stops reading this
+    repo's maps and data models as it opens, and **Redraft**, which reads
     main's map in full again and removes every map worked out from the old
     one.
 - **The data model** shows the entities the change touched: new fields,
@@ -128,24 +133,23 @@ before reading its lines:
   `.xcdatamodeld` (Core Data), or SQL schema files: the `CREATE TABLE`
   statements in a `schema.sql`, a `structure.sql` or a `schema/` folder, outside
   migrations and tests. Any other repo can have its data model drafted by
-  Claude Code. It reads main's data model in full once per repo, about $0.15 on
-  a small repo and over $1 and a few minutes on a large one. Every other
-  commit's model is worked out from the nearest model already read, by reading
-  only the patch between them: cents, and well under a minute. A view's base is
+  Claude Code. It reads main's data model in full once per repo, a few minutes
+  on a large repo. Every other commit's model is worked out from the nearest
+  model already read, by reading only the patch between them, well under a
+  minute. A view's base is
   worked out from main's model, and its head from its base, so a second branch
   from the same point, or a branch rebased onto main, reads only its own
   change. The result is marked as a draft and kept in `~/.backstory/data/`.
-  - **Maps and data models** in the setup checklist, once Claude Code is
-    ready, has **Read automatically**, which turns on reading both. With it
-    on, opening a repo starts the reads of main's data model and map, and
-    opening a view on Story starts the view's reads, with the data model's
-    progress on the Data line. With it off, **Draft the data model** under the
-    map on Story reads one view, and **Read automatically** beside it turns
-    reading on and starts this view's read. **Turn off** stops new reads of
-    either kind; a read already running finishes.
-  - On a drafted view, the Data line says what this repo's data models have
-    cost, and has **Turn off** for reading automatically, and **Redraft**.
-    **Show data** opens the whole model when the change touches none of it.
+  - Reads start as a repo and a view open: opening a repo starts the reads of
+    main's data model and map, and opening a view on Story starts the view's
+    reads, with the data model's progress on the Data line. **Turn off**, under
+    each drafted map and data model, stops new reads of either kind for that
+    repo and all its worktrees; a read already running finishes. For a repo
+    you turned off, **Draft the data model** under the map on Story reads one
+    view, and **Read automatically** beside it turns reading back on and starts
+    this view's read.
+  - On a drafted view, the Data line has **Turn off** and **Redraft**. **Show
+    data** opens the whole model when the change touches none of it.
   - The Data line's graph opens by itself when the change touches the data
     model; **Hide data** closes it.
   - Main's data model moves forward when a view's base is on main and past it:
@@ -187,13 +191,24 @@ runs `claude -p` over a copy of the commit, with read-only tools. That means:
 - **Your code is read by Claude** the same way it is when you use Claude Code in
   that repo. Think about that before tracing a repo you couldn't use Claude Code
   on.
-- **It costs.** Tracing a change takes about a minute and usually $0.10–0.40 on
-  your Claude account. It only happens when you press "Trace this change", and
-  the result is kept in `~/.backstory/flows/`, so a view is traced once.
+- **It runs on a click.** Tracing a change takes about a minute, and only
+  happens when you press "Trace this change". The result is kept in
+  `~/.backstory/flows/`, so a view is traced once.
 - **The model** is Sonnet. On a server you run yourself (`npm run dev`),
   `BACKSTORY_FLOWS_MODEL` picks another (`opus`, or a full model id). Every step
   Claude cites is checked against its line; the ones that don't match are shown
   dashed, as unverified.
+
+### Cost
+
+Every read runs through your own Claude Code login:
+
+- With an API key, you pay per read. Main's map or data model is about a dollar
+  on a large repo and cents on a small one, and each change after it is cents. A
+  trace usually costs $0.10–0.40.
+- On a Claude subscription, reads count toward Claude's usage limits.
+- Each repo has **Turn off**, under its drafted map and data model, to stop
+  reading it as it opens.
 
 ## Reviewing an agent's work
 
