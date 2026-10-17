@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { existsSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -194,8 +195,14 @@ test("a cross-site request to a route that writes is refused and writes nothing"
       "map read",
       map.POST(send(at("map", `repo=${repo}&rev=HEAD`), "POST", EVIL)),
     ],
-    ["data auto on", data.POST(send(at("data", "auto=1"), "POST", EVIL))],
-    ["data auto off", data.POST(send(at("data", "auto=0"), "POST", EVIL))],
+    [
+      "data auto on",
+      data.POST(send(at("data", `repo=${repo}&auto=1`), "POST", EVIL)),
+    ],
+    [
+      "data auto off",
+      data.POST(send(at("data", `repo=${repo}&auto=0`), "POST", EVIL)),
+    ],
   ];
 
   for (const [name, call] of calls) {
@@ -205,17 +212,62 @@ test("a cross-site request to a route that writes is refused and writes nothing"
   assert.equal(waitingReview(REPO), null);
 });
 
-test("auto=1 turns reading data models automatically on, and auto=0 turns it off", async () => {
-  process.env.BACKSTORY_HOME = mkdtempSync(
-    path.join(tmpdir(), "backstory-api-"),
+/** A temp repo with one commit on `main`. */
+function tempRepo(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), "backstory-api-repo-"));
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" });
+  git("init", "-q", "-b", "main");
+  git(
+    "-c",
+    "user.email=t@example.com",
+    "-c",
+    "user.name=T",
+    "commit",
+    "-q",
+    "--allow-empty",
+    "-m",
+    "Start",
   );
-  const auto = async (value: string) =>
-    (await data.POST(send(at("data", `auto=${value}`), "POST", {}))).json();
-  assert.equal(autoRead(), false);
-  assert.deepEqual(await auto("1"), { auto: true });
-  assert.equal(autoRead(), true);
-  assert.deepEqual(await auto("0"), { auto: false });
-  assert.equal(autoRead(), false);
+  return dir;
+}
+
+test("auto=0 turns reading off for that repo and its worktrees only, and auto=1 turns it back on", async () => {
+  const home = mkdtempSync(path.join(tmpdir(), "backstory-api-"));
+  process.env.BACKSTORY_HOME = home;
+  const a = tempRepo();
+  const b = tempRepo();
+  const worktree = path.join(mkdtempSync(path.join(tmpdir(), "wt-")), "a2");
+  execFileSync("git", ["-C", a, "worktree", "add", "-q", "--detach", worktree]);
+  const auto = async (repo: string, value: string) =>
+    (
+      await data.POST(
+        send(
+          at("data", `repo=${encodeURIComponent(repo)}&auto=${value}`),
+          "POST",
+          {},
+        ),
+      )
+    ).json();
+
+  assert.equal(await autoRead(a), true);
+  assert.deepEqual(await auto(a, "0"), { auto: false });
+  assert.equal(await autoRead(a), false);
+  assert.equal(await autoRead(worktree), false);
+  assert.equal(await autoRead(b), true);
+
+  const trunk = await data.POST(
+    send(at("data", `repo=${encodeURIComponent(a)}&trunk=1`), "POST", {}),
+  );
+  assert.deepEqual(await trunk.json(), { started: false });
+  assert.equal(existsSync(path.join(home, "data")), false);
+
+  assert.deepEqual(await auto(a, "1"), { auto: true });
+  assert.equal(await autoRead(a), true);
+  assert.equal(await autoRead(worktree), true);
+
+  const bare = await data.POST(send(at("data", "auto=0"), "POST", {}));
+  assert.equal(bare.status, 400);
 });
 
 test("Disconnect GitHub deletes the saved token, and does nothing with none saved", async () => {

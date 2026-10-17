@@ -16,6 +16,7 @@ import { after, test } from "node:test";
 import type { Runner } from "../lib/ai/provider";
 import { buildData } from "../lib/data/build";
 import {
+  autoRead,
   dataReadSettled,
   dataStatus,
   PHASES,
@@ -943,7 +944,7 @@ test("a repo no reader knows shows its data model change once the AI provider dr
   assert.deepEqual(before.draft, {
     status: "idle",
     provider: "Claude Code",
-    auto: false,
+    auto: true,
   });
 
   const ai = recorder();
@@ -1187,7 +1188,7 @@ test("data.files tells the drafted read where the model is, and a changed steer 
     assert.deepEqual(stale.draft, {
       status: "idle",
       provider: "Claude Code",
-      auto: false,
+      auto: true,
     });
 
     const again = recorder();
@@ -1484,18 +1485,40 @@ test("a data folder in the old shape still uses its head model", async () => {
   assert.equal(data.source, "drafted");
 });
 
-test("with reading turned on, the idle status says so and nothing starts by itself", async () => {
+test("reading is on for a repo nobody turned off, the idle status says so, and nothing starts by itself", async () => {
   const repo = notesRepo();
-  setAutoRead(true);
-  try {
-    const data = await buildData(repo.root, repo.base, repo.head);
-    assert.deepEqual(data.draft, {
-      status: "idle",
-      provider: "Claude Code",
-      auto: true,
-    });
-  } finally {
-    setAutoRead(false);
-  }
+  assert.equal(await autoRead(repo.root), true);
+  const data = await buildData(repo.root, repo.base, repo.head);
+  assert.deepEqual(data.draft, {
+    status: "idle",
+    provider: "Claude Code",
+    auto: true,
+  });
   assert.equal((await dataStatus(repo.view)).status, "idle");
+
+  await setAutoRead(repo.root, false);
+  assert.equal(await autoRead(repo.root), false);
+  assert.deepEqual((await buildData(repo.root, repo.base, repo.head)).draft, {
+    status: "idle",
+    provider: "Claude Code",
+    auto: false,
+  });
+});
+
+test("reading main's data model reads no branch's view, so a view nobody opens is never read", async () => {
+  const repo = mainRepo();
+  const views = ["one", "two", "three"].map((name) => {
+    repo.git("checkout", "-q", "-b", name, repo.main);
+    return {
+      root: repo.root,
+      base: repo.main,
+      head: repo.on(["id", "body", name]),
+    };
+  });
+
+  const ai = recorder();
+  assert.equal(await readMain(repo.root, ai.runner), true);
+  assert.deepEqual(ai.calls, ["head"]);
+  for (const view of views)
+    assert.equal((await dataStatus(view)).status, "idle");
 });

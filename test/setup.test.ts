@@ -10,7 +10,6 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { setAutoRead } from "../lib/data/cache";
 import { SETUP_DETAILS, setupChecks, type SetupId } from "../lib/setup";
 import {
   githubApiStandIn,
@@ -86,38 +85,6 @@ test("Claude Code's row tells not installed, logged out and ready apart", async 
       "claude",
     ),
     "ready",
-  );
-});
-
-test("the Maps and data models row shows once Claude Code is ready, and is ready once reading is turned on", async () => {
-  process.env.BACKSTORY_HOME = mkdtempSync(
-    path.join(os.tmpdir(), "backstory-setup-"),
-  );
-  const claude = (loggedIn: boolean) =>
-    `if [ "$1" = auth ]; then echo '{"loggedIn": ${loggedIn}}'; exit ${loggedIn ? 0 : 1}; fi\necho "2.1.0 (Claude Code)"`;
-  const rows = async (loggedIn: boolean) =>
-    (await checks({ git: GIT, claude: claude(loggedIn) })).rows.map(
-      (row) => row.id,
-    );
-  assert.deepEqual(await rows(false), ["git", "github", "claude", "reviews"]);
-  assert.deepEqual(await rows(true), [
-    "git",
-    "github",
-    "claude",
-    "data",
-    "reviews",
-  ]);
-
-  const data = async () =>
-    (await checks({ git: GIT, claude: claude(true) })).state("data");
-  assert.equal(await data(), "missing");
-  setAutoRead(true);
-  assert.equal(await data(), "ready");
-  setAutoRead(false);
-  assert.equal(await data(), "missing");
-  assert.match(
-    SETUP_DETAILS.data,
-    /map and data model .* once for main .* then only what each change differs by/,
   );
 });
 

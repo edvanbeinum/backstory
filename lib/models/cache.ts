@@ -52,10 +52,10 @@ import { draftModel } from "./draft";
  * every derived map, since an error in main's map is copied into each of
  * them.
  *
- * Reads run one at a time, apart from the data cache's: a full read on a
- * large repo is a few minutes. They start on a click, or, once the user turns
- * on reading automatically (`autoRead`), as a repo and a view open. Kept on
- * globalThis, as `lib/flows/cache.ts` keeps its runs, because Next may load
+ * Reads run one at a time, apart from the data cache's, to keep within the
+ * user's usage limits: a full read on a large repo is a few minutes. They
+ * start as a repo and a view open, unless the user turned the repo off
+ * (`autoRead`), or on a click. Kept on globalThis, as `lib/flows/cache.ts` keeps its runs, because Next may load
  * this module once per route bundle.
  */
 
@@ -230,7 +230,7 @@ export async function mapStatus(view: MapView): Promise<MapDraftStatus> {
   const idle = {
     status: "idle",
     provider: aiProvider().name,
-    auto: autoRead(),
+    auto: await autoRead(view.root),
   } as const;
   const ended = registry.ended.get(files.key);
   // A done read whose files were deleted since is a view to read again.

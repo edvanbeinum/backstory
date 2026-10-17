@@ -50,8 +50,9 @@ import type { DataDraftStatus, DataModel } from "./types";
  * derived model, since an error in main's model is copied into each of them.
  *
  * Reads run one at a time, to keep within the user's usage limits: a full
- * read on a large repo is a few minutes. They start on a click, or, once the
- * user turns on `data.auto`, as a repo and a view open. Kept on globalThis, as `lib/flows/cache.ts` keeps its
+ * read on a large repo is a few minutes. They start as a repo and a view
+ * open, unless the user turned the repo off (`autoRead`), or on a click. Kept
+ * on globalThis, as `lib/flows/cache.ts` keeps its
  * runs, because Next may load this module once per route bundle.
  */
 
@@ -117,11 +118,16 @@ export const PHASES = {
   head: "Reading this change",
 };
 
-const AUTO = "data.auto";
+const offKey = async (root: string) => `read.off.${await repoKey(root)}`;
 
-/** Whether the user has turned on reading data models as repos and views open. */
-export const autoRead = () => setting(AUTO) === "1";
-export const setAutoRead = (on: boolean) => setSetting(AUTO, on ? "1" : "0");
+/**
+ * Whether maps and data models read as the repo and its views open: on unless
+ * the user turned the repo off. Keyed by repo, so every worktree shares it.
+ */
+export const autoRead = async (root: string) =>
+  setting(await offKey(root)) !== "1";
+export const setAutoRead = async (root: string, on: boolean) =>
+  setSetting(await offKey(root), on ? "0" : "1");
 
 interface Files {
   dir: string;
@@ -242,7 +248,7 @@ export async function dataStatus(view: DataView): Promise<DataDraftStatus> {
   const idle = {
     status: "idle",
     provider: aiProvider().name,
-    auto: autoRead(),
+    auto: await autoRead(view.root),
   } as const;
   const ended = registry.ended.get(files.key);
   // A done read whose files were deleted since is a view to read again.

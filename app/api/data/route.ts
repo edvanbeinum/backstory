@@ -51,9 +51,9 @@ export async function GET(request: Request) {
 
 /**
  * Starts the AI provider's read of the view's data model; `redraft=1` reads it
- * again. `trunk=1` starts reading main's data model for `repo`, when reading
- * automatically is on. `auto=1` and `auto=0` turn reading automatically on
- * and off.
+ * again. `trunk=1` starts reading main's data model for `repo`, unless the
+ * repo is turned off. `auto=1` and `auto=0` turn reading `repo`'s maps and
+ * data models as it opens on and off.
  */
 export async function POST(request: Request) {
   // A read sends code to the AI provider: only Backstory's own page asks.
@@ -62,11 +62,8 @@ export async function POST(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const auto = searchParams.get("auto");
-    if (auto === "1" || auto === "0") {
-      setAutoRead(auto === "1");
-      return NextResponse.json({ auto: autoRead() });
-    }
-    if (searchParams.get("trunk") === "1") {
+    const setsAuto = auto === "1" || auto === "0";
+    if (setsAuto || searchParams.get("trunk") === "1") {
       const repoPath = searchParams.get("repo");
       if (!repoPath)
         return NextResponse.json<ApiError>(
@@ -74,8 +71,12 @@ export async function POST(request: Request) {
           { status: 400 },
         );
       const { root } = await resolveRepo(repoPath);
+      if (setsAuto) {
+        await setAutoRead(root, auto === "1");
+        return NextResponse.json({ auto: await autoRead(root) });
+      }
       return NextResponse.json({
-        started: autoRead() && (await startTrunkRead(root)),
+        started: (await autoRead(root)) && (await startTrunkRead(root)),
       });
     }
     const r = await resolve(request);

@@ -229,7 +229,7 @@ export async function buildMap(
   const reading = drafting
     ? {
         draft: await mapStatus({ root, base, head }),
-        auto: autoRead(),
+        auto: await autoRead(root),
         handFile: await localModelFile(root),
       }
     : {};

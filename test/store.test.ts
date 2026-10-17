@@ -147,11 +147,11 @@ test("a home with no JSON files makes an empty database at version 2", () => {
 
 test("a setting reads back as it was set, and null when never set", () => {
   tempHome();
-  assert.equal(setting("data.auto"), null);
-  setSetting("data.auto", "1");
-  assert.equal(setting("data.auto"), "1");
-  setSetting("data.auto", "0");
-  assert.equal(setting("data.auto"), "0");
+  assert.equal(setting("read.off.x"), null);
+  setSetting("read.off.x", "1");
+  assert.equal(setting("read.off.x"), "1");
+  setSetting("read.off.x", "0");
+  assert.equal(setting("read.off.x"), "0");
   assert.equal(count("settings"), 1);
 });
 
@@ -167,8 +167,8 @@ test("a database at version 1 opens at version 2 with a settings table, its rows
   process.env.BACKSTORY_HOME = home;
   assert.equal(version(), 2);
   assert.equal(count("seen"), 1);
-  setSetting("data.auto", "1");
-  assert.equal(setting("data.auto"), "1");
+  setSetting("read.off.x", "1");
+  assert.equal(setting("read.off.x"), "1");
 });
 
 const SHA = "76c66deaa060ae3da0ff460e13aabfff3de885c4";

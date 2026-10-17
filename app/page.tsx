@@ -483,8 +483,8 @@ export default function Page() {
   }, [ready, repoPath, ref, loadSession]);
 
   // Start reading main's data model and map as a repo opens, while a pull
-  // request is still being chosen. The server starts each only when reading
-  // automatically is on and main has no model of that kind yet.
+  // request is still being chosen. The server starts each unless the repo is
+  // turned off or main has a model of that kind already.
   useEffect(() => {
     if (!ready || !repoPath) return;
     const trunk = `repo=${encodeURIComponent(repoPath)}&trunk=1`;

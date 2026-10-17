@@ -48,7 +48,7 @@ terms:
     means: "`data.files` and `data.format` in a workspace's properties: which files hold the data model, and which data reader reads them. Read at the head and used at both ends of a view."
     avoid: []
   - name: drafted data model
-    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read on a click, or as repos and views open once the setup checklist's Maps and data models row turns that on, and marked drafted wherever it's shown."
+    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read as repos and views open, unless the repo is turned off (Turn off under a drafted data model or map), or on a click, and marked drafted wherever it's shown."
     avoid: []
   - name: main's data model
     means: "The drafted data model of the repo's default branch that every view's base is derived from, pointed at by `trunk.json` in the repo's data folder (`lib/data/cache.ts`). Read in full once, and moved forward when a view's base is on main past it."
@@ -71,7 +71,7 @@ terms:
     avoid:
       - draft alone, for the model (reply drafts are `lib/drafts.ts`)
   - name: drafted map
-    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read on a click (Draft a model), or as repos and views open once reading automatically is on, and marked Draft under the map."
+    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off, or on a click (Draft a model), and marked Draft under the map."
     avoid:
       - local model, for a drafted map
   - name: main's map
@@ -101,7 +101,7 @@ terms:
       - dev mode
       - override
   - name: setup checklist
-    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, maps and data models, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Maps and data models row, shown once Claude Code is ready, states what reading maps and data models costs, and its Read automatically button turns on reading both, as does Read automatically beside Draft a model or Draft the data model on Story. The Mac app's Set Up Backstory… brings it back at `/?setup=1`, and so does the Connect GitHub link on a repo or inbox notice. The GitHub row offers Connect GitHub, with `gh auth login` as the alternative. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
+    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Mac app's Set Up Backstory… brings it back at `/?setup=1`, and so does the Connect GitHub link on a repo or inbox notice. The GitHub row offers Connect GitHub, with `gh auth login` as the alternative. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
     avoid:
       - onboarding
       - wizard
