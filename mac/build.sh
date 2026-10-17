@@ -45,9 +45,6 @@ xcodebuild -quiet -project mac/backstory/Backstory.xcodeproj -scheme Backstory \
 
 rm -rf "$app"
 ditto "$out/DerivedData/Build/Products/Release/Backstory.app" "$app"
-# Stamp the bundle with this build's time. ditto keeps the date Xcode's
-# incremental build left on the folder, so Finder would show an old build date.
-touch "$app"
 identity="${BACKSTORY_SIGN_IDENTITY:-}"
 if [ -z "$identity" ]; then
   identity="$(security find-identity -v -p codesigning |
