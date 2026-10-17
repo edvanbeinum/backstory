@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import * as ai from "../app/api/ai/route";
 import * as data from "../app/api/data/route";
 import * as githubLogin from "../app/api/github/login/route";
 import * as map from "../app/api/map/route";
@@ -15,7 +22,8 @@ import * as review from "../app/api/review/route";
 import { crossSite } from "../lib/api";
 import { autoRead } from "../lib/data/cache";
 import { waitingReview } from "../lib/review";
-import { SECURITY, standIns } from "./standins";
+import type { ApiError } from "../lib/types";
+import { quietLoginShell, SECURITY, standIns } from "./standins";
 import { readText, root } from "./yaml";
 
 const req = (headers: Record<string, string>) =>
@@ -268,6 +276,53 @@ test("auto=0 turns reading off for that repo and its worktrees only, and auto=1 
 
   const bare = await data.POST(send(at("data", "auto=0"), "POST", {}));
   assert.equal(bare.status, 400);
+});
+
+/**
+ * A stand-in `claude` that logs each command's first argument to `calls`
+ * beside it: missing when `--version` fails, else signed in or out.
+ */
+const claudeStandIn = (state: "missing" | "logged-out" | "ready") =>
+  `echo "$1" >> "\${0%/*}/calls"
+if [ "$1" = --version ]; then exit ${state === "missing" ? 1 : 0}; fi
+echo '{"loggedIn": ${state === "ready"}}'; exit ${state === "ready" ? 0 : 1}`;
+
+test("GET /api/ai answers missing, logged out or ready, and checks again only when missing", async () => {
+  quietLoginShell();
+  const saved = process.env.PATH;
+  try {
+    for (const state of ["missing", "logged-out", "ready"] as const) {
+      const dir = standIns({ claude: claudeStandIn(state) });
+      process.env.PATH = dir;
+      const res = await ai.GET();
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), {
+        status: state,
+        provider: "Claude Code",
+      });
+      const versions = readFileSync(path.join(dir, "calls"), "utf8")
+        .split("\n")
+        .filter((call) => call === "--version").length;
+      assert.equal(versions, state === "missing" ? 2 : 1, state);
+    }
+  } finally {
+    process.env.PATH = saved;
+  }
+});
+
+test("GET /api/ai answers an error, never ready, when the provider can't be asked", async () => {
+  const saved = process.env.BACKSTORY_AI;
+  process.env.BACKSTORY_AI = "not-a-provider";
+  try {
+    const res = await ai.GET();
+    assert.equal(res.ok, false);
+    const body = (await res.json()) as ApiError;
+    assert.equal(body.kind, "internal");
+    assert.match(body.detail ?? "", /not-a-provider/);
+  } finally {
+    if (saved === undefined) delete process.env.BACKSTORY_AI;
+    else process.env.BACKSTORY_AI = saved;
+  }
 });
 
 test("Disconnect GitHub deletes the saved token, and does nothing with none saved", async () => {
