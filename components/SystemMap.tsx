@@ -685,8 +685,8 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
       </span>
       {provider && (
         <span className="est">
-          {provider} · a few minutes for main, then cents a change · uses your{" "}
-          {provider} account
+          {provider} · a few minutes for main, then seconds a change · uses your{" "}
+          {provider} login
         </span>
       )}
       {file && (
@@ -727,13 +727,11 @@ function LocalModel({ map }: { map: MapResponse }) {
   );
 }
 
-/** A drafted map's footnote: the Draft badge, whether reads start by themselves, what the repo's maps cost, Turn off and Redraft. */
+/** A drafted map's footnote: the Draft badge, whether reads start by themselves, Turn off and Redraft. */
 function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   const running = map.draft?.status === "running";
   const parts: React.ReactNode[] = [];
   if (map.auto) parts.push("Read automatically");
-  if (map.spentUsd !== undefined)
-    parts.push(`$${map.spentUsd.toFixed(2)} spent on this repo's map`);
   if (map.auto)
     parts.push(
       <button

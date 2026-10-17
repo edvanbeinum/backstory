@@ -49,7 +49,7 @@ export async function GET(request: Request) {
  * when reading automatically is on.
  */
 export async function POST(request: Request) {
-  // A read costs money and sends code to the AI provider: only Backstory's own page asks.
+  // A read sends code to the AI provider: only Backstory's own page asks.
   const refused = crossSite(request);
   if (refused) return refused;
   try {

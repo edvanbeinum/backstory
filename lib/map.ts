@@ -8,7 +8,7 @@ import {
   type ModelElement,
   type ModelSource,
 } from "./model";
-import { mapSpentUsd, mapStatus, type MapDraftStatus } from "./models/cache";
+import { mapStatus, type MapDraftStatus } from "./models/cache";
 
 /**
  * The system map for a view: which C4 elements the change touched, which
@@ -68,8 +68,6 @@ export interface MapResponse {
   modelFile: string | null;
   /** The view's map read, when the repo has no model of its own */
   draft?: MapDraftStatus;
-  /** On a drafted map: the dollars spent drafting this repo's maps */
-  spentUsd?: number;
   /** When the repo has no model of its own: whether maps are read as repos and views open */
   auto?: boolean;
   /** When the repo has no model of its own: where a hand-written local model goes */
@@ -412,9 +410,6 @@ export async function buildMap(
     local,
     modelFile: headRead.file,
     ...reading,
-    ...(headRead.source === "drafted"
-      ? { spentUsd: await mapSpentUsd(root) }
-      : {}),
     nodes,
     edges: [...edges.values()].filter(
       (e) => shown.has(e.source) && shown.has(e.destination),

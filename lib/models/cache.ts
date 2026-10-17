@@ -116,7 +116,7 @@ const registry: Registry = (g.__backstoryMaps ??= {
 export const PHASES = {
   waiting: "Waiting for another read",
   main: "Reading main's map first",
-  firstMain: "Reading main's map first, so each change after this costs cents",
+  firstMain: "Reading main's map first, so each change after this is quick",
   base: "Reading what the base changed since main",
   baseInFull: "Reading the base",
   head: "Reading this change",
@@ -183,18 +183,6 @@ async function cached(files: Files) {
   return base ? { base, head } : null;
 }
 
-/** The dollars spent on every map saved for the repo. */
-async function spent(dir: string): Promise<number> {
-  const names = await fs.readdir(dir).catch(() => []);
-  let total = 0;
-  for (const name of names) {
-    if (!name.endsWith(".json")) continue;
-    const file = await readJson<{ costUsd?: unknown }>(path.join(dir, name));
-    if (typeof file?.costUsd === "number") total += file.costUsd;
-  }
-  return total;
-}
-
 /**
  * The drafted map saved for the rev's tree, for `readModelAt`. Returns the
  * `Workspace`, not a model: `lib/model.ts` builds it, and this module can't
@@ -208,11 +196,6 @@ export async function savedMapAt(
   if (!t) return null;
   const map = await savedMap(await mapsDir(root), t);
   return map ? { workspace: map.workspace, readAt: map.readAt } : null;
-}
-
-/** The dollars spent on the repo's drafted maps. */
-export async function mapSpentUsd(root: string): Promise<number> {
-  return spent(await mapsDir(root));
 }
 
 /** Why the map at the rev isn't drafted, or null when it may be. */

@@ -1232,7 +1232,6 @@ test("once main is read, a new branch reads two deltas and never its head in ful
   );
   // A base off main leaves main's model where it was.
   assert.equal((await readTrunk(repo.root)).commit, repo.main);
-  assert.equal(Math.round((data.spentUsd ?? 0) * 100) / 100, 0.3);
 
   // A second branch from the same point finds the base's model.
   repo.git("checkout", "-q", "-b", "other", first);
@@ -1483,7 +1482,6 @@ test("a data folder in the old shape still uses its head model", async () => {
   assert.equal((await readModelFile(repo.root, head)).readAt, 1);
   const data = await buildData(repo.root, repo.base, repo.head);
   assert.equal(data.source, "drafted");
-  assert.equal(Math.round((data.spentUsd ?? 0) * 100) / 100, 1.6);
 });
 
 test("with reading turned on, the idle status says so and nothing starts by itself", async () => {

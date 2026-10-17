@@ -118,8 +118,7 @@ export function Flows({
           Trace this change
         </Button>
         <span className="est">
-          Claude Code · about a minute · usually $0.10–0.40 on your Claude
-          account; the result is kept
+          Claude Code · about a minute · the result is kept
         </span>
       </div>
     );
@@ -257,7 +256,7 @@ function Regenerate({
     <p className="flex items-center gap-2 px-0.5 text-[11px] text-[var(--fg-subtle)]">
       <span>
         Traced by Claude Code{set.model ? ` (${modelName(set.model)})` : ""} in{" "}
-        {Math.round(set.durationMs / 1000)} s · ${set.costUsd.toFixed(2)}
+        {Math.round(set.durationMs / 1000)} s
       </span>
       <span className="flex-1" />
       <button

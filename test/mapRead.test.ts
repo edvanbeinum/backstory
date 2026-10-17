@@ -305,7 +305,7 @@ test("once main's map is saved, each branch reads only its own difference", asyn
   assert.equal((await mapFile(repo.root, repo.tree(first))).costUsd, 0.1);
   assert.equal((await trunk(repo.root)).commit, repo.main);
   const map = await buildMap(repo.root, first, second);
-  assert.equal(Math.round((map.spentUsd ?? 0) * 100) / 100, 0.3);
+  assert.equal(map.source, "drafted");
 
   // A second branch from the same point finds its base's map.
   repo.git("checkout", "-q", "-b", "other", first);
