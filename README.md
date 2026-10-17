@@ -71,7 +71,7 @@ reach an agent that's busy.
 ## Troubleshooting
 
 **Backstory asks for Claude Code.** Install
-[Claude Code](https://claude.com/claude-code) and sign in, then come back to
+[Claude Code](https://claude.com/claude-code) and run `claude auth login`, then come back to
 Backstory's window. It checks again and opens.
 
 **A banner sits where the PR's review comments should be.** GitHub isn't

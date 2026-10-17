@@ -19,7 +19,7 @@ see the [README](../README.md).
 
 Backstory draws your code with Claude Code. Until Claude Code is installed and
 signed in, Backstory shows only a card that says so, with **Get Claude Code** or
-**Copy: claude**, and checks again when you come back to the window.
+**Copy: claude auth login**, and checks again when you come back to the window.
 
 The first time, the inbox opens with **Set up Backstory**: a row each for git,
 Claude Code, GitHub and notes to your agent, saying what each one adds, with a

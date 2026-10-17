@@ -187,7 +187,7 @@ primitives:
     file: components/ClaudeCodeNotice.tsx
     symbols:
       - ClaudeCodeNotice
-    use: "The one message and button for Claude Code not installed (Get Claude Code) or logged out (Copy: claude). Flows, the map's and the data model's drafts, the setup checklist and the Claude Code gate show it, so they never word it differently."
+    use: "The one message and button for Claude Code not installed (Get Claude Code) or logged out (Copy: claude auth login). Flows, the map's and the data model's drafts, the setup checklist and the Claude Code gate show it, so they never word it differently."
   - name: graph layout
     block: UI tabs
     file: components/graph.ts
