@@ -502,6 +502,7 @@ export default function Page() {
       if (await checkBuild()) return;
       setWorkingTick((t) => t + 1);
       setReviewTick((t) => t + 1);
+      setModelTick((t) => t + 1);
       void loadSession(repoRef.current, { background: true });
     };
 

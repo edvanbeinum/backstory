@@ -228,7 +228,10 @@ export async function readDrafted(view: DataView): Promise<{
   };
 }
 
-export async function dataStatus(view: DataView): Promise<DataDraftStatus> {
+export async function dataStatus(
+  view: DataView,
+  status?: () => Promise<ProviderStatus>,
+): Promise<DataDraftStatus> {
   const files = await filesFor(view);
   const job = registry.jobs.get(files.key);
   if (job) {
@@ -253,6 +256,17 @@ export async function dataStatus(view: DataView): Promise<DataDraftStatus> {
   const ended = registry.ended.get(files.key);
   // A done read whose files were deleted since is a view to read again.
   if (ended?.status === "done" && !(await cached(files, view))) return idle;
+  // Ask the provider again while it was missing or signed out, so installing
+  // or signing in brings the read back without a restart.
+  if (ended?.status === "unavailable") {
+    const reason = providerGap(await (status ?? aiProvider().status)());
+    if (!reason) {
+      registry.ended.delete(files.key);
+      return idle;
+    }
+    registry.ended.set(files.key, { ...ended, reason });
+    return { ...ended, reason };
+  }
   return ended ?? idle;
 }
 

@@ -580,10 +580,21 @@ test("a provider that isn't installed, or is logged out, says so and reads nothi
       provider: "Claude Code",
       reason,
     });
-    assert.deepEqual(await mapStatus(view), started);
+    assert.deepEqual(await mapStatus(view, async () => status), started);
     assert.deepEqual(ai.calls, []);
   }
   assert.equal(existsSync(await mapsFolder(repo.root)), false);
+});
+
+test("once Claude Code is signed in, a view that found it signed out is idle again", async () => {
+  const repo = mainRepo();
+  const head = repo.commit({ "src/app/basket.ts": "1\n" }, "Basket");
+  const view = { root: repo.root, base: repo.main, head };
+  await startMapRead(view, {
+    runner: recorder().runner,
+    status: async () => "logged-out",
+  });
+  assert.equal((await mapStatus(view, async () => "ready")).status, "idle");
 });
 
 const post = (query: string) =>

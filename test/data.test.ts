@@ -1080,7 +1080,24 @@ test("a provider that isn't installed says which, and reads nothing", async () =
     reason: "no-claude",
   });
   assert.deepEqual(ai.calls, []);
-  assert.deepEqual(await dataStatus(repo.view), status);
+  assert.deepEqual(await dataStatus(repo.view, async () => "missing"), status);
+});
+
+test("once Claude Code is signed in, a view that found it signed out is idle again", async () => {
+  const repo = notesRepo();
+  await startDataRead(repo.view, {
+    runner: recorder().runner,
+    status: async () => "missing",
+  });
+  assert.deepEqual(await dataStatus(repo.view, async () => "logged-out"), {
+    status: "unavailable",
+    provider: "Claude Code",
+    reason: "logged-out",
+  });
+  assert.equal(
+    (await dataStatus(repo.view, async () => "ready")).status,
+    "idle",
+  );
 });
 
 test("a logged-out provider says so, and reads nothing", async () => {

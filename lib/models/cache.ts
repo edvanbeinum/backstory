@@ -210,7 +210,10 @@ export async function mapRefusal(
   return null;
 }
 
-export async function mapStatus(view: MapView): Promise<MapDraftStatus> {
+export async function mapStatus(
+  view: MapView,
+  status?: () => Promise<ProviderStatus>,
+): Promise<MapDraftStatus> {
   const files = await filesFor(view);
   const job = registry.jobs.get(files.key);
   if (job) {
@@ -235,6 +238,17 @@ export async function mapStatus(view: MapView): Promise<MapDraftStatus> {
   const ended = registry.ended.get(files.key);
   // A done read whose files were deleted since is a view to read again.
   if (ended?.status === "done" && !(await cached(files))) return idle;
+  // Ask the provider again while it was missing or signed out, so installing
+  // or signing in brings the read back without a restart.
+  if (ended?.status === "unavailable") {
+    const reason = providerGap(await (status ?? aiProvider().status)());
+    if (!reason) {
+      registry.ended.delete(files.key);
+      return idle;
+    }
+    registry.ended.set(files.key, { ...ended, reason });
+    return { ...ended, reason };
+  }
   return ended ?? idle;
 }
 
