@@ -526,12 +526,16 @@ function useDataDraft(
   // says idle, and would hide the answer that says running, so nothing would
   // poll. A page read that lands after the answer still replaces it.
   const latest = useRef({ view: `${repo}\n${rev}`, given });
+  // Try again repeats the last read: a Redraft only when that was a Redraft,
+  // since one reads main in full and removes every derived model.
+  const lastRedraft = useRef(false);
   useEffect(() => {
     latest.current = { view: `${repo}\n${rev}`, given };
   }, [repo, rev, given]);
 
   const request = useCallback(
     async (method: "GET" | "POST", redraft = false) => {
+      if (method === "POST") lastRedraft.current = redraft;
       const view = `${repo}\n${rev}`;
       const params = new URLSearchParams({ repo, rev });
       if (redraft) params.set("redraft", "1");
@@ -611,6 +615,7 @@ function useDataDraft(
     data,
     error: error?.over === given ? error.message : null,
     start: (redraft = false) => void request("POST", redraft),
+    retry: () => void request("POST", lastRedraft.current),
     turnOn: () => void setAuto(true),
     turnOff: () => void setAuto(false),
   };
@@ -652,7 +657,7 @@ function DraftProgress({
         <span className="truncate" title={job.error}>
           The read failed: {job.error}
         </span>
-        <Button size="sm" onClick={() => draft.start(Boolean(data.drafted))}>
+        <Button size="sm" onClick={draft.retry}>
           Try again
         </Button>
       </span>
