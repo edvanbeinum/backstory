@@ -757,6 +757,13 @@ function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
           </span>
         ))}
       </span>
+      {/* Offers Draft a model when the head has a map but its base doesn't,
+          so reading the base isn't left to Redraft, which reads main in full. */}
+      {!map.baseModel && map.draft?.status === "idle" && !map.auto && (
+        <Button size="sm" variant="invisible" onClick={() => draft.start()}>
+          Draft a model
+        </Button>
+      )}
       {!running && (
         <Button
           size="sm"
