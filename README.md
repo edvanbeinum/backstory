@@ -57,8 +57,8 @@ You need:
    about a minute and usually costs $0.10–0.40 on your Claude account. When it
    finishes, each flow appears as a card under the map.
 4. Check the map for the components the change touched. If the repo has no C4
-   model, press **Draft a model** and Claude Code writes one for you to correct,
-   outside the repo.
+   model, press **Draft a model** and Claude Code drafts one, kept outside the
+   repo.
 5. Click a step in a flow to open its code under it. Press **Show in Files
    changed** to see the same lines in the diff.
 6. To ask the agent for a fix, hover a line in **Files changed**, press **+** and

@@ -189,6 +189,65 @@ test("a base DSL that can't be read counts as no base model, and says why", asyn
   assert.ok(map.nodes.every((n) => n.state !== "added"));
 });
 
+test("a change that touches no component has the whole system for Show map as containers, unchanged; one that touches one doesn't", async () => {
+  const repo = gitRepo();
+  const model = `workspace {
+    !identifiers hierarchical
+    model {
+        shopper = person "Shopper"
+        payments = softwareSystem "Payments"
+        app = softwareSystem "App" {
+            web = container "Web" {
+                a = component "Alpha" {
+                    properties {
+                        "code.globs" "src/a/**"
+                    }
+                }
+                b = component "Beta"
+            }
+            db = container "Db"
+        }
+        shopper -> app.web.a "Uses"
+        shopper -> app.web "Opens"
+        app.web.a -> app.web.b "Calls"
+        app.web.b -> payments "Charges"
+        app.web.b -> app.db "Reads"
+        shopper -> app "Visits"
+    }
+}
+`;
+  const base = repo.commit(
+    { "src/a/one.ts": "1\n", "architecture/workspace.dsl": model },
+    "base",
+  );
+  const docs = repo.commit({ "README.md": "x\n" }, "docs");
+  const map = await buildMap(repo.dir, base, docs);
+  assert.equal(map.status, "ok");
+  assert.deepEqual(map.nodes, []);
+  assert.deepEqual(
+    map.whole?.nodes.map((n) => [n.id, n.state, n.files.length]).sort(),
+    [
+      ["app.db", "neighbour", 0],
+      ["app.web", "neighbour", 0],
+      ["payments", "neighbour", 0],
+      ["shopper", "neighbour", 0],
+    ],
+  );
+  assert.deepEqual(
+    map.whole?.edges.map((e) => [e.key, e.description, e.state]).sort(),
+    [
+      ["app.web → app.db", "Reads", "same"],
+      ["app.web → payments", "Charges", "same"],
+      ["shopper → app.web", "Uses; Opens", "same"],
+    ],
+  );
+
+  const touched = repo.commit({ "src/a/one.ts": "2\n" }, "touch");
+  const focused = await buildMap(repo.dir, docs, touched);
+  assert.equal(focused.nodes.length > 0, true);
+  assert.equal(focused.whole, undefined);
+});
+
 test("a base with no model adds nothing", async () => {
   const map = await buildMap(changeRepo.dir, null, changeRepo.base);
   assert.equal(map.baseModel, false);
@@ -212,7 +271,6 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
     assert.equal(map.baseModel, false);
     assert.equal(map.fileComponents["src/a/one.ts"], "Alpha");
     assert.equal(map.modelFile, file);
-    assert.equal(map.drafted, null);
   } finally {
     // Restore npm test's throwaway BACKSTORY_HOME so later tests can use it.
     if (previousHome === undefined) delete process.env.BACKSTORY_HOME;
@@ -220,7 +278,7 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
   }
 });
 
-test("a drafted local model says so and where it is; a committed one says neither", async () => {
+test("the old drafted local model is skipped, and the map says where a hand-written one goes; a committed one says neither", async () => {
   const repo = gitRepo();
   const home = tempDir("backstory-home-");
   const base = repo.commit({ README: "x\n" }, "base");
@@ -232,16 +290,20 @@ test("a drafted local model says so and where it is; a committed one says neithe
     const file = await localModelFile(repo.dir);
     write(path.dirname(file), "workspace.dsl", draftedDsl("backstory.drafted"));
     const map = await buildMap(repo.dir, base, head);
-    assert.equal(map.drafted, "2026-10-05");
-    assert.equal(map.modelFile, file);
+    assert.equal(map.status, "none");
+    assert.equal(map.modelFile, null);
+    assert.equal(map.handFile, file);
+    assert.equal(map.draft?.status, "idle");
 
     const committed = await buildMap(
       changeRepo.dir,
       changeRepo.base,
       changeRepo.head,
     );
-    assert.equal(committed.drafted, null);
+    assert.equal(committed.source, "committed");
     assert.equal(committed.modelFile, null);
+    assert.equal(committed.handFile, undefined);
+    assert.equal(committed.draft, undefined);
   } finally {
     if (previousHome === undefined) delete process.env.BACKSTORY_HOME;
     else process.env.BACKSTORY_HOME = previousHome;

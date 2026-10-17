@@ -1,25 +1,10 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
-
-import {
-  aiProvider,
-  providerGap,
-  type ProviderGap,
-  type ProviderStatus,
-  type Runner,
-} from "../ai/provider";
+import { aiProvider, type Runner } from "../ai/provider";
+import { readDsl } from "../dsl";
 import { git, gitLine } from "../exec";
 import { withSnapshot } from "../flows/generate";
-import {
-  DRAFTED_PROPERTY,
-  exists,
-  localModelDir,
-  localModelFile,
-  MODEL_DSL,
-  showFile,
-} from "../model";
+import type { Workspace } from "../model";
 import { assignIds, serializeModel, type DraftIds } from "./dsl";
-import { checkGlobs, type GlobCheck } from "./globs";
+import { checkGlobs } from "./globs";
 import {
   draftPrompt,
   draftSchema,
@@ -30,64 +15,20 @@ import {
 } from "./prompts";
 
 /**
- * Drafting a C4 model for a repo that has none: Claude reads the code at
- * HEAD and Backstory writes the result to the local model file the map
- * already reads, `~/.backstory/models/<repo key>/workspace.dsl`. Never into the
- * repo.
- *
- * One job per repo, in memory on globalThis, as `lib/flows/cache.ts` keeps
- * its runs: Next may load this module once per route bundle. A restart
- * mid-draft loses the job and writes nothing.
+ * Drafts a C4 model in full: Claude reads the code at a commit, and Backstory
+ * turns its structured answer into a `Workspace` through the DSL it writes
+ * and reads, so a draft always parses. A second, bounded call fixes the globs
+ * of files no component, or two components, claim. The map cache
+ * (`cache.ts`) saves the result; nothing here writes a file.
  */
 
 /** Paths the glob fix-up is shown, so a draft that missed most files stays one bounded call. */
 const MAX_FIX_PATHS = 200;
-/** Paths the file's header names before the rest become "and N more". */
-const MAX_HEADER_PATHS = 50;
-
-export type DraftStatus =
-  | { status: "idle" }
-  | { status: "running"; phase: string; startedAt: number }
-  | {
-      status: "done";
-      costUsd: number;
-      model: string | null;
-      durationMs: number;
-      unmatched: number;
-      ambiguous: number;
-    }
-  | { status: "failed"; error: string }
-  | { status: "unavailable"; reason: ProviderGap };
-
-/** What `/api/model` answers: where the repo's model at HEAD comes from */
-export interface ModelSourceResponse {
-  source: "committed" | "local" | "none";
-  /** The local model's path, or where a draft would write it; null for a committed one */
-  file: string | null;
-  job: DraftStatus;
-}
-
-/** Why a draft didn't start: the repo commits a model, or a local one needs `redraft`. */
-export interface DraftRefusal {
-  status: "refused";
-  reason: "committed" | "exists";
-}
 
 export interface DraftResult {
-  dsl: string;
+  workspace: Workspace;
   costUsd: number;
   model: string | null;
-  durationMs: number;
-  unmatched: number;
-  ambiguous: number;
-}
-
-const plural = (n: number, one: string, many: string) =>
-  `${n} ${n === 1 ? one : many}`;
-
-export function formatDuration(ms: number): string {
-  const s = Math.round(ms / 1000);
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
 }
 
 function applyFix(
@@ -111,39 +52,18 @@ function applyFix(
   };
 }
 
-function leftOver(check: GlobCheck, sha: string): string[] {
-  const list = (items: string[]) => {
-    const shown = items.slice(0, MAX_HEADER_PATHS).map((p) => `  ${p}`);
-    if (items.length > MAX_HEADER_PATHS)
-      shown.push(`  and ${items.length - MAX_HEADER_PATHS} more`);
-    return shown;
-  };
-  if (check.unmatched.length === 0 && check.ambiguous.length === 0)
-    return [`Every app file at ${sha} matches exactly one component.`];
-  const lines: string[] = [];
-  if (check.unmatched.length > 0)
-    lines.push(
-      `${plural(check.unmatched.length, "app file matches", "app files match")} no component:`,
-      ...list(check.unmatched),
-    );
-  if (check.ambiguous.length > 0)
-    lines.push(
-      `${plural(check.ambiguous.length, "app file matches", "app files match")} more than one component:`,
-      ...list(check.ambiguous.map((a) => `${a.file} ← ${a.ids.join(", ")}`)),
-    );
-  return lines;
-}
-
 export async function draftModel(opts: {
   root: string;
+  rev: string;
   runner?: Runner;
-  onPhase?: (phase: string) => void;
 }): Promise<DraftResult> {
-  const started = Date.now();
   const runner = opts.runner ?? aiProvider().run;
-  const phase = opts.onPhase ?? (() => {});
-  const sha = await gitLine(opts.root, ["rev-parse", "--verify", "HEAD"]);
-  if (!sha) throw new Error("The repo has no commits to draft a model from.");
+  const sha = await gitLine(opts.root, [
+    "rev-parse",
+    "--verify",
+    `${opts.rev}^{commit}`,
+  ]);
+  if (!sha) throw new Error(`No commit ${opts.rev.slice(0, 7)} to draft.`);
   const short = sha.slice(0, 7);
   // The same tracked files the snapshot holds, so the check sees what Claude saw.
   const { stdout } = await git(
@@ -154,7 +74,6 @@ export async function draftModel(opts: {
   const files = stdout.split("\0").filter(Boolean);
 
   return withSnapshot(opts.root, sha, async (dir) => {
-    phase("Reading the code");
     const first = await runner<DraftOutput>(
       draftPrompt({ sha: short, files: files.length }),
       draftSchema(),
@@ -163,8 +82,7 @@ export async function draftModel(opts: {
     let output = first.output;
     let costUsd = first.costUsd;
 
-    phase("Checking globs");
-    let check = checkGlobs(serializeModel(output), files);
+    const check = checkGlobs(serializeModel(output), files);
     if (check.unmatched.length > 0 || check.ambiguous.length > 0) {
       const ids = assignIds(output);
       const unmatched = check.unmatched.slice(0, MAX_FIX_PATHS);
@@ -192,157 +110,12 @@ export async function draftModel(opts: {
       );
       costUsd += fix.costUsd;
       output = applyFix(output, ids, fix.output);
-      check = checkGlobs(serializeModel(output), files);
     }
 
-    const durationMs = Date.now() - started;
-    const model = first.model ?? aiProvider().model();
-    const day = new Date().toISOString().slice(0, 10);
-    // The cost is only here, not in the strip: Claude Code reports it at API
-    // list prices even on a subscription, where a run isn't charged.
-    const header = [
-      `Drafted by Claude for Backstory on ${day}, from commit ${short}, with ${model}.`,
-      "It's a draft, meant to be corrected: rename, merge and split components, and fix their globs.",
-      `Delete the "${DRAFTED_PROPERTY}" property once it's right, and the map stops calling it a draft.`,
-      `The run took ${formatDuration(durationMs)}; Claude Code put its cost at $${costUsd.toFixed(2)} at API list prices.`,
-      "",
-      ...leftOver(check, short),
-    ];
     return {
-      dsl: serializeModel(output, { header, drafted: day }),
+      workspace: readDsl(serializeModel(output)),
       costUsd,
-      model,
-      durationMs,
-      unmatched: check.unmatched.length,
-      ambiguous: check.ambiguous.length,
+      model: first.model ?? aiProvider().model(),
     };
   });
-}
-
-interface Job {
-  status: DraftStatus;
-  settled: Promise<void>;
-  checking?: Promise<void>;
-}
-
-const g = globalThis as { __backstoryModels?: Map<string, Job> };
-const jobs: Map<string, Job> = (g.__backstoryModels ??= new Map());
-
-/**
- * Writes through a temp file and a rename, so the map never reads half a
- * model. The old model is copied to `.bak` only now, just before it's
- * replaced: a draft that fails leaves both untouched.
- */
-async function writeModel(dir: string, dsl: string) {
-  await fs.mkdir(dir, { recursive: true });
-  const file = path.join(dir, "workspace.dsl");
-  const temp = path.join(dir, `.workspace.dsl.${process.pid}-${Date.now()}`);
-  await fs.writeFile(temp, dsl, "utf8");
-  try {
-    if (await exists(file)) await fs.copyFile(file, `${file}.bak`);
-    await fs.rename(temp, file);
-  } catch (err) {
-    await fs.rm(temp, { force: true });
-    throw err;
-  }
-}
-
-export async function draftStatus(root: string): Promise<DraftStatus> {
-  return (
-    jobs.get(await localModelDir(root))?.status ?? {
-      status: "idle",
-    }
-  );
-}
-
-/** The current job's end, for tests: nothing waits on a draft otherwise. */
-export async function draftSettled(root: string): Promise<void> {
-  await jobs.get(await localModelDir(root))?.settled;
-}
-
-export async function startDraft(
-  root: string,
-  opts: {
-    redraft?: boolean;
-    runner?: Runner;
-    status?: () => Promise<ProviderStatus>;
-  } = {},
-): Promise<DraftStatus | DraftRefusal> {
-  const dir = await localModelDir(root);
-  const previous = jobs.get(dir);
-  if (previous?.status.status === "running") {
-    // Wait out a claim that is still being checked, since it may yet be
-    // refused: a Redraft must not return a draft that never runs.
-    if (previous.checking) {
-      await previous.checking;
-      return startDraft(root, opts);
-    }
-    return previous.status;
-  }
-  // Claim the repo before the checks below, which wait: a second click
-  // meanwhile sees this job rather than starting another.
-  const running = {
-    status: "running" as const,
-    phase: "Starting",
-    startedAt: Date.now(),
-  };
-  let checked = () => {};
-  const job: Job = {
-    status: running,
-    settled: Promise.resolve(),
-    checking: new Promise((resolve) => (checked = resolve)),
-  };
-  jobs.set(dir, job);
-  const release = () => {
-    if (previous) jobs.set(dir, previous);
-    else jobs.delete(dir);
-  };
-
-  try {
-    if ((await showFile(root, "HEAD", MODEL_DSL)) !== null) {
-      release();
-      return { status: "refused", reason: "committed" };
-    }
-    const file = await localModelFile(root);
-    if (!opts.redraft && (await exists(file))) {
-      release();
-      return { status: "refused", reason: "exists" };
-    }
-    const gap = providerGap(await (opts.status ?? aiProvider().status)());
-    if (gap) {
-      job.status = { status: "unavailable", reason: gap };
-      return job.status;
-    }
-  } catch (err) {
-    release();
-    throw err;
-  } finally {
-    job.checking = undefined;
-    checked();
-  }
-
-  job.settled = (async () => {
-    try {
-      const result = await draftModel({
-        root,
-        runner: opts.runner,
-        onPhase: (phase) => (running.phase = phase),
-      });
-      await writeModel(dir, result.dsl);
-      job.status = {
-        status: "done",
-        costUsd: result.costUsd,
-        model: result.model,
-        durationMs: result.durationMs,
-        unmatched: result.unmatched,
-        ambiguous: result.ambiguous,
-      };
-    } catch (err) {
-      job.status = {
-        status: "failed",
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
-  })();
-  return running;
 }

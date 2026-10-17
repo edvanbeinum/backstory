@@ -6,6 +6,7 @@ import { test } from "node:test";
 
 import * as data from "../app/api/data/route";
 import * as githubLogin from "../app/api/github/login/route";
+import * as map from "../app/api/map/route";
 import * as notes from "../app/api/notes/route";
 import * as outbox from "../app/api/outbox/route";
 import * as responses from "../app/api/responses/route";
@@ -184,6 +185,14 @@ test("a cross-site request to a route that writes is refused and writes nothing"
     [
       "data trunk",
       data.POST(send(at("data", `repo=${repo}&trunk=1`), "POST", EVIL)),
+    ],
+    [
+      "map trunk",
+      map.POST(send(at("map", `repo=${repo}&trunk=1`), "POST", EVIL)),
+    ],
+    [
+      "map read",
+      map.POST(send(at("map", `repo=${repo}&rev=HEAD`), "POST", EVIL)),
     ],
     ["data auto on", data.POST(send(at("data", "auto=1"), "POST", EVIL))],
     ["data auto off", data.POST(send(at("data", "auto=0"), "POST", EVIL))],

@@ -21,7 +21,7 @@ import type {
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { Elapsed } from "./SystemMap";
+import { Elapsed, setAutoReading } from "./SystemMap";
 import { Badge, Button, Spinner } from "./ui";
 
 /**
@@ -521,11 +521,27 @@ function useDataDraft(
   useEffect(() => {
     onReadRef.current = onRead;
   }, [onRead]);
+  // Tags an answer with the page's latest read of the view when it arrives,
+  // not the read it was sent over: a page read that lands while a read starts
+  // says idle, and would hide the answer that says running, so nothing would
+  // poll. A page read that lands after the answer still replaces it.
+  const latest = useRef({ view: `${repo}\n${rev}`, given });
+  // Try again repeats the last read: a Redraft only when that was a Redraft,
+  // since one reads main in full and removes every derived model.
+  const lastRedraft = useRef(false);
+  useEffect(() => {
+    latest.current = { view: `${repo}\n${rev}`, given };
+  }, [repo, rev, given]);
 
   const request = useCallback(
     async (method: "GET" | "POST", redraft = false) => {
+      if (method === "POST") lastRedraft.current = redraft;
+      const view = `${repo}\n${rev}`;
       const params = new URLSearchParams({ repo, rev });
       if (redraft) params.set("redraft", "1");
+      // Drops the answer for a view the page has left.
+      const over = () =>
+        latest.current.view === view ? latest.current.given : undefined;
       try {
         const response = await fetch(`/api/data?${params}`, {
           method,
@@ -536,25 +552,28 @@ function useDataDraft(
         const body = (await response.json()) as
           DataResponse | { error?: string };
         if (!response.ok || !("readers" in body)) {
-          setError({
-            over: given,
-            message: body.error ?? response.statusText,
-          });
+          const at = over();
+          if (at !== undefined)
+            setError({ over: at, message: body.error ?? response.statusText });
           return;
         }
+        const at = over();
+        if (at === undefined) return;
         setError(null);
-        setAnswer({ over: given, data: body });
+        setAnswer({ over: at, data: body });
         // The page reads the data again once a read ends, so everything
         // that shows the data model sees the drafted one.
         if (body.draft?.status !== "running") onReadRef.current();
       } catch (err) {
-        setError({
-          over: given,
-          message: err instanceof Error ? err.message : String(err),
-        });
+        const at = over();
+        if (at !== undefined)
+          setError({
+            over: at,
+            message: err instanceof Error ? err.message : String(err),
+          });
       }
     },
-    [repo, rev, given],
+    [repo, rev],
   );
 
   const data = answer?.over === given ? answer.data : given;
@@ -577,21 +596,10 @@ function useDataDraft(
     void request("POST");
   }, [autoStart, repo, rev, request]);
 
-  // Turning reading on starts main's read before the page reads the view
-  // again, so the view's own read waits behind it instead of reading its base
-  // in full.
   const setAuto = useCallback(
     async (on: boolean) => {
       try {
-        const response = await fetch(`/api/data?auto=${on ? 1 : 0}`, {
-          method: "POST",
-        });
-        if (!response.ok)
-          throw new Error(`Backstory answered ${response.status}.`);
-        if (on)
-          await fetch(`/api/data?repo=${encodeURIComponent(repo)}&trunk=1`, {
-            method: "POST",
-          });
+        await setAutoReading(repo, on);
         onReadRef.current();
       } catch (err) {
         setError({
@@ -607,6 +615,7 @@ function useDataDraft(
     data,
     error: error?.over === given ? error.message : null,
     start: (redraft = false) => void request("POST", redraft),
+    retry: () => void request("POST", lastRedraft.current),
     turnOn: () => void setAuto(true),
     turnOff: () => void setAuto(false),
   };
@@ -648,7 +657,7 @@ function DraftProgress({
         <span className="truncate" title={job.error}>
           The read failed: {job.error}
         </span>
-        <Button size="sm" onClick={() => draft.start(Boolean(data.drafted))}>
+        <Button size="sm" onClick={draft.retry}>
           Try again
         </Button>
       </span>

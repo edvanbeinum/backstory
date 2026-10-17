@@ -1,5 +1,14 @@
+import { autoRead } from "./data/cache";
 import { git } from "./exec";
-import { isAppCode, readModelAt, type Model } from "./model";
+import {
+  isAppCode,
+  localModelFile,
+  readModelAt,
+  type Model,
+  type ModelElement,
+  type ModelSource,
+} from "./model";
+import { mapSpentUsd, mapStatus, type MapDraftStatus } from "./models/cache";
 
 /**
  * The system map for a view: which C4 elements the change touched, which
@@ -9,6 +18,7 @@ import { isAppCode, readModelAt, type Model } from "./model";
  * ends, so a new label on the same pair reads as changed.
  *
  * Focused on the change: the changed elements and their direct neighbours.
+ * A drafted map is compared like a committed one, base with head.
  */
 
 export type NodeState = "touched" | "added" | "removed" | "neighbour";
@@ -50,14 +60,24 @@ export interface MapResponse {
   error: string | null;
   /** Why the base's model file couldn't be read: nothing was compared */
   baseError: string | null;
-  /** The model is kept on this machine, not in the repo: no structural diff */
+  /** Where the head's model comes from; missing when there's none */
+  source?: ModelSource;
+  /** The model is hand-written on this machine, not in the repo: no structural diff */
   local: boolean;
-  /** The local model's path, to correct it by hand; null for a committed one */
+  /** The hand-written local model's path, to correct it; null otherwise */
   modelFile: string | null;
-  /** When Claude drafted the model, if it did */
-  drafted: string | null;
+  /** The view's map read, when the repo has no model of its own */
+  draft?: MapDraftStatus;
+  /** On a drafted map: the dollars spent drafting this repo's maps */
+  spentUsd?: number;
+  /** When the repo has no model of its own: whether maps are read as repos and views open */
+  auto?: boolean;
+  /** When the repo has no model of its own: where a hand-written local model goes */
+  handFile?: string;
   nodes: MapNode[];
   edges: MapEdge[];
+  /** Every component, person and external system, unchanged, when the change touches none */
+  whole?: { nodes: MapNode[]; edges: MapEdge[] };
   /** Elements in the model that the focused map leaves out */
   hidden: number;
   /** Each changed file's component, by name, for the diff's file headers */
@@ -126,6 +146,61 @@ async function fileStats(
 
 const leafOf = (model: Model, file: string) => model.match(file);
 
+/**
+ * The whole system, for Show map, as a container view: each container,
+ * person, and software system with no containers inside, unchanged. Each
+ * arrow is drawn between the boxes its ends sit in, so a component's arrow
+ * becomes its container's; arrows within one box, and arrows to a system
+ * drawn as its containers, are left out.
+ */
+function wholeMap(model: Model): { nodes: MapNode[]; edges: MapEdge[] } {
+  const parents = new Set(
+    [...model.elements.values()].map((e) => e.parent).filter(Boolean),
+  );
+  const drawn = (e: ModelElement) =>
+    e.type === "container" || (e.type !== "component" && !parents.has(e.id));
+  const boxOf = (id: string): string | null => {
+    for (let e = model.elements.get(id); e;) {
+      if (drawn(e)) return e.id;
+      e = e.parent ? model.elements.get(e.parent) : undefined;
+    }
+    return null;
+  };
+  const nodes: MapNode[] = [...model.elements.values()]
+    .filter(drawn)
+    .map((e) => ({
+      id: e.id,
+      name: e.name,
+      description: e.description,
+      type: e.type,
+      state: "neighbour",
+      files: [],
+      fileStats: [],
+      additions: 0,
+      deletions: 0,
+      newFiles: 0,
+    }));
+  const between = new Map<string, MapEdge>();
+  for (const r of model.relationships.values()) {
+    const source = boxOf(r.source);
+    const destination = boxOf(r.destination);
+    if (!source || !destination || source === destination) continue;
+    const key = `${source} → ${destination}`;
+    const edge = between.get(key);
+    if (!edge)
+      between.set(key, {
+        key,
+        source,
+        destination,
+        description: r.description,
+        state: "same",
+      });
+    else if (!edge.description.split("; ").includes(r.description))
+      edge.description = `${edge.description}; ${r.description}`;
+  }
+  return { nodes, edges: [...between.values()] };
+}
+
 /** The focused map stays a glance: changed elements plus a few neighbours. */
 const MAX_NODES = 7;
 
@@ -142,7 +217,6 @@ export async function buildMap(
     baseError: null,
     local: false,
     modelFile: null,
-    drafted: null,
     nodes: [],
     edges: [],
     hidden: 0,
@@ -151,20 +225,33 @@ export async function buildMap(
     ambiguous: [],
     descriptions: {},
   };
-  if (!headRead) return empty;
+  // With no model of its own, the repo's map is drafted: say how its read
+  // for this view stands.
+  const drafting = !headRead || headRead.source === "drafted";
+  const reading = drafting
+    ? {
+        draft: await mapStatus({ root, base, head }),
+        auto: autoRead(),
+        handFile: await localModelFile(root),
+      }
+    : {};
+  if (!headRead) return { ...empty, ...reading };
+  const local = headRead.source === "local";
   if (!headRead.model)
     return {
       ...empty,
+      source: headRead.source,
       error: headRead.error,
-      local: headRead.local,
+      local,
       modelFile: headRead.file,
     };
   const model = headRead.model;
   // A local model is the same for every commit; comparing it with itself
-  // would claim "no structural change" when nothing was checked.
-  const baseRead =
-    base && !headRead.local ? await readModelAt(root, base) : null;
-  const baseModel = baseRead && !baseRead.local ? baseRead.model : null;
+  // would claim "no structural change" when nothing was checked. A base
+  // whose model comes from elsewhere than the head's isn't compared either.
+  const baseRead = base && !local ? await readModelAt(root, base) : null;
+  const sameSource = baseRead?.source === headRead.source;
+  const baseModel = sameSource ? (baseRead?.model ?? null) : null;
 
   // Files: each to its one leaf element. A deleted file maps by the base
   // model, where its element may still exist.
@@ -320,14 +407,19 @@ export async function buildMap(
     status: "ok",
     baseModel: baseModel !== null,
     error: null,
-    baseError: baseRead?.error ?? null,
-    local: headRead.local,
+    baseError: sameSource ? (baseRead?.error ?? null) : null,
+    source: headRead.source,
+    local,
     modelFile: headRead.file,
-    drafted: headRead.drafted,
+    ...reading,
+    ...(headRead.source === "drafted"
+      ? { spentUsd: await mapSpentUsd(root) }
+      : {}),
     nodes,
     edges: [...edges.values()].filter(
       (e) => shown.has(e.source) && shown.has(e.destination),
     ),
+    ...(nodes.length === 0 ? { whole: wholeMap(model) } : {}),
     hidden: Math.max(
       0,
       leaves - nodes.filter((n) => n.state !== "removed").length,

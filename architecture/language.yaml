@@ -48,7 +48,7 @@ terms:
     means: "`data.files` and `data.format` in a workspace's properties: which files hold the data model, and which data reader reads them. Read at the head and used at both ends of a view."
     avoid: []
   - name: drafted data model
-    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read on a click, or as repos and views open once the setup checklist's Data models row turns that on, and marked drafted wherever it's shown."
+    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read on a click, or as repos and views open once the setup checklist's Maps and data models row turns that on, and marked drafted wherever it's shown."
     avoid: []
   - name: main's data model
     means: "The drafted data model of the repo's default branch that every view's base is derived from, pointed at by `trunk.json` in the repo's data folder (`lib/data/cache.ts`). Read in full once, and moved forward when a view's base is on main past it."
@@ -61,17 +61,29 @@ terms:
   - name: store
     means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes, rounds and responses, one table each, plus `seen` and `settings`."
     avoid:
-      - store, for the flow cache or the data cache
+      - store, for the flow cache, the data cache or the map cache
   - name: flow cache
     means: "`lib/flows/cache.ts`: one cached SARIF file per view in `~/.backstory/flows/`, plus the queue of runs that make them."
     avoid:
       - store
   - name: local model
-    means: "A C4 model kept on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo key>/workspace.dsl` (`localModelDir` in `lib/model.ts`). Claude can draft one (`lib/models/draft.ts`)."
+    means: "A C4 model written by hand on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo key>/workspace.dsl` (`localModelFile` in `lib/model.ts`). It wins over a drafted map, and Backstory never writes it. One with the `backstory.drafted` property is the old single drafted model, and is skipped."
     avoid:
       - draft alone, for the model (reply drafts are `lib/drafts.ts`)
+  - name: drafted map
+    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read on a click (Draft a model), or as repos and views open once reading automatically is on, and marked Draft under the map."
+    avoid:
+      - local model, for a drafted map
+  - name: main's map
+    means: "The drafted map of the repo's default branch that every view's base is derived from, pointed at by `trunk.json` in the repo's map folder (`lib/models/cache.ts`). Read in full once, and moved forward when a view's base is on main past it."
+    avoid:
+      - trunk, in copy
+  - name: map cache
+    means: "`lib/models/cache.ts`: the drafted maps in `~/.backstory/maps/`, one file per tree with the tree it was derived from, plus `trunk.json` for main's map and the queue of reads that make them. The data cache's engine, copied."
+    avoid:
+      - store
   - name: repo key
-    means: "The folder a repo gets under `~/.backstory/flows/`, `data/` and `models/` (`repoKey` in `lib/git.ts`): the main checkout's folder plus the first 8 hex characters of a hash of the common git dir. Every worktree of a repo has the same key; two repos whose checkouts share a folder name don't."
+    means: "The folder a repo gets under `~/.backstory/flows/`, `data/`, `maps/` and `models/` (`repoKey` in `lib/git.ts`): the main checkout's folder plus the first 8 hex characters of a hash of the common git dir. Every worktree of a repo has the same key; two repos whose checkouts share a folder name don't."
     avoid: []
   - name: AI provider
     means: "The tool Backstory asks to read code and answer in a JSON schema; Claude Code for now (`lib/ai/provider.ts`)."
@@ -89,7 +101,7 @@ terms:
       - dev mode
       - override
   - name: setup checklist
-    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, data models, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Data models row, shown once Claude Code is ready, states what reading data models costs, and its Read data models automatically button turns that on, as does Read automatically beside Draft the data model on Story. The Mac app's Set Up Backstory… brings it back at `/?setup=1`, and so does the Connect GitHub link on a repo or inbox notice. The GitHub row offers Connect GitHub, with `gh auth login` as the alternative. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
+    means: "The empty inbox's list of what Backstory needs on this machine (git, GitHub, Claude Code, maps and data models, notes to your agent), each with what it unlocks and a button for the fix (`components/SetupChecklist.tsx`, checked by `lib/setup.ts`). The Maps and data models row, shown once Claude Code is ready, states what reading maps and data models costs, and its Read automatically button turns on reading both, as does Read automatically beside Draft a model or Draft the data model on Story. The Mac app's Set Up Backstory… brings it back at `/?setup=1`, and so does the Connect GitHub link on a repo or inbox notice. The GitHub row offers Connect GitHub, with `gh auth login` as the alternative. In the Mac app, the Notes to your agent row's Set Up adds the Claude Code Stop hook and `/backstory-review` (`mac/backstory/Backstory/ClaudeSetup.swift`), and its Remove… takes them out."
     avoid:
       - onboarding
       - wizard
@@ -161,7 +173,7 @@ blocks:
       - lib/map.ts
       - lib/mapGroups.ts
       - lib/models/
-    summary: Reads the repo's C4 model from its Structurizr DSL and marks the components a change touched, added or removed. Has Claude draft a local model for a repo with none.
+    summary: Reads the repo's C4 model from its Structurizr DSL and marks the components a change touched, added or removed. Has the AI provider draft a map for a repo with none, main's once and each view's forward from it.
     read: "`lib/model.ts` header"
   - name: data model reader
     code:
