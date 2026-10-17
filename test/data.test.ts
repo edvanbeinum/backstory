@@ -1444,6 +1444,19 @@ test("Redraft reads main again, removes the repo's derived models, and a view de
   assert.deepEqual(derived.calls, ["delta"]);
 });
 
+test("with no default branch, Redraft reads the base in full, not from the old main's model", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  const feature = repo.on(["id", "body", "rev"]);
+  const view = { root: repo.root, base: repo.main, head: feature };
+  await read(view, recorder());
+  repo.git("branch", "-M", "main", "no-default-here");
+
+  const redraft = recorder();
+  await read(view, { runner: redraft.runner, redraft: true });
+  assert.deepEqual(redraft.calls, ["head", "delta"]);
+});
+
 test("a data folder in the old shape still uses its head model", async () => {
   const repo = notesRepo();
   const dir = await dataFolder(repo.root);

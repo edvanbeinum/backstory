@@ -440,7 +440,9 @@ async function readView(
     });
     moved = { tree: t, commit: main, files: c.files };
     trunk = { pointer: moved, model };
-  } else {
+  } else if (!c.fresh) {
+    // A Redraft with no main to read again reads the base in full, rather
+    // than from the old main's model it is meant to replace.
     trunk = await savedTrunk(c.dir, c.files);
   }
 
