@@ -137,6 +137,8 @@ const delta = (d: Partial<MapDelta> = {}): MapDelta => ({
   absent: [],
   arrows: [],
   absentArrows: [],
+  tests: null,
+  ignore: null,
   ...d,
 });
 
@@ -459,6 +461,20 @@ test("a forward read's difference merges onto its start", () => {
       "shop.web.mail → shop.web.app: Replies",
       "shop.web.billing → shop.web.app: Bills",
     ],
+  );
+});
+
+test("a forward read's tests and ignore replace the start's globs, and null keeps them", () => {
+  const start: Workspace = {
+    properties: { "code.tests": "test/**", "code.ignore": "**/*.md" },
+    elements: [],
+    relationships: [],
+  };
+  assert.deepEqual(mergeMapDelta(start, delta()).properties, start.properties);
+  assert.deepEqual(
+    mergeMapDelta(start, delta({ tests: ["test/**", "e2e/**"], ignore: [] }))
+      .properties,
+    { "code.tests": "test/** e2e/**" },
   );
 });
 

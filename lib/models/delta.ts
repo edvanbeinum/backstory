@@ -35,14 +35,19 @@ export interface MapDelta {
   arrows: WorkspaceRelationship[];
   /** Pairs whose arrows the patch removed */
   absentArrows: { source: string; destination: string }[];
+  /** This commit's test globs when the patch needs them changed; null keeps the start's */
+  tests: string[] | null;
+  /** This commit's ignore globs when the patch needs them changed; null keeps the start's */
+  ignore: string[] | null;
 }
 
 const strings = { type: "array", items: { type: "string" } };
+const stringsOrNull = { type: ["array", "null"], items: { type: "string" } };
 
 export const mapDeltaSchema = () => ({
   type: "object",
   additionalProperties: false,
-  required: ["changed", "absent", "arrows", "absentArrows"],
+  required: ["changed", "absent", "arrows", "absentArrows", "tests", "ignore"],
   properties: {
     changed: {
       type: "array",
@@ -88,6 +93,8 @@ export const mapDeltaSchema = () => ({
         },
       },
     },
+    tests: stringsOrNull,
+    ignore: stringsOrNull,
   },
 });
 
@@ -117,8 +124,10 @@ Below is a C4 model of another commit of this repository, and the patch from tha
 - absent: the ids of elements in the model below that the patch removed.
 - arrows: for each pair of elements whose arrows the patch changed or added, every arrow THIS commit has between them, with source, destination and a short description ("Reads and writes", "Sends events to").
 - absentArrows: the pairs, source and destination, whose arrows the patch removed altogether.
+- tests: when the patch adds or removes test code, fixtures or test helpers that the model's tests globs don't match as they should, the full list of test globs THIS commit needs; otherwise null.
+- ignore: when the patch adds or removes files that are not app code (docs, lockfiles, generated code, vendored code, assets that aren't behaviour, CI and editor config) that the model's ignore globs don't match as they should, the full list of ignore globs THIS commit needs; otherwise null.
 
-An element or arrow the patch does not touch goes in no list. If the patch changes nothing in the system's structure, every list is empty. Check the code here when the patch is unclear.
+An element or arrow the patch does not touch goes in no list. If the patch changes nothing in the system's structure, every list is empty and tests and ignore are null. An app file is one that tests and ignore don't cover. Check the code here when the patch is unclear.
 
 Keep every id exactly as the model below has it. A new element's id is its parent's id, a dot, and a short lower-camel-case word unique among its siblings, in the same style ("shop.web.syncEngine"); a person or external system has no parent and a one-word id. Write names and descriptions in the same style as the model below, keeping everything the patch does not touch word for word. Globs are matched against paths relative to the repository root with picomatch (\`**\` crosses folders; dotfiles match); a glob must not contain spaces.
 
@@ -148,8 +157,8 @@ function toElement(
 }
 
 /**
- * This commit's map: the start's, with `changed` replacing or adding
- * elements, `absent` gone with every arrow that touches them, and each named
+ * This commit's map: the start's, with `tests` and `ignore` replacing its
+ * globs when given, `changed` replacing or adding elements, `absent` gone with every arrow that touches them, and each named
  * pair's arrows replaced by `arrows` or dropped by `absentArrows`. Then, as
  * the DSL writer does, drops an element whose parent is missing or that sits
  * inside itself, and an arrow with a missing end or that joins an element to
@@ -201,8 +210,19 @@ export function mergeMapDelta(from: Workspace, delta: MapDelta): Workspace {
     return true;
   });
 
+  const properties = { ...from.properties };
+  for (const [key, globs] of [
+    ["code.tests", delta.tests],
+    ["code.ignore", delta.ignore],
+  ] as const) {
+    if (globs === null) continue;
+    const list = globList(globs);
+    if (list) properties[key] = list;
+    else delete properties[key];
+  }
+
   return {
-    properties: from.properties,
+    properties,
     elements,
     relationships: relationships.map(
       ({ source, destination, description }) => ({
