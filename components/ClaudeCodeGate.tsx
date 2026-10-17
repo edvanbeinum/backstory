@@ -77,13 +77,19 @@ export function ClaudeCodeGate({ children }: { children: React.ReactNode }) {
     return (
       <>
         <div hidden={!ready}>{children}</div>
-        {!ready && card(check, load)}
+        {!ready && <GateCard check={check} onRetry={load} />}
       </>
     );
-  return card(check, load);
+  return <GateCard check={check} onRetry={load} />;
 }
 
-function card(check: Check, load: () => Promise<void>) {
+function GateCard({
+  check,
+  onRetry,
+}: {
+  check: Check;
+  onRetry: () => Promise<void>;
+}) {
   return (
     <div className="mx-auto max-w-2xl p-6 pt-16">
       {"error" in check ? (
@@ -92,7 +98,7 @@ function card(check: Check, load: () => Promise<void>) {
           <p className="flex items-center justify-center gap-1.5 text-[var(--attention)]">
             <AlertIcon size={12} /> {check.error}
           </p>
-          <Button variant="primary" onClick={() => void load()}>
+          <Button variant="primary" onClick={() => void onRetry()}>
             Try again
           </Button>
         </div>
