@@ -65,8 +65,6 @@ export interface MapResponse {
   local: boolean;
   /** The hand-written local model's path, to correct it; null otherwise */
   modelFile: string | null;
-  /** The day the drafted map was read, when it's drafted */
-  drafted: string | null;
   /** The view's map read, when the repo has no model of its own */
   draft?: MapDraftStatus;
   /** On a drafted map: the dollars spent drafting this repo's maps */
@@ -199,7 +197,6 @@ export async function buildMap(
     baseError: null,
     local: false,
     modelFile: null,
-    drafted: null,
     nodes: [],
     edges: [],
     hidden: 0,
@@ -394,7 +391,6 @@ export async function buildMap(
     source: headRead.source,
     local,
     modelFile: headRead.file,
-    drafted: headRead.drafted,
     ...reading,
     ...(headRead.source === "drafted"
       ? { spentUsd: await mapSpentUsd(root) }

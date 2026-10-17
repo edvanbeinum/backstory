@@ -217,8 +217,6 @@ export interface ModelRead {
   source: ModelSource;
   /** The hand-written local model's path; null otherwise */
   file: string | null;
-  /** The day a drafted map was read, YYYY-MM-DD; null otherwise */
-  drafted: string | null;
   error: string | null;
 }
 
@@ -228,13 +226,12 @@ function read(
   file: string | null,
 ): ModelRead {
   try {
-    return { model: parseDsl(text), source, file, drafted: null, error: null };
+    return { model: parseDsl(text), source, file, error: null };
   } catch (e) {
     return {
       model: null,
       source,
       file,
-      drafted: null,
       error: e instanceof DslError ? e.message : String(e),
     };
   }
@@ -279,7 +276,6 @@ export async function readModelAt(
     model: buildModel(saved.workspace),
     source: "drafted",
     file: null,
-    drafted: new Date(saved.readAt).toISOString().slice(0, 10),
     error: null,
   };
 }

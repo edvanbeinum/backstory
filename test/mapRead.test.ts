@@ -238,7 +238,12 @@ const local = (dsl: string) => async (root: string) => {
   return file;
 };
 const handWritten = local(serializeModel(SHOP));
-const oldDrafted = local(serializeModel(SHOP, { drafted: "2026-10-05" }));
+const oldDrafted = local(
+  serializeModel(SHOP).replace(
+    "properties {",
+    'properties {\n        "backstory.drafted" "2026-10-05"',
+  ),
+);
 
 test("a branch's drafted map marks the component and arrow it added and the component it removed", async () => {
   const repo = mainRepo();
@@ -272,7 +277,6 @@ test("a branch's drafted map marks the component and arrow it added and the comp
   assert.equal(map.source, "drafted");
   assert.equal(map.baseModel, true);
   assert.equal(map.local, false);
-  assert.match(map.drafted ?? "", /^\d{4}-\d{2}-\d{2}$/);
   const shown = states(map);
   assert.equal(shown["shop.web.billing"], "added");
   assert.equal(shown["shop.web.sync"], "removed");

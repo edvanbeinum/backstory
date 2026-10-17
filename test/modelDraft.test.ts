@@ -206,14 +206,9 @@ test("a draft reads back as it was written, whatever its strings and ids", () =>
     tests: ["test/**"],
     ignore: ["**/*.md"],
   };
-  const text = serializeModel(awkward, {
-    header: ["A header line", "", "with\na newline"],
-    drafted: "2026-10-05",
-  });
-  const ws = readDsl(text);
+  const ws = readDsl(serializeModel(awkward));
 
   assert.deepEqual(ws.properties, {
-    "backstory.drafted": "2026-10-05",
     "code.tests": "test/**",
     "code.ignore": "**/*.md",
   });
@@ -249,10 +244,6 @@ test("a draft reads back as it was written, whatever its strings and ids", () =>
       description: "Calls",
     },
   ]);
-  assert.match(
-    text,
-    /^\/\/ A header line\n\/\/\n\/\/ with a newline\n\/\/ Left out 2 relationships /,
-  );
 });
 
 test("the glob check finds files no component has, and files two have", () => {

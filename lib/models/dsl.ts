@@ -1,4 +1,3 @@
-import { DRAFTED_PROPERTY } from "../model";
 import type { DraftElement, DraftOutput } from "./prompts";
 
 /**
@@ -79,15 +78,7 @@ export const globList = (globs: string[]) =>
 export const isWithin = (inner: string, outer: string) =>
   inner === outer || inner.startsWith(`${outer}.`);
 
-export interface SerializeOptions {
-  header?: string[];
-  drafted?: string;
-}
-
-export function serializeModel(
-  output: DraftOutput,
-  opts: SerializeOptions = {},
-): string {
+export function serializeModel(output: DraftOutput): string {
   const ids = assignIds(output);
   const leaf = (id: string) => id.slice(id.lastIndexOf(".") + 1);
   // The reader refuses an element with an empty name.
@@ -109,7 +100,6 @@ export function serializeModel(
 
   const seen = new Set<string>();
   const arrows: string[] = [];
-  let dropped = 0;
   for (const r of output.relationships) {
     const source = ids.byDraftId.get(r.source);
     const destination = ids.byDraftId.get(r.destination);
@@ -119,24 +109,13 @@ export function serializeModel(
       !destination ||
       isWithin(source, destination) ||
       isWithin(destination, source)
-    ) {
-      dropped++;
+    )
       continue;
-    }
     const arrow = `${source} -> ${destination} ${quote(r.description)}`;
     if (seen.has(arrow)) continue;
     seen.add(arrow);
     arrows.push(arrow);
   }
-
-  const header = [...(opts.header ?? [])];
-  if (dropped > 0)
-    header.push(
-      `Left out ${dropped} ${dropped === 1 ? "relationship" : "relationships"} that named an element the draft doesn't have, or joined an element to itself or its parent.`,
-    );
-  for (const line of header)
-    lines.push(line ? `// ${line.replace(/[\r\n]+/g, " ")}` : "//");
-  if (header.length > 0) lines.push("");
 
   lines.push(
     `workspace ${quote(output.name)} ${quote(output.description)} {`,
@@ -145,7 +124,6 @@ export function serializeModel(
   );
   if (
     properties(1, [
-      [DRAFTED_PROPERTY, opts.drafted ?? ""],
       ["code.tests", globList(output.tests)],
       ["code.ignore", globList(output.ignore)],
     ])

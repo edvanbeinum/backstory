@@ -265,7 +265,6 @@ test("a repo with no model uses a DSL kept locally, without a structural diff", 
     assert.equal(map.baseModel, false);
     assert.equal(map.fileComponents["src/a/one.ts"], "Alpha");
     assert.equal(map.modelFile, file);
-    assert.equal(map.drafted, null);
   } finally {
     // Restore npm test's throwaway BACKSTORY_HOME so later tests can use it.
     if (previousHome === undefined) delete process.env.BACKSTORY_HOME;
@@ -286,7 +285,6 @@ test("the old drafted local model is skipped, and the map says where a hand-writ
     write(path.dirname(file), "workspace.dsl", draftedDsl("backstory.drafted"));
     const map = await buildMap(repo.dir, base, head);
     assert.equal(map.status, "none");
-    assert.equal(map.drafted, null);
     assert.equal(map.modelFile, null);
     assert.equal(map.handFile, file);
     assert.equal(map.draft?.status, "idle");
@@ -297,7 +295,6 @@ test("the old drafted local model is skipped, and the map says where a hand-writ
       changeRepo.head,
     );
     assert.equal(committed.source, "committed");
-    assert.equal(committed.drafted, null);
     assert.equal(committed.modelFile, null);
     assert.equal(committed.handFile, undefined);
     assert.equal(committed.draft, undefined);
