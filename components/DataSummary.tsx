@@ -752,9 +752,9 @@ function DraftFootnote({
   draft: DraftApi;
 }) {
   const parts: React.ReactNode[] = [];
-  if (data.auto) parts.push("Read automatically");
   if (data.auto)
     parts.push(
+      "Read automatically",
       <button
         type="button"
         className="text-[var(--accent)] hover:underline"

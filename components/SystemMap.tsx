@@ -731,9 +731,9 @@ function LocalModel({ map }: { map: MapResponse }) {
 function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   const running = map.draft?.status === "running";
   const parts: React.ReactNode[] = [];
-  if (map.auto) parts.push("Read automatically");
   if (map.auto)
     parts.push(
+      "Read automatically",
       <button
         type="button"
         className="text-[var(--accent)] hover:underline"
