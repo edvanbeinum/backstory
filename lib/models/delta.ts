@@ -7,7 +7,7 @@ import {
   type WorkspaceElement,
   type WorkspaceRelationship,
 } from "../model";
-import { globList } from "./dsl";
+import { globList, isWithin } from "./dsl";
 
 /**
  * A drafted map read forward: the provider gets the map of an earlier commit
@@ -130,9 +130,6 @@ ${patch}`;
 
 const pair = (r: { source: string; destination: string }) =>
   `${r.source}\n${r.destination}`;
-
-const isWithin = (inner: string, outer: string) =>
-  inner === outer || inner.startsWith(`${outer}.`);
 
 function toElement(
   e: MapDeltaElement,

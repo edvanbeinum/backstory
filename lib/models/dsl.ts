@@ -76,7 +76,7 @@ export const globList = (globs: string[]) =>
     .filter(Boolean)
     .join(" ");
 
-const isWithin = (inner: string, outer: string) =>
+export const isWithin = (inner: string, outer: string) =>
   inner === outer || inner.startsWith(`${outer}.`);
 
 export interface SerializeOptions {
