@@ -808,6 +808,19 @@ test("Redraft reads main in full again and removes derived maps, and a failed Re
   assert.deepEqual(derived.calls, ["delta"]);
 });
 
+test("with no default branch, Redraft reads the base in full, not from the old main's map", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  const feature = repo.commit({ "src/app/basket.ts": "1\n" }, "Basket");
+  const view = { root: repo.root, base: repo.main, head: feature };
+  await read(view, recorder());
+  repo.git("branch", "-M", "main", "no-default-here");
+
+  const redraft = recorder();
+  await read(view, { runner: redraft.runner, redraft: true });
+  assert.deepEqual(redraft.calls, ["full", "delta"]);
+});
+
 test("the idle status says whether reading is on, and with it off main's read doesn't start", async () => {
   const repo = mainRepo();
   const head = repo.commit({ "src/app/basket.ts": "1\n" }, "Basket");
