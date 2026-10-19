@@ -52,10 +52,10 @@ import { draftModel } from "./draft";
  * every derived map, since an error in main's map is copied into each of
  * them.
  *
- * Reads run one at a time, apart from the data cache's: a full read on a
- * large repo is a few minutes. They start on a click, or, once the user turns
- * on reading automatically (`autoRead`), as a repo and a view open. Kept on
- * globalThis, as `lib/flows/cache.ts` keeps its runs, because Next may load
+ * Reads run one at a time, apart from the data cache's, to keep within the
+ * user's usage limits: a full read on a large repo is a few minutes. They
+ * start as a repo and a view open, unless the user turned the repo off
+ * (`autoRead`), or on a click. Kept on globalThis, as `lib/flows/cache.ts` keeps its runs, because Next may load
  * this module once per route bundle.
  */
 
@@ -116,7 +116,7 @@ const registry: Registry = (g.__backstoryMaps ??= {
 export const PHASES = {
   waiting: "Waiting for another read",
   main: "Reading main's map first",
-  firstMain: "Reading main's map first, so each change after this costs cents",
+  firstMain: "Reading main's map first, so each change after this is quick",
   base: "Reading what the base changed since main",
   baseInFull: "Reading the base",
   head: "Reading this change",
@@ -183,18 +183,6 @@ async function cached(files: Files) {
   return base ? { base, head } : null;
 }
 
-/** The dollars spent on every map saved for the repo. */
-async function spent(dir: string): Promise<number> {
-  const names = await fs.readdir(dir).catch(() => []);
-  let total = 0;
-  for (const name of names) {
-    if (!name.endsWith(".json")) continue;
-    const file = await readJson<{ costUsd?: unknown }>(path.join(dir, name));
-    if (typeof file?.costUsd === "number") total += file.costUsd;
-  }
-  return total;
-}
-
 /**
  * The drafted map saved for the rev's tree, for `readModelAt`. Returns the
  * `Workspace`, not a model: `lib/model.ts` builds it, and this module can't
@@ -210,11 +198,6 @@ export async function savedMapAt(
   return map ? { workspace: map.workspace, readAt: map.readAt } : null;
 }
 
-/** The dollars spent on the repo's drafted maps. */
-export async function mapSpentUsd(root: string): Promise<number> {
-  return spent(await mapsDir(root));
-}
-
 /** Why the map at the rev isn't drafted, or null when it may be. */
 export async function mapRefusal(
   root: string,
@@ -227,7 +210,10 @@ export async function mapRefusal(
   return null;
 }
 
-export async function mapStatus(view: MapView): Promise<MapDraftStatus> {
+export async function mapStatus(
+  view: MapView,
+  status?: () => Promise<ProviderStatus>,
+): Promise<MapDraftStatus> {
   const files = await filesFor(view);
   const job = registry.jobs.get(files.key);
   if (job) {
@@ -247,11 +233,22 @@ export async function mapStatus(view: MapView): Promise<MapDraftStatus> {
   const idle = {
     status: "idle",
     provider: aiProvider().name,
-    auto: autoRead(),
+    auto: await autoRead(view.root),
   } as const;
   const ended = registry.ended.get(files.key);
   // A done read whose files were deleted since is a view to read again.
   if (ended?.status === "done" && !(await cached(files))) return idle;
+  // Ask the provider again while it was missing or signed out, so installing
+  // or signing in brings the read back without a restart.
+  if (ended?.status === "unavailable") {
+    const reason = providerGap(await (status ?? aiProvider().status)());
+    if (!reason) {
+      registry.ended.delete(files.key);
+      return idle;
+    }
+    registry.ended.set(files.key, { ...ended, reason });
+    return { ...ended, reason };
+  }
   return ended ?? idle;
 }
 

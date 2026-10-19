@@ -49,9 +49,10 @@ import type { DataDraftStatus, DataModel } from "./types";
  * main's model, makes it main's model, or on Redraft. Redraft reads main in full again and removes every
  * derived model, since an error in main's model is copied into each of them.
  *
- * Reads run one at a time: a full read on a large repo is a few minutes and a
- * dollar. They start on a click, or, once the user turns on `data.auto`, as a
- * repo and a view open. Kept on globalThis, as `lib/flows/cache.ts` keeps its
+ * Reads run one at a time, to keep within the user's usage limits: a full
+ * read on a large repo is a few minutes. They start as a repo and a view
+ * open, unless the user turned the repo off (`autoRead`), or on a click. Kept
+ * on globalThis, as `lib/flows/cache.ts` keeps its
  * runs, because Next may load this module once per route bundle.
  */
 
@@ -111,17 +112,22 @@ export const PHASES = {
   waiting: "Waiting for another read",
   main: "Reading main's data model first",
   firstMain:
-    "Reading main's data model first, so each change after this costs cents",
+    "Reading main's data model first, so each change after this is quick",
   base: "Reading what the base changed since main",
   baseInFull: "Reading the base",
   head: "Reading this change",
 };
 
-const AUTO = "data.auto";
+const offKey = async (root: string) => `read.off.${await repoKey(root)}`;
 
-/** Whether the user has turned on reading data models as repos and views open. */
-export const autoRead = () => setting(AUTO) === "1";
-export const setAutoRead = (on: boolean) => setSetting(AUTO, on ? "1" : "0");
+/**
+ * Whether maps and data models read as the repo and its views open: on unless
+ * the user turned the repo off. Keyed by repo, so every worktree shares it.
+ */
+export const autoRead = async (root: string) =>
+  setting(await offKey(root)) !== "1";
+export const setAutoRead = async (root: string, on: boolean) =>
+  setSetting(await offKey(root), on ? "0" : "1");
 
 interface Files {
   dir: string;
@@ -196,18 +202,6 @@ async function cached(files: Files, view: DataView) {
   return base ? { base, head } : null;
 }
 
-/** The dollars spent on every model saved for the repo. */
-async function spent(dir: string): Promise<number> {
-  const names = await fs.readdir(dir).catch(() => []);
-  let total = 0;
-  for (const name of names) {
-    if (!name.endsWith(".json")) continue;
-    const file = await readJson<{ costUsd?: unknown }>(path.join(dir, name));
-    if (typeof file?.costUsd === "number") total += file.costUsd;
-  }
-  return total;
-}
-
 const toModel = (entities: DraftedHead["entities"]): DataModel => ({
   source: "drafted",
   entities: new Map(entities.map((e) => [e.name, e])),
@@ -222,7 +216,6 @@ export async function readDrafted(view: DataView): Promise<{
   head: DataModel;
   provider: string;
   model: string | null;
-  spentUsd: number;
 } | null> {
   const files = await filesFor(view);
   const hit = await cached(files, view);
@@ -232,11 +225,13 @@ export async function readDrafted(view: DataView): Promise<{
     head: toModel(hit.head.entities),
     provider: hit.head.provider,
     model: hit.head.model,
-    spentUsd: await spent(files.dir),
   };
 }
 
-export async function dataStatus(view: DataView): Promise<DataDraftStatus> {
+export async function dataStatus(
+  view: DataView,
+  status?: () => Promise<ProviderStatus>,
+): Promise<DataDraftStatus> {
   const files = await filesFor(view);
   const job = registry.jobs.get(files.key);
   if (job) {
@@ -256,11 +251,22 @@ export async function dataStatus(view: DataView): Promise<DataDraftStatus> {
   const idle = {
     status: "idle",
     provider: aiProvider().name,
-    auto: autoRead(),
+    auto: await autoRead(view.root),
   } as const;
   const ended = registry.ended.get(files.key);
   // A done read whose files were deleted since is a view to read again.
   if (ended?.status === "done" && !(await cached(files, view))) return idle;
+  // Ask the provider again while it was missing or signed out, so installing
+  // or signing in brings the read back without a restart.
+  if (ended?.status === "unavailable") {
+    const reason = providerGap(await (status ?? aiProvider().status)());
+    if (!reason) {
+      registry.ended.delete(files.key);
+      return idle;
+    }
+    registry.ended.set(files.key, { ...ended, reason });
+    return { ...ended, reason };
+  }
   return ended ?? idle;
 }
 

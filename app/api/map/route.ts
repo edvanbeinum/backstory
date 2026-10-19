@@ -46,10 +46,10 @@ export async function GET(request: Request) {
 /**
  * Starts the AI provider's read of the view's map; `redraft=1` reads main's
  * map and the view's again. `trunk=1` starts reading main's map for `repo`,
- * when reading automatically is on.
+ * unless the repo is turned off.
  */
 export async function POST(request: Request) {
-  // A read costs money and sends code to the AI provider: only Backstory's own page asks.
+  // A read sends code to the AI provider: only Backstory's own page asks.
   const refused = crossSite(request);
   if (refused) return refused;
   try {
@@ -63,7 +63,7 @@ export async function POST(request: Request) {
         );
       const { root } = await resolveRepo(repoPath);
       return NextResponse.json({
-        started: autoRead() && (await startMapTrunkRead(root)),
+        started: (await autoRead(root)) && (await startMapTrunkRead(root)),
       });
     }
     const r = await resolve(request);

@@ -1,9 +1,17 @@
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readdirSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import * as ai from "../app/api/ai/route";
 import * as data from "../app/api/data/route";
 import * as githubLogin from "../app/api/github/login/route";
 import * as map from "../app/api/map/route";
@@ -14,7 +22,8 @@ import * as review from "../app/api/review/route";
 import { crossSite } from "../lib/api";
 import { autoRead } from "../lib/data/cache";
 import { waitingReview } from "../lib/review";
-import { SECURITY, standIns } from "./standins";
+import type { ApiError } from "../lib/types";
+import { quietLoginShell, SECURITY, standIns } from "./standins";
 import { readText, root } from "./yaml";
 
 const req = (headers: Record<string, string>) =>
@@ -194,8 +203,14 @@ test("a cross-site request to a route that writes is refused and writes nothing"
       "map read",
       map.POST(send(at("map", `repo=${repo}&rev=HEAD`), "POST", EVIL)),
     ],
-    ["data auto on", data.POST(send(at("data", "auto=1"), "POST", EVIL))],
-    ["data auto off", data.POST(send(at("data", "auto=0"), "POST", EVIL))],
+    [
+      "data auto on",
+      data.POST(send(at("data", `repo=${repo}&auto=1`), "POST", EVIL)),
+    ],
+    [
+      "data auto off",
+      data.POST(send(at("data", `repo=${repo}&auto=0`), "POST", EVIL)),
+    ],
   ];
 
   for (const [name, call] of calls) {
@@ -205,17 +220,109 @@ test("a cross-site request to a route that writes is refused and writes nothing"
   assert.equal(waitingReview(REPO), null);
 });
 
-test("auto=1 turns reading data models automatically on, and auto=0 turns it off", async () => {
-  process.env.BACKSTORY_HOME = mkdtempSync(
-    path.join(tmpdir(), "backstory-api-"),
+/** A temp repo with one commit on `main`. */
+function tempRepo(): string {
+  const dir = mkdtempSync(path.join(tmpdir(), "backstory-api-repo-"));
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" });
+  git("init", "-q", "-b", "main");
+  git(
+    "-c",
+    "user.email=t@example.com",
+    "-c",
+    "user.name=T",
+    "commit",
+    "-q",
+    "--allow-empty",
+    "-m",
+    "Start",
   );
-  const auto = async (value: string) =>
-    (await data.POST(send(at("data", `auto=${value}`), "POST", {}))).json();
-  assert.equal(autoRead(), false);
-  assert.deepEqual(await auto("1"), { auto: true });
-  assert.equal(autoRead(), true);
-  assert.deepEqual(await auto("0"), { auto: false });
-  assert.equal(autoRead(), false);
+  return dir;
+}
+
+test("auto=0 turns reading off for that repo and its worktrees only, and auto=1 turns it back on", async () => {
+  const home = mkdtempSync(path.join(tmpdir(), "backstory-api-"));
+  process.env.BACKSTORY_HOME = home;
+  const a = tempRepo();
+  const b = tempRepo();
+  const worktree = path.join(mkdtempSync(path.join(tmpdir(), "wt-")), "a2");
+  execFileSync("git", ["-C", a, "worktree", "add", "-q", "--detach", worktree]);
+  const auto = async (repo: string, value: string) =>
+    (
+      await data.POST(
+        send(
+          at("data", `repo=${encodeURIComponent(repo)}&auto=${value}`),
+          "POST",
+          {},
+        ),
+      )
+    ).json();
+
+  assert.equal(await autoRead(a), true);
+  assert.deepEqual(await auto(a, "0"), { auto: false });
+  assert.equal(await autoRead(a), false);
+  assert.equal(await autoRead(worktree), false);
+  assert.equal(await autoRead(b), true);
+
+  const trunk = await data.POST(
+    send(at("data", `repo=${encodeURIComponent(a)}&trunk=1`), "POST", {}),
+  );
+  assert.deepEqual(await trunk.json(), { started: false });
+  assert.equal(existsSync(path.join(home, "data")), false);
+
+  assert.deepEqual(await auto(a, "1"), { auto: true });
+  assert.equal(await autoRead(a), true);
+  assert.equal(await autoRead(worktree), true);
+
+  const bare = await data.POST(send(at("data", "auto=0"), "POST", {}));
+  assert.equal(bare.status, 400);
+});
+
+/**
+ * A stand-in `claude` that logs each command's first argument to `calls`
+ * beside it: missing when `--version` fails, else signed in or out.
+ */
+const claudeStandIn = (state: "missing" | "logged-out" | "ready") =>
+  `echo "$1" >> "\${0%/*}/calls"
+if [ "$1" = --version ]; then exit ${state === "missing" ? 1 : 0}; fi
+echo '{"loggedIn": ${state === "ready"}}'; exit ${state === "ready" ? 0 : 1}`;
+
+test("GET /api/ai answers missing, logged out or ready, and checks again only when missing", async () => {
+  quietLoginShell();
+  const saved = process.env.PATH;
+  try {
+    for (const state of ["missing", "logged-out", "ready"] as const) {
+      const dir = standIns({ claude: claudeStandIn(state) });
+      process.env.PATH = dir;
+      const res = await ai.GET();
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), {
+        status: state,
+        provider: "Claude Code",
+      });
+      const versions = readFileSync(path.join(dir, "calls"), "utf8")
+        .split("\n")
+        .filter((call) => call === "--version").length;
+      assert.equal(versions, state === "missing" ? 2 : 1, state);
+    }
+  } finally {
+    process.env.PATH = saved;
+  }
+});
+
+test("GET /api/ai answers an error, never ready, when the provider can't be asked", async () => {
+  const saved = process.env.BACKSTORY_AI;
+  process.env.BACKSTORY_AI = "not-a-provider";
+  try {
+    const res = await ai.GET();
+    assert.equal(res.ok, false);
+    const body = (await res.json()) as ApiError;
+    assert.equal(body.kind, "internal");
+    assert.match(body.detail ?? "", /not-a-provider/);
+  } finally {
+    if (saved === undefined) delete process.env.BACKSTORY_AI;
+    else process.env.BACKSTORY_AI = saved;
+  }
 });
 
 test("Disconnect GitHub deletes the saved token, and does nothing with none saved", async () => {

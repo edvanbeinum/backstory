@@ -101,7 +101,7 @@ primitives:
       - KEY
       - setting
       - setSetting
-    use: "Every read and write of notes, rounds, responses and settings, in the SQLite database `~/.backstory/backstory.db`. `db` opens it on first use, makes the schema from `lib/schema.sql` and upgrades an older database from `lib/upgrades/<version>.sql`; `transaction` runs a synchronous write in one transaction, joining one already open, so a module's write can be part of a larger one; `reading` runs a read and returns an empty result when the database can't be opened or read. `homeDir` is the one directory everything on this machine lives in (the database, the flow cache, the data cache, the map cache, local models). `KEY` is the shape of an id the store accepts. `setting` and `setSetting` read and write one setting, such as `data.auto`."
+    use: "Every read and write of notes, rounds, responses and settings, in the SQLite database `~/.backstory/backstory.db`. `db` opens it on first use, makes the schema from `lib/schema.sql` and upgrades an older database from `lib/upgrades/<version>.sql`; `transaction` runs a synchronous write in one transaction, joining one already open, so a module's write can be part of a larger one; `reading` runs a read and returns an empty result when the database can't be opened or read. `homeDir` is the one directory everything on this machine lives in (the database, the flow cache, the data cache, the map cache, local models). `KEY` is the shape of an id the store accepts. `setting` and `setSetting` read and write one setting, such as `read.off.<repoKey>`."
   - name: run the AI provider
     block: AI provider
     file: lib/ai/provider.ts
@@ -139,7 +139,7 @@ primitives:
       - startMapTrunkRead
       - mapRefusal
       - savedMapAt
-    use: "The AI provider's drafted map for a repo with no committed or hand-written model: main read in full once (`startMapTrunkRead`), then each view's base derived forward from main's map and its head from its base, one small read each that returns only what the patch changed (`lib/models/delta.ts`), cached by tree under `~/.backstory/maps/`, one read at a time. The data model's engine, copied with its own queue. Reads start on a click, or as repos and views open when `autoRead` is on. `readModelAt` reads the saved map through `savedMapAt`."
+    use: "The AI provider's drafted map for a repo with no committed or hand-written model: main read in full once (`startMapTrunkRead`), then each view's base derived forward from main's map and its head from its base, one small read each that returns only what the patch changed (`lib/models/delta.ts`), cached by tree under `~/.backstory/maps/`, one read at a time. The data model's engine, copied with its own queue. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. `readModelAt` reads the saved map through `savedMapAt`."
   - name: data readers
     block: data model reader
     file: lib/data/readers.ts
@@ -156,7 +156,7 @@ primitives:
       - startTrunkRead
       - autoRead
       - setAutoRead
-    use: "The AI provider's reading of a data model no reader finds: main read in full once (`startTrunkRead`), then each view's base derived forward from main's model and its head from its base, one small read each, cached by tree under `~/.backstory/data/`, one read at a time. Reads start on a click, or as repos and views open when `autoRead` is on; that one setting covers drafted maps too. Told which files have the model when `data.files` is set. `buildData` falls back to it."
+    use: "The AI provider's reading of a data model no reader finds: main read in full once (`startTrunkRead`), then each view's base derived forward from main's model and its head from its base, one small read each, cached by tree under `~/.backstory/data/`, one read at a time. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. The switch is per repo, on by default, shared by every worktree, and covers drafted maps too. Told which files have the model when `data.files` is set. `buildData` falls back to it."
   - name: route errors
     file: lib/api.ts
     symbols:
@@ -187,7 +187,7 @@ primitives:
     file: components/ClaudeCodeNotice.tsx
     symbols:
       - ClaudeCodeNotice
-    use: "The one message and button for Claude Code not installed (Get Claude Code) or logged out (Copy: claude). Flows, the map's and the data model's drafts and the setup checklist show it, so they never word it differently."
+    use: "The one message and button for Claude Code not installed (Get Claude Code) or logged out (Copy: claude auth login). Flows, the map's and the data model's drafts, the setup checklist and the Claude Code gate show it, so they never word it differently."
   - name: graph layout
     block: UI tabs
     file: components/graph.ts

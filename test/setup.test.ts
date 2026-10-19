@@ -10,8 +10,12 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { setAutoRead } from "../lib/data/cache";
-import { SETUP_DETAILS, setupChecks, type SetupId } from "../lib/setup";
+import {
+  providerStatusFresh,
+  SETUP_DETAILS,
+  setupChecks,
+  type SetupId,
+} from "../lib/setup";
 import {
   githubApiStandIn,
   quietLoginShell,
@@ -62,13 +66,42 @@ test("with git but no gh and no Claude Code, the checklist says what each missin
   const { rows } = await checks({ git: GIT });
   assert.deepEqual(rows, [
     { id: "git", state: "ready", detail: SETUP_DETAILS.git },
-    { id: "github", state: "missing", detail: SETUP_DETAILS.github },
     { id: "claude", state: "missing", detail: SETUP_DETAILS.claude },
+    { id: "github", state: "missing", detail: SETUP_DETAILS.github },
     { id: "reviews", state: "missing", detail: SETUP_DETAILS.reviews },
   ]);
   assert.match(SETUP_DETAILS.github, /review comments/);
-  assert.match(SETUP_DETAILS.claude, /explained/);
+  assert.match(
+    SETUP_DETAILS.claude,
+    /draws each repo's map, data model and flows with Claude Code/,
+  );
   assert.match(SETUP_DETAILS.reviews, /coding agent/);
+});
+
+test("with Claude Code ready the rows are git, Claude Code, GitHub and notes to your agent", async () => {
+  const { rows } = await checks({
+    git: GIT,
+    claude: `if [ "$1" = auth ]; then echo '{"loggedIn": true}'; fi`,
+  });
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    ["git", "claude", "github", "reviews"],
+  );
+});
+
+test("the provider's status is checked again only when it's missing", async () => {
+  for (const [first, calls] of [
+    ["missing", 2],
+    ["logged-out", 1],
+    ["ready", 1],
+  ] as const) {
+    let called = 0;
+    const status = await providerStatusFresh(async () =>
+      called++ === 0 ? first : "ready",
+    );
+    assert.equal(called, calls, first);
+    assert.equal(status, first === "missing" ? "ready" : first);
+  }
 });
 
 test("Claude Code's row tells not installed, logged out and ready apart", async () => {
@@ -86,38 +119,6 @@ test("Claude Code's row tells not installed, logged out and ready apart", async 
       "claude",
     ),
     "ready",
-  );
-});
-
-test("the Maps and data models row shows once Claude Code is ready, and is ready once reading is turned on", async () => {
-  process.env.BACKSTORY_HOME = mkdtempSync(
-    path.join(os.tmpdir(), "backstory-setup-"),
-  );
-  const claude = (loggedIn: boolean) =>
-    `if [ "$1" = auth ]; then echo '{"loggedIn": ${loggedIn}}'; exit ${loggedIn ? 0 : 1}; fi\necho "2.1.0 (Claude Code)"`;
-  const rows = async (loggedIn: boolean) =>
-    (await checks({ git: GIT, claude: claude(loggedIn) })).rows.map(
-      (row) => row.id,
-    );
-  assert.deepEqual(await rows(false), ["git", "github", "claude", "reviews"]);
-  assert.deepEqual(await rows(true), [
-    "git",
-    "github",
-    "claude",
-    "data",
-    "reviews",
-  ]);
-
-  const data = async () =>
-    (await checks({ git: GIT, claude: claude(true) })).state("data");
-  assert.equal(await data(), "missing");
-  setAutoRead(true);
-  assert.equal(await data(), "ready");
-  setAutoRead(false);
-  assert.equal(await data(), "missing");
-  assert.match(
-    SETUP_DETAILS.data,
-    /map and data model .* once for main .* then only what each change differs by/,
   );
 });
 

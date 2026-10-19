@@ -743,7 +743,7 @@ function Redraft({ data, draft }: { data: DataResponse; draft: DraftApi }) {
   );
 }
 
-/** A drafted view's footnote: whether reads start by themselves, what the repo's models cost, Turn off and Redraft. */
+/** A drafted view's footnote: whether reads start by themselves, Turn off or Read automatically, and Redraft. */
 function DraftFootnote({
   data,
   draft,
@@ -752,17 +752,25 @@ function DraftFootnote({
   draft: DraftApi;
 }) {
   const parts: React.ReactNode[] = [];
-  if (data.auto) parts.push("Read automatically");
-  if (data.spentUsd !== undefined)
-    parts.push(`$${data.spentUsd.toFixed(2)} spent on this repo's data model`);
   if (data.auto)
     parts.push(
+      "Read automatically",
       <button
         type="button"
         className="text-[var(--accent)] hover:underline"
         onClick={draft.turnOff}
       >
         Turn off
+      </button>,
+    );
+  else
+    parts.push(
+      <button
+        type="button"
+        className="text-[var(--accent)] hover:underline"
+        onClick={draft.turnOn}
+      >
+        Read automatically
       </button>,
     );
   return (

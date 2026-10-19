@@ -14,9 +14,8 @@ export const SETUP_SKIPPED_KEY = "backstory.setupSkipped";
 
 const NAMES: Record<SetupId, string> = {
   git: "git",
-  github: "GitHub",
   claude: "Claude Code",
-  data: "Maps and data models",
+  github: "GitHub",
   reviews: "Notes to your agent",
 };
 
@@ -94,7 +93,8 @@ export function SetupChecklist({ onSkip }: { onSkip: () => void }) {
           </Button>
         </div>
         <p className="text-[12px] text-[var(--fg-muted)]">
-          Backstory only needs git. Each of the others adds something more.
+          Backstory needs git and Claude Code. Each of the others adds something
+          more.
         </p>
       </header>
       {error && (
@@ -124,7 +124,7 @@ export function SetupChecklist({ onSkip }: { onSkip: () => void }) {
                   <span className="text-[13px] font-semibold">
                     {NAMES[row.id]}
                   </span>
-                  {row.id === "git" && (
+                  {(row.id === "git" || row.id === "claude") && (
                     <span className="text-[11px] text-[var(--fg-subtle)]">
                       needed
                     </span>
@@ -183,8 +183,6 @@ function Fix({
           reason={row.state === "logged-out" ? "logged-out" : "no-claude"}
         />
       );
-    case "data":
-      return <ReadDataModels onChanged={onChanged} />;
     case "reviews":
       return inMacApp ? (
         <ClaudeCodeSetup ready={row.state === "ready"} onChanged={onChanged} />
@@ -330,41 +328,6 @@ function ConnectGitHub({
         )}
       </span>
     </div>
-  );
-}
-
-/**
- * Turns on reading maps and data models as repos and views open, as Read
- * automatically on Story does; Turn off is on each drafted map's and data
- * model's footnote. Main's reads start as the next repo opens.
- */
-function ReadDataModels({ onChanged }: { onChanged: () => Promise<void> }) {
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const run = async () => {
-    setBusy(true);
-    try {
-      const response = await fetch("/api/data?auto=1", { method: "POST" });
-      if (!response.ok)
-        throw new Error(`Backstory answered ${response.status}.`);
-      setError(null);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
-    }
-    await onChanged();
-    setBusy(false);
-  };
-  return (
-    <span className="inline-flex flex-wrap items-center gap-2">
-      <Button size="sm" disabled={busy} onClick={run}>
-        Read automatically
-      </Button>
-      {error && (
-        <span className="flex items-center gap-1.5 text-[var(--attention)]">
-          <AlertIcon size={12} /> {error}
-        </span>
-      )}
-    </span>
   );
 }
 

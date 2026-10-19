@@ -448,14 +448,14 @@ function Ticked({ text }: { text: string }) {
 }
 
 /**
- * Turns reading maps and data models automatically on or off. Turning it on
- * starts main's two reads before the page reads the view again, so the
- * view's own reads wait behind them instead of reading their bases in full.
+ * Turns reading the repo's maps and data models as it opens on or off.
+ * Turning it on starts main's two reads before the page reads the view again,
+ * so the view's own reads wait behind them instead of reading their bases in
+ * full.
  */
 export async function setAutoReading(repo: string, on: boolean) {
-  const response = await fetch(`/api/data?auto=${on ? 1 : 0}`, {
-    method: "POST",
-  });
+  const params = new URLSearchParams({ repo, auto: on ? "1" : "0" });
+  const response = await fetch(`/api/data?${params}`, { method: "POST" });
   if (!response.ok) throw new Error(`Backstory answered ${response.status}.`);
   if (!on) return;
   const trunk = `repo=${encodeURIComponent(repo)}&trunk=1`;
@@ -685,8 +685,8 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
       </span>
       {provider && (
         <span className="est">
-          {provider} · a few minutes for main, then cents a change · uses your{" "}
-          {provider} account
+          {provider} · a few minutes for main, then seconds a change · uses your{" "}
+          {provider} login
         </span>
       )}
       {file && (
@@ -727,21 +727,29 @@ function LocalModel({ map }: { map: MapResponse }) {
   );
 }
 
-/** A drafted map's footnote: the Draft badge, whether reads start by themselves, what the repo's maps cost, Turn off and Redraft. */
+/** A drafted map's footnote: the Draft badge, whether reads start by themselves, Turn off or Read automatically, and Redraft. */
 function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   const running = map.draft?.status === "running";
   const parts: React.ReactNode[] = [];
-  if (map.auto) parts.push("Read automatically");
-  if (map.spentUsd !== undefined)
-    parts.push(`$${map.spentUsd.toFixed(2)} spent on this repo's map`);
   if (map.auto)
     parts.push(
+      "Read automatically",
       <button
         type="button"
         className="text-[var(--accent)] hover:underline"
         onClick={draft.turnOff}
       >
         Turn off
+      </button>,
+    );
+  else
+    parts.push(
+      <button
+        type="button"
+        className="text-[var(--accent)] hover:underline"
+        onClick={draft.turnOn}
+      >
+        Read automatically
       </button>,
     );
   return (

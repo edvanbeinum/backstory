@@ -16,6 +16,7 @@ import { after, test } from "node:test";
 import type { Runner } from "../lib/ai/provider";
 import { buildData } from "../lib/data/build";
 import {
+  autoRead,
   dataReadSettled,
   dataStatus,
   PHASES,
@@ -943,7 +944,7 @@ test("a repo no reader knows shows its data model change once the AI provider dr
   assert.deepEqual(before.draft, {
     status: "idle",
     provider: "Claude Code",
-    auto: false,
+    auto: true,
   });
 
   const ai = recorder();
@@ -1079,7 +1080,24 @@ test("a provider that isn't installed says which, and reads nothing", async () =
     reason: "no-claude",
   });
   assert.deepEqual(ai.calls, []);
-  assert.deepEqual(await dataStatus(repo.view), status);
+  assert.deepEqual(await dataStatus(repo.view, async () => "missing"), status);
+});
+
+test("once Claude Code is signed in, a view that found it signed out is idle again", async () => {
+  const repo = notesRepo();
+  await startDataRead(repo.view, {
+    runner: recorder().runner,
+    status: async () => "missing",
+  });
+  assert.deepEqual(await dataStatus(repo.view, async () => "logged-out"), {
+    status: "unavailable",
+    provider: "Claude Code",
+    reason: "logged-out",
+  });
+  assert.equal(
+    (await dataStatus(repo.view, async () => "ready")).status,
+    "idle",
+  );
 });
 
 test("a logged-out provider says so, and reads nothing", async () => {
@@ -1187,7 +1205,7 @@ test("data.files tells the drafted read where the model is, and a changed steer 
     assert.deepEqual(stale.draft, {
       status: "idle",
       provider: "Claude Code",
-      auto: false,
+      auto: true,
     });
 
     const again = recorder();
@@ -1232,7 +1250,6 @@ test("once main is read, a new branch reads two deltas and never its head in ful
   );
   // A base off main leaves main's model where it was.
   assert.equal((await readTrunk(repo.root)).commit, repo.main);
-  assert.equal(Math.round((data.spentUsd ?? 0) * 100) / 100, 0.3);
 
   // A second branch from the same point finds the base's model.
   repo.git("checkout", "-q", "-b", "other", first);
@@ -1483,21 +1500,42 @@ test("a data folder in the old shape still uses its head model", async () => {
   assert.equal((await readModelFile(repo.root, head)).readAt, 1);
   const data = await buildData(repo.root, repo.base, repo.head);
   assert.equal(data.source, "drafted");
-  assert.equal(Math.round((data.spentUsd ?? 0) * 100) / 100, 1.6);
 });
 
-test("with reading turned on, the idle status says so and nothing starts by itself", async () => {
+test("reading is on for a repo nobody turned off, the idle status says so, and nothing starts by itself", async () => {
   const repo = notesRepo();
-  setAutoRead(true);
-  try {
-    const data = await buildData(repo.root, repo.base, repo.head);
-    assert.deepEqual(data.draft, {
-      status: "idle",
-      provider: "Claude Code",
-      auto: true,
-    });
-  } finally {
-    setAutoRead(false);
-  }
+  assert.equal(await autoRead(repo.root), true);
+  const data = await buildData(repo.root, repo.base, repo.head);
+  assert.deepEqual(data.draft, {
+    status: "idle",
+    provider: "Claude Code",
+    auto: true,
+  });
   assert.equal((await dataStatus(repo.view)).status, "idle");
+
+  await setAutoRead(repo.root, false);
+  assert.equal(await autoRead(repo.root), false);
+  assert.deepEqual((await buildData(repo.root, repo.base, repo.head)).draft, {
+    status: "idle",
+    provider: "Claude Code",
+    auto: false,
+  });
+});
+
+test("reading main's data model reads no branch's view, so a view nobody opens is never read", async () => {
+  const repo = mainRepo();
+  const views = ["one", "two", "three"].map((name) => {
+    repo.git("checkout", "-q", "-b", name, repo.main);
+    return {
+      root: repo.root,
+      base: repo.main,
+      head: repo.on(["id", "body", name]),
+    };
+  });
+
+  const ai = recorder();
+  assert.equal(await readMain(repo.root, ai.runner), true);
+  assert.deepEqual(ai.calls, ["head"]);
+  for (const view of views)
+    assert.equal((await dataStatus(view)).status, "idle");
 });

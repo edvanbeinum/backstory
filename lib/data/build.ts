@@ -59,8 +59,7 @@ export async function buildData(
         model: drafted.model,
       },
       draft,
-      spentUsd: drafted.spentUsd,
-      auto: autoRead(),
+      auto: await autoRead(root),
       baseModel: drafted.base !== null,
       entities: withComponents(
         c4,

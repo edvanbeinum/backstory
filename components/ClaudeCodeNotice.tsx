@@ -9,7 +9,8 @@ export const CLAUDE_CODE_INSTALL =
 /**
  * What to do when Claude Code isn't installed or is logged out, with the
  * button that fixes it. Logging in belongs to Claude Code, so Backstory only
- * says to run `claude`.
+ * gives the command. It names `claude auth login`, not `claude`: a signed-out
+ * `claude` opens looking ready and asks to log in only at the first prompt.
  */
 export function ClaudeCodeNotice({
   reason,
@@ -30,8 +31,8 @@ export function ClaudeCodeNotice({
           <>Backstory can&apos;t find Claude Code on this Mac.</>
         ) : (
           <>
-            Claude Code is signed out. Run <code className="mono">claude</code>{" "}
-            in Terminal and sign in.
+            Claude Code is signed out. Run{" "}
+            <code className="mono">claude auth login</code> in Terminal.
           </>
         )}
       </span>
@@ -40,7 +41,7 @@ export function ClaudeCodeNotice({
           Get Claude Code
         </Button>
       ) : (
-        <CopyButton value="claude" label="Copy: claude" />
+        <CopyButton value="claude auth login" label="Copy: claude auth login" />
       )}
       {children}
     </span>

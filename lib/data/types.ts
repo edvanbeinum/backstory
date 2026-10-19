@@ -98,8 +98,6 @@ export interface DataResponse {
   entities: EntityDiff[];
   /** Who drafted the model, when no reader found one and the AI provider read it */
   drafted: { provider: string; model: string | null } | null;
-  /** On a drafted view: the dollars spent drafting this repo's data models */
-  spentUsd?: number;
   /** On a drafted view: whether data models are read as repos and views open */
   auto?: boolean;
   /** When no reader found a model: the AI provider's read, for this view */

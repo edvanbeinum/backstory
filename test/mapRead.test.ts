@@ -38,8 +38,6 @@ import { serializeModel } from "../lib/models/dsl";
 import type { DraftOutput } from "../lib/models/prompts";
 import { homeDir } from "../lib/store";
 
-// Its own home, so turning reading on here can't race another test file's
-// reads of the setting.
 const previousHome = process.env.BACKSTORY_HOME;
 const home = mkdtempSync(path.join(os.tmpdir(), "backstory-maps-home-"));
 process.env.BACKSTORY_HOME = home;
@@ -305,7 +303,7 @@ test("once main's map is saved, each branch reads only its own difference", asyn
   assert.equal((await mapFile(repo.root, repo.tree(first))).costUsd, 0.1);
   assert.equal((await trunk(repo.root)).commit, repo.main);
   const map = await buildMap(repo.root, first, second);
-  assert.equal(Math.round((map.spentUsd ?? 0) * 100) / 100, 0.3);
+  assert.equal(map.source, "drafted");
 
   // A second branch from the same point finds its base's map.
   repo.git("checkout", "-q", "-b", "other", first);
@@ -582,10 +580,21 @@ test("a provider that isn't installed, or is logged out, says so and reads nothi
       provider: "Claude Code",
       reason,
     });
-    assert.deepEqual(await mapStatus(view), started);
+    assert.deepEqual(await mapStatus(view, async () => status), started);
     assert.deepEqual(ai.calls, []);
   }
   assert.equal(existsSync(await mapsFolder(repo.root)), false);
+});
+
+test("once Claude Code is signed in, a view that found it signed out is idle again", async () => {
+  const repo = mainRepo();
+  const head = repo.commit({ "src/app/basket.ts": "1\n" }, "Basket");
+  const view = { root: repo.root, base: repo.main, head };
+  await startMapRead(view, {
+    runner: recorder().runner,
+    status: async () => "logged-out",
+  });
+  assert.equal((await mapStatus(view, async () => "ready")).status, "idle");
 });
 
 const post = (query: string) =>
@@ -840,9 +849,16 @@ test("with no default branch, Redraft reads the base in full, not from the old m
   assert.deepEqual(redraft.calls, ["full", "delta"]);
 });
 
-test("the idle status says whether reading is on, and with it off main's read doesn't start", async () => {
+test("the idle status says whether reading is on, and with the repo turned off main's read doesn't start", async () => {
   const repo = mainRepo();
   const head = repo.commit({ "src/app/basket.ts": "1\n" }, "Basket");
+  assert.deepEqual((await buildMap(repo.root, repo.main, head)).draft, {
+    status: "idle",
+    provider: "Claude Code",
+    auto: true,
+  });
+
+  await setAutoRead(repo.root, false);
   const map = await buildMap(repo.root, repo.main, head);
   assert.equal(map.status, "none");
   assert.deepEqual(map.draft, {
@@ -854,16 +870,22 @@ test("the idle status says whether reading is on, and with it off main's read do
   const trunkPost = () => post(`repo=${encodeURIComponent(repo.root)}&trunk=1`);
   assert.deepEqual(await (await trunkPost()).json(), { started: false });
   assert.equal(existsSync(await mapsFolder(repo.root)), false);
+});
 
-  setAutoRead(true);
-  try {
-    assert.deepEqual((await buildMap(repo.root, repo.main, head)).draft, {
-      status: "idle",
-      provider: "Claude Code",
-      auto: true,
-    });
-  } finally {
-    setAutoRead(false);
-  }
-  assert.deepEqual(await (await trunkPost()).json(), { started: false });
+test("reading main's map reads no branch's view, so a view nobody opens is never read", async () => {
+  const repo = mainRepo();
+  const views = ["one", "two", "three"].map((name) => {
+    repo.git("checkout", "-q", "-b", name, repo.main);
+    return {
+      root: repo.root,
+      base: repo.main,
+      head: repo.commit({ [`src/app/${name}.ts`]: "1\n" }, name),
+    };
+  });
+
+  const ai = recorder();
+  assert.equal(await readMain(repo.root, ai.runner), true);
+  assert.deepEqual(ai.calls, ["full"]);
+  for (const view of views)
+    assert.equal((await mapStatus(view)).status, "idle");
 });
