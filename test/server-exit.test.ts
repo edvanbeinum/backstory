@@ -50,8 +50,12 @@ test("the server exits soon after the app that started it is gone", async () => 
 
 test("the server keeps running while the app that started it is alive", async () => {
   const { app, server } = await startApp(false);
-  await new Promise((resolve) => setTimeout(resolve, 2500));
-  assert.ok(alive(server), "the server exited with its app still running");
-  app.kill();
+  // Kill the stand-in app even when the check fails, or the test never ends.
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 2500));
+    assert.ok(alive(server), "the server exited with its app still running");
+  } finally {
+    app.kill();
+  }
   assert.ok(await goneWithin(server, 5000), "the server outlived the app");
 });
