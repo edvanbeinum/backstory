@@ -108,6 +108,11 @@ final class ServerProcess {
             "BACKSTORY_HOME": launch.home.path,
             "HOME": NSHomeDirectory(),
             "PATH": "/usr/bin:/bin:/usr/sbin:/sbin",
+            // Without USER, tools that look the user up by it fail: `claude`
+            // can't find its login in the keychain and reports itself signed
+            // out. Pass USER and LOGNAME, as a login session would.
+            "USER": NSUserName(),
+            "LOGNAME": NSUserName(),
         ]
         // Pass on CLAUDE_CONFIG_DIR, so the checklist reads the same Claude
         // Code settings that Set Up, which inherits the app's environment,

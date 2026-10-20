@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { homedir, userInfo } from "node:os";
+import { homedir } from "node:os";
 import path from "node:path";
 
 /**
@@ -30,22 +30,6 @@ export function withToolDirs(
 }
 
 process.env.PATH = withToolDirs(process.env.PATH ?? "");
-
-/**
- * Without USER, `claude` reports itself signed out: Claude Code finds its
- * login in the keychain by USER. The Mac app starts the server with neither
- * USER nor LOGNAME, so this returns whichever is missing, set to `name`.
- */
-export function missingUser(
-  env: Record<string, string | undefined>,
-  name: string,
-): Record<string, string> {
-  const missing: Record<string, string> = {};
-  for (const key of ["USER", "LOGNAME"]) if (!env[key]) missing[key] = name;
-  return missing;
-}
-
-Object.assign(process.env, missingUser(process.env, userInfo().username));
 
 /** The tools a user's shell config may put on PATH where no fixed folder would find them (nvm, asdf, mise). */
 const LOGIN_SHELL_TOOLS = ["gh", "claude"];

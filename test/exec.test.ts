@@ -3,13 +3,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import {
-  loginShellDirs,
-  missingUser,
-  run,
-  toolDirsIn,
-  withToolDirs,
-} from "../lib/exec";
+import { loginShellDirs, run, toolDirsIn, withToolDirs } from "../lib/exec";
 import { standIns } from "./standins";
 
 const TOOL_DIRS = [
@@ -70,18 +64,4 @@ test("a program that exits without reading its input still resolves, rather than
   const quits = path.join(standIns({ quits: "exit 0" }), "quits");
   const result = await run(quits, [], { input: "x".repeat(4 * 1024 * 1024) });
   assert.equal(result.code, 0);
-});
-
-test("an environment without USER or LOGNAME gets both, so claude finds its keychain login", () => {
-  assert.deepEqual(missingUser({ HOME: "/Users/someone" }, "someone"), {
-    USER: "someone",
-    LOGNAME: "someone",
-  });
-});
-
-test("a USER or LOGNAME already set is left alone", () => {
-  assert.deepEqual(missingUser({ USER: "a", LOGNAME: "b" }, "someone"), {});
-  assert.deepEqual(missingUser({ USER: "a" }, "someone"), {
-    LOGNAME: "someone",
-  });
 });
