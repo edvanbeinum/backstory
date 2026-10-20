@@ -32,9 +32,9 @@ export function withToolDirs(
 process.env.PATH = withToolDirs(process.env.PATH ?? "");
 
 /**
- * Returns the USER and LOGNAME an environment lacks, both set to `name`.
- * The Mac app starts the server without them, and Claude Code finds its
- * keychain login by USER, so without it `claude` reports itself signed out.
+ * Without USER, `claude` reports itself signed out: Claude Code finds its
+ * login in the keychain by USER. The Mac app starts the server with neither
+ * USER nor LOGNAME, so this returns whichever is missing, set to `name`.
  */
 export function missingUser(
   env: Record<string, string | undefined>,
