@@ -132,7 +132,9 @@ function importJson(database: DatabaseSync, home: string): string[] {
   ];
   const read: string[] = [];
   for (const [name, importer] of importers) {
-    const file = path.join(home, name);
+    // Keep Next's file tracing off this join: `home` is only known at run
+    // time, so tracing it would copy the whole project into the server.
+    const file = path.join(/*turbopackIgnore: true*/ home, name);
     const legacy = readLegacy(file);
     if (legacy === null) continue;
     importer(database, legacy);
