@@ -709,9 +709,8 @@ function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
       {provider && (
         <span className="text-[11px] text-[var(--fg-subtle)]">
           {provider} reads the code, read-only: main&apos;s data model once,
-          then only what each change differs by. The first read can take a few
-          minutes and uses your {provider} account. The result is kept on this
-          machine.
+          then only what the diff changes. The first read can take a few minutes
+          and uses your {provider} account. The result is kept on this machine.
         </span>
       )}
     </div>

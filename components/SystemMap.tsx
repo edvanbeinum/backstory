@@ -672,14 +672,14 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
       {mainMap ? (
         <p>
           Backstory has main&apos;s map. {provider ?? "The AI provider"} reads
-          only what this change differs by, read-only, and adds it. The map
-          stays on this machine, never in the repo.
+          only what the diff changes, read-only, and adds it. The map stays on
+          this machine, never in the repo.
         </p>
       ) : (
         <p>
           Backstory draws the map from a C4 model of the system.{" "}
           {provider ?? "The AI provider"} reads the code, read-only: main&apos;s
-          map once, then only what each change differs by. The map stays on this
+          map once, then only what the diff changes. The map stays on this
           machine, never in the repo.
         </p>
       )}
