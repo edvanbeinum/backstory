@@ -129,8 +129,9 @@ before reading its lines:
     names, so an arrow to a container meets the container's edge.
   - The map opens by itself when the change touches a component. When it
     touches none, the line under the map says so and has **Show map**, which
-    opens the whole system: every element and every arrow in the model.
-    **Hide map** closes it.
+    opens the whole system: every element, and every arrow in the model
+    between two boxes that aren't drawn one inside the other. **Hide map**
+    closes it.
   - Under a drafted map, the line has **Turn off**, which stops reading this
     repo's maps and data models as it opens, and **Redraft**, which reads
     main's map in full again and removes every map worked out from the old
