@@ -357,7 +357,7 @@ test("a container whose own files changed keeps them when drawn as the box aroun
   assert.equal(node("app.api.auth")?.parent, "app.api");
 });
 
-test("hidden counts the components the focused map leaves out, never the boxes around them", async () => {
+test("hidden counts the components the focused map leaves out, never the boxes around them or the people", async () => {
   const repo = shop(`            jobs = container "Jobs" {
                 one = component "One"
                 two = component "Two"
@@ -370,9 +370,9 @@ test("hidden counts the components the focused map leaves out, never the boxes a
     .map((n) => n.id)
     .sort();
   assert.deepEqual(leaves, ["app.web.a", "app.web.b", "shopper"]);
-  // The model's five components less the three drawn leaves: Web and App,
-  // drawn as boxes, aren't counted.
-  assert.equal(map.hidden, 2);
+  // One, Two and Three are left out. Shopper isn't a component, and Web and
+  // App are drawn as boxes, so none of them count.
+  assert.equal(map.hidden, 3);
 });
 
 test("a base with no model adds nothing", async () => {

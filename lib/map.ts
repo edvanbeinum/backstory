@@ -420,9 +420,11 @@ export async function buildMap(
     };
   });
 
-  const leaves = [...model.elements.values()].filter(
-    (e) => e.type === "component" || e.globs.length > 0,
-  ).length;
+  const leaves = new Set(
+    [...model.elements.values()]
+      .filter((e) => e.type === "component" || e.globs.length > 0)
+      .map((e) => e.id),
+  );
 
   return {
     status: "ok",
@@ -444,7 +446,8 @@ export async function buildMap(
     ...(nodes.length === 0 ? { whole: wholeMap(model) } : {}),
     hidden: Math.max(
       0,
-      leaves - nodes.filter((n) => !n.group && n.state !== "removed").length,
+      leaves.size -
+        nodes.filter((n) => leaves.has(n.id) && n.state !== "removed").length,
     ),
     fileComponents,
     unmapped,
