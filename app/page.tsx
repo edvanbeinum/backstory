@@ -377,9 +377,10 @@ export default function Page() {
         if (seq !== sessionSeq.current) return; // superseded by a newer fetch
         setSession(data);
         setSessionError(null);
-        if (!opts.background && data.repo.branch) {
+        const shownTip = data.commits[0]?.sha ?? data.history[0]?.sha;
+        if (!opts.background && data.repo.branch && shownTip) {
           void fetch(
-            `/api/looked?repo=${encodeURIComponent(path)}&ref=${encodeURIComponent(data.repo.branch)}`,
+            `/api/looked?repo=${encodeURIComponent(path)}&ref=${encodeURIComponent(data.repo.branch)}&tip=${shownTip}`,
             { method: "POST" },
           ).catch(() => {
             // The inbox shows the branch as changed a while longer, nothing worse.

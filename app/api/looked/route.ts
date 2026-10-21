@@ -13,10 +13,12 @@ const bad = (error: string) =>
   NextResponse.json<ApiError>({ error }, { status: 400 });
 
 /**
- * `POST /api/looked?repo=<path>&ref=<branch>`: you opened this branch, so the
- * inbox reads it as seen until it gets another commit. The page sends it on
- * every load of a branch but a background refresh, which would otherwise mark
- * commits seen that arrived while you weren't looking.
+ * `POST /api/looked?repo=<path>&ref=<branch>&tip=<sha>`: you opened this
+ * branch, so the inbox reads it as seen until it gets another commit. The page
+ * sends it on every load of a branch but a background refresh, which would
+ * otherwise mark commits seen that arrived while you weren't looking. It sends
+ * the tip it showed you, because a commit can land while the page waits on
+ * GitHub; without one, the branch's tip now is stored.
  */
 export async function POST(request: Request) {
   const refused = crossSite(request);
@@ -24,7 +26,11 @@ export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const repoPath = searchParams.get("repo");
   const ref = searchParams.get("ref");
+  const shown = searchParams.get("tip");
   if (!repoPath || !ref) return bad("`repo` and `ref` are required.");
+  if (shown && !/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(shown)) {
+    return bad("`tip` must be a full commit SHA.");
+  }
 
   try {
     const repo = await resolveRepo(repoPath);
@@ -40,8 +46,8 @@ export async function POST(request: Request) {
       ]),
     ]);
     if (!tip) return bad(`No local branch named ${ref}.`);
-    markLooked(commonDir, ref, tip);
-    return NextResponse.json({ tip });
+    markLooked(commonDir, ref, shown ?? tip);
+    return NextResponse.json({ tip: shown ?? tip });
   } catch (err) {
     return errorResponse(err);
   }

@@ -282,7 +282,7 @@ test("auto=0 turns reading off for that repo and its worktrees only, and auto=1 
   assert.equal(bare.status, 400);
 });
 
-test("POST /api/looked stores the branch's tip, and wants both a repo and a branch", async () => {
+test("POST /api/looked stores the tip the page showed, else the branch's tip, and wants both a repo and a branch", async () => {
   process.env.BACKSTORY_HOME = mkdtempSync(
     path.join(tmpdir(), "backstory-api-"),
   );
@@ -308,6 +308,17 @@ test("POST /api/looked stores the branch's tip, and wants both a repo and a bran
   }).trim();
   assert.deepEqual(await res.json(), { tip });
   assert.equal(lookedTips(await gitCommonDir(dir)).get("main")?.tip, tip);
+
+  const shown = "a".repeat(40);
+  const sent = await mark(
+    `repo=${encodeURIComponent(dir)}&ref=main&tip=${shown}`,
+  );
+  assert.equal(sent.status, 200);
+  assert.equal(lookedTips(await gitCommonDir(dir)).get("main")?.tip, shown);
+  assert.equal(
+    (await mark(`repo=${encodeURIComponent(dir)}&ref=main&tip=HEAD`)).status,
+    400,
+  );
 });
 
 /**
