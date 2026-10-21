@@ -17,6 +17,13 @@ import {
 } from "./standins";
 
 quietLoginShell();
+// Strip the user's git config and any `GIT_*` a pre-push hook exported, so
+// git sees only the temp repo it's given.
+for (const key of Object.keys(process.env)) {
+  if (key.startsWith("GIT_")) delete process.env[key];
+}
+process.env.GIT_CONFIG_GLOBAL = "/dev/null";
+process.env.GIT_CONFIG_NOSYSTEM = "1";
 process.env.BACKSTORY_HOME ??= mkdtempSync(
   path.join(os.tmpdir(), "backstory-session-"),
 );
