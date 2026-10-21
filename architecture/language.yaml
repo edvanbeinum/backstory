@@ -59,7 +59,7 @@ terms:
     avoid:
       - store
   - name: store
-    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes and rounds, one table each, plus `seen` and `settings`."
+    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes and rounds, one table each, plus `seen`, `settings` and `looked`."
     avoid:
       - store, for the flow cache, the data cache or the map cache
   - name: flow cache
@@ -164,6 +164,8 @@ blocks:
       - lib/upgrades/
       - lib/notes.ts
       - lib/outbox.ts
+      - lib/looked.ts
+      - app/api/looked/
     summary: The SQLite database `~/.backstory/backstory.db` and the modules that keep its records.
     read: "`lib/store.ts` header"
   - name: flow engine

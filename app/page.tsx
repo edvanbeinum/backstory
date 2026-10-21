@@ -377,6 +377,14 @@ export default function Page() {
         if (seq !== sessionSeq.current) return; // superseded by a newer fetch
         setSession(data);
         setSessionError(null);
+        if (!opts.background && data.repo.branch) {
+          void fetch(
+            `/api/looked?repo=${encodeURIComponent(path)}&ref=${encodeURIComponent(data.repo.branch)}`,
+            { method: "POST" },
+          ).catch(() => {
+            // The inbox shows the branch as changed a while longer, nothing worse.
+          });
+        }
 
         setCommentId((current) => resolveComment(current, data.github.threads));
 

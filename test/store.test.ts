@@ -139,10 +139,10 @@ const hasTable = (name: string) =>
     .prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?")
     .get(name) !== undefined;
 
-test("a home with no JSON files makes an empty database at version 3, with no responses table", () => {
+test("a home with no JSON files makes an empty database at version 4, with no responses table", () => {
   tempHome();
-  assert.equal(version(), 3);
-  for (const table of ["notes", "rounds", "seen", "settings"]) {
+  assert.equal(version(), 4);
+  for (const table of ["notes", "rounds", "seen", "settings", "looked"]) {
     assert.equal(count(table), 0, table);
   }
   assert.equal(hasTable("responses"), false);
@@ -169,14 +169,16 @@ const RESPONSES_V2 = `CREATE TABLE responses (
   PRIMARY KEY (pr, thread)
 );`;
 
-test("a database at version 1 opens at version 3 with a settings table, its rows intact", () => {
+test("a database at version 1 opens at version 4 with a settings table, its rows intact", () => {
   const home = tempHome();
   db()
     .prepare(`INSERT INTO seen (root, session, at) VALUES ('/repo', 's-1', 1)`)
     .run();
-  db().exec(`DROP TABLE settings; ${RESPONSES_V2} PRAGMA user_version = 1;`);
+  db().exec(
+    `DROP TABLE settings; DROP TABLE looked; ${RESPONSES_V2} PRAGMA user_version = 1;`,
+  );
   reopen(home);
-  assert.equal(version(), 3);
+  assert.equal(version(), 4);
   assert.equal(count("seen"), 1);
   assert.equal(hasTable("responses"), false);
   setSetting("read.off.x", "1");
@@ -193,6 +195,7 @@ test("a database at version 2 loses its responses table on upgrade, and keeps ev
     `INSERT INTO rounds (root, id, note_ids, message, queued_at)
        VALUES ('/repo', 'r1', '["n1"]', 'why?', 5);
      INSERT INTO seen (root, session, at) VALUES ('/repo', 's-1', 4);
+     DROP TABLE looked;
      ${RESPONSES_V2}
      INSERT INTO responses (pr, thread, done, done_at, reply, commits)
        VALUES ('o/r#1', 't1', 1, 1, 'hi', '[]');
@@ -201,8 +204,39 @@ test("a database at version 2 loses its responses table on upgrade, and keeps ev
   setSetting("read.off.x", "1");
 
   reopen(home);
-  assert.equal(version(), 3);
+  assert.equal(version(), 4);
   assert.equal(hasTable("responses"), false);
+  assert.deepEqual(
+    (await getNotes("/repo")).map((n) => n.id),
+    ["n1"],
+  );
+  assert.deepEqual(
+    (await getOutbox("/repo")).rounds.map((r) => r.id),
+    ["r1"],
+  );
+  assert.equal(count("seen"), 1);
+  assert.equal(setting("read.off.x"), "1");
+});
+
+test("a database at version 3 gains an empty looked table on upgrade, and keeps every other row", async () => {
+  const home = tempHome();
+  await changeNotes("/repo", {
+    op: "save",
+    note: { ...NOTE, sentAt: null, done: false, doneAt: null },
+  });
+  db().exec(
+    `INSERT INTO rounds (root, id, note_ids, message, queued_at)
+       VALUES ('/repo', 'r1', '["n1"]', 'why?', 5);
+     INSERT INTO seen (root, session, at) VALUES ('/repo', 's-1', 4);
+     DROP TABLE looked;
+     PRAGMA user_version = 3;`,
+  );
+  setSetting("read.off.x", "1");
+
+  reopen(home);
+  assert.equal(version(), 4);
+  assert.equal(count("looked"), 0);
+  assert.deepEqual(primaryKey("looked"), ["common_dir", "branch"]);
   assert.deepEqual(
     (await getNotes("/repo")).map((n) => n.id),
     ["n1"],
@@ -385,7 +419,8 @@ test("a new database has the tables, keys and checks in lib/schema.sql", () => {
   assert.deepEqual(primaryKey("notes"), ["root", "id"]);
   assert.deepEqual(primaryKey("rounds"), ["root", "id"]);
   assert.deepEqual(primaryKey("seen"), ["root", "session"]);
-  assert.equal(version(), 3);
+  assert.deepEqual(primaryKey("looked"), ["common_dir", "branch"]);
+  assert.equal(version(), 4);
 
   const rejects = (sql: string) =>
     assert.throws(() => db().prepare(sql).run(), /CHECK constraint failed/);
@@ -420,7 +455,7 @@ test("a missing lib/schema.sql fails the open, and the next open makes the datab
   } finally {
     process.chdir(repo);
   }
-  for (const table of ["notes", "rounds", "seen", "settings"]) {
+  for (const table of ["notes", "rounds", "seen", "settings", "looked"]) {
     assert.equal(count(table), 0, table);
   }
 });

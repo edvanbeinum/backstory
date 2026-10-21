@@ -7,8 +7,8 @@ import { importNotes } from "./notes";
 import { importOutbox } from "./outbox";
 
 /**
- * The SQLite database behind notes, rounds, seen sessions and settings:
- * `backstory.db` in `homeDir`.
+ * The SQLite database behind notes, rounds, seen sessions, settings and the
+ * branch tips you last looked at: `backstory.db` in `homeDir`.
  *
  * One database, so a write that touches two kinds of record commits or fails
  * as one (Send files a round and marks its notes sent), and so the schema is
@@ -35,7 +35,7 @@ export function homeDir(): string {
 }
 
 const FILE = "backstory.db";
-const VERSION = 3;
+const VERSION = 4;
 
 // Read from the working directory, not beside this module: bundled, the
 // module is a `.next` chunk. The dev server and tests run from the repo root,
