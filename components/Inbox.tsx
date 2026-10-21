@@ -175,9 +175,7 @@ export function Inbox({
     });
   }, [data]);
 
-  const changed = (data?.rows ?? []).filter(
-    (row) => !row.archived && row.changed,
-  ).length;
+  const changed = (data?.rows ?? []).filter((row) => row.changed).length;
   // A row is a branch now, not always a worktree — a stacked PR is reviewable
   // without one, so the two counts have to be said separately.
   const checkedOut = (data?.rows ?? []).filter((row) => row.worktree).length;
