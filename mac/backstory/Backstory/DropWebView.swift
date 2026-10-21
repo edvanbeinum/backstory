@@ -11,6 +11,7 @@ final class DropWebView: WKWebView {
     override init(frame: CGRect, configuration: WKWebViewConfiguration) {
         super.init(frame: frame, configuration: configuration)
         registerForDraggedTypes([.fileURL])
+        highlightFindMatchesInPage()
     }
 
     @available(*, unavailable)
@@ -62,6 +63,24 @@ final class DropWebView: WKWebView {
             return textFinder.validateAction(action)
         }
         return super.validateUserInterfaceItem(item)
+    }
+
+    // Have WebKit scroll to find matches and highlight them itself. Left to
+    // AppKit's finder, a search counts its matches but never scrolls to one off
+    // screen or marks it, so it looks as if it found nothing. The setting is
+    // private WebKit API, so it is skipped if a later macOS drops it.
+    private func highlightFindMatchesInPage() {
+        let setter = NSSelectorFromString("_setUsePlatformFindUI:")
+        guard responds(to: setter) else { return }
+        typealias Setter = @convention(c) (AnyObject, Selector, Bool) -> Void
+        unsafeBitCast(method(for: setter), to: Setter.self)(self, setter, false)
+    }
+
+    /// Clears WebKit's find highlighting, which stays on the page, dimmed,
+    /// after the find bar closes.
+    func clearFindMatches() {
+        let hide = NSSelectorFromString("_hideFindUI")
+        if responds(to: hide) { perform(hide) }
     }
 }
 

@@ -477,6 +477,11 @@ struct FindBarContainerTests {
         find.cmdF()
         await find.expectBarShown("Cmd-F after the click")
     }
+
+    @Test func thePageHighlightsItsOwnFindMatches() {
+        let webView = DropWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        #expect(webView.value(forKey: "_usePlatformFindUI") as? Bool == false)
+    }
 }
 
 /// The find wiring `MainWindowController` builds, in a window of its own, with
@@ -490,6 +495,8 @@ private final class FindWindow {
     let page: FindBarContainer
     let textFinder = NSTextFinder()
     private let loading = PageLoad()
+    private var hides = 0
+    private var hidesBefore = 0
 
     init() async throws {
         page = FindBarContainer(content: webView)
@@ -497,6 +504,10 @@ private final class FindWindow {
         textFinder.findBarContainer = page
         textFinder.isIncrementalSearchingEnabled = true
         webView.textFinder = textFinder
+        page.onHide = { [weak self] in
+            self?.hides += 1
+            self?.webView.clearFindMatches()
+        }
         window.isReleasedWhenClosed = false
         window.contentView = page
         window.makeKeyAndOrderFront(nil)
@@ -583,12 +594,14 @@ private final class FindWindow {
             focusIsInBar, "\(step): focus in the bar, not \(String(describing: window.firstResponder))",
             sourceLocation: sourceLocation)
         lastShownBar = bar
+        hidesBefore = hides
     }
 
     func expectBarHidden(_ step: String, sourceLocation: SourceLocation = #_sourceLocation) async {
         await settle { barIsDown }
         #expect(!page.isFindBarVisible, "\(step): container hides the bar", sourceLocation: sourceLocation)
         #expect(bar == nil, "\(step): container dropped the bar", sourceLocation: sourceLocation)
+        #expect(hides == hidesBefore + 1, "\(step): page told to clear its highlighting", sourceLocation: sourceLocation)
         #expect(webView.frame.height == page.bounds.height, "\(step): page has its height back", sourceLocation: sourceLocation)
         #expect(
             !focusIsInBar, "\(step): focus left the bar, still \(String(describing: window.firstResponder))",

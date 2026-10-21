@@ -30,6 +30,7 @@ final class MainWindowController: NSWindowController, WKNavigationDelegate, WKUI
         textFinder.findBarContainer = page
         textFinder.isIncrementalSearchingEnabled = true
         webView.textFinder = textFinder
+        page.onHide = { [weak self] in self?.webView.clearFindMatches() }
         waitingView = WaitingView { [weak self] in self?.retry() }
         webView.onFolderDrop = { [weak self] folder in
             guard let self else { return }

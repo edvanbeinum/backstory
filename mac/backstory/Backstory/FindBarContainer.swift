@@ -4,6 +4,7 @@ import AppKit
 /// in; a scroll view is the usual one, and the web view isn't in one.
 final class FindBarContainer: NSView, NSTextFinderBarContainer {
     let content: NSView
+    var onHide: (() -> Void)?
 
     var findBarView: NSView? {
         didSet {
@@ -24,6 +25,7 @@ final class FindBarContainer: NSView, NSTextFinderBarContainer {
             guard !newValue, let bar = findBarView else { return }
             handFocusToContent(from: bar)
             findBarView = nil
+            onHide?()
         }
     }
 
