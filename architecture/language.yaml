@@ -48,7 +48,7 @@ terms:
     means: "`data.files` and `data.format` in a workspace's properties: which files hold the data model, and which data reader reads them. Read at the head and used at both ends of a view."
     avoid: []
   - name: drafted data model
-    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read as repos and views open, unless the repo is turned off (Turn off under a drafted data model or map), or on a click, and marked drafted wherever it's shown."
+    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read as repos and views open, unless the repo is turned off (Turn off under a drafted data model or map), or on a click (Read the data model), and marked Drawn by <provider> wherever it's shown. Read again reads main's data model in full again."
     avoid: []
   - name: main's data model
     means: "The drafted data model of the repo's default branch that every view's base is derived from, pointed at by `trunk.json` in the repo's data folder (`lib/data/cache.ts`). Read in full once, and moved forward when a view's base is on main past it."
