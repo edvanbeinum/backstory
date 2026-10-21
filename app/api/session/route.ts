@@ -81,8 +81,6 @@ export async function GET(request: Request) {
       hasRemoteRefs(repo.root),
     ]);
 
-    // Uncommitted work belongs to whatever is checked out here, not to some
-    // other branch you happen to be reading.
     const working = repo.ref ? EMPTY_WORKING_TREE : workingTree;
 
     // The branch diff needs the PR's base branch, so it waits on GitHub —
