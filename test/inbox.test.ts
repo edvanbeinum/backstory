@@ -367,6 +367,19 @@ test("changed rows come first, then newest commit first, and merged PRs last", a
   );
 });
 
+test("newest commit first compares times, not the dates' text across UTC offsets", async () => {
+  const repo = repoOnMain(null);
+  const older = repo.worktree("older");
+  repo.commit(older, { "o.txt": "o\n" }, "2026-10-25T01:30:00+01:00");
+  const newer = repo.worktree("newer");
+  repo.commit(newer, { "n.txt": "n\n" }, "2026-10-25T01:10:00+00:00");
+
+  assert.deepEqual(
+    (await buildInbox([repo.root])).rows.map((r) => r.branch).slice(0, 2),
+    ["newer", "older"],
+  );
+});
+
 test("with a refused token and gh signed out, the repo asks to Connect GitHub and still lists its rows", async () => {
   const { inbox } = await inboxWithToken(repoOnGitHub("other"), () => ({
     status: 401,

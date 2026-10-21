@@ -669,9 +669,11 @@ function nest(rows: InboxRow[]): InboxRow[] {
     }
   }
 
+  // Compare times, not strings: git's dates carry the committer's UTC offset.
+  const time = (row: InboxRow) =>
+    row.lastCommitAt ? Date.parse(row.lastCommitAt) : 0;
   const order = (a: InboxRow, b: InboxRow) =>
-    Number(b.changed) - Number(a.changed) ||
-    (b.lastCommitAt ?? "").localeCompare(a.lastCommitAt ?? "");
+    Number(b.changed) - Number(a.changed) || time(b) - time(a);
 
   const out: InboxRow[] = [];
   const walk = (row: InboxRow, depth: number) => {
