@@ -1118,6 +1118,9 @@ tr.line-del .diff-gutter {
   font-weight: 400;
   color: var(--fg-subtle);
 }
+.map-group.touched {
+  border: 1.5px solid var(--fg-muted);
+}
 .map-group.added {
   border-color: var(--success);
   background: color-mix(in srgb, var(--diff-add-bg) 35%, transparent);
@@ -1606,7 +1609,8 @@ tr.step-code-target td.diff-num {
 .story-map .map-key {
   margin-top: 8px;
 }
-.map-node.highlight {
+.map-node.highlight,
+.map-group.highlight {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }

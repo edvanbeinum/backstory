@@ -10,6 +10,7 @@ import {
 } from "react";
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
+import { ownsCode } from "@/lib/mapGroups";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
@@ -164,7 +165,7 @@ function MapCanvas({
         .map((n) => (
           <div
             key={n.id}
-            className={`map-group ${n.state}`}
+            className={`map-group ${n.state} ${highlight === n.name ? "highlight" : ""}`}
             style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
             title={n.description || undefined}
           >
@@ -386,7 +387,7 @@ const names = (list: MapNode[]) => {
 };
 
 function summary(map: MapResponse) {
-  const leaves = map.nodes.filter((n) => !n.group);
+  const leaves = map.nodes.filter(ownsCode);
   const changed = leaves.filter((n) => n.state !== "neighbour");
   const added = leaves.filter((n) => n.state === "added");
   const removed = leaves.filter((n) => n.state === "removed");

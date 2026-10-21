@@ -327,6 +327,36 @@ test("a container added between base and head is drawn as a new box, and a remov
   assert.deepEqual([removed?.group, removed?.state], [true, "removed"]);
 });
 
+test("a container whose own files changed keeps them when drawn as the box around a neighbour", async () => {
+  const api = `            api = container "Api" {
+                properties {
+                    "code.globs" "src/api/**"
+                }
+                auth = component "Auth" {
+                    properties {
+                        "code.globs" "src/auth/**"
+                    }
+                }
+            }`;
+  const repo = shop(api);
+  const touched = repo.commit(
+    {
+      "src/api/server.ts": "s\n",
+      "architecture/workspace.dsl": SHOP(
+        `${api}\n            app.api.auth -> app.db "Reads"`,
+      ),
+    },
+    "touch the api",
+  );
+  const map = await buildMap(repo.dir, repo.docs, touched);
+  const node = (id: string) => map.nodes.find((n) => n.id === id);
+  assert.deepEqual(
+    [node("app.api")?.group, node("app.api")?.state, node("app.api")?.files],
+    [true, "touched", ["src/api/server.ts"]],
+  );
+  assert.equal(node("app.api.auth")?.parent, "app.api");
+});
+
 test("hidden counts the components the focused map leaves out, never the boxes around them", async () => {
   const repo = shop(`            jobs = container "Jobs" {
                 one = component "One"

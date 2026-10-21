@@ -397,7 +397,7 @@ export async function buildMap(
   const nodes: MapNode[] = [...shown].map((id) => {
     const el = elementOf(id);
     const group = groups.has(id);
-    const t = group ? undefined : touched.get(id);
+    const t = touched.get(id);
     return {
       id,
       name: el?.name ?? id,

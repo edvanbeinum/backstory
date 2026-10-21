@@ -6,7 +6,7 @@ import { coverage } from "@/lib/flows/coverage";
 import { fileFlows, type StepMark, type StepMarks } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
 import type { MapResponse } from "@/lib/map";
-import { groupByComponent } from "@/lib/mapGroups";
+import { groupByComponent, ownsCode } from "@/lib/mapGroups";
 import type {
   CommitSummary,
   DiffResponse,
@@ -164,10 +164,9 @@ export function FilesChanged({
 
   const grouped =
     !byPath && map?.status === "ok" && map.nodes.length > 0 ? map : null;
-  // The map can name a component it doesn't draw as a box of its own, such
-  // as a container drawn around a changed component, which has nothing to
-  // outline.
-  const leaves = grouped?.nodes.filter((n) => !n.group) ?? [];
+  // Group files only by boxes that own them: a container drawn around a
+  // changed component has nothing of its own to outline.
+  const leaves = grouped?.nodes.filter(ownsCode) ?? [];
   const drawn = new Set(leaves.map((n) => n.name));
   const sections: DiffSection[] = grouped
     ? groupByComponent(shownFiles, grouped.fileComponents, leaves).map((g) => ({
