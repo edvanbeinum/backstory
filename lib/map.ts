@@ -169,13 +169,16 @@ const contains = (
   inner: string,
 ) => ancestors(elementOf, inner).includes(outer);
 
-const unchanged = {
+const unchanged = (): Pick<
+  MapNode,
+  "files" | "fileStats" | "additions" | "deletions" | "newFiles"
+> => ({
   files: [],
   fileStats: [],
   additions: 0,
   deletions: 0,
   newFiles: 0,
-};
+});
 
 /**
  * The whole system, for Show map: every element unchanged, each inside its
@@ -196,7 +199,7 @@ function wholeMap(model: Model): { nodes: MapNode[]; edges: MapEdge[] } {
     state: "neighbour",
     parent: e.parent && model.elements.has(e.parent) ? e.parent : null,
     group: parents.has(e.id),
-    ...unchanged,
+    ...unchanged(),
   }));
   const edges: MapEdge[] = [...model.relationships.values()]
     .filter(
@@ -269,16 +272,7 @@ export async function buildMap(
 
   // Files: each to its one leaf element. A deleted file maps by the base
   // model, where its element may still exist.
-  const touched = new Map<
-    string,
-    {
-      files: string[];
-      fileStats: MapNode["fileStats"];
-      additions: number;
-      deletions: number;
-      newFiles: number;
-    }
-  >();
+  const touched = new Map<string, ReturnType<typeof unchanged>>();
   const fileComponents: Record<string, string> = {};
   const unmapped: string[] = [];
   const ambiguous: { file: string; ids: string[] }[] = [];
@@ -295,13 +289,7 @@ export async function buildMap(
       ambiguous.push({ file: f.path, ids });
       continue;
     }
-    const entry = touched.get(ids[0]) ?? {
-      files: [],
-      fileStats: [],
-      additions: 0,
-      deletions: 0,
-      newFiles: 0,
-    };
+    const entry = touched.get(ids[0]) ?? unchanged();
     entry.files.push(f.path);
     entry.fileStats.push({
       path: f.path,
