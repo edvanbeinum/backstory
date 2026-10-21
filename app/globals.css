@@ -1089,6 +1089,43 @@ tr.line-del .diff-gutter {
 .map-tag.removed {
   color: var(--danger);
 }
+/* Sits before the arrows in the page, so arrows and leaf boxes draw over it. */
+.map-group {
+  position: absolute;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--canvas-subtle) 55%, transparent);
+}
+.map-group h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0 11px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  color: var(--fg-muted);
+}
+.map-group h4 .name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.map-group h4 .type {
+  flex-shrink: 0;
+  font-weight: 400;
+  color: var(--fg-subtle);
+}
+.map-group.added {
+  border-color: var(--success);
+  background: color-mix(in srgb, var(--diff-add-bg) 35%, transparent);
+}
+.map-group.removed {
+  border: 1px dashed var(--danger);
+  background: color-mix(in srgb, var(--diff-del-bg) 35%, transparent);
+}
 .map-squares {
   display: inline-flex;
   gap: 2px;

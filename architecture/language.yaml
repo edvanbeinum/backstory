@@ -183,7 +183,7 @@ blocks:
       - lib/map.ts
       - lib/mapGroups.ts
       - lib/models/
-    summary: Reads the repo's C4 model from its Structurizr DSL and marks the components a change touched, added or removed. Has the AI provider draft a map for a repo with none, main's once and each view's forward from it.
+    summary: Reads the repo's C4 model from its Structurizr DSL and marks the components a change touched, added or removed, drawing each component inside its container's box and each container inside its system's. Has the AI provider draft a map for a repo with none, main's once and each view's forward from it.
     read: "`lib/model.ts` header"
   - name: data model reader
     code:
