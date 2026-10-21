@@ -26,7 +26,7 @@ export async function POST(request: Request) {
   const { searchParams } = new URL(request.url);
   const repoPath = searchParams.get("repo");
   const ref = searchParams.get("ref");
-  const shown = searchParams.get("tip");
+  const shown = searchParams.get("tip") || null;
   if (!repoPath || !ref) return bad("`repo` and `ref` are required.");
   if (shown && !/^[0-9a-f]{40}([0-9a-f]{24})?$/.test(shown)) {
     return bad("`tip` must be a full commit SHA.");

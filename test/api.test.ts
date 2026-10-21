@@ -319,6 +319,8 @@ test("POST /api/looked stores the tip the page showed, else the branch's tip, an
     (await mark(`repo=${encodeURIComponent(dir)}&ref=main&tip=HEAD`)).status,
     400,
   );
+  const empty = await mark(`repo=${encodeURIComponent(dir)}&ref=main&tip=`);
+  assert.deepEqual(await empty.json(), { tip });
 });
 
 /**
