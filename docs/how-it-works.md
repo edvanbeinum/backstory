@@ -18,6 +18,10 @@ worktrees resolve in about half a second. The PR and counts come from GitHub:
 without GitHub connected, or without a remote, every worktree still appears
 with a note saying the counts are missing.
 
+The same call lists the repo's 50 most recently updated open pull requests and its first 100
+branches by name, for **On GitHub**: the ones this clone has no local branch for, minus
+pull requests from forks and the default branch.
+
 ## Handling a comment is deliberate
 
 Backstory doesn't guess when a comment is handled. A guess, such as the newest
@@ -110,3 +114,10 @@ nothing for them by default.
 - The server binds to `127.0.0.1` — it runs git against whatever path you give
   it, so it should not be reachable from your network.
 - `git` and `gh` are always invoked with an argv array, never a shell string.
+- Backstory writes to a repo only when you open a branch from **On GitHub** or
+  press **Fetch**. It updates origin's remote-tracking refs for that branch and
+  its base, and creates or moves the local branch of the same name. It never
+  changes what a worktree has checked out, and never moves a branch that has
+  commits origin doesn't have. A github.com https remote signs in with Connect
+  GitHub's token, passed to that one `git fetch` in its environment, then with
+  git's own credentials.

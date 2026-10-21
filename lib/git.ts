@@ -190,7 +190,9 @@ export function parseRemote(url: string | null): {
  * `git remote show origin` would be authoritative but makes a network call,
  * which is not acceptable inside a request.
  */
-async function resolveDefaultBranch(root: string): Promise<string | null> {
+export async function resolveDefaultBranch(
+  root: string,
+): Promise<string | null> {
   const symref = await gitLine(root, [
     "symbolic-ref",
     "--short",

@@ -51,6 +51,13 @@ ACME-APP ───────────────────────�
  ○  feature/release-script          no PR yet
 ```
 
+Under each repo, **On GitHub** lists the open pull requests and branches on
+GitHub that this clone has no local branch for. Click one to fetch it into a
+local branch and review it; your checkouts stay as they are. While you review a
+branch that isn't checked out, **Fetch** beside its name brings in the newest
+push. A local branch with commits of its own, or one checked out in a worktree,
+is left as it is, and Fetch says so.
+
 **The workspace** is one branch. Its header picks the change: the whole branch,
 your uncommitted work, or any one commit on it. It opens on your uncommitted
 work when there is some, and on the whole branch otherwise. Under the header are

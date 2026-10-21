@@ -25,6 +25,12 @@ primitives:
     symbols:
       - resolveRepo
     use: "Turns a path into a `RepoInfo`, throwing a typed `RepoError` the routes can report."
+  - name: fetch a branch
+    block: git reader
+    file: lib/fetch.ts
+    symbols:
+      - fetchBranch
+    use: "The one place Backstory writes refs. Fetches a branch and its base from origin into remote-tracking refs, then creates the local branch, or moves it when it has nothing of its own. It never moves a branch a worktree has checked out, or one with commits origin doesn't have. A github.com https remote signs in with Connect GitHub's token first, then git's own credentials."
   - name: a repo's key
     block: git reader
     file: lib/git.ts
