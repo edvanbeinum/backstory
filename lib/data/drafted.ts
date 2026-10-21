@@ -5,17 +5,16 @@ import type { Entity } from "./types";
 
 /**
  * The AI provider's reading of a data model, for a repo no data reader
- * understands. The head is read in full. The base is read as a delta from
- * the head: the provider gets the head's model and the patch and returns only
- * the entities the patch changed. Two independent reads disagree on
- * judgement calls, and the diff would report the disagreement as change; and
- * asked for a whole base model, the provider drops the untouched entities of
- * a large one.
+ * understands. A commit is read in full, or as a delta from a model already
+ * read: the provider gets that model and the patch from its commit to this
+ * one, and returns only the entities the patch changed. Two independent reads
+ * disagree on judgement calls, and the diff would report the disagreement as
+ * change; and asked for a whole model again, the provider drops the untouched
+ * entities of a large one.
  */
 
-/** Patches past this aren't sent: "All changes" on a long branch is the case it guards. */
+/** Patches past this aren't sent; the commit is read in full instead. */
 export const MAX_PATCH_BYTES = 400 * 1024;
-export const TOO_LARGE = "This change is too large to draft a data model from";
 
 export interface DraftedHead {
   /** One sentence: where and how the program keeps its data */
@@ -24,9 +23,9 @@ export interface DraftedHead {
 }
 
 export interface DraftedDelta {
-  /** The base's version of each entity the patch changed, or that the patch removed */
+  /** This commit's version of each entity the patch changed or added */
   changed: Entity[];
-  /** Head entities the patch added, so the base doesn't have them */
+  /** Entities of the model the delta starts from that this commit doesn't have */
   absent: string[];
 }
 
@@ -126,56 +125,55 @@ ${RULES}
 
 Be precise and complete for the records that are stored; leave out everything else.`;
 
-// Steer the delta as the head was steered: unsteered, it can report a removed
-// record from outside the files, and the base gains an entity the head never had.
+// Steer the delta as the model it starts from was steered: unsteered, it can
+// report a record from outside the files, an entity the start never had.
 export const deltaPrompt = (
-  head: DraftedHead,
+  from: DraftedHead,
   patch: string,
   files: string[] | null = null,
 ) =>
   `You are reading the code of one commit of a repository, in the current directory. Nothing may be run.
 
-Below is the data model of the commit that comes after this one, and the patch between the two. Work out how THIS commit's data model differs from it, by undoing what the patch changed in stored records. Return only the difference:
+Below is the data model of another commit of this repository, and the patch from that commit to this one. Work out THIS commit's data model by applying what the patch changes in stored records to the model below. Return only the difference:
 
-- changed: for every entity the patch changed, its full version as it is in THIS commit. Include an entity that exists here but the patch removed. Write each one in the same style as the model below, keeping everything the patch does not touch word for word.
-- absent: the names of entities in the model below that the patch added, so they don't exist here.
+- changed: for every entity the patch changed or added, its full version as it is in THIS commit. Write each one in the same style as the model below, keeping everything the patch does not touch word for word.
+- absent: the names of entities in the model below that the patch removed, so they don't exist here.
 
 An entity the patch does not touch goes in neither list. If the patch changes no stored records, both lists are empty. Check the code here when the patch is unclear.
 ${steering(files)}
 ${RULES}
 
-Data model after the patch:
-${JSON.stringify({ storage: head.storage, entities: head.entities }, null, 2)}
+Data model before the patch:
+${JSON.stringify({ storage: from.storage, entities: from.entities }, null, 2)}
 
 The patch:
 ${patch}`;
 
-/** The base's entities: the head's, with the delta's changed ones in place and its absent ones gone. */
-export function mergeDelta(head: Entity[], delta: DraftedDelta): Entity[] {
+/** This commit's entities: the start's, with the delta's changed ones in place and its absent ones gone. */
+export function mergeDelta(from: Entity[], delta: DraftedDelta): Entity[] {
   const changed = new Map(delta.changed.map((e) => [e.name, e]));
   const absent = new Set(delta.absent);
-  const known = new Set(head.map((e) => e.name));
+  const known = new Set(from.map((e) => e.name));
   return [
-    ...head
+    ...from
       .filter((e) => !absent.has(e.name))
       .map((e) => changed.get(e.name) ?? e),
     ...delta.changed.filter((e) => !known.has(e.name)),
   ];
 }
 
-/** The base..head patch to undo, or a failure when it's past the cap. */
-export async function deltaPatch(
+/** The patch from one tree to another, or null past the cap, so the caller reads in full instead. */
+export async function forwardPatch(
   root: string,
-  base: string,
-  head: string,
-): Promise<string> {
+  from: string,
+  to: string,
+): Promise<string | null> {
   const { stdout } = await git(
     root,
-    ["diff", "--no-color", "--no-ext-diff", "--no-textconv", base, head],
+    ["diff", "--no-color", "--no-ext-diff", "--no-textconv", from, to],
     { maxBuffer: 256 * 1024 * 1024 },
   );
-  if (Buffer.byteLength(stdout) > MAX_PATCH_BYTES) throw new Error(TOO_LARGE);
-  return stdout;
+  return Buffer.byteLength(stdout) > MAX_PATCH_BYTES ? null : stdout;
 }
 
 export function readHead(
@@ -189,15 +187,16 @@ export function readHead(
   );
 }
 
+/** Reads the commit `at` as the delta from `from`'s model, given the patch between them. */
 export function readDelta(
   root: string,
-  base: string,
-  head: DraftedHead,
+  at: string,
+  from: DraftedHead,
   patch: string,
   runner: Runner,
   files: string[] | null,
 ): Promise<AiResult<DraftedDelta>> {
-  return withSnapshot(root, base, (dir) =>
-    runner<DraftedDelta>(deltaPrompt(head, patch, files), deltaSchema(), dir),
+  return withSnapshot(root, at, (dir) =>
+    runner<DraftedDelta>(deltaPrompt(from, patch, files), deltaSchema(), dir),
   );
 }

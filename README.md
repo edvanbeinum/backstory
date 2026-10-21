@@ -2,7 +2,9 @@
 
 Stop reading diffs. Backstory shows what a change did to your system, on a C4
 map, as sequence diagrams and in the data model, so you can review an agent's
-work without reading every line.
+work without reading every line. Backstory draws these with your coding agent.
+
+Works with Claude Code.
 
 An agent can write a change faster than you can read it, and you're still
 answerable for what ships. Reading the diff line by line is slow, and it doesn't
@@ -30,8 +32,8 @@ You need:
 
 - A Mac with Apple silicon, on macOS 14.6 or later.
 - **git**.
-- [Claude Code](https://claude.com/claude-code), installed and signed in, to
-  trace flows and draft a map or data model.
+- [Claude Code](https://claude.com/claude-code), installed and signed in.
+  Backstory draws the map, flows and data model with it.
 - A GitHub connection, to bring in the PR and its review comments. Press
   **Connect GitHub** on the setup checklist and approve the code it shows on
   github.com. If [gh](https://cli.github.com) is already signed in with
@@ -42,7 +44,7 @@ You need:
    [latest release](https://github.com/edvanbeinum/backstory/releases/latest).
 2. Open the disk image and drag Backstory to Applications.
 3. Open Backstory. The inbox opens with **Set up Backstory**: a row each for
-   git, GitHub, Claude Code and notes to your agent, with a button for anything
+   git, Claude Code, GitHub and notes to your agent, with a button for anything
    missing.
 
 ## Review your first change
@@ -54,11 +56,9 @@ You need:
 3. The change opens on **Story**, with the map at the top. Press **Trace this
    change** under it. Claude Code reads the change through your own `claude`
    login, the same way it does when you use Claude Code in that repo. It takes
-   about a minute and usually costs $0.10–0.40 on your Claude account. When it
-   finishes, each flow appears as a card under the map.
+   about a minute. When it finishes, each flow appears as a card under the map.
 4. Check the map for the components the change touched. If the repo has no C4
-   model, press **Draft a model** and Claude Code writes one for you to correct,
-   outside the repo.
+   model, Claude Code drafts one as the repo opens, kept outside the repo.
 5. Click a step in a flow to open its code under it. Press **Show in Files
    changed** to see the same lines in the diff.
 6. To ask the agent for a fix, hover a line in **Files changed**, press **+** and
@@ -70,9 +70,9 @@ reach an agent that's busy.
 
 ## Troubleshooting
 
-**Trace this change says it needs Claude Code.** Install
-[Claude Code](https://claude.com/claude-code) and sign in, then press **Look
-again**.
+**Backstory asks for Claude Code.** Install
+[Claude Code](https://claude.com/claude-code) and run `claude auth login`, then come back to
+Backstory's window. It checks again and opens.
 
 **A banner sits where the PR's review comments should be.** GitHub isn't
 connected. Press **Connect GitHub** in the banner and approve the code on

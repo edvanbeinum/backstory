@@ -625,20 +625,6 @@ export function commitUrl(repo: RepoInfo, sha: string): string | null {
   return `https://github.com/${repo.owner}/${repo.name}/commit/${sha}`;
 }
 
-/**
- * The URL you actually want in a review reply: the commit *as viewed inside
- * the PR* — github.com/<owner>/<repo>/pull/<n>/commits/<sha> — rather than
- * the bare commit page.
- */
-export function prCommitUrl(
-  repo: RepoInfo,
-  prNumber: number,
-  sha: string,
-): string | null {
-  if (!repo.owner || !repo.name) return null;
-  return `https://github.com/${repo.owner}/${repo.name}/pull/${prNumber}/commits/${sha}`;
-}
-
 export async function getWorkingTree(repo: RepoInfo): Promise<WorkingTreeInfo> {
   const out = await gitTry(repo.root, [
     "status",

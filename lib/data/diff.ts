@@ -107,9 +107,11 @@ function diffEntity(
 /** Neighbours shown with the changed entities: at most this many. */
 const MAX_NEIGHBOURS = 6;
 
+/** `whole`: when nothing changed, every entity, unchanged, so the model can still be looked at. */
 export function diffModels(
   base: DataModel | null,
   head: DataModel,
+  opts: { whole?: boolean } = {},
 ): EntityDiff[] {
   const names = new Set([
     ...head.entities.keys(),
@@ -125,6 +127,8 @@ export function diffModels(
   // Without a base model nothing can be said to have changed; show none
   // rather than everything as new.
   const changed = base ? all.filter((e) => e.state !== "same") : [];
+  if (opts.whole && changed.length === 0)
+    return [...head.entities.values()].map((e) => diffEntity(e.name, e, e));
   const touched = new Set(changed.map((e) => e.name));
 
   // The unchanged entities they relate to, either way round.

@@ -5,13 +5,15 @@ import picomatch from "picomatch";
 
 import { DslError, readDsl } from "./dsl";
 import { gitTry } from "./exec";
-import { gitCommonDir, repoKey, repoKeyOf } from "./git";
+import { gitCommonDir, repoKeyOf } from "./git";
 import { homeDir } from "./store";
 
 /**
- * The repo's C4 model: `architecture/workspace.dsl`, in Structurizr's DSL.
- * Backstory only reads it. Elements are keyed by their DSL identifier
- * (`ios.progress`), which survives elements being added.
+ * The repo's C4 model: `architecture/workspace.dsl`, in Structurizr's DSL,
+ * else a hand-written local model, else the drafted map saved for the
+ * commit's tree (`lib/models/cache.ts`). Backstory only reads the first two.
+ * Elements are keyed by their DSL identifier (`ios.progress`), which
+ * survives elements being added.
  */
 
 export const MODEL_DSL = "architecture/workspace.dsl";
@@ -153,17 +155,6 @@ export async function showFile(
   });
 }
 
-/**
- * A model kept on this machine for a repo that doesn't commit one:
- * `~/.backstory/models/<repo key>/workspace.dsl`, so every worktree of a repo
- * finds it and two repos whose checkouts share a folder name don't. One model
- * for every commit, so it can say where a change landed but not what it
- * added or removed.
- */
-export async function localModelDir(root: string): Promise<string> {
-  return path.join(homeDir(), "models", await repoKey(root));
-}
-
 export const exists = (file: string) =>
   fs.access(file).then(
     () => true,
@@ -175,11 +166,16 @@ function unlessMissing(err: NodeJS.ErrnoException) {
 }
 
 /**
- * Returns the local model's file. Moves a model still in the folder named
- * after the main checkout alone, `~/.backstory/models/<folder>/`, the first
- * time it's looked for, rather than reading it there: read in place, two
- * repos with that folder name would go on sharing it, and a Draft wouldn't
- * see it.
+ * Returns the file of a model written by hand on this machine for a repo
+ * that doesn't commit one: `~/.backstory/models/<repo key>/workspace.dsl`, so
+ * every worktree of a repo finds it and two repos whose checkouts share a
+ * folder name don't. One model for every commit, so it can say where a
+ * change landed but not what it added or removed.
+ *
+ * Moves a model still in the folder named after the main checkout alone,
+ * `~/.backstory/models/<folder>/`, the first time it's looked for, rather
+ * than reading it there: read in place, two repos with that folder name
+ * would go on sharing it.
  * Ignores a file that's gone mid-move, so two reads moving it at once don't
  * throw.
  */
@@ -207,60 +203,81 @@ export async function localModelFile(root: string): Promise<string> {
 }
 
 /**
- * The workspace property a drafted model carries, with the day it was
- * drafted. A property, not the header comment, because the reader skips
- * comments; removing it after correcting a draft drops the Draft chip.
+ * The workspace property the old single drafted local model has, with the
+ * day it was drafted. A local model with it is skipped: the drafted map
+ * replaced it. One whose property was taken off counts as hand-written.
  */
 export const DRAFTED_PROPERTY = "backstory.drafted";
+
+export type ModelSource = "committed" | "local" | "drafted";
 
 export interface ModelRead {
   /** Null when the file is there but couldn't be read: see `error` */
   model: Model | null;
-  local: boolean;
-  /** The local model's path; null for a committed one */
+  source: ModelSource;
+  /** The hand-written local model's path; null otherwise */
   file: string | null;
-  drafted: string | null;
   error: string | null;
 }
 
-function read(text: string, file: string | null): ModelRead {
-  const local = file !== null;
+function read(
+  text: string,
+  source: "committed" | "local",
+  file: string | null,
+): ModelRead {
   try {
-    const model = parseDsl(text);
-    return {
-      model,
-      local,
-      file,
-      drafted: model.properties[DRAFTED_PROPERTY] ?? null,
-      error: null,
-    };
+    return { model: parseDsl(text), source, file, error: null };
   } catch (e) {
     return {
       model: null,
-      local,
+      source,
       file,
-      drafted: null,
       error: e instanceof DslError ? e.message : String(e),
     };
   }
 }
 
 /**
- * The model at the rev, or else the one kept on this machine. A DSL that
- * fails to read gives its error and no model, so flows filter files as in a
- * repo with no model: a change the model would mark as tests or ignored can
- * still cost a `claude -p` trace. That's the cost any repo without a model
- * already pays, and the line under the map shows the error so it gets fixed.
+ * The hand-written local model, or null when there's none or it's the old
+ * drafted one. A local model that fails to read counts as hand-written.
+ */
+export async function handWrittenModel(
+  root: string,
+): Promise<ModelRead | null> {
+  const file = await localModelFile(root);
+  const text = await fs.readFile(file, "utf8").catch(() => null);
+  if (text === null) return null;
+  const local = read(text, "local", file);
+  return local.model?.properties[DRAFTED_PROPERTY] ? null : local;
+}
+
+/**
+ * The model at the rev: committed, else hand-written on this machine, else
+ * the drafted map saved for the rev's tree. A DSL that fails to read gives
+ * its error and no model, so flows filter files as in a repo with no model:
+ * a change the model would mark as tests or ignored can still cost a
+ * `claude -p` trace. That's the cost any repo without a model already pays,
+ * and the line under the map shows the error so it gets fixed.
  */
 export async function readModelAt(
   root: string,
   rev: string,
 ): Promise<ModelRead | null> {
   const dsl = await showFile(root, rev, MODEL_DSL);
-  if (dsl !== null) return read(dsl, null);
-  const file = await localModelFile(root);
-  const local = await fs.readFile(file, "utf8").catch(() => null);
-  return local === null ? null : read(local, file);
+  if (dsl !== null) return read(dsl, "committed", null);
+  const local = await handWrittenModel(root);
+  if (local) return local;
+  // Imported here, not at the top: the map cache imports this module, and a
+  // cycle at load time can leave Next's bundle with an undefined import.
+  const { savedMapAt } = await import("./models/cache");
+  const saved = await savedMapAt(root, rev);
+  if (!saved) return null;
+  return {
+    model: buildModel(saved.workspace),
+    source: "drafted",
+    file: null,
+    error: null,
+  };
 }
 
 /**

@@ -187,23 +187,3 @@ function plainTextFile(file: DiffFile) {
     }
   }
 }
-
-/**
- * Highlight a raw diff hunk from a GitHub review comment. These arrive as a
- * unified-diff string and are shown as the comment's context, exactly the way
- * GitHub renders them above a thread.
- */
-export function renderDiffHunk(hunk: string): Array<{
-  type: "add" | "del" | "context" | "header";
-  content: string;
-}> {
-  return hunk.split("\n").map((line) => {
-    if (line.startsWith("@@"))
-      return { type: "header" as const, content: line };
-    if (line.startsWith("+"))
-      return { type: "add" as const, content: line.slice(1) };
-    if (line.startsWith("-"))
-      return { type: "del" as const, content: line.slice(1) };
-    return { type: "context" as const, content: line.replace(/^ /, "") };
-  });
-}

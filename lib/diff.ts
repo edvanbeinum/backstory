@@ -371,21 +371,3 @@ export function totals(files: DiffFile[]) {
     { additions: 0, deletions: 0 },
   );
 }
-
-/**
- * Does `line` (a new-side line number from a GitHub review thread) fall inside
- * one of this file's hunks? Used to anchor threads into the diff.
- */
-export function findLineInFile(
-  file: DiffFile,
-  line: number,
-): { hunkIndex: number; lineIndex: number } | null {
-  for (let h = 0; h < file.hunks.length; h++) {
-    const hunk = file.hunks[h];
-    if (line < hunk.newStart || line > hunk.newStart + hunk.newLines) continue;
-    for (let l = 0; l < hunk.lines.length; l++) {
-      if (hunk.lines[l].newNo === line) return { hunkIndex: h, lineIndex: l };
-    }
-  }
-  return null;
-}

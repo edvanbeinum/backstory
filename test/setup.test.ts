@@ -10,7 +10,12 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { SETUP_DETAILS, setupChecks, type SetupId } from "../lib/setup";
+import {
+  providerStatusFresh,
+  SETUP_DETAILS,
+  setupChecks,
+  type SetupId,
+} from "../lib/setup";
 import {
   githubApiStandIn,
   quietLoginShell,
@@ -61,13 +66,42 @@ test("with git but no gh and no Claude Code, the checklist says what each missin
   const { rows } = await checks({ git: GIT });
   assert.deepEqual(rows, [
     { id: "git", state: "ready", detail: SETUP_DETAILS.git },
-    { id: "github", state: "missing", detail: SETUP_DETAILS.github },
     { id: "claude", state: "missing", detail: SETUP_DETAILS.claude },
+    { id: "github", state: "missing", detail: SETUP_DETAILS.github },
     { id: "reviews", state: "missing", detail: SETUP_DETAILS.reviews },
   ]);
   assert.match(SETUP_DETAILS.github, /review comments/);
-  assert.match(SETUP_DETAILS.claude, /explained/);
+  assert.match(
+    SETUP_DETAILS.claude,
+    /draws each repo's map, data model and flows with Claude Code/,
+  );
   assert.match(SETUP_DETAILS.reviews, /coding agent/);
+});
+
+test("with Claude Code ready the rows are git, Claude Code, GitHub and notes to your agent", async () => {
+  const { rows } = await checks({
+    git: GIT,
+    claude: `if [ "$1" = auth ]; then echo '{"loggedIn": true}'; fi`,
+  });
+  assert.deepEqual(
+    rows.map((row) => row.id),
+    ["git", "claude", "github", "reviews"],
+  );
+});
+
+test("the provider's status is checked again only when it's missing", async () => {
+  for (const [first, calls] of [
+    ["missing", 2],
+    ["logged-out", 1],
+    ["ready", 1],
+  ] as const) {
+    let called = 0;
+    const status = await providerStatusFresh(async () =>
+      called++ === 0 ? first : "ready",
+    );
+    assert.equal(called, calls, first);
+    assert.equal(status, first === "missing" ? "ready" : first);
+  }
 });
 
 test("Claude Code's row tells not installed, logged out and ready apart", async () => {

@@ -13,7 +13,7 @@ import { Spinner } from "./ui";
  * "20 of 23 changed hunks are on a flow · read these 3 yourself", beside the
  * Flows heading, with the rest listed beneath it. Each opens its code in
  * place, and a hunk on no flow can have one traced on demand: only the flows
- * asked for cost anything. Its parts sit in the heading's wrapping row.
+ * asked for take a minute and the user's usage. Its parts sit in the heading's wrapping row.
  */
 export function FlowCoverage({
   set,

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { ChangeHeader, openingChangeFor } from "@/components/ChangeHeader";
+import { ClaudeCodeGate } from "@/components/ClaudeCodeGate";
 import { Comments } from "@/components/Comments";
 import { FeedbackBar } from "@/components/FeedbackBar";
 import { FilesChanged, type FilesJump } from "@/components/FilesChanged";
@@ -482,6 +483,16 @@ export default function Page() {
     // nothing else.
   }, [ready, repoPath, ref, loadSession]);
 
+  // Start reading main's data model and map as a repo opens, while a pull
+  // request is still being chosen. The server starts each unless the repo is
+  // turned off or main has a model of that kind already.
+  useEffect(() => {
+    if (!ready || !repoPath) return;
+    const trunk = `repo=${encodeURIComponent(repoPath)}&trunk=1`;
+    for (const api of ["data", "map"])
+      void fetch(`/api/${api}?${trunk}`, { method: "POST" }).catch(() => {});
+  }, [ready, repoPath]);
+
   // Catch up on focus, the Cmd-Tab-into-the-window moment, on anything that
   // changed while the window was in the background.
   useEffect(() => {
@@ -491,6 +502,7 @@ export default function Page() {
       if (await checkBuild()) return;
       setWorkingTick((t) => t + 1);
       setReviewTick((t) => t + 1);
+      setModelTick((t) => t + 1);
       void loadSession(repoRef.current, { background: true });
     };
 
@@ -1264,292 +1276,296 @@ export default function Page() {
   }, [session, rev, threads, commentId, toggleDone, selectComment, tab]);
 
   return (
-    <div className="min-h-screen">
-      {repoPath && (
-        <RepoBar
-          repoPath={repoPath}
-          onRepoPathChange={selectRepo}
-          session={session}
-          loading={sessionLoading || diffLoading}
-          onRefresh={() => void loadSession(repoPath, { fresh: true })}
-          live={live}
-          recents={recents}
-          onRemoveRecent={removeRecent}
-          onBackToInbox={backToInbox}
-        />
-      )}
-
-      {!repoPath ? (
-        <>
-          <Inbox
-            roots={inboxRoots}
-            onOpen={selectRepo}
-            onAdd={rememberRoot}
-            onBrowse={() => setBrowsing(true)}
-            onForget={forgetRoot}
-            setupAsked={setup}
-            onSetupDone={() => setSetup(false)}
+    <ClaudeCodeGate>
+      <div className="min-h-screen">
+        {repoPath && (
+          <RepoBar
+            repoPath={repoPath}
+            onRepoPathChange={selectRepo}
+            session={session}
+            loading={sessionLoading || diffLoading}
+            onRefresh={() => void loadSession(repoPath, { fresh: true })}
+            live={live}
+            recents={recents}
+            onRemoveRecent={removeRecent}
+            onBackToInbox={backToInbox}
           />
-          {browsing && (
-            <RepoBrowser
-              currentRepo={inboxRoots[0] ?? null}
-              onPick={(path) => {
-                setBrowsing(false);
-                selectRepo(path);
-              }}
-              onClose={() => setBrowsing(false)}
+        )}
+
+        {!repoPath ? (
+          <>
+            <Inbox
+              roots={inboxRoots}
+              onOpen={selectRepo}
+              onAdd={rememberRoot}
+              onBrowse={() => setBrowsing(true)}
+              onForget={forgetRoot}
+              setupAsked={setup}
+              onSetupDone={() => setSetup(false)}
             />
-          )}
-        </>
-      ) : sessionError ? (
-        <div className="mx-auto max-w-3xl p-6">
-          <div className="flex items-start gap-2 rounded-md border border-[var(--danger)] bg-[var(--canvas)] p-4 text-[13px]">
-            <AlertIcon className="mt-0.5 shrink-0 text-[var(--danger)]" />
-            <span>{sessionError}</span>
+            {browsing && (
+              <RepoBrowser
+                currentRepo={inboxRoots[0] ?? null}
+                onPick={(path) => {
+                  setBrowsing(false);
+                  selectRepo(path);
+                }}
+                onClose={() => setBrowsing(false)}
+              />
+            )}
+          </>
+        ) : sessionError ? (
+          <div className="mx-auto max-w-3xl p-6">
+            <div className="flex items-start gap-2 rounded-md border border-[var(--danger)] bg-[var(--canvas)] p-4 text-[13px]">
+              <AlertIcon className="mt-0.5 shrink-0 text-[var(--danger)]" />
+              <span>{sessionError}</span>
+            </div>
           </div>
-        </div>
-      ) : session ? (
-        <div className="flex items-start">
-          {/* No comments, no checklist. A branch nobody has reviewed yet —
+        ) : session ? (
+          <div className="flex items-start">
+            {/* No comments, no checklist. A branch nobody has reviewed yet —
               often work an agent just wrote, which you're reading before it
               goes anywhere — would give up the spine to say "no review
               comments". The story is what you came for; it gets the window. */}
-          {hasComments && (
-            <TickSpine
-              threads={threads}
-              selectedId={commentId}
-              onSelect={(thread) => selectComment(thread.id)}
-            />
-          )}
-
-          <main className="min-w-0 flex-1 pb-16">
-            {/* Below lg the spine can't sit beside the content, and the old
-                300px list simply vanished at this width — leaving the checklist
-                unreachable. Same squares, laid out sideways. */}
             {hasComments && (
-              <TickStrip
+              <TickSpine
                 threads={threads}
                 selectedId={commentId}
                 onSelect={(thread) => selectComment(thread.id)}
               />
             )}
-            <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
-              {session.github.pr && <PrTitle pr={session.github.pr} />}
 
-              {revNotice && (
-                <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                  <AlertIcon
-                    size={13}
-                    className="mt-0.5 shrink-0 text-[var(--attention)]"
-                  />
-                  <span className="flex-1">
-                    <span className="mono">{revNotice}</span> isn&apos;t waiting
-                    to be pushed any more — it may already be on GitHub. Showing
-                    the latest instead.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setRevNotice(null)}
-                    className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                  >
-                    Dismiss
-                  </button>
-                </p>
+            <main className="min-w-0 flex-1 pb-16">
+              {/* Below lg the spine can't sit beside the content, and the old
+                300px list simply vanished at this width — leaving the checklist
+                unreachable. Same squares, laid out sideways. */}
+              {hasComments && (
+                <TickStrip
+                  threads={threads}
+                  selectedId={commentId}
+                  onSelect={(thread) => selectComment(thread.id)}
+                />
               )}
+              <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
+                {session.github.pr && <PrTitle pr={session.github.pr} />}
 
-              {session.github.unavailable && !session.github.pr && (
-                <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
-                  {session.github.unavailable}
-                  {session.github.connect && (
-                    <>
-                      {" "}
-                      <ConnectGitHubLink />
-                    </>
-                  )}
-                </p>
-              )}
+                {revNotice && (
+                  <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                    <AlertIcon
+                      size={13}
+                      className="mt-0.5 shrink-0 text-[var(--attention)]"
+                    />
+                    <span className="flex-1">
+                      <span className="mono">{revNotice}</span> isn&apos;t
+                      waiting to be pushed any more — it may already be on
+                      GitHub. Showing the latest instead.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setRevNotice(null)}
+                      className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                    >
+                      Dismiss
+                    </button>
+                  </p>
+                )}
 
-              {linkNotice && (
-                <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                  <AlertIcon
-                    size={13}
-                    className="mt-0.5 shrink-0 text-[var(--attention)]"
-                  />
-                  <span className="flex-1">{linkNotice}</span>
-                  <button
-                    type="button"
-                    onClick={() => setLinkNotice(null)}
-                    className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                  >
-                    Dismiss
-                  </button>
-                </p>
-              )}
+                {session.github.unavailable && !session.github.pr && (
+                  <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
+                    {session.github.unavailable}
+                    {session.github.connect && (
+                      <>
+                        {" "}
+                        <ConnectGitHubLink />
+                      </>
+                    )}
+                  </p>
+                )}
 
-              {/* Not dismissible, and it stays until a write actually lands:
+                {linkNotice && (
+                  <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                    <AlertIcon
+                      size={13}
+                      className="mt-0.5 shrink-0 text-[var(--attention)]"
+                    />
+                    <span className="flex-1">{linkNotice}</span>
+                    <button
+                      type="button"
+                      onClick={() => setLinkNotice(null)}
+                      className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                    >
+                      Dismiss
+                    </button>
+                  </p>
+                )}
+
+                {/* Not dismissible, and it stays until a write actually lands:
                 the whole point is that you find out your words are only in
                 this window before you close it. */}
-              {draftNotice && (
-                <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                  <AlertIcon
-                    size={13}
-                    className="mt-0.5 shrink-0 text-[var(--attention)]"
-                  />
-                  <span className="flex-1">
-                    A draft reply hasn&apos;t reached Backstory — it&apos;s
-                    still here and still being retried, but copy it somewhere
-                    safe before closing this window.
-                  </span>
-                </p>
-              )}
+                {draftNotice && (
+                  <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                    <AlertIcon
+                      size={13}
+                      className="mt-0.5 shrink-0 text-[var(--attention)]"
+                    />
+                    <span className="flex-1">
+                      A draft reply hasn&apos;t reached Backstory — it&apos;s
+                      still here and still being retried, but copy it somewhere
+                      safe before closing this window.
+                    </span>
+                  </p>
+                )}
 
-              {commentNotice && (
-                <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                  <AlertIcon
-                    size={13}
-                    className="mt-0.5 shrink-0 text-[var(--attention)]"
-                  />
-                  <span className="flex-1">
-                    That comment isn&apos;t on this pull request any more —
-                    showing the first open one instead.
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setCommentNotice(null)}
-                    className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                  >
-                    Dismiss
-                  </button>
-                </p>
-              )}
+                {commentNotice && (
+                  <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                    <AlertIcon
+                      size={13}
+                      className="mt-0.5 shrink-0 text-[var(--attention)]"
+                    />
+                    <span className="flex-1">
+                      That comment isn&apos;t on this pull request any more —
+                      showing the first open one instead.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setCommentNotice(null)}
+                      className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                    >
+                      Dismiss
+                    </button>
+                  </p>
+                )}
 
-              <ChangeHeader
-                session={session}
-                rev={rev}
-                onRevChange={pickRev}
-                commit={commitForRev}
-                diff={diff}
-                threads={threads}
-                thread={selectedThread}
-                pushed={revIsPushed}
-              />
+                <ChangeHeader
+                  session={session}
+                  rev={rev}
+                  onRevChange={pickRev}
+                  commit={commitForRev}
+                  diff={diff}
+                  threads={threads}
+                  thread={selectedThread}
+                  pushed={revIsPushed}
+                />
 
-              <Tabs
-                tab={tab}
-                onTab={setTab}
-                fileCount={diff && diff.rev === rev ? diff.files.length : null}
-                threads={threads}
-              />
+                <Tabs
+                  tab={tab}
+                  onTab={setTab}
+                  fileCount={
+                    diff && diff.rev === rev ? diff.files.length : null
+                  }
+                  threads={threads}
+                />
 
-              <WithReview root={session.repo.root} tick={reviewTick}>
-                {({ notes, review, outbox }) => (
-                  <>
-                    {visited.has("story") && (
-                      <div hidden={tab !== "story"}>
-                        <Story
-                          repo={repoPath}
-                          rev={rev}
-                          map={map}
-                          data={dataModel}
-                          entityNotes={entityNotes}
-                          onModelChange={onModelChange}
-                          mapHighlight={mapHighlight}
-                          onOpenFile={openFile}
-                          flows={flows}
-                          diff={diff && diff.rev === rev ? diff : null}
-                          onShowFiles={() => setTab("files")}
-                          onShowYourself={showYourself}
-                          target={storyTarget}
-                          onTargetDone={clearStoryTarget}
-                          onShowInFiles={showInFiles}
-                          navRef={flowNavRef}
-                          components={componentInfo}
-                          dataFields={dataFields}
-                          flowNotes={flowNotes}
-                          badges={badges}
-                          onBadge={selectComment}
-                        />
-                      </div>
-                    )}
-                    {visited.has("files") && (
-                      <div hidden={tab !== "files"}>
-                        <FilesChanged
-                          view={viewKey}
-                          diff={diff}
-                          loading={diffLoading}
-                          error={diffError}
-                          threads={threads}
-                          repo={session.repo}
-                          commit={commitForRev}
-                          focusedThreadId={focusedThreadId}
-                          notes={noteRev ? notes : null}
-                          noteRev={noteRev}
-                          map={map}
-                          flowSet={diffIsCurrent ? flowSet : null}
-                          marks={diffIsCurrent ? marks : null}
-                          jump={filesJump}
-                          onJumped={clearFilesJump}
-                          filterAsk={filesFilter}
-                          onShowOnMap={showOnMap}
-                          commentNumbers={commentNumbers}
-                          onStep={openStep}
-                          onComment={selectComment}
-                        />
-                      </div>
-                    )}
-                    {hasComments && visited.has("comments") && (
-                      <div hidden={tab !== "comments"}>
-                        <Comments
-                          threads={threads}
-                          focusedId={commentId}
-                          focusAsk={focusAsk}
-                          onFocus={(id) => {
-                            setCommentId(id);
-                            setFocusedThreadId(id);
-                          }}
-                          fileComponents={map?.fileComponents ?? null}
-                          threadSteps={threadSteps}
-                          onOpenStep={(at) =>
-                            openStep({ flow: at.flow - 1, row: at.row.key })
-                          }
-                          repo={session.repo}
-                          pr={session.github.pr}
-                          commit={commitForRev}
-                          branch={session.repo.branch}
-                          commitCandidates={pinCandidates}
-                          onToggleDone={toggleDone}
-                          onLinkCommit={linkCommit}
-                          onDraftChange={saveDraft}
-                        />
-                      </div>
-                    )}
+                <WithReview root={session.repo.root} tick={reviewTick}>
+                  {({ notes, review, outbox }) => (
+                    <>
+                      {visited.has("story") && (
+                        <div hidden={tab !== "story"}>
+                          <Story
+                            repo={repoPath}
+                            rev={rev}
+                            map={map}
+                            data={dataModel}
+                            entityNotes={entityNotes}
+                            onModelChange={onModelChange}
+                            mapHighlight={mapHighlight}
+                            onOpenFile={openFile}
+                            flows={flows}
+                            diff={diff && diff.rev === rev ? diff : null}
+                            onShowFiles={() => setTab("files")}
+                            onShowYourself={showYourself}
+                            target={storyTarget}
+                            onTargetDone={clearStoryTarget}
+                            onShowInFiles={showInFiles}
+                            navRef={flowNavRef}
+                            components={componentInfo}
+                            dataFields={dataFields}
+                            flowNotes={flowNotes}
+                            badges={badges}
+                            onBadge={selectComment}
+                          />
+                        </div>
+                      )}
+                      {visited.has("files") && (
+                        <div hidden={tab !== "files"}>
+                          <FilesChanged
+                            view={viewKey}
+                            diff={diff}
+                            loading={diffLoading}
+                            error={diffError}
+                            threads={threads}
+                            repo={session.repo}
+                            commit={commitForRev}
+                            focusedThreadId={focusedThreadId}
+                            notes={noteRev ? notes : null}
+                            noteRev={noteRev}
+                            map={map}
+                            flowSet={diffIsCurrent ? flowSet : null}
+                            marks={diffIsCurrent ? marks : null}
+                            jump={filesJump}
+                            onJumped={clearFilesJump}
+                            filterAsk={filesFilter}
+                            onShowOnMap={showOnMap}
+                            commentNumbers={commentNumbers}
+                            onStep={openStep}
+                            onComment={selectComment}
+                          />
+                        </div>
+                      )}
+                      {hasComments && visited.has("comments") && (
+                        <div hidden={tab !== "comments"}>
+                          <Comments
+                            threads={threads}
+                            focusedId={commentId}
+                            focusAsk={focusAsk}
+                            onFocus={(id) => {
+                              setCommentId(id);
+                              setFocusedThreadId(id);
+                            }}
+                            fileComponents={map?.fileComponents ?? null}
+                            threadSteps={threadSteps}
+                            onOpenStep={(at) =>
+                              openStep({ flow: at.flow - 1, row: at.row.key })
+                            }
+                            repo={session.repo}
+                            pr={session.github.pr}
+                            commit={commitForRev}
+                            branch={session.repo.branch}
+                            commitCandidates={pinCandidates}
+                            onToggleDone={toggleDone}
+                            onLinkCommit={linkCommit}
+                            onDraftChange={saveDraft}
+                          />
+                        </div>
+                      )}
 
-                    {/* Pinned to the bottom of the window on every tab: an
+                      {/* Pinned to the bottom of the window on every tab: an
                         agent waiting on review must never be invisible, and
                         notes written in Files changed are sent from anywhere. */}
-                    {(noteRev ||
-                      notes.notes.length > 0 ||
-                      review.waiting ||
-                      review.error) && (
-                      <div className="sticky bottom-4 z-20">
-                        <FeedbackBar
-                          notes={notes}
-                          noteRev={noteRev}
-                          diff={noteRev ? diff : null}
-                          session={session}
-                          review={review}
-                          outbox={outbox}
-                          onOpenNote={openNote}
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
-              </WithReview>
-            </div>
-          </main>
-        </div>
-      ) : null}
-    </div>
+                      {(noteRev ||
+                        notes.notes.length > 0 ||
+                        review.waiting ||
+                        review.error) && (
+                        <div className="sticky bottom-4 z-20">
+                          <FeedbackBar
+                            notes={notes}
+                            noteRev={noteRev}
+                            diff={noteRev ? diff : null}
+                            session={session}
+                            review={review}
+                            outbox={outbox}
+                            onOpenNote={openNote}
+                          />
+                        </div>
+                      )}
+                    </>
+                  )}
+                </WithReview>
+              </div>
+            </main>
+          </div>
+        ) : null}
+      </div>
+    </ClaudeCodeGate>
   );
 }

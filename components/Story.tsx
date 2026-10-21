@@ -88,6 +88,7 @@ export function Story({
           <SystemMap
             map={map}
             repo={repo}
+            rev={rev}
             highlight={mapHighlight}
             onOpenFile={onOpenFile}
             onModelChange={onModelChange}
