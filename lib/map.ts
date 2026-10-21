@@ -8,7 +8,7 @@ import {
   type ModelElement,
   type ModelSource,
 } from "./model";
-import { mapStatus, type MapDraftStatus } from "./models/cache";
+import { hasMainMap, mapStatus, type MapDraftStatus } from "./models/cache";
 
 /**
  * The system map for a view: which C4 elements the change touched, which
@@ -72,6 +72,8 @@ export interface MapResponse {
   auto?: boolean;
   /** When the repo has no model of its own: where a hand-written local model goes */
   handFile?: string;
+  /** When the repo has no model of its own: whether main's map is saved */
+  mainMap?: boolean;
   nodes: MapNode[];
   edges: MapEdge[];
   /** Every component, person and external system, unchanged, when the change touches none */
@@ -231,6 +233,7 @@ export async function buildMap(
         draft: await mapStatus({ root, base, head }),
         auto: await autoRead(root),
         handFile: await localModelFile(root),
+        mainMap: await hasMainMap(root),
       }
     : {};
   if (!headRead) return { ...empty, ...reading };

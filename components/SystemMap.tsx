@@ -650,7 +650,7 @@ function DraftProgress({ draft }: { draft: DraftApi }) {
   return null;
 }
 
-/** What a view in a repo with no map yet shows, where the map goes: the read's progress, or the offer to read it. */
+/** What a view with no map of its own shows, where the map goes: the read's progress, or the offer to read it. */
 function DraftOffer({ draft }: { draft: DraftApi }) {
   const job = draft.map?.draft;
   const idle =
@@ -661,15 +661,28 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
   const provider = job?.status === "idle" ? job.provider : null;
   const offerAuto = job?.status === "idle" && !job.auto;
   const file = draft.map?.handFile;
+  const mainMap = draft.map?.mainMap;
   return (
     <div className="story-card">
-      <h3>This repo has no map yet</h3>
-      <p>
-        Backstory draws the map from a C4 model of the system.{" "}
-        {provider ?? "The AI provider"} reads the code, read-only: main&apos;s
-        map once, then only what each change differs by. The map stays on this
-        machine, never in the repo.
-      </p>
+      <h3>
+        {mainMap
+          ? "This change isn't on the map yet"
+          : "This repo has no map yet"}
+      </h3>
+      {mainMap ? (
+        <p>
+          Backstory has main&apos;s map. {provider ?? "The AI provider"} reads
+          only what this change differs by, read-only, and adds it. The map
+          stays on this machine, never in the repo.
+        </p>
+      ) : (
+        <p>
+          Backstory draws the map from a C4 model of the system.{" "}
+          {provider ?? "The AI provider"} reads the code, read-only: main&apos;s
+          map once, then only what each change differs by. The map stays on this
+          machine, never in the repo.
+        </p>
+      )}
       {idle && (
         <span className="flex flex-wrap justify-center gap-2">
           <Button variant="primary" onClick={() => draft.start()}>
@@ -685,8 +698,11 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
       </span>
       {provider && (
         <span className="est">
-          {provider} · a few minutes for main, then seconds a change · uses your{" "}
-          {provider} login
+          {provider} ·{" "}
+          {mainMap
+            ? "seconds for this change"
+            : "a few minutes for main, then seconds a change"}{" "}
+          · uses your {provider} login
         </span>
       )}
       {file && (

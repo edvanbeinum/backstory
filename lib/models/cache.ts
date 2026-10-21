@@ -210,6 +210,11 @@ export async function mapRefusal(
   return null;
 }
 
+/** Whether main's map is saved, so a view's read only adds its own change to it. */
+export async function hasMainMap(root: string): Promise<boolean> {
+  return (await savedTrunk(await mapsDir(root))) !== null;
+}
+
 export async function mapStatus(
   view: MapView,
   status?: () => Promise<ProviderStatus>,
