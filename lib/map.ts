@@ -431,11 +431,7 @@ export async function buildMap(
         !contains(elementOf, e.destination, e.source),
     ),
     ...(nodes.length === 0 ? { whole: wholeMap(model) } : {}),
-    hidden: Math.max(
-      0,
-      leaves.size -
-        nodes.filter((n) => leaves.has(n.id) && n.state !== "removed").length,
-    ),
+    hidden: leaves.size - nodes.filter((n) => leaves.has(n.id)).length,
     fileComponents,
     unmapped,
     ambiguous,
