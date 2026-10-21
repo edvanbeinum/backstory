@@ -151,16 +151,23 @@ async function fileStats(
 
 const leafOf = (model: Model, file: string) => model.match(file);
 
+/** An element's containers and systems, nearest first. */
+function ancestors(
+  elementOf: (id: string) => ModelElement | undefined,
+  id: string,
+) {
+  const found: string[] = [];
+  for (let p = elementOf(id)?.parent; p; p = elementOf(p)?.parent ?? null)
+    found.push(p);
+  return found;
+}
+
 /** Whether `outer` is `inner`'s container or system, at any depth. */
-function contains(
+const contains = (
   elementOf: (id: string) => ModelElement | undefined,
   outer: string,
   inner: string,
-) {
-  for (let p = elementOf(inner)?.parent; p; p = elementOf(p)?.parent ?? null)
-    if (p === outer) return true;
-  return false;
-}
+) => ancestors(elementOf, inner).includes(outer);
 
 const unchanged = {
   files: [],
@@ -353,13 +360,9 @@ export async function buildMap(
   // boxes around them, not as changed elements of their own.
   const elementOf = (id: string) =>
     model.elements.get(id) ?? baseModel?.elements.get(id);
-  const ancestors = (id: string) => {
-    const found: string[] = [];
-    for (let p = elementOf(id)?.parent; p; p = elementOf(p)?.parent ?? null)
-      found.push(p);
-    return found;
-  };
-  const parents = new Set([...changed].flatMap(ancestors));
+  const parents = new Set(
+    [...changed].flatMap((id) => ancestors(elementOf, id)),
+  );
   for (const p of parents) changed.delete(p);
 
   // Neighbours, best first: the far end of a changed arrow always shows;
@@ -385,7 +388,8 @@ export async function buildMap(
   // Every container and system around a shown element is drawn too, as the
   // box it sits in.
   const shown = new Set([...changed, ...neighbours]);
-  for (const id of [...shown]) for (const p of ancestors(id)) shown.add(p);
+  for (const id of [...shown])
+    for (const p of ancestors(elementOf, id)) shown.add(p);
   const groups = new Set(
     [...shown].map((id) => elementOf(id)?.parent).filter(Boolean),
   );
