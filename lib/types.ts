@@ -137,45 +137,6 @@ export interface ReviewComment {
   diffHunk: string | null;
 }
 
-/**
- * What you've done about one comment, as the client sees it.
- *
- * Non-optional on `ReviewThread`, so nothing has to guard on its absence.
- */
-export interface ThreadResponse {
-  /**
-   * The tick, and the only thing that means handled. Nothing infers it:
-   * not a linked commit, not a drafted reply, not a reply spotted on GitHub.
-   * Backstory used to guess which commit answered a comment, and a guess always
-   * found *something*, so no comment ever read as outstanding and the list
-   * couldn't work as a checklist.
-   */
-  done: boolean;
-  /** ms epoch of the tick, for "handled 2 minutes ago". */
-  doneAt: number | null;
-  /** The reply you're drafting. Backstory never posts it. */
-  reply: string | null;
-  /**
-   * The changes you say answer the comment, in the order you linked them.
-   * A long comment often makes several points and takes several commits to
-   * answer. Never implies `done`.
-   */
-  commits: Array<{
-    sha: string;
-    shortSha: string;
-    /**
-     * Not reachable from the branch and no patch-id match — a squash, an
-     * amend, or a rebase through a conflict changed the diff. The link is
-     * kept rather than silently dropped, and the UI asks for a new one. It
-     * does *not* untick the comment: a rebase can't undo a judgement you
-     * made.
-     */
-    missing: boolean;
-    /** Re-matched to a rewritten commit by patch-id this load, so it's said once. */
-    healed: boolean;
-  }>;
-}
-
 export interface ReviewThread {
   id: string;
   isResolved: boolean;
@@ -190,10 +151,9 @@ export interface ReviewThread {
   comments: ReviewComment[];
   /**
    * A top-level review body rather than an inline thread. It has no file or
-   * line, but it still needs addressing, so it belongs in the checklist.
+   * line, but it is still feedback, so it is listed with the comments.
    */
   isReviewSummary?: boolean;
-  response: ThreadResponse;
 }
 
 export interface ReviewSummary {

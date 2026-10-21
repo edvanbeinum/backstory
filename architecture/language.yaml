@@ -59,7 +59,7 @@ terms:
     avoid:
       - store
   - name: store
-    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes, rounds and responses, one table each, plus `seen` and `settings`."
+    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes and rounds, one table each, plus `seen` and `settings`."
     avoid:
       - store, for the flow cache, the data cache or the map cache
   - name: flow cache
@@ -69,7 +69,7 @@ terms:
   - name: local model
     means: "A C4 model written by hand on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo key>/workspace.dsl` (`localModelFile` in `lib/model.ts`). It wins over a drafted map, and Backstory never writes it. One with the `backstory.drafted` property is the old single drafted model, and is skipped."
     avoid:
-      - draft alone, for the model (reply drafts are `lib/drafts.ts`)
+      - draft alone, for the model
   - name: drafted map
     means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off, or on a click (Draft a model), and marked Draft under the map."
     avoid:
@@ -115,10 +115,6 @@ terms:
     avoid:
       - log in, for this (`gh auth login` is `gh`'s own sign-in)
       - OAuth, in copy
-  - name: answering commit
-    means: "A commit you link to a review comment as one that answers it, kept in the comment's response beside the tick and the drafted reply (`commits` in `lib/responses.ts`). It stores the commit's patch-id as well as its sha, so a rebase re-matches it (`healed`); when nothing matches it's `missing` and you choose another. It never ticks the comment."
-    avoid:
-      - link, as a noun (link stays the verb, as in "Link another…")
   - name: On GitHub
     means: "The inbox's fold under each repo listing the open pull requests and branches on GitHub this clone has no local branch for. Opening one fetches it into a local branch and reviews it (`onGitHub` in `lib/inbox.ts`)."
     avoid:
@@ -166,8 +162,6 @@ blocks:
       - lib/store.ts
       - lib/schema.sql
       - lib/upgrades/
-      - lib/responses.ts
-      - lib/drafts.ts
       - lib/notes.ts
       - lib/outbox.ts
     summary: The SQLite database `~/.backstory/backstory.db` and the modules that keep its records.

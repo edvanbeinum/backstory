@@ -20,7 +20,6 @@ function thread(
     startLine: null,
     side: "RIGHT",
     comments: [],
-    response: { done: false, doneAt: null, reply: null, commits: [] },
     ...opts,
   };
 }

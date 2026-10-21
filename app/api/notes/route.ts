@@ -11,8 +11,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * The worktree root, as the session reported it. Taken from the client
- * without a `resolveRepo`, for the same reason /api/responses takes its key:
- * a note save shouldn't cost five git calls. It's only ever a store key.
+ * without a `resolveRepo`, because a note save shouldn't cost five git calls.
+ * It's only ever a store key.
  */
 function rootParam(request: Request): string | null {
   const root = new URL(request.url).searchParams.get("repo");

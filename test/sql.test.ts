@@ -323,10 +323,7 @@ test("this repo's data model reads from lib/schema.sql", async () => {
   });
   assert.equal(model?.source, "sql");
   const entities = model?.entities ?? new Map<string, Entity>();
-  assert.deepEqual(
-    [...entities.keys()],
-    ["Note", "Round", "Seen", "Response", "Setting"],
-  );
+  assert.deepEqual([...entities.keys()], ["Note", "Round", "Seen", "Setting"]);
   for (const entity of entities.values()) {
     assert.equal(entity.file, "lib/schema.sql", entity.name);
   }
@@ -360,13 +357,5 @@ test("this repo's data model reads from lib/schema.sql", async () => {
     ["root", "text", true],
     ["session", "text", true],
     ["at", "integer", true],
-  ]);
-  assert.deepEqual(fields(entities.get("Response")), [
-    ["pr", "text", true],
-    ["thread", "text", true],
-    ["done", "integer", true],
-    ["done_at", "integer", false],
-    ["reply", "text", false],
-    ["commits", "text", true],
   ]);
 });

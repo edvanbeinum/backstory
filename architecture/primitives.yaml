@@ -107,7 +107,7 @@ primitives:
       - KEY
       - setting
       - setSetting
-    use: "Every read and write of notes, rounds, responses and settings, in the SQLite database `~/.backstory/backstory.db`. `db` opens it on first use, makes the schema from `lib/schema.sql` and upgrades an older database from `lib/upgrades/<version>.sql`; `transaction` runs a synchronous write in one transaction, joining one already open, so a module's write can be part of a larger one; `reading` runs a read and returns an empty result when the database can't be opened or read. `homeDir` is the one directory everything on this machine lives in (the database, the flow cache, the data cache, the map cache, local models). `KEY` is the shape of an id the store accepts. `setting` and `setSetting` read and write one setting, such as `read.off.<repoKey>`."
+    use: "Every read and write of notes, rounds, seen sessions and settings, in the SQLite database `~/.backstory/backstory.db`. `db` opens it on first use, makes the schema from `lib/schema.sql` and upgrades an older database from `lib/upgrades/<version>.sql`; `transaction` runs a synchronous write in one transaction, joining one already open, so a module's write can be part of a larger one; `reading` runs a read and returns an empty result when the database can't be opened or read. `homeDir` is the one directory everything on this machine lives in (the database, the flow cache, the data cache, the map cache, local models). `KEY` is the shape of an id the store accepts. `setting` and `setSetting` read and write one setting, such as `read.off.<repoKey>`."
   - name: run the AI provider
     block: AI provider
     file: lib/ai/provider.ts

@@ -122,7 +122,7 @@ export function DiffFile({
       : shown.hunks;
 
   // Anchoring only marks where comments point. The comments themselves live
-  // in the spine and the Comments tab; Files changed is the diff.
+  // in the Comments tab; Files changed is the diff.
   const { byNewLine, byOldLine } = useMemo(
     () => anchorThreads(shown, threads),
     [shown, threads],
@@ -635,8 +635,8 @@ function HunkRows({
                       <button
                         key={t.id}
                         type="button"
-                        className={`mark c ${t.response.done ? "done" : ""}`}
-                        title={`Review comment ${commentNumbers.get(t.id)}${t.response.done ? ", handled" : ""}: open it in Comments`}
+                        className="mark c"
+                        title={`Review comment ${commentNumbers.get(t.id)}: open it in Comments`}
                         onClick={() => onComment?.(t.id)}
                       >
                         💬 {commentNumbers.get(t.id)}

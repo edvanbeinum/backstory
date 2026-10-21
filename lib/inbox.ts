@@ -4,12 +4,10 @@ import { listWorktrees } from "./browse";
 import { run } from "./exec";
 import { parseRemote } from "./git";
 import { describeGhError, githubGraphql, pickPullRequest } from "./github";
-import { countProgress, type Progress } from "./progress";
-import { getAllResponses, prKey } from "./responses";
 
 /**
  * The inbox: every worktree you've got checked out, across every repo you've
- * opened, with how much of each PR's review you've worked through.
+ * opened, with how many of each PR's review threads GitHub calls unresolved.
  *
  * The cost is the interesting part. The obvious build — resolve each worktree,
  * find its PR, fetch its threads — is two network round trips *per worktree*,
@@ -27,7 +25,7 @@ export interface InboxPr {
   url: string;
   /** What this PR targets — another branch here, when it's a stack. */
   baseRefName: string;
-  /** Threads GitHub still calls unresolved. Shown, never used to tick. */
+  /** Threads GitHub still calls unresolved. */
   unresolved: number;
 }
 
@@ -52,14 +50,12 @@ export interface InboxRow {
   ahead: number | null;
   lastCommitAt: string | null;
   pr: InboxPr | null;
-  progress: Progress | null;
   /** How deep in a stack of PRs, from the base each one targets. */
   depth: number;
   /**
-   * Merged or closed: the review is over, so it can't need a response. Kept
-   * rather than dropped — three of these are worktrees still on disk, and
-   * this is the only screen that lists what you have checked out — but it
-   * doesn't count and doesn't compete for the top of the list.
+   * Merged or closed: the review is over. Kept rather than dropped — three
+   * of these are worktrees still on disk, and this is the only screen that
+   * lists what you have checked out — but it doesn't count and doesn't compete for the top of the list.
    */
   archived: boolean;
 }
@@ -174,8 +170,7 @@ fragment F on PullRequest {
   number title state isDraft url updatedAt baseRefName
   isCrossRepository
   headRepositoryOwner { login }
-  reviewThreads(first: 100) { totalCount nodes { id isResolved } }
-  reviews(first: 50) { nodes { id body } }
+  reviewThreads(first: 100) { nodes { isResolved } }
 }`;
 
 interface GqlInboxPr {
@@ -188,11 +183,7 @@ interface GqlInboxPr {
   baseRefName: string;
   isCrossRepository: boolean;
   headRepositoryOwner: { login: string } | null;
-  reviewThreads: {
-    totalCount: number;
-    nodes: Array<{ id: string; isResolved: boolean }>;
-  };
-  reviews: { nodes: Array<{ id: string; body: string }> };
+  reviewThreads: { nodes: Array<{ isResolved: boolean }> };
 }
 
 interface GqlOpenPr {
@@ -383,23 +374,15 @@ export async function buildInbox(
     [...groups.values()].map((identity) => buildRepo(identity, opts)),
   );
 
-  // Most outstanding first, then alphabetically — Promise.all resolves in
+  // Most unresolved first, then alphabetically — Promise.all resolves in
   // whatever order the network felt like, which is no order at all.
-  // Only live PRs count. A merged one can't need a response, and letting it
-  // count made the headline three times the real number.
-  const outstanding = (rows: InboxRow[]) =>
-    rows.reduce(
-      (n, row) =>
-        n +
-        (row.archived || !row.progress
-          ? 0
-          : row.progress.total - row.progress.done),
-      0,
-    );
+  // Only live PRs count: a merged one's threads often stay unresolved, and
+  // letting them count made the headline three times the real number.
+  const total = (rows: InboxRow[]) =>
+    rows.reduce((n, row) => n + unresolvedIn(row), 0);
   results.sort(
     (a, b) =>
-      outstanding(b.rows) - outstanding(a.rows) ||
-      a.repo.label.localeCompare(b.repo.label),
+      total(b.rows) - total(a.rows) || a.repo.label.localeCompare(b.repo.label),
   );
 
   return {
@@ -407,6 +390,11 @@ export async function buildInbox(
     rows: results.flatMap((r) => r.rows),
     unresolved,
   };
+}
+
+/** A live PR's unresolved threads; zero for an archived row or one with no PR. */
+function unresolvedIn(row: InboxRow): number {
+  return row.archived || !row.pr ? 0 : row.pr.unresolved;
 }
 
 async function buildRepo(
@@ -423,11 +411,10 @@ async function buildRepo(
     : identity.root;
   const label = path.basename(root);
 
-  const [worktrees, facts, remoteUrl, responses] = await Promise.all([
+  const [worktrees, facts, remoteUrl] = await Promise.all([
     listWorktrees(root),
     branchFacts(root),
     git(root, ["remote", "get-url", "origin"]),
-    getAllResponses(),
   ]);
 
   const { host, owner, name } = parseRemote(remoteUrl);
@@ -503,36 +490,18 @@ async function buildRepo(
       ? pickPullRequest(prs.get(branch) ?? [], owner)
       : null;
 
-    let pr: InboxPr | null = null;
-    let progress: Progress | null = null;
-
-    if (chosen) {
-      pr = {
-        number: chosen.number,
-        title: chosen.title,
-        state: chosen.state,
-        isDraft: chosen.isDraft,
-        url: chosen.url,
-        baseRefName: chosen.baseRefName,
-        unresolved: chosen.reviewThreads.nodes.filter((t) => !t.isResolved)
-          .length,
-      };
-
-      const key = prKey(owner, name, chosen.number);
-      // An empty review body is the envelope around inline comments, not
-      // something to respond to.
-      const ids = [
-        ...chosen.reviewThreads.nodes.map((t) => t.id),
-        ...chosen.reviews.nodes
-          .filter((r) => r.body.trim().length > 0)
-          .map((r) => r.id),
-      ];
-      progress = countProgress(ids, key ? (responses[key] ?? {}) : {}, {
-        reportedTotal:
-          chosen.reviewThreads.totalCount +
-          (ids.length - chosen.reviewThreads.nodes.length),
-      });
-    }
+    const pr: InboxPr | null = chosen
+      ? {
+          number: chosen.number,
+          title: chosen.title,
+          state: chosen.state,
+          isDraft: chosen.isDraft,
+          url: chosen.url,
+          baseRefName: chosen.baseRefName,
+          unresolved: chosen.reviewThreads.nodes.filter((t) => !t.isResolved)
+            .length,
+        }
+      : null;
 
     return {
       id: branch ?? worktree?.path ?? "",
@@ -553,7 +522,6 @@ async function buildRepo(
       ahead: fact?.ahead ?? null,
       lastCommitAt: fact?.lastCommitAt ?? null,
       pr,
-      progress,
       depth: 0,
       archived: pr !== null && (pr.state === "MERGED" || pr.state === "CLOSED"),
     };
@@ -564,7 +532,7 @@ async function buildRepo(
     ...worktrees.map((worktree) => build(worktree.branch, worktree)),
     // Plus any branch with a PR that no worktree holds. Without a PR it's
     // just a local branch — a `backup/*` or a scratch name — and listing
-    // those would bury the ones that need a response.
+    // those would bury the ones under review.
     ...branches
       .filter((branch) => !byBranch.has(branch))
       .map((branch) => build(branch, null))
@@ -616,10 +584,8 @@ function nest(rows: InboxRow[]): InboxRow[] {
     }
   }
 
-  const left = (row: InboxRow) =>
-    row.archived || !row.progress ? -1 : row.progress.total - row.progress.done;
   const order = (a: InboxRow, b: InboxRow) =>
-    left(b) - left(a) ||
+    unresolvedIn(b) - unresolvedIn(a) ||
     (b.lastCommitAt ?? "").localeCompare(a.lastCommitAt ?? "");
 
   const out: InboxRow[] = [];
