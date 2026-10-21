@@ -404,10 +404,13 @@ const names = (list: MapNode[]) => {
 };
 
 function summary(map: MapResponse) {
-  const leaves = map.nodes.filter(ownsCode);
-  const changed = leaves.filter((n) => n.state !== "neighbour");
-  const added = leaves.filter((n) => n.state === "added");
-  const removed = leaves.filter((n) => n.state === "removed");
+  // A new or removed box is named as such, but a box around a changed
+  // component isn't a changed component itself.
+  const changed = map.nodes
+    .filter(ownsCode)
+    .filter((n) => n.state !== "neighbour");
+  const added = map.nodes.filter((n) => n.state === "added");
+  const removed = map.nodes.filter((n) => n.state === "removed");
   const arrows = {
     added: map.edges.filter((e) => e.state === "added").length,
     removed: map.edges.filter((e) => e.state === "removed").length,
