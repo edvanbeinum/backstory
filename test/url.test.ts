@@ -144,44 +144,19 @@ test("a ?comment= link opens Comments, unless it names another tab", () => {
   assert.equal(parsed.comment, "PRRT_x");
 });
 
-test("a comment id resolves, falling back to the first OPEN thread", () => {
-  const threads = [
-    { id: "resolved-one", isResolved: true },
-    { id: "open-one", isResolved: false },
-    { id: "open-two", isResolved: false },
-  ];
-
-  // A known id is honoured, resolved or not
-  assert.deepEqual(resolveComment("resolved-one", threads), {
-    commentId: "resolved-one",
-    notice: null,
-  });
-
-  // Nothing requested → first open, not merely first
-  assert.deepEqual(resolveComment(null, threads), {
-    commentId: "open-one",
-    notice: null,
-  });
-
-  // A stale id falls back and reports what was asked for
-  assert.deepEqual(resolveComment("gone-thread", threads), {
-    commentId: "open-one",
-    notice: "gone-thread",
-  });
+test("a comment id the PR still has is focused", () => {
+  const threads = [{ id: "one" }, { id: "two" }];
+  assert.equal(resolveComment("two", threads), "two");
 });
 
-test("comment resolution copes with all-resolved and empty PRs", () => {
-  const allResolved = [{ id: "only", isResolved: true }];
-  assert.equal(resolveComment(null, allResolved).commentId, "only");
+test("a comment id that's gone focuses nothing", () => {
+  assert.equal(resolveComment("gone-thread", [{ id: "one" }]), null);
+  assert.equal(resolveComment("gone", []), null);
+});
 
-  assert.deepEqual(resolveComment(null, []), {
-    commentId: null,
-    notice: null,
-  });
-  assert.deepEqual(resolveComment("gone", []), {
-    commentId: null,
-    notice: "gone",
-  });
+test("no comment asked for focuses nothing", () => {
+  assert.equal(resolveComment(null, [{ id: "one" }]), null);
+  assert.equal(resolveComment(null, []), null);
 });
 
 test("a short sha from a hand-typed URL resolves to the full one", () => {

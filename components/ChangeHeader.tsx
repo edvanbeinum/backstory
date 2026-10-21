@@ -11,7 +11,7 @@ import type {
 } from "@/lib/types";
 import { CommitHeader } from "./CommitHeader";
 import { CommitPicker } from "./CommitPicker";
-import { CommentIcon, FileDiffIcon, GitCommitIcon, PencilIcon } from "./icons";
+import { FileDiffIcon, GitCommitIcon, PencilIcon } from "./icons";
 
 export interface ChangeOption {
   rev: string;
@@ -56,47 +56,12 @@ export function changesFor(
     });
   }
 
-  // A commit already linked to this comment stays offered, so returning to a
-  // handled comment shows the change you said answers it.
-  // Every change you said answers this comment stays offered, so returning
-  // to a handled comment can show any of them.
-  for (const link of thread?.response.commits ?? []) {
-    if (link.missing) continue;
-    const linked = link.sha;
-    const commit =
-      session.commits.find((c) => c.sha === linked) ??
-      session.history.find((c) => c.sha === linked);
-    options.push({
-      rev: linked,
-      label: linked.slice(0, 7),
-      hint: `linked: ${commit?.subject ?? "commit"}`,
-      icon: <GitCommitIcon size={12} />,
-    });
-  }
-
   return options;
 }
 
 /**
- * Which change to show when you move to a comment — or `null` for "leave the
- * diff exactly where it is".
- *
- * A comment you linked reopens on the change you linked it to. That isn't a
- * guess; it's the answer you already gave, played back.
- *
- * An unlinked comment moves nothing. It used to fall back to the whole branch
- * diff, which threw away the commit you were reading the moment you stepped
- * to the next comment — precisely when you were most likely to want it still
- * on screen. Backstory has no idea which change answers an unhandled comment,
- * and behaving as though it might is worse than doing nothing.
- */
-export function openingChangeFor(thread: ReviewThread | null): string | null {
-  return thread?.response.commits.find((c) => !c.missing)?.sha ?? null;
-}
-
-/**
- * Above the tabs: the change picker, the comments this change answers, and
- * the commit's header. Picking a change leaves the focused comment alone.
+ * Above the tabs: the change picker and the commit's header. Picking a change
+ * leaves the focused comment alone.
  */
 export function ChangeHeader({
   session,
@@ -104,7 +69,6 @@ export function ChangeHeader({
   onRevChange,
   commit,
   diff,
-  threads,
   thread,
   pushed,
 }: {
@@ -113,31 +77,20 @@ export function ChangeHeader({
   onRevChange: (rev: string) => void;
   commit: CommitSummary | null;
   diff: DiffResponse | null;
-  threads: ReviewThread[];
-  /** The focused comment, so the landing line can say this change answers it */
+  /** The focused comment, so Uncommitted can say it touches the comment's file */
   thread: ReviewThread | null;
   pushed: boolean;
 }) {
   const options = useMemo(() => changesFor(thread, session), [thread, session]);
 
   /**
-   * Any commit on the branch, so the change picked isn't limited to the three
+   * Any commit on the branch, so the change picked isn't limited to the
    * chips. Reading your own commits before pushing is what Backstory was built
    * for; it just no longer needs a list of its own to do it.
    */
   const commitCandidates = useMemo(
     () => [...session.commits, ...session.history],
     [session],
-  );
-
-  // How many comments this change answers — the reverse lookup that was
-  // missing: given a commit, which review comments land in it?
-  const landing = useMemo(
-    () =>
-      threads.filter((t) =>
-        t.response.commits.some((c) => !c.missing && c.sha === rev),
-      ),
-    [threads, rev],
   );
 
   return (
@@ -180,26 +133,7 @@ export function ChangeHeader({
         )}
       </div>
 
-      {landing.length > 0 && (
-        <p className="flex items-center gap-1.5 rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-1.5 text-[11px] text-[var(--fg-muted)]">
-          <CommentIcon size={12} className="text-[var(--attention)]" />
-          {landing.length} {landing.length === 1 ? "comment" : "comments"} land
-          {landing.length === 1 ? "s" : ""} in this change
-          {thread && landing.some((t) => t.id === thread.id) && (
-            <span className="text-[var(--accent)]">
-              · including the one you&apos;re on
-            </span>
-          )}
-        </p>
-      )}
-
-      <CommitHeader
-        commit={commit}
-        diff={diff}
-        repo={session.repo}
-        pr={session.github.pr}
-        pushed={pushed}
-      />
+      <CommitHeader commit={commit} diff={diff} pushed={pushed} />
     </div>
   );
 }

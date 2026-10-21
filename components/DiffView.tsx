@@ -20,9 +20,8 @@ import type { NotesApi } from "./useNotes";
 /**
  * Group threads by the file they belong to, so each DiffFile only has to
  * consider its own — and only to mark the line the comment you're reading
- * points at. Nothing here renders a comment: the spine lists them all and the
- * response panel answers them, so repeating them among the code was three
- * copies of one list.
+ * points at. Nothing here renders a comment: the Comments tab lists them all,
+ * and repeating them among the code would be a second copy of one list.
  */
 function partitionThreads(diff: DiffResponse | null, threads: ReviewThread[]) {
   const paths = new Set(
@@ -110,7 +109,7 @@ export function DiffView({
   flows?: Map<string, number[] | "yourself"> | null;
   /** Per file, the only hunks to show, by `hunkKey` */
   onlyHunks?: Map<string, Set<string>> | null;
-  /** Each thread's number, in the spine's order, for its gutter mark */
+  /** Each thread's number, oldest first, for its gutter mark */
   commentNumbers?: Map<string, number> | null;
   onStep?: (mark: StepMark) => void;
   onComment?: (threadId: string) => void;

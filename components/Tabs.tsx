@@ -5,7 +5,7 @@ import type { ReviewThread } from "@/lib/types";
 
 /**
  * Story, Files changed and Comments, as a pull request's tabs. Comments shows
- * only when the pull request has threads, with how many are still to tick.
+ * only when the pull request has threads.
  */
 export function Tabs({
   tab,
@@ -18,7 +18,6 @@ export function Tabs({
   fileCount: number | null;
   threads: ReviewThread[];
 }) {
-  const toGo = threads.filter((t) => !t.response.done).length;
   const button = (id: Tab, children: React.ReactNode) => (
     <button
       type="button"
@@ -45,7 +44,6 @@ export function Tabs({
           "comments",
           <>
             Comments <span className="counter">{threads.length}</span>
-            {toGo > 0 && <span className="tab-note">· {toGo} to go</span>}
           </>,
         )}
     </div>

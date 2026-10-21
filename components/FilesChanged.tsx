@@ -98,7 +98,7 @@ export function FilesChanged({
   filterAsk?: { filter: "yourself"; at: number } | null;
   /** Outline a component on the story's map */
   onShowOnMap: (component: string) => void;
-  /** Each thread's number, in the spine's order, for its gutter mark */
+  /** Each thread's number, oldest first, for its gutter mark */
   commentNumbers: Map<string, number>;
   /** Open a step's gutter mark in the story */
   onStep: (mark: StepMark) => void;

@@ -38,16 +38,18 @@ that marks which folders are git checkouts.
 ## The inbox and the workspace
 
 **The inbox** is the home screen: every worktree you've got checked out, across
-every repo you've opened, with how far through each one's review you are.
+every repo you've opened, with how many of each pull request's review comments
+GitHub still calls unresolved. A comment counts until someone presses
+**Resolve conversation** on GitHub.
 
 ```text
-10 comments need a response
+10 unresolved comments
 across 5 branches · 21 worktrees checked out
 
 ACME-APP ──────────────────────────────────────────────────────────
- ●  feature/offline-sync-1203       #40 merged   ▓▓░░░░░  2 of 7 handled
+ ●  feature/offline-sync-1203       #40 open     5 unresolved
     Queue edits made offline and replay them
- ✓  fix/login-timeout-36            #38 merged   ▓▓▓▓     all handled
+ ○  fix/login-timeout-36            #38 merged
  ○  feature/release-script          no PR yet
 ```
 
@@ -72,10 +74,6 @@ three tabs, as on a pull request, and every change opens on the first:
 - **Comments** lists the pull request's review comments, when it has any.
 
 The tab is in the address bar, so a link opens on the tab it was copied from.
-When the PR has review comments, a checklist spine runs down the left edge.
-
-Whatever change is selected says how many review comments are on it, which is
-the reverse lookup: given a commit, which review comments does it answer?
 
 In **Files changed**, files are grouped by the map's components, each group
 with an **On the map** link that outlines its component on Story; **By path**
@@ -292,44 +290,14 @@ its server to come up before asking for the review.
 
 ## Review comments from GitHub
 
-When a branch has a PR with review comments, Backstory turns them into a
-checklist to work through.
+When a branch has a PR with review comments, Backstory shows them as they are on
+GitHub, numbered oldest first. To reply or resolve one, open it on GitHub. In
+**Files changed**, each sits on its line as `💬` and its number.
 
-The **spine** is the checklist: one square per comment, filled when handled. It
-shows how far through you are, and a square opens Comments on that comment. In a
-narrow window it runs across the top instead.
-
-**Comments** shows every comment as a card: its file and line, its component,
-whether it's handled, the lines it was written against, and the comment. On the
-Comments tab `j`/`k` move between comments and `x` ticks the one outlined.
-
-The **response** sits under each comment: the tick, a drafted reply, and
-optionally its **answering commits**, the commits you link to the comment as the
-ones that answer it. All three are independent.
-
-Only you decide when a comment is handled: you tick it. An answering commit, a
-drafted reply or a reply on GitHub never ticks it for you.
-[How it works](how-it-works.md#handling-a-comment-is-deliberate) says why.
-
-A comment answered without any code change is one you tick with no answering
-commit — the reply templates drop `Addressed in <commit>` and offer a plain 👍
-or "No change needed".
-
-### Answering commits survive rebases
-
-Rebasing a stack rewrites every sha. So each answering commit is stored with its
-**patch-id**, a hash of its diff alone, as well as its sha. A rebased commit
-keeps its patch-id, so Backstory finds the rewritten commit automatically and
-marks it _re-matched after a rebase_.
-
-| you did                                              | result                                          |
-| ---------------------------------------------------- | ----------------------------------------------- |
-| rebase / restack (clean)                             | re-matched automatically                        |
-| reword a commit message                              | re-matched: same diff, same patch-id            |
-| squash, amend the content, rebase through a conflict | `26ef8f7 gone`, asks you to choose a new commit |
-
-**A rebase never unticks anything.** It changes only the answering commit, so
-the comment stays handled and Backstory offers to link another.
+**Comments** shows every comment as a card, oldest first: its file and line, its
+component, the lines it was written against, the comment and its replies, and
+**Open on GitHub**. A comment on a line a flow passes through says which step,
+with **open in the story**. On the Comments tab `j`/`k` move between comments.
 
 ## Shareable URLs
 
@@ -363,8 +331,8 @@ The server logs to `~/.backstory/server.log`.
 
 ## What Backstory keeps
 
-Its own state lives under `~/.backstory`. Notes, ticks, drafted replies and the
-outbox are in one database, `backstory.db`. Traced flows, drafted maps and
+Its own state lives under `~/.backstory`. Notes to your agent and the outbox are
+in one database, `backstory.db`. Traced flows, drafted maps and
 data models, and hand-written models are files beside it. Nothing Backstory writes is inside your repos.
 
 If you connected GitHub, its token is in your login Keychain, under
@@ -379,7 +347,7 @@ If you connected GitHub, its token is in your login Keychain, under
    **Remove**. If you connected GitHub, choose **Backstory → Disconnect
    GitHub**. It deletes Backstory's GitHub token from your Keychain.
 2. Turn off **Open at Login**, quit Backstory, and delete `Backstory.app`.
-3. Delete Backstory's data: notes, ticks, the outbox, traced flows, drafted
+3. Delete Backstory's data: notes, the outbox, traced flows, drafted
    models and data models, and the log.
 
    ```bash

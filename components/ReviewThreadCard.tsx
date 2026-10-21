@@ -4,15 +4,13 @@ import { useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
-import type {
-  CommitSummary,
-  PullRequestInfo,
-  RepoInfo,
-  ReviewComment,
-  ReviewThread,
-} from "@/lib/types";
-import { CheckIcon, ChevronDownIcon, ChevronRightIcon } from "./icons";
-import { ReplyComposer } from "./ReplyComposer";
+import type { PullRequestInfo, ReviewComment, ReviewThread } from "@/lib/types";
+import {
+  CheckIcon,
+  ChevronDownIcon,
+  ChevronRightIcon,
+  LinkExternalIcon,
+} from "./icons";
 import { Badge, RelativeTime } from "./ui";
 
 function Avatar({ url, login }: { url: string | null; login: string }) {
@@ -106,30 +104,17 @@ function DiffHunkPreview({ hunk }: { hunk: string }) {
 
 export function ReviewThreadCard({
   thread,
-  repo,
   pr,
-  commit,
   showContext = false,
   defaultCollapsed,
   highlighted = false,
-  onDraftChange,
-  hideComposer = false,
 }: {
   thread: ReviewThread;
-  repo: RepoInfo;
   pr: PullRequestInfo | null;
-  commit: CommitSummary | null;
   /** Show the comment's captured diff hunk — useful when not anchored inline */
   showContext?: boolean;
   defaultCollapsed?: boolean;
   highlighted?: boolean;
-  onDraftChange?: (threadId: string, text: string | null) => void;
-  /**
-   * The response panel already owns the composer for the selected comment.
-   * Two live composers on one thread is a second writer for one record, and
-   * a second place to wonder which draft is the real one.
-   */
-  hideComposer?: boolean;
 }) {
   const [collapsed, setCollapsed] = useState(
     defaultCollapsed ?? thread.isResolved,
@@ -172,7 +157,9 @@ export function ReviewThreadCard({
 
         {thread.isOutdated && <Badge>outdated</Badge>}
 
-        {thread.isResolved ? (
+        {/* Skip the badge on a review summary: GitHub can't resolve a review
+            body, so it would read "open" forever. */}
+        {thread.isReviewSummary ? null : thread.isResolved ? (
           <Badge tone="merged">
             <CheckIcon size={11} /> resolved
           </Badge>
@@ -191,23 +178,16 @@ export function ReviewThreadCard({
             <Comment key={comment.id} comment={comment} />
           ))}
 
-          {hideComposer ? null : (
-            <div className="border-t border-[var(--border-muted)] bg-[var(--canvas-subtle)] p-2">
-              <ReplyComposer
-                repo={repo}
-                pr={pr}
-                commit={commit}
-                threadUrl={threadUrl}
-                linkedShas={thread.response.commits
-                  .filter((c) => !c.missing)
-                  .map((c) => c.sha)}
-                draft={thread.response.reply}
-                onDraftChange={
-                  onDraftChange
-                    ? (text) => onDraftChange(thread.id, text)
-                    : undefined
-                }
-              />
+          {threadUrl && (
+            <div className="border-t border-[var(--border-muted)] bg-[var(--canvas-subtle)] px-3 py-1.5">
+              <a
+                href={threadUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[12px] text-[var(--accent)] hover:underline"
+              >
+                Open on GitHub <LinkExternalIcon size={12} />
+              </a>
             </div>
           )}
         </>

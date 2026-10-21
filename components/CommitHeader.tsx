@@ -1,14 +1,8 @@
 "use client";
 
 import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
-import type {
-  CommitSummary,
-  DiffResponse,
-  PullRequestInfo,
-  RepoInfo,
-} from "@/lib/types";
+import type { CommitSummary, DiffResponse } from "@/lib/types";
 import { FileDiffIcon, GitCommitIcon, PencilIcon } from "./icons";
-import { CommitLinkButton } from "./ReplyComposer";
 import { Badge, RelativeTime } from "./ui";
 
 /**
@@ -19,14 +13,10 @@ import { Badge, RelativeTime } from "./ui";
 export function CommitHeader({
   commit,
   diff,
-  repo,
-  pr,
   pushed = false,
 }: {
   commit: CommitSummary | null;
   diff: DiffResponse | null;
-  repo: RepoInfo;
-  pr: PullRequestInfo | null;
   /** Below the push boundary — already on the remote */
   pushed?: boolean;
 }) {
@@ -50,9 +40,6 @@ export function CommitHeader({
           <h1 className="flex-1 text-[16px] font-semibold leading-6">
             {commit.subject}
           </h1>
-          {!isWorking && !isBranch && (
-            <CommitLinkButton repo={repo} pr={pr} commit={commit} />
-          )}
         </div>
 
         {commit.body && (
@@ -64,7 +51,7 @@ export function CommitHeader({
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-[var(--canvas-subtle)] px-4 py-2 text-[12px] text-[var(--fg-muted)]">
         {isWorking ? (
-          <span>Not committed yet — no SHA to link to.</span>
+          <span>Not committed yet.</span>
         ) : isBranch ? (
           <span>
             Everything the pull request will contain after you push —

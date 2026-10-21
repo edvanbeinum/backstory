@@ -24,13 +24,8 @@ import {
 import { Button, RelativeTime, Spinner } from "./ui";
 
 /**
- * The home screen: every worktree you've got checked out, and how much of each
- * one's review is still waiting on you.
- *
- * Before this, Backstory could only ever show one branch, and getting to it
- * meant typing or browsing a path. With twenty worktrees across two repos, "what's
- * outstanding everywhere I'm working" had no answer at all — which is a
- * strange gap in something that's meant to be a TODO tracker.
+ * The home screen: every worktree you've got checked out, and how many of
+ * each one's review threads GitHub calls unresolved.
  */
 export function Inbox({
   roots,
@@ -180,23 +175,18 @@ export function Inbox({
     });
   }, [data]);
 
-  // A merged PR can't need a response, so it doesn't count. Counting them
-  // made this read three times higher than the work actually waiting.
+  // A merged PR's threads often stay unresolved, so it doesn't count.
+  // Counting them made this read three times higher than the work waiting.
   const live = useMemo(
     () => (data?.rows ?? []).filter((row) => !row.archived),
     [data],
   );
-  const outstanding = useMemo(
-    () =>
-      live.reduce(
-        (total, row) =>
-          total + (row.progress ? row.progress.total - row.progress.done : 0),
-        0,
-      ),
+  const unresolved = useMemo(
+    () => live.reduce((total, row) => total + (row.pr?.unresolved ?? 0), 0),
     [live],
   );
   const branchesWaiting = live.filter(
-    (row) => row.progress && row.progress.done < row.progress.total,
+    (row) => (row.pr?.unresolved ?? 0) > 0,
   ).length;
   // A row is a branch now, not always a worktree — a stacked PR is reviewable
   // without one, so the two counts have to be said separately.
@@ -252,11 +242,11 @@ export function Inbox({
               </div>
             )}
             <h1 className="text-[20px] font-semibold">
-              {outstanding === 0
+              {unresolved === 0
                 ? data
-                  ? "Nothing needs a response"
+                  ? "No unresolved comments"
                   : "Checking your worktrees…"
-                : `${outstanding} ${outstanding === 1 ? "comment needs" : "comments need"} a response`}
+                : `${unresolved} unresolved ${unresolved === 1 ? "comment" : "comments"}`}
             </h1>
             <p className="mt-0.5 text-[13px] text-[var(--fg-muted)]">
               {branchesWaiting > 0 && (

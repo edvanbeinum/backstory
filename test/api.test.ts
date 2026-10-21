@@ -18,7 +18,6 @@ import * as githubLogin from "../app/api/github/login/route";
 import * as map from "../app/api/map/route";
 import * as notes from "../app/api/notes/route";
 import * as outbox from "../app/api/outbox/route";
-import * as responses from "../app/api/responses/route";
 import * as review from "../app/api/review/route";
 import { crossSite } from "../lib/api";
 import { autoRead } from "../lib/data/cache";
@@ -160,15 +159,6 @@ test("a cross-site request to a route that writes is refused and writes nothing"
     [
       "outbox DELETE",
       outbox.DELETE(send(at("outbox", `repo=${repo}&id=r1`), "DELETE", EVIL)),
-    ],
-    [
-      "responses POST",
-      responses.POST(
-        send(at("responses", "key=acme/app%2342"), "POST", EVIL, {
-          threadId: "t1",
-          done: true,
-        }),
-      ),
     ],
     [
       "review POST",

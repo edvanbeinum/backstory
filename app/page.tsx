@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { ChangeHeader, openingChangeFor } from "@/components/ChangeHeader";
+import { ChangeHeader } from "@/components/ChangeHeader";
 import { ClaudeCodeGate } from "@/components/ClaudeCodeGate";
 import { Comments } from "@/components/Comments";
 import { FeedbackBar } from "@/components/FeedbackBar";
@@ -35,7 +35,6 @@ import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
 import { ConnectGitHubLink } from "@/components/SetupChecklist";
 import { PrTitle } from "@/components/PrTitle";
-import { TickSpine, TickStrip } from "@/components/TickSpine";
 import { useStaleReload } from "@/components/useStaleReload";
 import { pushedState } from "@/lib/pushed";
 import { RepoBar } from "@/components/RepoBar";
@@ -45,12 +44,6 @@ import {
   STORAGE_KEY,
   WORKING_REV,
 } from "@/lib/constants";
-import {
-  confirmedDrafts,
-  keyFor,
-  withDrafts,
-  type PendingDraft,
-} from "@/lib/drafts";
 import {
   loadRecents,
   removeFromList,
@@ -85,8 +78,6 @@ const WORKING_COMMIT: CommitSummary = {
   url: null,
   isMerge: false,
 };
-
-const sleep = (ms: number) => new Promise((done) => setTimeout(done, ms));
 
 class ApiFetchError extends Error {
   constructor(
@@ -160,16 +151,13 @@ export default function Page() {
   /** Previously-opened repos for the RepoBar dropdown. */
   const [recents, setRecents] = useState<RecentRepo[]>([]);
 
-  /** The focused review thread: marked on the spine, outlined in Comments. */
+  /** The focused review thread, outlined in Comments. */
   const [commentId, setCommentId] = useState<string | null>(null);
   /** Focus asked for from outside Comments, which scrolls the thread into view. */
   const [focusAsk, setFocusAsk] = useState<{ id: string; at: number } | null>(
     null,
   );
   const [tab, setTab] = useState<Tab>("story");
-  /** Set when a URL asked for a comment that isn't in this PR. */
-  const [commentNotice, setCommentNotice] = useState<string | null>(null);
-  const [linkNotice, setLinkNotice] = useState<string | null>(null);
   /** Bumped by watcher events; retriggers the working-tree diff fetch. */
   const [workingTick, setWorkingTick] = useState(0);
   /**
@@ -207,20 +195,6 @@ export default function Page() {
    * exist and bounce you off it.
    */
   const pickedRevs = useRef<string[]>([]);
-  /**
-   * Drafts you've typed that the store hasn't confirmed yet.
-   *
-   * The client, not the disk, is what the box reads from between a keystroke
-   * and the write landing — so this is where a draft lives while it's in
-   * flight, and where it stays if the write fails. Entries only leave once
-   * the store has acknowledged that exact text, which is also what makes it
-   * safe for a background refresh to overwrite everything else.
-   */
-  const pendingDrafts = useRef(new Map<string, PendingDraft>());
-  const flushingDrafts = useRef(new Set<string>());
-  /** Set when a draft has run out of retries and is still only in memory. */
-  const [draftNotice, setDraftNotice] = useState(false);
-
   useEffect(() => {
     repoRef.current = repoPath;
   }, [repoPath]);
@@ -401,26 +375,10 @@ export default function Page() {
             (opts.fresh ? "&fresh=1" : ""),
         );
         if (seq !== sessionSeq.current) return; // superseded by a newer fetch
-        // Anything you've typed that this data doesn't already show outranks
-        // what came back: either the store hadn't been told yet, or it had
-        // and this read was already in flight when it was.
-        const key = keyFor(data);
-        for (const id of confirmedDrafts(data, pendingDrafts.current, key)) {
-          pendingDrafts.current.delete(id);
-        }
-        setSession(withDrafts(data, pendingDrafts.current, key));
+        setSession(data);
         setSessionError(null);
 
-        let landedOn: string | null = null;
-        setCommentId((current) => {
-          const { commentId: next, notice } = resolveComment(
-            current,
-            data.github.threads,
-          );
-          setCommentNotice(notice);
-          landedOn = next;
-          return next;
-        });
+        setCommentId((current) => resolveComment(current, data.github.threads));
 
         setRev((current) => {
           // History counts: a URL can point at an already-pushed commit and
@@ -433,16 +391,6 @@ export default function Page() {
             pickedRevs.current,
           );
           setRevNotice(notice);
-
-          // Arriving with no rev asked for, on a comment that already names
-          // the change answering it: show that change rather than an empty
-          // Uncommitted diff. Only ever a fallback — an explicit rev, and
-          // anything you pick later, wins.
-          if (next === WORKING_REV && !data.working.hasChanges) {
-            const thread = data.github.threads.find((t) => t.id === landedOn);
-            const linked = thread?.response.commits.find((c) => !c.missing);
-            if (linked) return linked.sha;
-          }
           return next;
         });
       } catch (err) {
@@ -657,15 +605,14 @@ export default function Page() {
   );
 
   /**
-   * Already ordered by file server-side, so the spine's grouping gaps, the
-   * stepper and `j`/`k` all agree with the "first open comment" fallback.
+   * Already ordered oldest first server-side, so the 💬 numbers, "Comment i of
+   * N" and `j`/`k` agree.
    */
   const threads = useMemo(() => session?.github.threads ?? [], [session]);
 
   /**
-   * Whether there's a checklist to show at all. Not "is there a PR": this
-   * branch has a draft PR nobody has reviewed, which is exactly the case
-   * where the Comments tab and the spine are dead weight.
+   * Whether there are comments to show at all. Not "is there a PR": a draft
+   * PR nobody has reviewed has a PR and nothing for the Comments tab.
    */
   const hasComments = threads.length > 0;
 
@@ -818,21 +765,7 @@ export default function Page() {
     return info;
   }, [map]);
 
-  /**
-   * Commits a thread can be pinned to: the unpushed ones first, then a slice
-   * of pushed history. The right commit is often neither the guess nor the
-   * selection — a fix can land in a different file from the one commented on
-   * — so the picker has to offer the whole branch.
-   */
-  const pinCandidates = useMemo(
-    () => [
-      ...(session?.commits ?? []),
-      ...(session?.history ?? []).slice(0, 15),
-    ],
-    [session],
-  );
-
-  /** Each thread's number, in the spine's order, for the marks that name it. */
+  /** Each thread's number, oldest first, for the marks that name it. */
   const commentNumbers = useMemo(
     () => new Map(threads.map((t, i) => [t.id, i + 1])),
     [threads],
@@ -866,11 +799,7 @@ export default function Page() {
       const key = badgeKey(at.row);
       flow.set(key, [
         ...(flow.get(key) ?? []),
-        {
-          id: t.id,
-          n: commentNumbers.get(t.id) ?? 0,
-          done: t.response.done,
-        },
+        { id: t.id, n: commentNumbers.get(t.id) ?? 0 },
       ]);
       out.set(at.flow - 1, flow);
     }
@@ -882,255 +811,13 @@ export default function Page() {
     [threads, commentId],
   );
 
-  /**
-   * Focusing a comment opens Comments on it, and the change on its linked
-   * commit if it has one — never a guess about which commit answers it.
-   * Picking a commit leaves the comment alone, so the two stay separate axes.
-   */
-  const selectComment = useCallback(
-    (id: string) => {
-      setCommentId(id);
-      setFocusedThreadId(id);
-      setFocusAsk({ id, at: Date.now() });
-      setTab("comments");
-      const thread = threads.find((t) => t.id === id) ?? null;
-      // null leaves the change alone: an unlinked comment has nothing to say
-      // about which change you should be looking at.
-      const linked = openingChangeFor(thread);
-      if (linked) setRev(linked);
-    },
-    [threads],
-  );
-
-  /** Sent with every write; see `keyFor`. */
-  const responseKey = useMemo(() => keyFor(session), [session]);
-
-  const writeResponse = useCallback(
-    async (
-      threadId: string,
-      patch: {
-        done?: boolean;
-        reply?: string | null;
-        sha?: string | null;
-        unlink?: string;
-        clear?: boolean;
-      },
-      {
-        // keepalive only where the write is fire-and-forget — a draft save or
-        // a tick, which the UI has already reflected optimistically and never
-        // waits on.
-        keepalive = false,
-        // A retry names the PR the text was typed on. Without that it would
-        // use whatever is open when it finally succeeds, filing your reply
-        // under a pull request it has nothing to do with.
-        key = responseKey,
-      }: { keepalive?: boolean; key?: string | null } = {},
-    ): Promise<{ ok: boolean; error: string | null }> => {
-      if (!key) return { ok: false, error: null };
-      // `repo` rides along only so the server can compute a patch-id when a
-      // commit is linked; ticks and drafts need no subprocess at all.
-      const params = new URLSearchParams({ key });
-      if (patch.sha) params.set("repo", repoPath);
-
-      try {
-        const response = await fetch(`/api/responses?${params}`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ threadId, ...patch }),
-          keepalive,
-          // Nothing here should take ten seconds. A write that does has gone
-          // wrong, and the UI needs to hear about it rather than wait.
-          signal: keepalive ? undefined : AbortSignal.timeout(10_000),
-        });
-
-        // Always drain the body, even when there's nothing in it we need.
-        // `fetch` resolves as soon as the headers land, so a response left
-        // unread keeps the request open — it shows as "pending" in the
-        // network inspector indefinitely, which reads exactly like a server
-        // that never answered.
-        const body = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-
-        return { ok: response.ok, error: body?.error ?? null };
-      } catch {
-        // A failed write shouldn't break the view; the next action retries.
-        return { ok: false, error: null };
-      }
-    },
-    [responseKey, repoPath],
-  );
-
-  /**
-   * Get a thread's pending draft onto disk, retrying a failure rather than
-   * shrugging at it. A draft is the one thing here you can't reconstruct: a
-   * tick is one click to redo and a link is one pick, but nobody can retype
-   * what they wrote from memory.
-   */
-  const flushDraft = useCallback(
-    async (threadId: string) => {
-      // A pass is already looping on this thread; it re-reads the pending
-      // text each time round, so it will pick up whatever was just typed.
-      if (flushingDrafts.current.has(threadId)) return;
-      flushingDrafts.current.add(threadId);
-
-      try {
-        for (let attempt = 0; ;) {
-          const pending = pendingDrafts.current.get(threadId);
-          if (!pending || pending.saved) return; // written, or discarded
-
-          // keepalive so it survives the window closing mid-save.
-          const { ok } = await writeResponse(
-            threadId,
-            { reply: pending.text },
-            { keepalive: true, key: pending.key },
-          );
-
-          if (ok) {
-            setDraftNotice(false);
-            // Anything typed while that was in flight is now the draft, and
-            // it needs a write of its own before this thread is clear.
-            if (pendingDrafts.current.get(threadId) !== pending) {
-              attempt = 0;
-              continue;
-            }
-            // Kept, not dropped: the window goes on holding the text until a
-            // session load comes back agreeing with it. Dropping it here
-            // leaves a read that was already in flight free to paint the
-            // older text back over the box.
-            pendingDrafts.current.set(threadId, { ...pending, saved: true });
-            return;
-          }
-
-          // Four goes over about eight seconds, then leave it pending: the
-          // text is still on screen and in `pendingDrafts`, so the next
-          // keystroke, the next focus, or a reconnect will try again.
-          if (attempt >= 3) {
-            setDraftNotice(true);
-            return;
-          }
-          await sleep(500 * 2 ** attempt);
-          attempt++;
-        }
-      } finally {
-        flushingDrafts.current.delete(threadId);
-      }
-    },
-    [writeResponse],
-  );
-
-  /** Retry everything still unwritten — on regaining focus, say. */
-  const flushDrafts = useCallback(() => {
-    for (const [threadId, pending] of pendingDrafts.current) {
-      if (!pending.saved) void flushDraft(threadId);
-    }
-  }, [flushDraft]);
-
-  /**
-   * Save a thread's draft reply.
-   *
-   * Into state first, disk second. The composer is keyed on the thread, so it
-   * unmounts the moment you step to the next comment — state is the only
-   * place the text survives that, and it's what the box is refilled from when
-   * you come back. Waiting for the store instead meant a draft that had been
-   * written but not yet re-read came back as an empty box.
-   *
-   * No session refresh: one would echo the text back into a box you're still
-   * typing in.
-   */
-  const saveDraft = useCallback(
-    (threadId: string, text: string | null) => {
-      if (!responseKey) return;
-      pendingDrafts.current.set(threadId, { key: responseKey, text });
-      setSession((current) =>
-        current
-          ? withDrafts(current, pendingDrafts.current, responseKey)
-          : current,
-      );
-      void flushDraft(threadId);
-    },
-    [flushDraft, responseKey],
-  );
-
-  // Coming back to the window is the moment to retry anything the store never
-  // confirmed — Backstory's own server may simply have been restarting when
-  // you typed it.
-  useEffect(() => {
-    window.addEventListener("focus", flushDrafts);
-    return () => window.removeEventListener("focus", flushDrafts);
-  }, [flushDrafts]);
-
-  // And once a draft is stuck, keep knocking on its own. The likeliest reason
-  // is a server that went away, which usually comes back — and the person who
-  // typed the reply shouldn't have to do anything to get it saved.
-  useEffect(() => {
-    if (!draftNotice) return;
-    const timer = setInterval(flushDrafts, 15_000);
-    return () => clearInterval(timer);
-  }, [draftNotice, flushDrafts]);
-
-  /**
-   * The tick.
-   *
-   * Optimistic, and that isn't polish: a checkbox that waits for a round trip
-   * doesn't feel like checking something off, and this is the interaction the
-   * whole app is built around. The write is fire-and-forget; the next session
-   * load reconciles it.
-   */
-  const toggleDone = useCallback(
-    (threadId: string, done: boolean) => {
-      setSession((current) => {
-        if (!current) return current;
-        return {
-          ...current,
-          github: {
-            ...current.github,
-            threads: current.github.threads.map((thread) =>
-              thread.id === threadId
-                ? {
-                    ...thread,
-                    response: {
-                      ...thread.response,
-                      done,
-                      doneAt: done
-                        ? (thread.response.doneAt ?? Date.now())
-                        : null,
-                    },
-                  }
-                : thread,
-            ),
-          },
-        };
-      });
-      // Fire-and-forget, and keepalive so a reload in the same instant as the
-      // click can't cancel a tick the screen has already shown as saved.
-      void writeResponse(threadId, { done }, { keepalive: true });
-    },
-    [writeResponse],
-  );
-
-  /**
-   * Link the change on screen to a comment, or clear the link. Refreshes,
-   * because the server computes the patch-id that lets the link survive a
-   * rebase and the client has no way to know it.
-   */
-  const linkCommit = useCallback(
-    async (threadId: string, sha: string | null, unlink?: string) => {
-      const { ok, error } = await writeResponse(
-        threadId,
-        unlink ? { unlink } : { sha },
-      );
-      // A pasted sha can simply not exist. Saying so beats a click that looks
-      // like it worked and leaves the row unchanged.
-      if (!ok) {
-        setLinkNotice(error ?? "That didn't reach Backstory — try again.");
-        return;
-      }
-      setLinkNotice(null);
-      void loadSession(repoPath, { background: true });
-    },
-    [writeResponse, repoPath, loadSession],
-  );
+  /** Focusing a comment opens Comments on it, and leaves the change alone. */
+  const selectComment = useCallback((id: string) => {
+    setCommentId(id);
+    setFocusedThreadId(id);
+    setFocusAsk({ id, at: Date.now() });
+    setTab("comments");
+  }, []);
 
   /** Back to the home screen. Clearing the repo is what the inbox *is*. */
   const backToInbox = useCallback(() => {
@@ -1210,7 +897,7 @@ export default function Page() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.metaKey || event.ctrlKey || event.altKey) return;
-      if (event.key !== "j" && event.key !== "k" && event.key !== "x") return;
+      if (event.key !== "j" && event.key !== "k") return;
 
       const target = event.target as HTMLElement | null;
       if (
@@ -1224,27 +911,16 @@ export default function Page() {
       if (!session) return;
 
       if (tab === "comments") {
-        // `x` ticks in place and deliberately does not advance: auto-advancing
-        // steals the moment you just earned and makes a mis-tick awkward to
-        // undo. `j` is right there.
-        if (event.key === "x") {
-          const thread = threads.find((t) => t.id === commentId);
-          if (!thread) return;
-          event.preventDefault();
-          toggleDone(thread.id, !thread.response.done);
-          return;
-        }
         const ids = threads.map((t) => t.id);
         const at = commentId ? ids.indexOf(commentId) : -1;
-        if (at === -1) return;
-        const step = event.key === "j" ? at + 1 : at - 1;
+        // With nothing focused, either key starts at the first comment.
+        const step = at === -1 ? 0 : event.key === "j" ? at + 1 : at - 1;
         if (step < 0 || step >= ids.length) return;
 
         event.preventDefault();
         selectComment(ids[step]);
         return;
       }
-      if (event.key === "x") return;
 
       // On Story, j/k walk the steps of the topmost open flow; with none to
       // walk, they move changes as Files changed does.
@@ -1273,7 +949,7 @@ export default function Page() {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session, rev, threads, commentId, toggleDone, selectComment, tab]);
+  }, [session, rev, threads, commentId, selectComment, tab]);
 
   return (
     <ClaudeCodeGate>
@@ -1323,29 +999,7 @@ export default function Page() {
           </div>
         ) : session ? (
           <div className="flex items-start">
-            {/* No comments, no checklist. A branch nobody has reviewed yet —
-              often work an agent just wrote, which you're reading before it
-              goes anywhere — would give up the spine to say "no review
-              comments". The story is what you came for; it gets the window. */}
-            {hasComments && (
-              <TickSpine
-                threads={threads}
-                selectedId={commentId}
-                onSelect={(thread) => selectComment(thread.id)}
-              />
-            )}
-
             <main className="min-w-0 flex-1 pb-16">
-              {/* Below lg the spine can't sit beside the content, and the old
-                300px list simply vanished at this width — leaving the checklist
-                unreachable. Same squares, laid out sideways. */}
-              {hasComments && (
-                <TickStrip
-                  threads={threads}
-                  selectedId={commentId}
-                  onSelect={(thread) => selectComment(thread.id)}
-                />
-              )}
               <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
                 {session.github.pr && <PrTitle pr={session.github.pr} />}
 
@@ -1382,67 +1036,12 @@ export default function Page() {
                   </p>
                 )}
 
-                {linkNotice && (
-                  <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                    <AlertIcon
-                      size={13}
-                      className="mt-0.5 shrink-0 text-[var(--attention)]"
-                    />
-                    <span className="flex-1">{linkNotice}</span>
-                    <button
-                      type="button"
-                      onClick={() => setLinkNotice(null)}
-                      className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                    >
-                      Dismiss
-                    </button>
-                  </p>
-                )}
-
-                {/* Not dismissible, and it stays until a write actually lands:
-                the whole point is that you find out your words are only in
-                this window before you close it. */}
-                {draftNotice && (
-                  <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                    <AlertIcon
-                      size={13}
-                      className="mt-0.5 shrink-0 text-[var(--attention)]"
-                    />
-                    <span className="flex-1">
-                      A draft reply hasn&apos;t reached Backstory — it&apos;s
-                      still here and still being retried, but copy it somewhere
-                      safe before closing this window.
-                    </span>
-                  </p>
-                )}
-
-                {commentNotice && (
-                  <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                    <AlertIcon
-                      size={13}
-                      className="mt-0.5 shrink-0 text-[var(--attention)]"
-                    />
-                    <span className="flex-1">
-                      That comment isn&apos;t on this pull request any more —
-                      showing the first open one instead.
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setCommentNotice(null)}
-                      className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                    >
-                      Dismiss
-                    </button>
-                  </p>
-                )}
-
                 <ChangeHeader
                   session={session}
                   rev={rev}
                   onRevChange={pickRev}
                   commit={commitForRev}
                   diff={diff}
-                  threads={threads}
                   thread={selectedThread}
                   pushed={revIsPushed}
                 />
@@ -1527,14 +1126,7 @@ export default function Page() {
                             onOpenStep={(at) =>
                               openStep({ flow: at.flow - 1, row: at.row.key })
                             }
-                            repo={session.repo}
                             pr={session.github.pr}
-                            commit={commitForRev}
-                            branch={session.repo.branch}
-                            commitCandidates={pinCandidates}
-                            onToggleDone={toggleDone}
-                            onLinkCommit={linkCommit}
-                            onDraftChange={saveDraft}
                           />
                         </div>
                       )}
