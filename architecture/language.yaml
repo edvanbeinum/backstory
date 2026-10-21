@@ -67,11 +67,11 @@ terms:
     avoid:
       - store
   - name: local model
-    means: "A C4 model written by hand on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo key>/workspace.dsl` (`localModelFile` in `lib/model.ts`). It wins over a drafted map, and Backstory never writes it. One with the `backstory.drafted` property is the old single drafted model, and is skipped."
+    means: "A C4 model written by hand on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo key>/workspace.dsl` (`localModelFile` in `lib/model.ts`). It wins over a drafted map, and Backstory never writes it. One with the `backstory.drafted` property is the old single drafted model, and is skipped. The UI calls it the hand-written map."
     avoid:
       - draft alone, for the model
   - name: drafted map
-    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off, or on a click (Draft a model), and marked Draft under the map."
+    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off, or on a click (Draw the map), and marked Drawn by <provider> under the map. Draw again reads main in full again."
     avoid:
       - local model, for a drafted map
   - name: main's map

@@ -380,15 +380,16 @@ function summary(map: MapResponse) {
       </>,
       names(changed),
       map.local ? (
-        "local model, no structural diff"
+        "hand-written map, so nothing shows as new or removed"
       ) : map.baseModel ? (
         "no structural change"
       ) : map.baseError ? (
         <span className="text-[var(--attention)]" title={map.baseError}>
-          couldn&apos;t read the base model, so nothing shows as new or removed
+          couldn&apos;t read the base&apos;s map, so nothing shows as new or
+          removed
         </span>
       ) : (
-        "no model at base"
+        "no map at the base to compare with"
       ),
     );
     return parts;
@@ -644,7 +645,7 @@ function DraftProgress({ draft }: { draft: DraftApi }) {
   if (job?.status === "unavailable")
     return (
       <span className="text-[12px] text-[var(--attention)]">
-        <ClaudeCodeNotice reason={job.reason} needs="Drafting the map needs" />
+        <ClaudeCodeNotice reason={job.reason} needs="Drawing the map needs" />
       </span>
     );
   return null;
@@ -667,7 +668,7 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
       <h3>
         {mainMap
           ? "This change isn't on the map yet"
-          : "This repo has no map yet"}
+          : "Backstory hasn't drawn this repo yet"}
       </h3>
       {mainMap ? (
         <p>
@@ -677,16 +678,15 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
         </p>
       ) : (
         <p>
-          Backstory draws the map from a C4 model of the system.{" "}
-          {provider ?? "The AI provider"} reads the code, read-only: main&apos;s
-          map once, then only what the diff changes. The map stays on this
-          machine.
+          Backstory draws a map of your system from the code.{" "}
+          {provider ?? "The AI provider"} reads main once, read-only, then only
+          what each diff changes. The map stays on this machine.
         </p>
       )}
       {idle && (
         <span className="flex flex-wrap justify-center gap-2">
           <Button variant="primary" onClick={() => draft.start()}>
-            Draft a model
+            Draw the map
           </Button>
           {offerAuto && (
             <Button onClick={draft.turnOn}>Read automatically</Button>
@@ -715,7 +715,7 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
             <CopyButton
               value={file}
               variant="invisible"
-              title="Copy the path a local model goes at, to write one by hand"
+              title="Copy the path a hand-written map goes at, to write one"
               label="Copy path"
             />
           </span>
@@ -725,7 +725,7 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
   );
 }
 
-/** A hand-written local model's path, to correct it. */
+/** A hand-written map's path, to correct it. */
 function LocalModel({ map }: { map: MapResponse }) {
   if (!map.modelFile) return null;
   return (
@@ -736,16 +736,22 @@ function LocalModel({ map }: { map: MapResponse }) {
       <CopyButton
         value={map.modelFile}
         variant="invisible"
-        title="Copy the model file's path, to correct it"
+        title="Copy the hand-written map's path, to correct it"
         label="Copy path"
       />
     </div>
   );
 }
 
-/** A drafted map's footnote: the Draft badge, whether reads start by themselves, Turn off or Read automatically, and Redraft. */
+/** A drafted map's footnote: who drew it, whether reads start by themselves, Turn off or Read automatically, and Draw again. */
 function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   const running = map.draft?.status === "running";
+  // Name the provider only from a read that's idle or unavailable: a running
+  // or done read's status doesn't say which provider ran it.
+  const provider =
+    map.draft?.status === "idle" || map.draft?.status === "unavailable"
+      ? map.draft.provider
+      : null;
   const parts: React.ReactNode[] = [];
   if (map.auto)
     parts.push(
@@ -771,7 +777,7 @@ function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   return (
     <span className="part inline-flex flex-wrap items-center gap-1.5">
       <Badge tone="draft" className="!py-0 !leading-4">
-        Draft
+        Drawn by {provider ?? "the AI provider"}
       </Badge>
       <span className="text-[11px] text-[var(--fg-subtle)]">
         {parts.map((part, i) => (
@@ -781,11 +787,11 @@ function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
           </span>
         ))}
       </span>
-      {/* Offers Draft a model when the head has a map but its base doesn't,
-          so reading the base isn't left to Redraft, which reads main in full. */}
+      {/* Offers Draw the map when the head has a map but its base doesn't,
+          so reading the base isn't left to Draw again, which reads main in full. */}
       {!map.baseModel && map.draft?.status === "idle" && !map.auto && (
         <Button size="sm" variant="invisible" onClick={() => draft.start()}>
-          Draft a model
+          Draw the map
         </Button>
       )}
       {!running && (
@@ -795,13 +801,13 @@ function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
           onClick={() => {
             if (
               window.confirm(
-                "Redraft the map? Main's map is read again in full and this view is worked out from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current map is kept if it fails.",
+                `Draw the map again? ${provider ?? "The AI provider"} reads main again in full and this view is worked out from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current map is kept if it fails.`,
               )
             )
               draft.start(true);
           }}
         >
-          Redraft
+          Draw again
         </Button>
       )}
       <DraftProgress draft={draft} />
@@ -885,13 +891,13 @@ export function SystemMap({
           <div className="story-line">
             {map.error ? (
               <span className="flex items-center gap-1 text-[var(--attention)]">
-                <AlertIcon size={11} /> Couldn&apos;t read the model:{" "}
+                <AlertIcon size={11} /> Couldn&apos;t read the map:{" "}
                 <Ticked text={map.error} />
               </span>
             ) : (
               <span>
                 {map.status === "none"
-                  ? "No architecture/workspace.dsl in this repo, and no local model"
+                  ? "This repo has no map"
                   : "This change touches no mapped component"}
               </span>
             )}
@@ -1005,7 +1011,7 @@ export function SystemMap({
           >
             {map.unmapped.length > 0 &&
               (map.local
-                ? `${map.unmapped.length} ${map.unmapped.length === 1 ? "file" : "files"} the local model has no place for`
+                ? `${map.unmapped.length} ${map.unmapped.length === 1 ? "file" : "files"} the hand-written map has no place for`
                 : `${map.unmapped.length} unmapped`)}
             {map.unmapped.length > 0 && map.ambiguous.length > 0 && " · "}
             {map.ambiguous.length > 0 && `${map.ambiguous.length} ambiguous`}
