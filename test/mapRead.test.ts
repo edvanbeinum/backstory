@@ -275,6 +275,7 @@ test("a branch's drafted map marks the component and arrow it added and the comp
 
   const map = await buildMap(repo.root, repo.main, removed);
   assert.equal(map.source, "drafted");
+  assert.equal(map.drawnBy, "Claude Code");
   assert.equal(map.baseModel, true);
   assert.equal(map.local, false);
   const shown = states(map);
