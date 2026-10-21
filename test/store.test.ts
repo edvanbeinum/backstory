@@ -3,6 +3,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmdirSync,
   writeFileSync,
 } from "node:fs";
@@ -14,7 +15,7 @@ import { WORKING_REV } from "../lib/constants";
 import { changeNotes, getNotes } from "../lib/notes";
 import { getOutbox } from "../lib/outbox";
 import { getAllResponses, getResponses } from "../lib/responses";
-import { db, transaction } from "../lib/store";
+import { db, setSetting, setting, transaction } from "../lib/store";
 import type { Note } from "../lib/types";
 
 /** The store resolves BACKSTORY_HOME per call; never touch the real home. */
@@ -129,15 +130,45 @@ test("a note saved before rounds existed imports as a draft on uncommitted work"
   assert.ok(!existsSync(path.join(home, "notes.json")));
 });
 
-test("a home with no JSON files makes an empty database at version 1", () => {
+const version = () =>
+  (
+    db().prepare("PRAGMA user_version").get() as {
+      user_version: number;
+    }
+  ).user_version;
+
+test("a home with no JSON files makes an empty database at version 2", () => {
   tempHome();
-  const { user_version } = db().prepare("PRAGMA user_version").get() as {
-    user_version: number;
-  };
-  assert.equal(user_version, 1);
-  for (const table of ["notes", "rounds", "seen", "responses"]) {
+  assert.equal(version(), 2);
+  for (const table of ["notes", "rounds", "seen", "responses", "settings"]) {
     assert.equal(count(table), 0, table);
   }
+});
+
+test("a setting reads back as it was set, and null when never set", () => {
+  tempHome();
+  assert.equal(setting("read.off.x"), null);
+  setSetting("read.off.x", "1");
+  assert.equal(setting("read.off.x"), "1");
+  setSetting("read.off.x", "0");
+  assert.equal(setting("read.off.x"), "0");
+  assert.equal(count("settings"), 1);
+});
+
+test("a database at version 1 opens at version 2 with a settings table, its rows intact", () => {
+  const home = tempHome();
+  db()
+    .prepare(`INSERT INTO seen (root, session, at) VALUES ('/repo', 's-1', 1)`)
+    .run();
+  db().exec("DROP TABLE settings; PRAGMA user_version = 1;");
+  // Opening another home closes this one, so the next open runs the upgrade.
+  tempHome();
+  db();
+  process.env.BACKSTORY_HOME = home;
+  assert.equal(version(), 2);
+  assert.equal(count("seen"), 1);
+  setSetting("read.off.x", "1");
+  assert.equal(setting("read.off.x"), "1");
 });
 
 const SHA = "76c66deaa060ae3da0ff460e13aabfff3de885c4";
@@ -316,4 +347,68 @@ test("a JSON file that can't be read stops the open, and the next start imports 
   assert.deepEqual(await getNotes("/repo"), [NOTE]);
   assert.equal((await getResponses("o/r#1")).t1.done, true);
   assert.ok(existsSync(path.join(home, "notes.json.migrated")));
+});
+
+const primaryKey = (table: string) =>
+  (
+    db().prepare(`PRAGMA table_info(${table})`).all() as {
+      name: string;
+      pk: number;
+    }[]
+  )
+    .filter((c) => c.pk > 0)
+    .sort((a, b) => a.pk - b.pk)
+    .map((c) => c.name);
+
+test("a new database has the tables, keys and checks in lib/schema.sql", () => {
+  tempHome();
+  assert.deepEqual(primaryKey("notes"), ["root", "id"]);
+  assert.deepEqual(primaryKey("rounds"), ["root", "id"]);
+  assert.deepEqual(primaryKey("seen"), ["root", "session"]);
+  assert.deepEqual(primaryKey("responses"), ["pr", "thread"]);
+  const { user_version } = db().prepare("PRAGMA user_version").get() as {
+    user_version: number;
+  };
+  assert.equal(user_version, 2);
+
+  const rejects = (sql: string) =>
+    assert.throws(() => db().prepare(sql).run(), /CHECK constraint failed/);
+  rejects(
+    `INSERT INTO notes (root, id, rev, side, body, created_at, sent_at, done)
+     VALUES ('/repo', 'n1', 'working', 'new', 'fix it', 1, NULL, 1)`,
+  );
+  rejects(
+    `INSERT INTO rounds (root, id, note_ids, message, queued_at)
+     VALUES ('/repo', 'r1', 'not json', 'fix it', 1)`,
+  );
+  rejects(
+    `INSERT INTO rounds (root, id, note_ids, message, queued_at, claim_session, claim_until)
+     VALUES ('/repo', 'r1', '[]', 'fix it', 1, 's-1', NULL)`,
+  );
+  rejects(
+    `INSERT INTO responses (pr, thread, done, commits)
+     VALUES ('o/r#1', 't1', 2, '[]')`,
+  );
+});
+
+test("lib/store.ts leaves the schema to lib/schema.sql", () => {
+  const source = readFileSync(
+    path.join(import.meta.dirname, "..", "lib", "store.ts"),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /CREATE TABLE/i);
+});
+
+test("a missing lib/schema.sql fails the open, and the next open makes the database", () => {
+  tempHome();
+  const repo = process.cwd();
+  process.chdir(mkdtempSync(path.join(tmpdir(), "backstory-cwd-")));
+  try {
+    assert.throws(() => db(), /ENOENT/);
+  } finally {
+    process.chdir(repo);
+  }
+  for (const table of ["notes", "rounds", "seen", "responses"]) {
+    assert.equal(count(table), 0, table);
+  }
 });

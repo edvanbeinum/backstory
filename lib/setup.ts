@@ -3,7 +3,8 @@ import { homedir } from "node:os";
 import path from "node:path";
 
 import { backstoryHookProgram } from "../bin/hook.mjs";
-import { aiProvider } from "./ai/provider";
+import { aiProvider, type ProviderStatus } from "./ai/provider";
+import { DRAWS_WITH_CLAUDE_CODE } from "./constants";
 import { refreshLoginShellDirs, run } from "./exec";
 import { gh, githubTokenWorks } from "./github";
 
@@ -13,7 +14,7 @@ import { gh, githubTokenWorks } from "./github";
  * that a saved GitHub token GitHub refuses is forgotten.
  */
 
-export type SetupId = "git" | "github" | "claude" | "reviews";
+export type SetupId = "git" | "claude" | "github" | "reviews";
 export type SetupState = "missing" | "logged-out" | "ready";
 
 export interface SetupRow {
@@ -25,10 +26,9 @@ export interface SetupRow {
 
 export const SETUP_DETAILS: Record<SetupId, string> = {
   git: "See what changed on every branch, commit by commit.",
+  claude: DRAWS_WITH_CLAUDE_CODE,
   github:
     "Bring your pull request's review comments in beside the code they're about.",
-  claude:
-    "Have a change explained: how it runs, step by step, and a map of the system and data it touches.",
   reviews:
     "Comment on what your coding agent wrote and send the notes straight to it, even while it's still working.",
 };
@@ -42,6 +42,8 @@ interface SetupOptions {
   claudeDir?: string;
   /** Stands in for `/usr/bin/git`, for tests */
   gitShim?: string;
+  /** The AI provider's status; its own `status()` by default */
+  claude?: () => Promise<ProviderStatus>;
 }
 
 export async function setupChecks(
@@ -54,7 +56,7 @@ export async function setupChecks(
   const [git, github, claude, reviews] = await Promise.all([
     gitState(opts.gitShim ?? GIT_SHIM),
     githubState(),
-    aiProvider().status(),
+    (opts.claude ?? (() => aiProvider().status()))(),
     reviewsState(claudeDir),
   ]);
   const states: Record<SetupId, SetupState> = { git, github, claude, reviews };
@@ -66,21 +68,33 @@ export async function setupChecks(
 }
 
 /**
+ * The AI provider's status. When it's missing, asks the login shell again and
+ * checks once more, so a `claude` installed since the server started (through
+ * nvm, say) is found without a restart.
+ */
+export async function providerStatusFresh(
+  status: () => Promise<ProviderStatus> = () => aiProvider().status(),
+): Promise<ProviderStatus> {
+  const first = await status();
+  if (first !== "missing") return first;
+  await refreshLoginShellDirs();
+  return status();
+}
+
+/**
  * Runs the checks, and when `gh` or `claude` is missing asks the login shell
- * again and checks once more, so a tool installed since the server started
- * (through nvm, say) is found without a restart.
+ * again and checks once more, as `providerStatusFresh` does for `claude`.
  */
 export async function setupChecksFresh(
   opts: SetupOptions = {},
 ): Promise<SetupRow[]> {
-  const rows = await setupChecks(opts);
-  const lacking = rows.some(
-    (row) =>
-      (row.id === "github" || row.id === "claude") && row.state === "missing",
-  );
-  if (!lacking) return rows;
+  const claude = providerStatusFresh(opts.claude);
+  const checks = { ...opts, claude: () => claude };
+  const rows = await setupChecks(checks);
+  if (!rows.some((row) => row.id === "github" && row.state === "missing"))
+    return rows;
   await refreshLoginShellDirs();
-  return setupChecks(opts);
+  return setupChecks(checks);
 }
 
 async function onPath(name: string): Promise<string | null> {

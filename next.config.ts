@@ -14,9 +14,14 @@ const nextConfig: NextConfig = {
   // `next/image`. Next's own server trace still lists sharp, which route
   // excludes can't reach.
   images: { unoptimized: true },
-  // `lib/exec.ts` makes Next trace the whole project, which would copy the
-  // Mac app's sources and its Xcode build output into the server.
+  // Keep the Mac app's sources and its Xcode build output out of the server,
+  // should a run-time path make Next trace the whole project again.
   outputFileTracingExcludes: { "/*": ["./mac/**/*"] },
+  // Name the schema and upgrades `lib/store.ts` reads at run time, since
+  // Next's trace doesn't find them.
+  outputFileTracingIncludes: {
+    "/*": ["./lib/schema.sql", "./lib/upgrades/*.sql"],
+  },
 };
 
 export default nextConfig;

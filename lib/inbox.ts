@@ -64,6 +64,20 @@ export interface InboxRow {
   archived: boolean;
 }
 
+/** A branch on GitHub this clone has no local branch for. */
+export interface RemoteBranch {
+  branch: string;
+  lastCommitAt: string | null;
+  pr: {
+    number: number;
+    title: string;
+    author: string | null;
+    isDraft: boolean;
+    baseRefName: string;
+    url: string;
+  } | null;
+}
+
 export interface InboxRepo {
   /** Canonical identity — the same for every worktree of one repo. */
   commonDir: string;
@@ -77,6 +91,11 @@ export interface InboxRepo {
   connect: boolean;
   /** Served from cache after a live failure, so the counts may lag. */
   stale: boolean;
+  /**
+   * Open same-repo PRs first, most recently updated first, then branches
+   * without one, newest commit first.
+   */
+  onGitHub: RemoteBranch[];
 }
 
 export interface InboxResult {
@@ -176,6 +195,47 @@ interface GqlInboxPr {
   reviews: { nodes: Array<{ id: string; body: string }> };
 }
 
+interface GqlOpenPr {
+  number: number;
+  title: string;
+  isDraft: boolean;
+  url: string;
+  baseRefName: string;
+  headRefName: string;
+  isCrossRepository: boolean;
+  author: { login: string } | null;
+  headRef: { target: { committedDate?: string } | null } | null;
+}
+
+interface GqlHead {
+  name: string;
+  target: { committedDate?: string } | null;
+}
+
+/**
+ * What the first chunk also asks for, for On GitHub. Asked even with no
+ * local branches, so a fresh clone still lists its teammates' work.
+ */
+const ON_GITHUB = `
+    open: pullRequests(states: OPEN, first: 50, orderBy: {field: UPDATED_AT, direction: DESC}) {
+      nodes {
+        number title isDraft url baseRefName headRefName isCrossRepository
+        author { login }
+        headRef { target { ... on Commit { committedDate } } }
+      }
+    }
+    heads: refs(refPrefix: "refs/heads/", first: 100) {
+      nodes { name target { ... on Commit { committedDate } } }
+    }
+    defaultBranchRef { name }`;
+
+interface Loaded {
+  prs: Map<string, GqlInboxPr[]>;
+  open: GqlOpenPr[];
+  heads: GqlHead[];
+  defaultBranch: string | null;
+}
+
 /** One request, one alias per branch. Chunked so the node budget can't bite. */
 const CHUNK = 25;
 
@@ -185,12 +245,21 @@ async function loadPullRequests(
   owner: string,
   name: string,
   branches: string[],
-): Promise<Map<string, GqlInboxPr[]>> {
-  const found = new Map<string, GqlInboxPr[]>();
+): Promise<Loaded> {
+  const loaded: Loaded = {
+    prs: new Map(),
+    open: [],
+    heads: [],
+    defaultBranch: null,
+  };
 
-  for (let start = 0; start < branches.length; start += CHUNK) {
+  for (let start = 0; start === 0 || start < branches.length; start += CHUNK) {
     const slice = branches.slice(start, start + CHUNK);
-    const decls = slice.map((_, i) => `$b${i}: String!`).join(", ");
+    const decls = [
+      "$owner: String!",
+      "$name: String!",
+      ...slice.map((_, i) => `$b${i}: String!`),
+    ].join(", ");
     const fields = slice
       .map(
         (_, i) =>
@@ -199,15 +268,19 @@ async function loadPullRequests(
       .join("\n");
 
     const query = `${FRAGMENT}
-query($owner: String!, $name: String!, ${decls}) {
+query(${decls}) {
   repository(owner: $owner, name: $name) {
-${fields}
+${fields}${start === 0 ? ON_GITHUB : ""}
   }
 }`;
 
     // Branch names ride in as variables, never interpolated into the query.
     const data = await githubGraphql<{
-      repository?: Record<string, { nodes: GqlInboxPr[] }>;
+      repository?: Record<string, unknown> & {
+        open?: { nodes: GqlOpenPr[] };
+        heads?: { nodes: GqlHead[] };
+        defaultBranchRef?: { name: string } | null;
+      };
     }>(
       root,
       query,
@@ -221,15 +294,62 @@ ${fields}
 
     const repository = data?.repository ?? {};
     slice.forEach((branch, i) => {
-      found.set(branch, repository[`w${i}`]?.nodes ?? []);
+      const alias = repository[`w${i}`] as { nodes: GqlInboxPr[] } | undefined;
+      loaded.prs.set(branch, alias?.nodes ?? []);
     });
+    if (start === 0) {
+      loaded.open = repository.open?.nodes ?? [];
+      loaded.heads = repository.heads?.nodes ?? [];
+      loaded.defaultBranch = repository.defaultBranchRef?.name ?? null;
+    }
   }
 
-  return found;
+  return loaded;
 }
 
-interface RepoSlice {
-  prs: Map<string, GqlInboxPr[]>;
+/**
+ * The branches On GitHub offers: same-repo open PRs, then plain branches,
+ * minus anything with a local branch and the default branch. A fork's PR is
+ * left out, because its branch isn't on origin to fetch.
+ */
+function remoteBranches(loaded: Loaded, local: Set<string>): RemoteBranch[] {
+  const taken = new Set(local);
+  if (loaded.defaultBranch) taken.add(loaded.defaultBranch);
+  const out: RemoteBranch[] = [];
+
+  for (const pr of loaded.open) {
+    if (pr.isCrossRepository || taken.has(pr.headRefName)) continue;
+    taken.add(pr.headRefName);
+    out.push({
+      branch: pr.headRefName,
+      lastCommitAt: pr.headRef?.target?.committedDate ?? null,
+      pr: {
+        number: pr.number,
+        title: pr.title,
+        author: pr.author?.login ?? null,
+        isDraft: pr.isDraft,
+        baseRefName: pr.baseRefName,
+        url: pr.url,
+      },
+    });
+  }
+  // Sorts here, because GitHub orders branches by name: its commit-date order
+  // applies only to tags.
+  const heads = [...loaded.heads].sort((a, b) =>
+    (b.target?.committedDate ?? "").localeCompare(
+      a.target?.committedDate ?? "",
+    ),
+  );
+  for (const head of heads) {
+    if (taken.has(head.name)) continue;
+    taken.add(head.name);
+    out.push({
+      branch: head.name,
+      lastCommitAt: head.target?.committedDate ?? null,
+      pr: null,
+    });
+  }
+  return out;
 }
 
 /**
@@ -239,7 +359,7 @@ interface RepoSlice {
  * `fresh` from there would turn the home screen into a GitHub poller.
  */
 const TTL_MS = 60_000;
-const cache = new Map<string, { at: number; slice: RepoSlice }>();
+const cache = new Map<string, { at: number; slice: Loaded }>();
 
 export async function buildInbox(
   roots: string[],
@@ -320,6 +440,7 @@ async function buildRepo(
     unavailable: null,
     connect: false,
     stale: false,
+    onGitHub: [],
   };
 
   // Every local branch, not just the checked-out ones. A stacked workflow
@@ -336,15 +457,24 @@ async function buildRepo(
   let prs = new Map<string, GqlInboxPr[]>();
   if (!owner || !name) {
     repo.unavailable = "No GitHub remote — showing local branches only.";
-  } else if (branches.length > 0) {
+  } else {
     const key = `${owner}/${name} ${[...branches].sort().join(",")}`;
     const hit = cache.get(key);
     if (!opts.fresh && hit && Date.now() - hit.at < TTL_MS) {
       prs = hit.slice.prs;
+      repo.onGitHub = remoteBranches(hit.slice, new Set(facts.keys()));
     } else {
       try {
-        prs = await loadPullRequests(root, host, owner, name, branches);
-        cache.set(key, { at: Date.now(), slice: { prs } });
+        const loaded = await loadPullRequests(
+          root,
+          host,
+          owner,
+          name,
+          branches,
+        );
+        cache.set(key, { at: Date.now(), slice: loaded });
+        prs = loaded.prs;
+        repo.onGitHub = remoteBranches(loaded, new Set(facts.keys()));
       } catch (err) {
         const { message, connect } = describeGhError(err);
         repo.unavailable = message;

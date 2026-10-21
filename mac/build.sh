@@ -45,6 +45,9 @@ xcodebuild -quiet -project mac/backstory/Backstory.xcodeproj -scheme Backstory \
 
 rm -rf "$app"
 ditto "$out/DerivedData/Build/Products/Release/Backstory.app" "$app"
+# Stamp the bundle with this build's time. ditto keeps the date Xcode's
+# incremental build left on the folder, so Finder would show an old build date.
+touch "$app"
 identity="${BACKSTORY_SIGN_IDENTITY:-}"
 if [ -z "$identity" ]; then
   identity="$(security find-identity -v -p codesigning |
@@ -59,13 +62,18 @@ timestamp=--timestamp
 # Copy an allowlist, never the whole folder: `lib/exec.ts` makes Next trace
 # the project, so the standalone output also holds the sources, tests and
 # docs. sharp is left out because `images.unoptimized` means the server never
-# loads it, and its native libraries would each need signing.
+# loads it, and its native libraries would each need signing. The store makes
+# a new database from lib/schema.sql and upgrades an old one from
+# lib/upgrades/; copying them from the standalone output fails the build if
+# the standalone output ever lacks them.
 server="$app/Contents/Resources/server"
-mkdir -p "$server"
+mkdir -p "$server/lib"
 for item in server.js .next node_modules public package.json; do
   rsync -a --exclude 'node_modules/sharp' --exclude 'node_modules/@img' \
     "$standalone/$item" "$server/"
 done
+cp "$standalone/lib/schema.sql" "$server/lib/schema.sql"
+cp -R "$standalone/lib/upgrades" "$server/lib/"
 cp mac/server-exit-with-parent.cjs "$app/Contents/Resources/"
 
 # The `backstory` command, which the Claude Code hook runs by its path in

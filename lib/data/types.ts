@@ -91,10 +91,15 @@ export interface DataResponse {
   readers: string[];
   /** False when the base has no data model: everything reads as added */
   baseModel: boolean;
-  /** Entities the change touched, then their unchanged neighbours */
+  /**
+   * Entities the change touched, then their unchanged neighbours; on a
+   * drafted view the change touched none of, every entity, unchanged
+   */
   entities: EntityDiff[];
   /** Who drafted the model, when no reader found one and the AI provider read it */
   drafted: { provider: string; model: string | null } | null;
+  /** On a drafted view: whether data models are read as repos and views open */
+  auto?: boolean;
   /** When no reader found a model: the AI provider's read, for this view */
   draft?: DataDraftStatus;
   /** Why no reader was tried: a `data.format` Backstory doesn't read */
@@ -103,8 +108,12 @@ export interface DataResponse {
 
 /** A drafted data model's read for one view, as the story shows it */
 export type DataDraftStatus =
-  /** Nothing read yet: the provider's name, for the offer's copy */
-  | { status: "idle"; provider: string }
+  /**
+   * Nothing read yet: the provider's name, for the offer's copy, and whether
+   * the user has turned on reading data models automatically, so the page
+   * starts the read without a click
+   */
+  | { status: "idle"; provider: string; auto: boolean }
   | { status: "running"; phase: string; startedAt: number }
   | { status: "done"; costUsd: number; durationMs: number }
   | { status: "failed"; error: string }

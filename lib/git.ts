@@ -190,7 +190,9 @@ export function parseRemote(url: string | null): {
  * `git remote show origin` would be authoritative but makes a network call,
  * which is not acceptable inside a request.
  */
-async function resolveDefaultBranch(root: string): Promise<string | null> {
+export async function resolveDefaultBranch(
+  root: string,
+): Promise<string | null> {
   const symref = await gitLine(root, [
     "symbolic-ref",
     "--short",
@@ -621,20 +623,6 @@ export async function getRangePatch(
 export function commitUrl(repo: RepoInfo, sha: string): string | null {
   if (!repo.owner || !repo.name) return null;
   return `https://github.com/${repo.owner}/${repo.name}/commit/${sha}`;
-}
-
-/**
- * The URL you actually want in a review reply: the commit *as viewed inside
- * the PR* — github.com/<owner>/<repo>/pull/<n>/commits/<sha> — rather than
- * the bare commit page.
- */
-export function prCommitUrl(
-  repo: RepoInfo,
-  prNumber: number,
-  sha: string,
-): string | null {
-  if (!repo.owner || !repo.name) return null;
-  return `https://github.com/${repo.owner}/${repo.name}/pull/${prNumber}/commits/${sha}`;
 }
 
 export async function getWorkingTree(repo: RepoInfo): Promise<WorkingTreeInfo> {

@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 
-import type { InboxResult } from "@/lib/inbox";
+import type { InboxRepo, InboxResult, RemoteBranch } from "@/lib/inbox";
+import { requestFetch } from "./fetchBranch";
 import {
   AlertIcon,
   ChevronRightIcon,
   FileDiffIcon,
   FolderIcon,
+  GitCommitIcon,
+  PullRequestIcon,
   SyncIcon,
 } from "./icons";
 import { InboxRow } from "./InboxRow";
@@ -18,7 +21,7 @@ import {
   SetupChecklist,
   useInMacApp,
 } from "./SetupChecklist";
-import { Button, Spinner } from "./ui";
+import { Button, RelativeTime, Spinner } from "./ui";
 
 /**
  * The home screen: every worktree you've got checked out, and how much of each
@@ -343,6 +346,10 @@ export function Inbox({
                     </div>
                   </details>
                 )}
+
+                {repo.onGitHub.length > 0 && (
+                  <OnGitHub repo={repo} onOpen={onOpen} />
+                )}
               </section>
             ))}
 
@@ -388,6 +395,110 @@ export function Inbox({
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Teammates' open PRs and branches this clone has no local branch for.
+ * Folded by default, so the count at the top stays about your own work.
+ */
+function OnGitHub({
+  repo,
+  onOpen,
+}: {
+  repo: InboxRepo;
+  onOpen: (path: string, ref?: string | null) => void;
+}) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [failed, setFailed] = useState<{
+    branch: string;
+    message: string;
+  } | null>(null);
+
+  const open = async (remote: RemoteBranch) => {
+    setBusy(remote.branch);
+    setFailed(null);
+    try {
+      const result = await requestFetch(
+        repo.root,
+        remote.branch,
+        remote.pr?.baseRefName ?? null,
+      );
+      onOpen(result.worktree ?? repo.root, remote.branch);
+    } catch (err) {
+      setFailed({
+        branch: remote.branch,
+        message: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <details className="mt-1 group">
+      <summary className="cursor-pointer list-none px-2 py-1.5 text-[12px] text-[var(--fg-muted)] hover:text-[var(--fg)]">
+        <ChevronRightIcon
+          size={11}
+          className="mr-1 inline-block transition-transform group-open:rotate-90"
+        />
+        On GitHub · {repo.onGitHub.length}
+      </summary>
+      <div>
+        {repo.onGitHub.map((remote) => (
+          <button
+            key={remote.branch}
+            type="button"
+            disabled={busy !== null}
+            onClick={() => void open(remote)}
+            className="grid w-full grid-cols-[16px_minmax(0,1fr)_auto] items-start gap-x-3 rounded-md py-2 pl-2 pr-2 text-left hover:bg-[var(--canvas-subtle)] disabled:cursor-wait"
+          >
+            <span className="mt-[3px] grid place-items-center">
+              {busy === remote.branch ? (
+                <Spinner className="!h-3 !w-3" />
+              ) : remote.pr ? (
+                <PullRequestIcon size={12} className="text-[var(--fg-muted)]" />
+              ) : (
+                <GitCommitIcon size={12} className="text-[var(--fg-muted)]" />
+              )}
+            </span>
+            <span className="min-w-0">
+              {remote.pr ? (
+                <>
+                  <span className="block truncate text-[13px]">
+                    <span className="text-[var(--fg-muted)]">
+                      #{remote.pr.number}
+                    </span>{" "}
+                    {remote.pr.title}
+                    {remote.pr.isDraft && (
+                      <span className="text-[var(--fg-subtle)]"> · draft</span>
+                    )}
+                  </span>
+                  <span className="mono mt-0.5 block truncate text-[11px] text-[var(--fg-subtle)]">
+                    {remote.pr.author && `${remote.pr.author} · `}
+                    {remote.branch}
+                  </span>
+                </>
+              ) : (
+                <span className="mono block truncate text-[13px] text-[var(--fg-muted)]">
+                  {remote.branch}
+                </span>
+              )}
+              {failed?.branch === remote.branch && (
+                <span className="mt-1 block whitespace-pre-wrap text-[12px] text-[var(--danger)]">
+                  {failed.message}
+                </span>
+              )}
+            </span>
+            <span className="whitespace-nowrap pl-4 text-[11px] text-[var(--fg-subtle)]">
+              {remote.lastCommitAt && (
+                <RelativeTime iso={remote.lastCommitAt} />
+              )}
+            </span>
+          </button>
+        ))}
+      </div>
+    </details>
   );
 }
 

@@ -5,9 +5,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FlowsStatus } from "@/lib/flows/types";
 
 /**
- * The flows for the view on screen. Tracing costs money and a minute, so it
- * starts only when asked ("Trace this change"); opening a commit to glance
- * at it costs nothing. Cached flows load as soon as the view opens. A
+ * The flows for the view on screen. Tracing takes a minute and the user's
+ * usage, so it starts only when asked ("Trace this change"); opening a commit
+ * to glance at it uses nothing. Cached flows load as soon as the view opens. A
  * finished run arrives as a "flows" watch event (`tick`); while one runs, a
  * slow poll keeps its phase current.
  */

@@ -8,8 +8,8 @@ import { importOutbox } from "./outbox";
 import { importResponses } from "./responses";
 
 /**
- * The SQLite database behind notes, rounds and responses: `backstory.db` in
- * `homeDir`.
+ * The SQLite database behind notes, rounds, responses and settings:
+ * `backstory.db` in `homeDir`.
  *
  * One database, so a write that touches two kinds of record commits or fails
  * as one (Send files a round and marks its notes sent), and so the schema is
@@ -36,56 +36,13 @@ export function homeDir(): string {
 }
 
 const FILE = "backstory.db";
-const VERSION = 1;
+const VERSION = 2;
 
-const SCHEMA = `
-  CREATE TABLE notes (
-    root TEXT NOT NULL,
-    id TEXT NOT NULL,
-    rev TEXT NOT NULL,
-    path TEXT,
-    side TEXT NOT NULL CHECK (side IN ('old', 'new')),
-    line INTEGER CHECK (line > 0),
-    quote TEXT,
-    body TEXT NOT NULL,
-    created_at INTEGER NOT NULL,
-    sent_at INTEGER,
-    done INTEGER NOT NULL CHECK (done IN (0, 1)),
-    done_at INTEGER,
-    CHECK (done = 0 OR sent_at IS NOT NULL),
-    CHECK (done = 1 OR done_at IS NULL),
-    PRIMARY KEY (root, id)
-  );
-  CREATE TABLE rounds (
-    root TEXT NOT NULL,
-    id TEXT NOT NULL,
-    note_ids TEXT NOT NULL CHECK (json_valid(note_ids)),
-    message TEXT NOT NULL,
-    queued_at INTEGER NOT NULL,
-    for_session TEXT,
-    delivered_at INTEGER,
-    delivered_to TEXT,
-    claim_session TEXT,
-    claim_until INTEGER,
-    CHECK ((claim_session IS NULL) = (claim_until IS NULL)),
-    PRIMARY KEY (root, id)
-  );
-  CREATE TABLE seen (
-    root TEXT NOT NULL,
-    session TEXT NOT NULL,
-    at INTEGER NOT NULL,
-    PRIMARY KEY (root, session)
-  );
-  CREATE TABLE responses (
-    pr TEXT NOT NULL,
-    thread TEXT NOT NULL,
-    done INTEGER NOT NULL CHECK (done IN (0, 1)),
-    done_at INTEGER,
-    reply TEXT,
-    commits TEXT NOT NULL CHECK (json_valid(commits)),
-    PRIMARY KEY (pr, thread)
-  );
-`;
+// Read from the working directory, not beside this module: bundled, the
+// module is a `.next` chunk. The dev server and tests run from the repo root,
+// and the Mac app runs its server from the server directory.
+const sql = (file: string) =>
+  readFileSync(path.join(process.cwd(), "lib", file), "utf8");
 
 let open: { file: string; database: DatabaseSync } | null = null;
 
@@ -119,10 +76,14 @@ export function db(): DatabaseSync {
       user_version: number;
     };
     if (user_version === 0) {
-      database.exec(SCHEMA);
+      database.exec(sql("schema.sql"));
       imported = importJson(database, home);
-      database.exec(`PRAGMA user_version = ${VERSION}`);
+    } else {
+      for (let v = user_version + 1; v <= VERSION; v++)
+        database.exec(sql(`upgrades/${v}.sql`));
     }
+    if (user_version < VERSION)
+      database.exec(`PRAGMA user_version = ${VERSION}`);
     database.exec("COMMIT");
   } catch (err) {
     // SQLite may already have rolled back, after a full disk or an I/O error.
@@ -171,7 +132,9 @@ function importJson(database: DatabaseSync, home: string): string[] {
   ];
   const read: string[] = [];
   for (const [name, importer] of importers) {
-    const file = path.join(home, name);
+    // Keep Next's file tracing off this join: `home` is only known at run
+    // time, so tracing it would copy the whole project into the server.
+    const file = path.join(/*turbopackIgnore: true*/ home, name);
     const legacy = readLegacy(file);
     if (legacy === null) continue;
     importer(database, legacy);
@@ -243,6 +206,26 @@ export function reading<T>(empty: T, fn: (database: DatabaseSync) => T): T {
     console.error("Backstory couldn't read its database:", err);
     return empty;
   }
+}
+
+/** A setting's value, or null when it was never set or the database can't be read. */
+export function setting(key: string): string | null {
+  return reading(null, (database) => {
+    const row = database
+      .prepare("SELECT value FROM settings WHERE key = ?")
+      .get(key) as { value: string } | undefined;
+    return row?.value ?? null;
+  });
+}
+
+export function setSetting(key: string, value: string): void {
+  transaction((database) =>
+    database
+      .prepare(
+        "INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+      )
+      .run(key, value),
+  );
 }
 
 /** GitHub thread node ids are opaque base64-ish strings; be strict anyway. */

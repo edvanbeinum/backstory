@@ -10,10 +10,9 @@ import {
 } from "react";
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
-import type { DraftStatus, ModelSourceResponse } from "@/lib/models/draft";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
-import { AlertIcon } from "./icons";
+import { AlertIcon, ChevronDownIcon } from "./icons";
 import { Badge, Button, CopyButton, Spinner } from "./ui";
 
 /**
@@ -98,12 +97,14 @@ export function jumpToFile(path: string): boolean {
 const fileName = (path: string) => path.split("/").pop() ?? path;
 
 function MapCanvas({
-  map,
+  nodes,
+  edges,
   width,
   highlight,
   onJump,
 }: {
-  map: MapResponse;
+  nodes: MapNode[];
+  edges: MapEdge[];
   width: number;
   /** A component's name, outlined as hovering it would */
   highlight: string | null;
@@ -111,8 +112,8 @@ function MapCanvas({
 }) {
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const { placed, height } = useMemo(
-    () => layout(map.nodes, map.edges, width, heights),
-    [map, width, heights],
+    () => layout(nodes, edges, width, heights),
+    [nodes, edges, width, heights],
   );
   const boxes = useRef(new Map<string, HTMLDivElement>());
 
@@ -135,7 +136,7 @@ function MapCanvas({
   const ends = useMemo(() => {
     const out = new Map<string, string[]>();
     const inn = new Map<string, string[]>();
-    const sorted = [...map.edges].sort(
+    const sorted = [...edges].sort(
       (a, b) =>
         (placed.get(a.destination)?.x ?? 0) -
         (placed.get(b.destination)?.x ?? 0),
@@ -145,7 +146,7 @@ function MapCanvas({
       inn.set(e.destination, [...(inn.get(e.destination) ?? []), e.key]);
     }
     return { out, inn };
-  }, [map.edges, placed]);
+  }, [edges, placed]);
   const around = { boxes: [...placed.values()], clearance: COL_GAP / 2 };
 
   return (
@@ -177,7 +178,7 @@ function MapCanvas({
             </marker>
           ))}
         </defs>
-        {map.edges.map((e) => {
+        {edges.map((e) => {
           const a = placed.get(e.source);
           const b = placed.get(e.destination);
           if (!a || !b || a === b) return null;
@@ -218,7 +219,7 @@ function MapCanvas({
         })}
       </svg>
 
-      {map.edges.map((e) => {
+      {edges.map((e) => {
         const a = placed.get(e.source);
         const b = placed.get(e.destination);
         if (!a || !b || a === b) return null;
@@ -449,91 +450,158 @@ function Ticked({ text }: { text: string }) {
   );
 }
 
-type Finished = Extract<DraftStatus, { status: "done" }>;
-type ModelAnswer = ModelSourceResponse | { error: string };
-type JobState = DraftStatus["status"];
+/**
+ * Turns reading the repo's maps and data models as it opens on or off.
+ * Turning it on starts main's two reads before the page reads the view again,
+ * so the view's own reads wait behind them instead of reading their bases in
+ * full.
+ */
+export async function setAutoReading(repo: string, on: boolean) {
+  const params = new URLSearchParams({ repo, auto: on ? "1" : "0" });
+  const response = await fetch(`/api/data?${params}`, { method: "POST" });
+  if (!response.ok) throw new Error(`Backstory answered ${response.status}.`);
+  if (!on) return;
+  const trunk = `repo=${encodeURIComponent(repo)}&trunk=1`;
+  await Promise.all([
+    fetch(`/api/data?${trunk}`, { method: "POST" }),
+    fetch(`/api/map?${trunk}`, { method: "POST" }),
+  ]);
+}
 
-/** Polls while a draft runs rather than adding a watch event: drafts are rare. */
-function useModelDraft(repo: string, wanted: boolean, onDrafted: () => void) {
+/**
+ * The view's map, replaced by what a read request answered until the page
+ * reads it again. Polls while a read runs rather than adding a watch event:
+ * reads are rare.
+ */
+function useMapDraft(
+  repo: string,
+  rev: string,
+  given: MapResponse | null,
+  onRead: () => void,
+) {
   const [answer, setAnswer] = useState<{
-    repo: string;
-    source: ModelSourceResponse;
+    over: MapResponse | null;
+    map: MapResponse;
   } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  /** Shown once, after a draft this window watched finish */
-  const [finished, setFinished] = useState<{
-    repo: string;
-    job: Finished;
+  const [error, setError] = useState<{
+    over: MapResponse | null;
+    message: string;
   } | null>(null);
-  const last = useRef<{ repo: string; status: JobState } | null>(null);
-  const onDraftedRef = useRef(onDrafted);
+  const onReadRef = useRef(onRead);
   useEffect(() => {
-    onDraftedRef.current = onDrafted;
-  }, [onDrafted]);
+    onReadRef.current = onRead;
+  }, [onRead]);
+  // Tags an answer with the page's latest read of the view when it arrives,
+  // not the read it was sent over: a page read that lands while a read starts
+  // says idle, and would hide the answer that says running, so nothing would
+  // poll. A page read that lands after the answer still replaces it.
+  const latest = useRef({ view: `${repo}\n${rev}`, given });
+  useEffect(() => {
+    latest.current = { view: `${repo}\n${rev}`, given };
+  }, [repo, rev, given]);
+  // Try again repeats the last read: a Redraft only when that was a Redraft,
+  // since one reads main in full and removes every derived map.
+  const lastRedraft = useRef(false);
 
   const request = useCallback(
     async (method: "GET" | "POST", redraft = false) => {
-      const params = new URLSearchParams({ repo });
+      if (method === "POST") lastRedraft.current = redraft;
+      const view = `${repo}\n${rev}`;
+      const params = new URLSearchParams({ repo, rev });
       if (redraft) params.set("redraft", "1");
+      // Drops the answer for a view the page has left.
+      const over = () =>
+        latest.current.view === view ? latest.current.given : undefined;
       try {
-        const response = await fetch(`/api/model?${params}`, {
+        const response = await fetch(`/api/map?${params}`, {
           method,
           cache: "no-store",
         });
-        const data = (await response.json()) as ModelAnswer;
-        if (!response.ok || "error" in data) {
-          setError("error" in data ? data.error : response.statusText);
+        // A map has `error` too, the model file's: only a failed response
+        // is a failed request.
+        const body = (await response.json()) as
+          MapResponse | { error?: string };
+        if (!response.ok || !("nodes" in body)) {
+          const at = over();
+          if (at !== undefined)
+            setError({ over: at, message: body.error ?? response.statusText });
           return;
         }
+        const at = over();
+        if (at === undefined) return;
         setError(null);
-        const status = data.job.status;
-        const before = last.current?.repo === repo ? last.current.status : null;
-        // Read the map again on any done this window hasn't seen, not only
-        // after a running one: a draft can finish before the first poll.
-        if (status === "done" && before !== "done") {
-          if (before === "running")
-            setFinished({ repo, job: data.job as Finished });
-          onDraftedRef.current();
-        }
-        last.current = { repo, status };
-        setAnswer({ repo, source: data });
+        setAnswer({ over: at, map: body });
+        // The page reads the map again once a read ends, so the flows and
+        // the data model see the drafted map too.
+        if (body.draft?.status !== "running") onReadRef.current();
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        const at = over();
+        if (at !== undefined)
+          setError({
+            over: at,
+            message: err instanceof Error ? err.message : String(err),
+          });
       }
     },
-    [repo],
+    [repo, rev],
   );
 
-  useEffect(() => {
-    if (!wanted || !repo) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches when its key changes
-    void request("GET");
-  }, [wanted, repo, request]);
-
-  const source = answer?.repo === repo ? answer.source : null;
-  const running = source?.job.status === "running";
+  const map = answer?.over === given ? answer.map : given;
+  const running = map?.draft?.status === "running";
   useEffect(() => {
     if (!running) return;
     const timer = setInterval(() => void request("GET"), 4000);
     return () => clearInterval(timer);
   }, [running, request]);
 
-  const start = useCallback(
-    (redraft = false) => {
-      setFinished(null);
-      void request("POST", redraft);
+  // With reading turned on, a view with no map yet, or with a drafted head
+  // but no base to compare it with, starts its read on open. It starts once
+  // until the view's read status changes: a read that fails or can't run
+  // stays that way, while the branch view, whose rev stays "branch" as HEAD
+  // moves, reads again once its new head needs it.
+  const autoStart =
+    !map?.error &&
+    (map?.status === "none" || (map?.source === "drafted" && !map.baseModel)) &&
+    map.draft?.status === "idle" &&
+    map.draft.auto;
+  const autoStarted = useRef<string | null>(null);
+  useEffect(() => {
+    const view = `${repo}\n${rev}`;
+    if (!autoStart) {
+      autoStarted.current = null;
+      return;
+    }
+    if (autoStarted.current === view) return;
+    autoStarted.current = view;
+    void request("POST");
+  }, [autoStart, repo, rev, request]);
+
+  const setAuto = useCallback(
+    async (on: boolean) => {
+      try {
+        await setAutoReading(repo, on);
+        onReadRef.current();
+      } catch (err) {
+        setError({
+          over: given,
+          message: err instanceof Error ? err.message : String(err),
+        });
+      }
     },
-    [request],
+    [repo, given],
   );
+
   return {
-    source,
-    error,
-    finished: finished?.repo === repo ? finished.job : null,
-    start,
+    map,
+    error: error?.over === given ? error.message : null,
+    start: (redraft = false) => void request("POST", redraft),
+    retry: () => void request("POST", lastRedraft.current),
+    turnOn: () => void setAuto(true),
+    turnOff: () => void setAuto(false),
   };
 }
 
-type DraftApi = ReturnType<typeof useModelDraft>;
+type DraftApi = ReturnType<typeof useMapDraft>;
 
 const formatSeconds = (ms: number) => {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -549,11 +617,8 @@ export function Elapsed({ since }: { since: number }) {
   return <>{formatSeconds(now - since)}</>;
 }
 
-const filesLeft = (n: number) =>
-  `${n} ${n === 1 ? "file" : "files"} no component covers`;
-
 function DraftProgress({ draft }: { draft: DraftApi }) {
-  const job = draft.source?.job;
+  const job = draft.map?.draft;
   if (draft.error)
     return (
       <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
@@ -572,9 +637,9 @@ function DraftProgress({ draft }: { draft: DraftApi }) {
       <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--attention)]">
         <AlertIcon size={11} />
         <span className="truncate" title={job.error}>
-          The draft failed: {job.error}
+          The read failed: {job.error}
         </span>
-        <Button size="sm" onClick={() => draft.start(true)}>
+        <Button size="sm" onClick={draft.retry}>
           Try again
         </Button>
       </span>
@@ -582,45 +647,65 @@ function DraftProgress({ draft }: { draft: DraftApi }) {
   if (job?.status === "unavailable")
     return (
       <span className="text-[12px] text-[var(--attention)]">
-        <ClaudeCodeNotice reason={job.reason} needs="Drafting a model needs" />
-      </span>
-    );
-  if (draft.finished)
-    return (
-      <span className="text-[12px] text-[var(--fg-muted)]">
-        Drafted in {formatSeconds(draft.finished.durationMs)}
-        {draft.finished.unmatched > 0 &&
-          ` · ${filesLeft(draft.finished.unmatched)}`}
-        {draft.finished.ambiguous > 0 &&
-          ` · ${draft.finished.ambiguous} in more than one`}
+        <ClaudeCodeNotice reason={job.reason} needs="Drafting the map needs" />
       </span>
     );
   return null;
 }
 
+/** What a view with no map of its own shows, where the map goes: the read's progress, or the offer to read it. */
 function DraftOffer({ draft }: { draft: DraftApi }) {
-  const job = draft.source?.job;
-  const idle = !job || job.status === "idle" || job.status === "unavailable";
-  const file = draft.source?.file;
+  const job = draft.map?.draft;
+  const idle =
+    !job ||
+    job.status === "idle" ||
+    job.status === "unavailable" ||
+    job.status === "done";
+  const provider = job?.status === "idle" ? job.provider : null;
+  const offerAuto = job?.status === "idle" && !job.auto;
+  const file = draft.map?.handFile;
+  const mainMap = draft.map?.mainMap;
   return (
     <div className="story-card">
-      <h3>This repo has no map yet</h3>
-      <p>
-        Backstory draws the map from a C4 model of the system. Claude Code reads
-        the code at HEAD, read-only, and drafts one that stays on this machine,
-        never in the repo.
-      </p>
+      <h3>
+        {mainMap
+          ? "This change isn't on the map yet"
+          : "This repo has no map yet"}
+      </h3>
+      {mainMap ? (
+        <p>
+          Backstory has main&apos;s map. {provider ?? "The AI provider"} reads
+          only what the diff changes, read-only, and adds it. The map stays on
+          this machine.
+        </p>
+      ) : (
+        <p>
+          Backstory draws the map from a C4 model of the system.{" "}
+          {provider ?? "The AI provider"} reads the code, read-only: main&apos;s
+          map once, then only what the diff changes. The map stays on this
+          machine.
+        </p>
+      )}
       {idle && (
-        <Button variant="primary" onClick={() => draft.start()}>
-          Draft a model
-        </Button>
+        <span className="flex flex-wrap justify-center gap-2">
+          <Button variant="primary" onClick={() => draft.start()}>
+            Draft a model
+          </Button>
+          {offerAuto && (
+            <Button onClick={draft.turnOn}>Read automatically</Button>
+          )}
+        </span>
       )}
       <span className="mt-2 flex justify-center">
         <DraftProgress draft={draft} />
       </span>
-      {idle && (
+      {provider && (
         <span className="est">
-          Claude Code · a few minutes · uses your Claude Code account
+          {provider} ·{" "}
+          {mainMap
+            ? "seconds for this change"
+            : "a few minutes for main, then seconds a change"}{" "}
+          · uses your {provider} login
         </span>
       )}
       {file && (
@@ -643,16 +728,11 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
   );
 }
 
-function LocalModel({ map, draft }: { map: MapResponse; draft: DraftApi }) {
+/** A hand-written local model's path, to correct it. */
+function LocalModel({ map }: { map: MapResponse }) {
   if (!map.modelFile) return null;
-  const running = draft.source?.job.status === "running";
   return (
     <div className="flex w-full min-w-0 flex-wrap items-center gap-1.5 text-[11px] text-[var(--fg-subtle)]">
-      {map.drafted && (
-        <Badge tone="draft" className="!py-0 !leading-4">
-          Draft
-        </Badge>
-      )}
       <code className="mono min-w-0 truncate" title={map.modelFile}>
         {map.modelFile}
       </code>
@@ -662,6 +742,55 @@ function LocalModel({ map, draft }: { map: MapResponse; draft: DraftApi }) {
         title="Copy the model file's path, to correct it"
         label="Copy path"
       />
+    </div>
+  );
+}
+
+/** A drafted map's footnote: the Draft badge, whether reads start by themselves, Turn off or Read automatically, and Redraft. */
+function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
+  const running = map.draft?.status === "running";
+  const parts: React.ReactNode[] = [];
+  if (map.auto)
+    parts.push(
+      "Read automatically",
+      <button
+        type="button"
+        className="text-[var(--accent)] hover:underline"
+        onClick={draft.turnOff}
+      >
+        Turn off
+      </button>,
+    );
+  else
+    parts.push(
+      <button
+        type="button"
+        className="text-[var(--accent)] hover:underline"
+        onClick={draft.turnOn}
+      >
+        Read automatically
+      </button>,
+    );
+  return (
+    <span className="part inline-flex flex-wrap items-center gap-1.5">
+      <Badge tone="draft" className="!py-0 !leading-4">
+        Draft
+      </Badge>
+      <span className="text-[11px] text-[var(--fg-subtle)]">
+        {parts.map((part, i) => (
+          <span key={i}>
+            {i > 0 && " · "}
+            {part}
+          </span>
+        ))}
+      </span>
+      {/* Offers Draft a model when the head has a map but its base doesn't,
+          so reading the base isn't left to Redraft, which reads main in full. */}
+      {!map.baseModel && map.draft?.status === "idle" && !map.auto && (
+        <Button size="sm" variant="invisible" onClick={() => draft.start()}>
+          Draft a model
+        </Button>
+      )}
       {!running && (
         <Button
           size="sm"
@@ -669,7 +798,7 @@ function LocalModel({ map, draft }: { map: MapResponse; draft: DraftApi }) {
           onClick={() => {
             if (
               window.confirm(
-                "Redraft the model? Claude reads the code at HEAD again, which takes a few minutes on your Claude Code account. The current file is kept as workspace.dsl.bak.",
+                "Redraft the map? Main's map is read again in full and this view is worked out from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current map is kept if it fails.",
               )
             )
               draft.start(true);
@@ -679,7 +808,7 @@ function LocalModel({ map, draft }: { map: MapResponse; draft: DraftApi }) {
         </Button>
       )}
       <DraftProgress draft={draft} />
-    </div>
+    </span>
   );
 }
 
@@ -700,8 +829,9 @@ function mostWork(map: MapResponse): React.ReactNode {
 }
 
 export function SystemMap({
-  map,
+  map: given,
   repo,
+  rev,
   highlight = null,
   onOpenFile,
   onModelChange,
@@ -709,20 +839,23 @@ export function SystemMap({
 }: {
   map: MapResponse | null;
   repo: string;
+  rev: string;
   /** A component to outline, asked for from Files changed */
   highlight?: { name: string; at: number } | null;
   /** Show a file in Files changed */
   onOpenFile: (path: string) => void;
-  /** A draft was written: read the map again */
+  /** A drafted map was read: read the map again */
   onModelChange: () => void;
   /** The rest of the line under the map: the data model's summary */
   children?: React.ReactNode;
 }) {
-  const draft = useModelDraft(
-    repo,
-    Boolean(map && (map.local || (map.status === "none" && !map.error))),
-    onModelChange,
-  );
+  const draft = useMapDraft(repo, rev, given, onModelChange);
+  const map = draft.map;
+  const drafted = map?.source === "drafted";
+  // Keep a click's Show map or Hide map only for the view it was made on.
+  const view = `${repo}\n${rev}`;
+  const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
+  const showWhole = toggled?.view === view && toggled.open;
   const boxRef = useRef<HTMLElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -734,8 +867,9 @@ export function SystemMap({
     );
     observer.observe(el);
     return () => observer.disconnect();
-    // Again once the map arrives: before it does, the section isn't rendered.
-  }, [map]);
+    // Again once the map arrives or the whole map opens: before then, the
+    // section isn't rendered.
+  }, [map, showWhole]);
 
   useEffect(() => {
     if (highlight)
@@ -745,8 +879,7 @@ export function SystemMap({
   if (!map)
     return children ? <div className="story-line">{children}</div> : null;
   if (map.status === "none" || map.nodes.length === 0) {
-    const offer =
-      map.status === "none" && !map.error && draft.source?.source === "none";
+    const offer = map.status === "none" && !map.error && map.draft;
     return (
       <>
         {offer ? (
@@ -765,11 +898,41 @@ export function SystemMap({
                   : "This change touches no mapped component"}
               </span>
             )}
+            {map.whole && (
+              <button
+                type="button"
+                className="story-disclose"
+                aria-expanded={showWhole}
+                onClick={() => setToggled({ view, open: !showWhole })}
+              >
+                {showWhole ? "Hide map" : "Show map"}
+                <ChevronDownIcon
+                  size={12}
+                  className={showWhole ? "rotate-180" : ""}
+                />
+              </button>
+            )}
+            {drafted && <DraftFootnote map={map} draft={draft} />}
           </div>
+        )}
+        {showWhole && map.whole && (
+          <section ref={boxRef} className="story-map">
+            <div className="map-card">
+              {width > 0 && (
+                <MapCanvas
+                  nodes={map.whole.nodes}
+                  edges={map.whole.edges}
+                  width={width - 2}
+                  highlight={highlight?.name ?? null}
+                  onJump={onOpenFile}
+                />
+              )}
+            </div>
+          </section>
         )}
         {map.local && (
           <div className="story-line">
-            <LocalModel map={map} draft={draft} />
+            <LocalModel map={map} />
           </div>
         )}
         {children && <div className="story-line">{children}</div>}
@@ -784,7 +947,8 @@ export function SystemMap({
       <div className="map-card">
         {width > 0 && (
           <MapCanvas
-            map={map}
+            nodes={map.nodes}
+            edges={map.edges}
             width={width - 2}
             highlight={highlight?.name ?? null}
             onJump={onOpenFile}
@@ -851,7 +1015,8 @@ export function SystemMap({
           </span>
         )}
         {children}
-        {map.local && <LocalModel map={map} draft={draft} />}
+        {drafted && <DraftFootnote map={map} draft={draft} />}
+        {map.local && <LocalModel map={map} />}
       </div>
     </section>
   );

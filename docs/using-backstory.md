@@ -17,10 +17,15 @@ see the [README](../README.md).
 
 ## Adding a repo
 
+Backstory draws your code with Claude Code. Until Claude Code is installed and
+signed in, Backstory shows only a card that says so, with **Get Claude Code** or
+**Copy: claude auth login**, and checks again when you come back to the window.
+
 The first time, the inbox opens with **Set up Backstory**: a row each for git,
-GitHub, Claude Code and notes to your agent, saying what each one adds, with a
-button for whatever is missing. It checks again when you come back to the
-window. **Backstory → Set Up Backstory…** brings it back.
+Claude Code, GitHub and notes to your agent, saying what each one adds, with a
+button for whatever is missing. Git and Claude Code are marked needed. It checks
+again when you come back to the window. **Backstory → Set Up Backstory…** brings
+it back.
 
 **Open Repo…** picks a checkout, and so does a folder dropped on the window or
 its Dock icon. Or use **Browse**, which finds them for you, or type a path. From
@@ -45,6 +50,13 @@ ACME-APP ───────────────────────�
  ✓  fix/login-timeout-36            #38 merged   ▓▓▓▓     all handled
  ○  feature/release-script          no PR yet
 ```
+
+Under each repo, **On GitHub** lists the open pull requests and branches on
+GitHub that this clone has no local branch for. Click one to fetch it into a
+local branch and review it; your checkouts stay as they are. While you review a
+branch that isn't checked out, **Fetch** beside its name brings in the newest
+push. A local branch with commits of its own, or one checked out in a worktree,
+is left as it is, and Fetch says so.
 
 **The workspace** is one branch. Its header picks the change: the whole branch,
 your uncommitted work, or any one commit on it. It opens on your uncommitted
@@ -87,30 +99,75 @@ footer says so.
 Backstory draws what a change did to the system, so you can see its effect
 before reading its lines:
 
-- **The map** is a C4 component view of the repo, with the components the change
-  touched, added or removed. It reads `architecture/workspace.dsl`, a
-  [Structurizr](https://docs.structurizr.com) model, from the repo at the
-  change's base and head. A repo that doesn't commit a model can keep one at
-  `~/.backstory/models/<folder>-<hash>/workspace.dsl`, where `<folder>` is the
-  main checkout's folder and `<hash>` is 8 characters that tell apart repos
-  with the same folder name; every worktree of the repo reads it, and the line
-  under the map on Story shows its path, or where it goes when there isn't one
-  yet. The hash comes from where the checkout is on disk, so after you move or
-  rename the checkout, rename its folder under `~/.backstory/models/` to the
-  one that line shows. It shows which components a change touched,
-  but not what it added or removed. With no model at all, **Draft a
-  model** under the map on Story has Claude Code read the code at HEAD and write one
-  there, never into the repo: a draft, marked as one, for you to correct.
+- **The map** is a C4 component view of the repo, with the components and
+  arrows the change touched, added or removed. It reads
+  `architecture/workspace.dsl`, a [Structurizr](https://docs.structurizr.com)
+  model, from the repo at the change's base and head.
+  - A repo that doesn't commit a model can have one written by hand at
+    `~/.backstory/models/<folder>-<hash>/workspace.dsl`, where `<folder>` is
+    the main checkout's folder and `<hash>` is 8 characters that tell apart
+    repos with the same folder name. Every worktree of the repo reads it, and
+    the line under the map on Story shows its path, or where it goes when
+    there isn't one yet. The hash comes from where the checkout is on disk, so
+    after you move or rename the checkout, rename its folder under
+    `~/.backstory/models/` to the one that line shows. It's the same model for
+    every commit, so the map shows which components a change touched, but not
+    what it added or removed.
+  - Any other repo can have its map drafted by Claude Code, the same way as
+    the data model. It reads main's map in full once per repo, a minute or two
+    on a small repo and more on a large one. Every other commit's map is worked
+    out from the nearest map already read, by reading only the patch between
+    them, well under a minute. The map marks
+    the components and arrows a branch added or removed, is marked as a draft,
+    and is kept in `~/.backstory/maps/`, a cache you can delete. Nothing is
+    written into the repo, or to `~/.backstory/models/`.
+  - Opening a repo starts the read of main's map, and opening a view on Story
+    starts the view's read, with its progress where the map goes. For a repo
+    you turned off (see **Turn off** below), **Draft a model** reads one view,
+    and **Read automatically** beside it turns reading back on for the repo's
+    maps and data models.
+  - The map opens by itself when the change touches a component. When it
+    touches none, the line under the map says so and has **Show map**, which
+    opens the whole system at the level of its containers: every container,
+    person and external system, with the arrows between them. A component's
+    arrow is drawn from or to its container. **Hide map** closes it.
+  - Under a drafted map, the line has **Turn off**, which stops reading this
+    repo's maps and data models as it opens, and **Redraft**, which reads
+    main's map in full again and removes every map worked out from the old
+    one. Once the repo is turned off, **Read automatically** takes the place of
+    **Turn off** and turns reading back on.
 - **The data model** shows the entities the change touched: new fields,
   relationships and rules. It reads `db/schema.rb` and the models (Rails), the
   `.xcdatamodeld` (Core Data), or SQL schema files: the `CREATE TABLE`
   statements in a `schema.sql`, a `structure.sql` or a `schema/` folder, outside
-  migrations and tests. Any other repo can have its data model drafted on
-  demand: **Draft the data model** under the map on Story has Claude Code read the
-  code at the head, and work out the base from the change. The result is marked
-  as a draft and kept in `~/.backstory/data/`, so a view is read once. A head
-  read costs about $0.15 on a small repo and over $1 and a few minutes on a
-  large one.
+  migrations and tests. Any other repo can have its data model drafted by
+  Claude Code. It reads main's data model in full once per repo, a few minutes
+  on a large repo. Every other commit's model is worked out from the nearest
+  model already read, by reading only the patch between them, well under a
+  minute. A view's base is
+  worked out from main's model, and its head from its base, so a second branch
+  from the same point, or a branch rebased onto main, reads only its own
+  change. The result is marked as a draft and kept in `~/.backstory/data/`.
+  - Reads start as a repo and a view open: opening a repo starts the reads of
+    main's data model and map, and opening a view on Story starts the view's
+    reads, with the data model's progress on the Data line. **Turn off**, under
+    each drafted map and data model, stops new reads of either kind for that
+    repo and all its worktrees; a read already running finishes. For a repo
+    you turned off, **Draft the data model** under the map on Story reads one
+    view, and **Read automatically** beside it turns reading back on and starts
+    this view's read.
+  - On a drafted view, the Data line has **Turn off**, or **Read automatically**
+    for a repo you turned off, and **Redraft**. **Show
+    data** opens the whole model when the change touches none of it.
+  - The Data line's graph opens by itself when the change touches the data
+    model; **Hide data** closes it.
+  - Main's data model moves forward when a view's base is on main and past it:
+    the read that view's base needed is main's change since, and the base
+    becomes main's model. Main is read in full again only when the patch from
+    its model to a commit on main is too large to send, which reads that
+    commit in full, or when you press **Redraft**. Redraft reads main in full
+    again and removes every model worked out from the old one, since a mistake
+    in main's model is copied into each of them.
 - **Flows** are sequence diagrams of what the code does for each user action the
   change touches, before and after, beside the code they come from.
 
@@ -141,15 +198,26 @@ Flows are traced by **Claude Code**, through your own `claude` login: Backstory
 runs `claude -p` over a copy of the commit, with read-only tools. That means:
 
 - **Your code is read by Claude** the same way it is when you use Claude Code in
-  that repo. Think about that before tracing a repo you couldn't use Claude Code
-  on.
-- **It costs.** Tracing a change takes about a minute and usually $0.10–0.40 on
-  your Claude account. It only happens when you press "Trace this change", and
-  the result is kept in `~/.backstory/flows/`, so a view is traced once.
+  that repo. Its map and data model are read as the repo opens, so think about
+  that before opening a repo you couldn't use Claude Code on.
+- **It runs on a click.** Tracing a change takes about a minute, and only
+  happens when you press "Trace this change". The result is kept in
+  `~/.backstory/flows/`, so a view is traced once.
 - **The model** is Sonnet. On a server you run yourself (`npm run dev`),
   `BACKSTORY_FLOWS_MODEL` picks another (`opus`, or a full model id). Every step
   Claude cites is checked against its line; the ones that don't match are shown
   dashed, as unverified.
+
+### Cost
+
+Every read runs through your own Claude Code login:
+
+- With an API key, you pay per read. Main's map or data model is about a dollar
+  on a large repo and cents on a small one, and each change after it is cents. A
+  trace usually costs $0.10–0.40.
+- On a Claude subscription, reads count toward Claude's usage limits.
+- Each repo has **Turn off**, under its drafted map and data model, to stop
+  reading it as it opens.
 
 ## Reviewing an agent's work
 
@@ -296,8 +364,8 @@ The server logs to `~/.backstory/server.log`.
 ## What Backstory keeps
 
 Its own state lives under `~/.backstory`. Notes, ticks, drafted replies and the
-outbox are in one database, `backstory.db`. Traced flows, drafted models and
-data models are files beside it. Nothing Backstory writes is inside your repos.
+outbox are in one database, `backstory.db`. Traced flows, drafted maps and
+data models, and hand-written models are files beside it. Nothing Backstory writes is inside your repos.
 
 If you connected GitHub, its token is in your login Keychain, under
 `dev.backstory.github`.

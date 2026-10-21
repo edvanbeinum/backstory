@@ -14,8 +14,8 @@ export const SETUP_SKIPPED_KEY = "backstory.setupSkipped";
 
 const NAMES: Record<SetupId, string> = {
   git: "git",
-  github: "GitHub",
   claude: "Claude Code",
+  github: "GitHub",
   reviews: "Notes to your agent",
 };
 
@@ -93,7 +93,8 @@ export function SetupChecklist({ onSkip }: { onSkip: () => void }) {
           </Button>
         </div>
         <p className="text-[12px] text-[var(--fg-muted)]">
-          Backstory only needs git. Each of the others adds something more.
+          Backstory needs git and Claude Code. Each of the others adds something
+          more.
         </p>
       </header>
       {error && (
@@ -123,7 +124,7 @@ export function SetupChecklist({ onSkip }: { onSkip: () => void }) {
                   <span className="text-[13px] font-semibold">
                     {NAMES[row.id]}
                   </span>
-                  {row.id === "git" && (
+                  {(row.id === "git" || row.id === "claude") && (
                     <span className="text-[11px] text-[var(--fg-subtle)]">
                       needed
                     </span>
