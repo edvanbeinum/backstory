@@ -380,7 +380,7 @@ function summary(map: MapResponse) {
       </>,
       names(changed),
       map.local ? (
-        "hand-written map, so nothing shows as new or removed"
+        "hand-written map on this machine, so nothing shows as new or removed"
       ) : map.baseModel ? (
         "no structural change"
       ) : map.baseError ? (
