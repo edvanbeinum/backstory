@@ -584,8 +584,12 @@ function nest(rows: InboxRow[]): InboxRow[] {
     }
   }
 
+  // Rank a row with no live PR below an open PR with nothing unresolved, so a
+  // scratch worktree committed today doesn't sit above a PR waiting on review.
+  const rank = (row: InboxRow) =>
+    row.archived || !row.pr ? -1 : row.pr.unresolved;
   const order = (a: InboxRow, b: InboxRow) =>
-    unresolvedIn(b) - unresolvedIn(a) ||
+    rank(b) - rank(a) ||
     (b.lastCommitAt ?? "").localeCompare(a.lastCommitAt ?? "");
 
   const out: InboxRow[] = [];

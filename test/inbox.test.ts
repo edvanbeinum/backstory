@@ -208,11 +208,20 @@ test("with a saved token and no gh, the inbox counts come from GitHub's API", as
   assert.equal("progress" in (row ?? {}), false);
 });
 
-test("rows with more unresolved threads come first, and a merged PR's don't count", async () => {
+test("rows with more unresolved threads come first, a row with no PR after them, and a merged PR's don't count", async () => {
   const root = repoOnGitHub("ordered");
   for (const branch of ["quiet", "busy", "merged"]) {
     execFileSync("git", ["-C", root, "branch", branch]);
   }
+  execFileSync("git", [
+    "-C",
+    root,
+    "worktree",
+    "add",
+    "-qb",
+    "early",
+    mkdtempSync(path.join(os.tmpdir(), "backstory-inbox-early-")),
+  ]);
   const pr = (number: number, unresolved: number, state = "OPEN") => ({
     ...INBOX_PR,
     number,
@@ -237,6 +246,7 @@ test("rows with more unresolved threads come first, and a merged PR's don't coun
       ["busy", 3],
       ["feature", 1],
       ["quiet", 0],
+      ["early", undefined],
       ["merged", 5],
     ],
   );
