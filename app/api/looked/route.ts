@@ -30,11 +30,13 @@ export async function POST(request: Request) {
     const repo = await resolveRepo(repoPath);
     const [commonDir, tip] = await Promise.all([
       gitCommonDir(repo.root),
+      // Read the tip with show-ref, which takes only an exact ref, so
+      // `main~1` or `main@{1}` is refused, not stored under a name nothing reads.
       gitLine(repo.root, [
-        "rev-parse",
+        "show-ref",
         "--verify",
-        "--quiet",
-        `refs/heads/${ref}^{commit}`,
+        "--hash",
+        `refs/heads/${ref}`,
       ]),
     ]);
     if (!tip) return bad(`No local branch named ${ref}.`);

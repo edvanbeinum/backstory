@@ -296,6 +296,10 @@ test("POST /api/looked stores the branch's tip, and wants both a repo and a bran
     (await mark(`repo=${encodeURIComponent(dir)}&ref=nope`)).status,
     400,
   );
+  assert.equal(
+    (await mark(`repo=${encodeURIComponent(dir)}&ref=main~0`)).status,
+    400,
+  );
 
   const res = await mark(`repo=${encodeURIComponent(dir)}&ref=main`);
   assert.equal(res.status, 200);
