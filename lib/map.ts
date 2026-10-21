@@ -173,8 +173,8 @@ const unchanged = {
 /**
  * The whole system, for Show map: every element unchanged, each inside its
  * parent's box, and every arrow as the model names it. An arrow between an
- * element and its own container or system is left out: one box holds the
- * other.
+ * element and its own container or system is left out: one box contains
+ * the other.
  */
 function wholeMap(model: Model): { nodes: MapNode[]; edges: MapEdge[] } {
   const parents = new Set(
@@ -349,18 +349,17 @@ export async function buildMap(
   // changed) still counts as changed only if it's added or removed; an
   // arrow's ends are its neighbours.
   const changed = new Set([...touched.keys(), ...added, ...removed]);
-  // Containers and systems that hold changed components are drawn as the
+  // Containers and systems that contain changed components are drawn as the
   // boxes around them, not as changed elements of their own.
-  const parents = new Set<string>();
-  for (const id of changed) {
-    for (
-      let p = (model.elements.get(id) ?? baseModel?.elements.get(id))?.parent;
-      p;
-    ) {
-      parents.add(p);
-      p = (model.elements.get(p) ?? baseModel?.elements.get(p))?.parent ?? null;
-    }
-  }
+  const elementOf = (id: string) =>
+    model.elements.get(id) ?? baseModel?.elements.get(id);
+  const ancestors = (id: string) => {
+    const found: string[] = [];
+    for (let p = elementOf(id)?.parent; p; p = elementOf(p)?.parent ?? null)
+      found.push(p);
+    return found;
+  };
+  const parents = new Set([...changed].flatMap(ancestors));
   for (const p of parents) changed.delete(p);
 
   // Neighbours, best first: the far end of a changed arrow always shows;
@@ -385,12 +384,8 @@ export async function buildMap(
 
   // Every container and system around a shown element is drawn too, as the
   // box it sits in.
-  const elementOf = (id: string) =>
-    model.elements.get(id) ?? baseModel?.elements.get(id);
   const shown = new Set([...changed, ...neighbours]);
-  for (const id of [...shown])
-    for (let p = elementOf(id)?.parent; p; p = elementOf(p)?.parent ?? null)
-      shown.add(p);
+  for (const id of [...shown]) for (const p of ancestors(id)) shown.add(p);
   const groups = new Set(
     [...shown].map((id) => elementOf(id)?.parent).filter(Boolean),
   );
