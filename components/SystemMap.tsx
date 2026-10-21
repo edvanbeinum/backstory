@@ -176,6 +176,23 @@ function MapCanvas({
               {n.state === "removed" && (
                 <span className="map-tag removed">Removed</span>
               )}
+              {n.files.length > 0 && (
+                <button
+                  type="button"
+                  className="files mono"
+                  title={`${n.files.join("\n")}\nShow them in Files changed`}
+                  onClick={() => onJump(n.files[0])}
+                >
+                  {n.files.length} {n.files.length === 1 ? "file" : "files"}{" "}
+                  <span className="text-[var(--success)]">+{n.additions}</span>
+                  {n.deletions > 0 && (
+                    <span className="text-[var(--danger)]">
+                      {" "}
+                      −{n.deletions}
+                    </span>
+                  )}
+                </button>
+              )}
             </h4>
           </div>
         ))}
