@@ -139,7 +139,8 @@ primitives:
       - startMapTrunkRead
       - mapRefusal
       - savedMapAt
-    use: "The AI provider's drafted map for a repo with no committed or hand-written model: main read in full once (`startMapTrunkRead`), then each view's base derived forward from main's map and its head from its base, one small read each that returns only what the patch changed (`lib/models/delta.ts`), cached by tree under `~/.backstory/maps/`, one read at a time. The data model's engine, copied with its own queue. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. `readModelAt` reads the saved map through `savedMapAt`."
+      - hasMainMap
+    use: "The AI provider's drafted map for a repo with no committed or hand-written model: main read in full once (`startMapTrunkRead`), then each view's base derived forward from main's map and its head from its base, one small read each that returns only what the patch changed (`lib/models/delta.ts`), cached by tree under `~/.backstory/maps/`, one read at a time. The data model's engine, copied with its own queue. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. `readModelAt` reads the saved map through `savedMapAt`; `hasMainMap` says whether main's map is saved."
   - name: data readers
     block: data model reader
     file: lib/data/readers.ts

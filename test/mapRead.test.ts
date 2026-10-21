@@ -330,6 +330,17 @@ test("once main's map is saved, each branch reads only its own difference", asyn
   });
 });
 
+test("a view's map says whether main's map is saved, so the page asks only for this change", async () => {
+  const repo = mainRepo();
+  const head = repo.commit({ "src/app/basket.ts": "1\n" }, "Basket");
+  assert.equal((await buildMap(repo.root, repo.main, head)).mainMap, false);
+
+  await readMain(repo.root, recorder().runner);
+  const map = await buildMap(repo.root, repo.main, head);
+  assert.equal(map.status, "none");
+  assert.equal(map.mainMap, true);
+});
+
 test("a forward read's difference merges onto its start", () => {
   const start = mergeMapDelta(
     {

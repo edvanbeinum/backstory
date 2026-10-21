@@ -709,9 +709,8 @@ function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
       {provider && (
         <span className="text-[11px] text-[var(--fg-subtle)]">
           {provider} reads the code, read-only: main&apos;s data model once,
-          then only what each change differs by. The first read can take a few
-          minutes and uses your {provider} account. The result is kept on this
-          machine.
+          then only what the diff changes. The first read can take a few minutes
+          and uses your {provider} account. The result is kept on this machine.
         </span>
       )}
     </div>
@@ -880,7 +879,7 @@ export function DataSummary({
           </div>
           <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
             {data.drafted
-              ? `Drafted by ${data.drafted.provider}: a model read once in full, then updated from what each change differs by. It may be wrong.`
+              ? `Drafted by ${data.drafted.provider}: a model read once in full, then updated from what each diff changes. It may be wrong.`
               : `From ${data.label}, at the base and the head.`}{" "}
             {whole
               ? `Every entity at the head; ${data.baseModel ? "this change touches none of them" : "there is no model at the base to compare with"}. Arrows point from the entity that has a link to the one it links to.`
