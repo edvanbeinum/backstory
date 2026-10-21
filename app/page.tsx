@@ -175,7 +175,7 @@ export default function Page() {
   /**
    * Keeps the data with the view it was read for, and shows none while
    * another view's read is on the way, so the story never offers a paid
-   * Redraft for one view beside the model of another.
+   * Read again for one view beside the data model of another.
    */
   const [dataRead, setDataRead] = useState<{
     view: string;
