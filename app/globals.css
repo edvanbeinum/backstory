@@ -888,10 +888,12 @@ tr.line-del .diff-gutter {
   background-size: 16px 16px;
   background-position: 8px 8px;
 }
+/* Lets the pointer through to the group boxes under it; only arrows take it. */
 .map-edges {
   position: absolute;
   inset: 0;
   overflow: visible;
+  pointer-events: none;
 }
 .map-edge {
   fill: none;
@@ -920,6 +922,7 @@ tr.line-del .diff-gutter {
   stroke: transparent;
   stroke-width: 10;
   cursor: default;
+  pointer-events: stroke;
 }
 .map-label {
   position: absolute;
