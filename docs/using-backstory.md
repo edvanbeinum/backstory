@@ -41,7 +41,7 @@ that marks which folders are git checkouts.
 every repo you've opened, with the branches that changed since you last looked
 at the top. Each row says what its branch changes against its base, the branch
 its pull request targets or the default branch, and when it last changed.
-Opening a branch marks it seen until it gets another commit.
+Opening a branch takes it out of that count until it gets another commit.
 
 ```text
 2 branches changed since you last looked

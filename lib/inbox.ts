@@ -666,7 +666,7 @@ function nest(rows: InboxRow[]): InboxRow[] {
     }
   }
 
-  // Compare times, not strings: git's dates carry the committer's UTC offset.
+  // Compare times, not strings: git's dates include the committer's UTC offset.
   const time = (row: InboxRow) =>
     row.lastCommitAt ? Date.parse(row.lastCommitAt) : 0;
   const order = (a: InboxRow, b: InboxRow) =>

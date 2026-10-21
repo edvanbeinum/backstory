@@ -14,9 +14,10 @@ const bad = (error: string) =>
 
 /**
  * `POST /api/looked?repo=<path>&ref=<branch>&tip=<sha>`: you opened this
- * branch, so the inbox reads it as seen until it gets another commit. The page
- * sends it on every load of a branch but a background refresh, which would
- * otherwise mark commits seen that arrived while you weren't looking. It sends
+ * branch, so the inbox leaves it out of the changed count until it gets another
+ * commit. The page sends it when you open a branch, not on a background
+ * refresh, which would otherwise mark as looked at commits that arrived while
+ * you weren't looking. It sends
  * the tip it showed you, because a commit can land while the page waits on
  * GitHub; without one, the branch's tip now is stored.
  */
