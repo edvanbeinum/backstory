@@ -746,8 +746,9 @@ function LocalModel({ map }: { map: MapResponse }) {
 /** A drafted map's footnote: who drew it, whether reads start by themselves, Turn off or Read automatically, and Draw again. */
 function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   const running = map.draft?.status === "running";
-  // Name who reads again from a read that's idle or unavailable, the provider
-  // set now: a running or done read's status doesn't say which one ran it.
+  // Name the provider set now when the read is idle or unavailable, and
+  // otherwise the one that drew the head's map, since a running, done or
+  // failed read's status doesn't name a provider.
   const provider =
     map.draft?.status === "idle" || map.draft?.status === "unavailable"
       ? map.draft.provider
