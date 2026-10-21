@@ -21,7 +21,7 @@ For a branch, a commit or your uncommitted work, Backstory draws:
 
 The diff is a click away from any component or step. Notes on what needs fixing
 go back to the agent that wrote the change. The PR's review comments appear on
-the lines they refer to, as a checklist you tick off.
+the lines they refer to.
 
 Backstory is a Mac app that runs on your machine, over your own checkouts. More
 at [stopreadingdiffs.com](https://stopreadingdiffs.com).

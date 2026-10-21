@@ -9,8 +9,10 @@ why it works the way it does. For what it does, see
 Each inbox row leads with the branch, because the branch is the identity. Folder
 names go out of date: a worktree's folder can be named after a branch it last
 had checked out two renames ago. So the folder name is shown only when it
-differs from the branch. Progress sits in a fixed right-hand column so the
-counts line up down the page.
+differs from the branch. The unresolved count sits in a fixed right-hand column
+so the counts line up down the page. It is GitHub's own count of threads nobody
+has resolved, and only open pull requests count towards the headline: a merged
+PR's threads often stay unresolved.
 
 This costs **one GitHub call per repository**, not per worktree: a single
 aliased GraphQL query asks for every branch at once. Three repos and twenty-one
@@ -21,41 +23,6 @@ with a note saying the counts are missing.
 The same call lists the repo's 50 most recently updated open pull requests and its first 100
 branches by name, for **On GitHub**: the ones this clone has no local branch for, minus
 pull requests from forks and the default branch.
-
-## Handling a comment is deliberate
-
-Backstory doesn't guess when a comment is handled. A guess, such as the newest
-commit touching the file, always finds _something_, so every comment would read
-as handled and the list couldn't work as a checklist.
-
-So there is exactly one thing that means handled: **you tick it.** Not an
-answering commit, not a drafted reply, not a reply spotted on GitHub. A
-checklist only works if you are the one checking things off.
-
-The tick is animated: the box springs, the check mark draws in, and one ring
-expands. The animation stays small, because a big effect on every comment stops
-feeling like a reward after a few. The last comment on a PR gets the larger
-effect: the panel shows that nothing is left, with a button to copy every
-drafted reply at once. Unticking isn't animated, so undoing a mistaken tick
-doesn't feel like a second event. With `prefers-reduced-motion`, the tick
-changes instantly.
-
-## Answering commits survive rebases
-
-A rebase changes only the answering commit. The work was done and only the
-record of which commit did it broke, so the comment stays handled, the count
-doesn't move, and Backstory offers to link another commit rather than demanding
-it.
-
-Squashing, amending the content or rebasing through a conflict asks you to
-choose a new answering commit on purpose: those change the diff, so attaching
-your reply to a guessed commit would be worse than saying the commit is gone.
-Same when two commits share a patch-id (revert-then-reapply): an ambiguous match
-never resolves itself.
-
-Note that "still on the branch" means _reachable from HEAD_, not "the object
-exists": rebased-away commits stay in the object database and would otherwise
-look valid.
 
 ## Browse
 
