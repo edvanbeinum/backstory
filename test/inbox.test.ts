@@ -196,7 +196,7 @@ async function inboxWithToken(
   }
 }
 
-test("with a saved token and no gh, the inbox counts come from GitHub's API", async () => {
+test("with a saved token and no gh, the inbox's pull requests come from GitHub's API", async () => {
   const { inbox, calls } = await inboxWithToken(
     repoOnGitHub("app"),
     inboxApi(),
