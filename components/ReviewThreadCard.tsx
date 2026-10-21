@@ -157,7 +157,9 @@ export function ReviewThreadCard({
 
         {thread.isOutdated && <Badge>outdated</Badge>}
 
-        {thread.isResolved ? (
+        {/* Skip the badge on a review summary: GitHub can't resolve a review
+            body, so it would read "open" forever. */}
+        {thread.isReviewSummary ? null : thread.isResolved ? (
           <Badge tone="merged">
             <CheckIcon size={11} /> resolved
           </Badge>
