@@ -207,17 +207,14 @@ async function changesFrom(
   base: string,
   tip: string,
 ): Promise<InboxChanges | null> {
-  const fork = await git(root, ["merge-base", base, tip]);
-  if (!fork) return null;
   const [count, stat] = await Promise.all([
-    git(root, ["rev-list", "--count", `${fork}..${tip}`]),
+    git(root, ["rev-list", "--count", `${base}..${tip}`]),
     git(root, [
       "diff",
       "--no-ext-diff",
       "--no-textconv",
       "--shortstat",
-      fork,
-      tip,
+      `${base}...${tip}`,
     ]),
   ]);
   if (count === null || stat === null) return null;
