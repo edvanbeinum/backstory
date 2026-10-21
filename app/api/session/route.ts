@@ -144,8 +144,8 @@ export async function GET(request: Request) {
     // submitted rather than being tacked on at the end — which is also where
     // GitHub puts it, above the comments that came with it.
     //
-    // Ordered here rather than in the client so the ‹ › stepper and `j`/`k`
-    // can't disagree about what "next" means.
+    // Ordered here rather than in the client so the 💬 numbers in Files
+    // changed, "Comment i of N" and `j`/`k` can't disagree about the order.
     const threads = [...rawGithub.threads, ...summaryThreads].sort((a, b) =>
       (a.comments[0]?.createdAt ?? "").localeCompare(
         b.comments[0]?.createdAt ?? "",

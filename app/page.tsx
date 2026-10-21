@@ -604,7 +604,10 @@ export default function Page() {
     [session, rev],
   );
 
-  /** Already ordered oldest first server-side, so the stepper and `j`/`k` agree. */
+  /**
+   * Already ordered oldest first server-side, so the 💬 numbers, "Comment i of
+   * N" and `j`/`k` agree.
+   */
   const threads = useMemo(() => session?.github.threads ?? [], [session]);
 
   /**
