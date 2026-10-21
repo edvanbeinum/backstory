@@ -9,16 +9,29 @@ why it works the way it does. For what it does, see
 Each inbox row leads with the branch, because the branch is the identity. Folder
 names go out of date: a worktree's folder can be named after a branch it last
 had checked out two renames ago. So the folder name is shown only when it
-differs from the branch. The unresolved count sits in a fixed right-hand column
-so the counts line up down the page. It is GitHub's own count of threads nobody
-has resolved, and only open pull requests count towards the headline: a merged
-PR's threads often stay unresolved.
+differs from the branch. What the branch changes sits in a fixed right-hand
+column so the counts line up down the page.
 
-This costs **one GitHub call per repository**, not per worktree: a single
-aliased GraphQL query asks for every branch at once. Three repos and twenty-one
-worktrees resolve in about half a second. The PR and counts come from GitHub:
-without GitHub connected, or without a remote, every worktree still appears
-with a note saying the counts are missing.
+A branch has **changed since you last looked** when its tip isn't the one it
+had when you last opened it, and it has at least one commit past its base.
+Opening a branch from the inbox, a `backstory://` link, Open Repo… or the
+address bar records its tip; a background refresh of a branch that's already
+open doesn't, so commits your agent makes while the branch is open still count
+as new. A merged or closed pull request never counts, and nor does the
+repo's own checkout on its default branch, which has no base to compare with.
+The tip is your local branch's: a fetch that only moves `origin/<branch>`
+doesn't count until you update the branch.
+
+The counts are local git: commits, files and lines from where the branch left
+its base. The base is the branch its pull request targets, so a stacked branch
+counts only its own work, or the default branch when it has no pull request.
+Each uses `origin/<base>` when there is one, else the local branch.
+
+Pull requests cost **one GitHub call per repository**, not per worktree: a
+single aliased GraphQL query asks for every branch at once. Three repos and
+twenty-one worktrees resolve in about half a second. Without GitHub connected,
+or without a remote, every worktree still appears, with its counts, and a note
+saying its pull requests are missing.
 
 The same call lists the repo's 50 most recently updated open pull requests and its first 100
 branches by name, for **On GitHub**: the ones this clone has no local branch for, minus

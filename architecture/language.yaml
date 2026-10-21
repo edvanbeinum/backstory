@@ -115,6 +115,13 @@ terms:
     avoid:
       - log in, for this (`gh auth login` is `gh`'s own sign-in)
       - OAuth, in copy
+  - name: inbox
+    means: "The home screen: the changes waiting for you, as every worktree and every branch with a pull request across the repos you've opened, each with its commits, files and lines against its base and when it last changed, the branches changed since you last looked first (`components/Inbox.tsx`, `buildInbox` in `lib/inbox.ts`)."
+  - name: changed since you last looked
+    means: "A branch whose tip isn't the one stored when you last opened it, with at least one commit past its base. Opening a branch, but not a background refresh, stores its tip (`markLooked` in `lib/looked.ts`, `POST /api/looked`). Never a merged or closed pull request, or the repo's own checkout on its default branch."
+    avoid:
+      - unread
+      - reviewed
   - name: On GitHub
     means: "The inbox's fold under each repo listing the open pull requests and branches on GitHub this clone has no local branch for. Opening one fetches it into a local branch and reviews it (`onGitHub` in `lib/inbox.ts`)."
     avoid:
