@@ -95,7 +95,7 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
       </span>
 
       <span className="whitespace-nowrap pl-4 text-right text-[11px] text-[var(--fg-muted)]">
-        {changes && (
+        {changes && changes.commits > 0 && (
           <>
             <span className="mono block text-[12px]">
               <span className="text-[var(--success)]">
