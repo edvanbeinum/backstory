@@ -84,7 +84,7 @@ export function ChangeHeader({
   const options = useMemo(() => changesFor(thread, session), [thread, session]);
 
   /**
-   * Any commit on the branch, so the change picked isn't limited to the three
+   * Any commit on the branch, so the change picked isn't limited to the
    * chips. Reading your own commits before pushing is what Backstory was built
    * for; it just no longer needs a list of its own to do it.
    */

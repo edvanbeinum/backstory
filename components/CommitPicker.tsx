@@ -96,7 +96,7 @@ export function CommitPicker({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
-              // The global j/k/x handler ignores inputs, but stop it here too
+              // The global j/k handler ignores inputs, but stop it here too
               // so typing a subject line can never move the selection.
               event.stopPropagation();
               if (event.key === "Escape") setOpen(false);
