@@ -1,4 +1,4 @@
-import { autoRead } from "./data/cache";
+import { autoRead, providerName } from "./data/cache";
 import { git } from "./exec";
 import {
   isAppCode,
@@ -66,6 +66,8 @@ export interface MapResponse {
   local: boolean;
   /** The hand-written local model's path, to correct it; null otherwise */
   modelFile: string | null;
+  /** The name of the AI provider that drew the head's drafted map */
+  drawnBy?: string;
   /** The view's map read, when the repo has no model of its own */
   draft?: MapDraftStatus;
   /** When the repo has no model of its own: whether maps are read as repos and views open */
@@ -412,6 +414,7 @@ export async function buildMap(
     source: headRead.source,
     local,
     modelFile: headRead.file,
+    ...(headRead.provider && { drawnBy: providerName(headRead.provider) }),
     ...reading,
     nodes,
     edges: [...edges.values()].filter(

@@ -746,12 +746,12 @@ function LocalModel({ map }: { map: MapResponse }) {
 /** A drafted map's footnote: who drew it, whether reads start by themselves, Turn off or Read automatically, and Draw again. */
 function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   const running = map.draft?.status === "running";
-  // Name the provider only from a read that's idle or unavailable: a running
-  // or done read's status doesn't say which provider ran it.
+  // Name who reads again from a read that's idle or unavailable, the provider
+  // set now: a running or done read's status doesn't say which one ran it.
   const provider =
     map.draft?.status === "idle" || map.draft?.status === "unavailable"
       ? map.draft.provider
-      : null;
+      : (map.drawnBy ?? null);
   const parts: React.ReactNode[] = [];
   if (map.auto)
     parts.push(
@@ -777,7 +777,7 @@ function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   return (
     <span className="part inline-flex flex-wrap items-center gap-1.5">
       <Badge tone="draft" className="!py-0 !leading-4">
-        Drawn by {provider ?? "the AI provider"}
+        Drawn by {map.drawnBy ?? "the AI provider"}
       </Badge>
       <span className="text-[11px] text-[var(--fg-subtle)]">
         {parts.map((part, i) => (
