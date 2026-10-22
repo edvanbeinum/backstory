@@ -230,7 +230,7 @@ export function Ticked({ text }: { text: string }) {
   return (
     <span>
       {text.split("`").map((part, i) =>
-        i % 2 ? (
+        !part ? null : i % 2 ? (
           <code key={i} className="ticked">
             {part}
           </code>
