@@ -38,7 +38,7 @@ primitives:
       - repoKey
       - repoKeyOf
       - gitCommonDir
-    use: "The folder name a repo gets under `~/.backstory/flows/`, `data/`, `maps/` and `models/`: the main checkout's folder plus a hash of the common git dir, the same from every worktree and different for two repos with the same folder name."
+    use: "The folder name a repo gets under `~/.backstory/flows/`, `data/`, `maps/`, `descriptions/` and `models/`: the main checkout's folder plus a hash of the common git dir, the same from every worktree and different for two repos with the same folder name."
   - name: a view's commits
     block: git reader
     file: lib/view.ts
@@ -164,6 +164,13 @@ primitives:
       - autoRead
       - setAutoRead
     use: "The AI provider's reading of a data model no reader finds: main read in full once (`startTrunkRead`), then each view's base derived forward from main's model and its head from its base, one small read each, cached by tree under `~/.backstory/data/`, one read at a time. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. The switch is per repo, on by default, shared by every worktree, and covers drafted maps too. Told which files have the model when `data.files` is set. `buildData` falls back to it."
+  - name: describe a change
+    block: change description
+    file: lib/description/cache.ts
+    symbols:
+      - descriptionStatus
+      - startDescription
+    use: "The AI provider's change description for a view: what it does, why, and at most two places to look first, read from the view's patch (cut past the drafted reads' cap, with a `--stat`), commit messages, PR and the names of the components and entities it touches, through `withSnapshot`. Cached by base and head trees under `~/.backstory/descriptions/`, one read at a time. The schema and the prompt's writing rules are in `lib/description/prompt.ts`, so a read that adds to the description changes that one file."
   - name: route errors
     file: lib/api.ts
     symbols:

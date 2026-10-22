@@ -14,6 +14,7 @@ import { test } from "node:test";
 import * as fetchRoute from "../app/api/fetch/route";
 import * as ai from "../app/api/ai/route";
 import * as data from "../app/api/data/route";
+import * as description from "../app/api/description/route";
 import * as githubLogin from "../app/api/github/login/route";
 import * as looked from "../app/api/looked/route";
 import * as map from "../app/api/map/route";
@@ -204,6 +205,12 @@ test("a cross-site request to a route that writes is refused and writes nothing"
       map.POST(send(at("map", `repo=${repo}&rev=HEAD`), "POST", EVIL)),
     ],
     [
+      "description read",
+      description.POST(
+        send(at("description", `repo=${repo}&rev=HEAD`), "POST", EVIL),
+      ),
+    ],
+    [
       "data auto on",
       data.POST(send(at("data", `repo=${repo}&auto=1`), "POST", EVIL)),
     ],
@@ -280,6 +287,13 @@ test("auto=0 turns reading off for that repo and its worktrees only, and auto=1 
 
   const bare = await data.POST(send(at("data", "auto=0"), "POST", {}));
   assert.equal(bare.status, 400);
+});
+
+test("GET /api/description wants both a repo and a rev", async () => {
+  const get = (query: string) =>
+    description.GET(send(at("description", query), "GET", {}));
+  assert.equal((await get(`repo=${encodeURIComponent(REPO)}`)).status, 400);
+  assert.equal((await get("rev=HEAD")).status, 400);
 });
 
 test("POST /api/looked stores the tip the page showed, else the branch's tip, and wants both a repo and a branch", async () => {

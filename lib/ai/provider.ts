@@ -2,7 +2,8 @@ import { claudeCode } from "./claude";
 
 /**
  * The one place Backstory picks the tool it asks to read code: flows, the
- * map's draft and the drafted data model all run through `aiProvider()`.
+ * map's draft, the drafted data model and the change description all run
+ * through `aiProvider()`.
  * A provider must be an agent that reads a directory itself, not a chat API;
  * one that can't would need a read-only tool loop of Backstory's own.
  */
