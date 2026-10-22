@@ -100,8 +100,8 @@ footer says so.
 
 ## The map, flows and the data model
 
-At the top of Story, Claude Code describes the change in three parts: **What it
-does**, **Why**, and **Where to look first**. It reads the patch, the commit
+At the top of Story, Claude Code describes the change in three parts: **Why**,
+**What it does**, and **Where to look first**. It reads the patch, the commit
 messages and the pull request, and writes **Why** only when the commits or the
 pull request say why. Click a place to look first that is on the map to outline
 it there. Opening a commit or the whole branch describes it, unless you turned

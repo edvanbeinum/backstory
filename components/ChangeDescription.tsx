@@ -130,10 +130,6 @@ function Parts({
 }) {
   return (
     <dl className="grid gap-x-6 gap-y-3 text-[14px] leading-6 sm:grid-cols-[max-content_1fr]">
-      <dt className={`${LABEL} sm:pt-0.5`}>What it does</dt>
-      <dd className="m-0">
-        <Ticked text={description.what} />
-      </dd>
       {description.why && (
         <>
           <dt className={`${LABEL} sm:pt-0.5`}>Why</dt>
@@ -142,6 +138,10 @@ function Parts({
           </dd>
         </>
       )}
+      <dt className={`${LABEL} sm:pt-0.5`}>What it does</dt>
+      <dd className="m-0">
+        <Ticked text={description.what} />
+      </dd>
       {description.lookFirst.length > 0 && (
         <>
           <dt className={`${LABEL} sm:pt-0.5`}>Where to look first</dt>
@@ -177,7 +177,8 @@ function Parts({
 }
 
 /**
- * What the change does, why, and where to look first, at the top of Story.
+ * Why the change was made, what it does, and where to look first, at the top
+ * of Story.
  * Read by the AI provider as the view opens when the repo reads
  * automatically, or on a click.
  */
