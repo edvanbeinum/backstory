@@ -14,6 +14,7 @@ import { git, gitLine } from "../exec";
 import { withSnapshot } from "../flows/generate";
 import { getRangePatch, repoKey } from "../git";
 import { buildMap } from "../map";
+import { mapReadSettled, startMapRead } from "../models/cache";
 import { homeDir } from "../store";
 import {
   descriptionPrompt,
@@ -187,10 +188,21 @@ async function messagesFor(view: DescriptionView) {
 }
 
 /**
- * The names the prompt offers: the components and entities the change
- * touches. Read from whatever map and data model are saved, so a map read
- * still going doesn't hold the description up.
+ * Waits for this view's map read, so the names offered come from this
+ * commit's map rather than none while it's still being drawn. Starts the read
+ * when the repo reads automatically, since the page may ask for the
+ * description before it asks for the map.
  */
+async function mapReady(
+  view: DescriptionView,
+  opts: { runner?: Runner; status?: () => Promise<ProviderStatus> },
+) {
+  if (await autoRead(view.root))
+    await startMapRead(view, opts).catch(() => null);
+  await mapReadSettled(view);
+}
+
+/** The names the prompt offers: the components and entities the change touches. */
 async function namesFor(view: DescriptionView) {
   const [map, data] = await Promise.all([
     buildMap(view.root, view.base, view.head).catch(() => null),
@@ -301,6 +313,7 @@ export async function startDescription(
   const runner = opts.runner ?? provider.run;
   enqueue(async () => {
     try {
+      await mapReady(view, { runner: opts.runner, status: opts.status });
       const inputs = await gather(view, opts.pr ?? (async () => null));
       const read = await withSnapshot(view.root, view.head, (dir) =>
         runner<DescriptionOutput>(

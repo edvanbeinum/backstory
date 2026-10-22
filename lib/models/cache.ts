@@ -257,7 +257,7 @@ export async function mapStatus(
   return ended ?? idle;
 }
 
-/** The current read's end, for tests: nothing waits on a read otherwise. */
+/** The end of the view's current read, if one is running: the change description waits on it, as tests do. */
 export async function mapReadSettled(view: MapView): Promise<void> {
   await registry.jobs.get((await filesFor(view)).key)?.settled;
 }

@@ -32,6 +32,7 @@ import { buildMap } from "../lib/map";
 import { MAX_PATCH_BYTES } from "../lib/data/drafted";
 import { repoKey } from "../lib/git";
 import { serializeModel } from "../lib/models/dsl";
+import type { MapDelta } from "../lib/models/delta";
 import type { DraftOutput } from "../lib/models/prompts";
 import { homeDir } from "../lib/store";
 
@@ -86,8 +87,11 @@ const SHOP: DraftOutput = {
   ignore: ["**/*.md", "**/*.txt"],
 };
 
-/** A repo that commits the shop's map, with one change to Sync Engine on top. */
-function shopRepo() {
+/**
+ * A repo that commits the shop's map, or with `drafted` has none for Backstory
+ * to draw, with one change to Sync Engine on top.
+ */
+function shopRepo({ drafted = false } = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), "backstory-descriptions-"));
   dirs.push(root);
   const git = (...a: string[]) =>
@@ -107,7 +111,9 @@ function shopRepo() {
   };
   const base = commit(
     {
-      "architecture/workspace.dsl": serializeModel(SHOP),
+      ...(drafted
+        ? {}
+        : { "architecture/workspace.dsl": serializeModel(SHOP) }),
       "src/app/checkout.ts": "export const checkout = 1;\n",
       "src/sync/engine.ts": "export const retries = 0;\n",
     },
@@ -188,6 +194,37 @@ test("a view's description is read once from its patch, commits, PR and componen
   await read(repo.view, { runner: ai.runner, pr: PR });
   assert.equal(ai.prompts.length, 1);
   assert.deepEqual(await descriptionStatus(repo.view), done);
+});
+
+test("in a repo with a drafted map, the description waits for the view's map read and names its components", async () => {
+  const repo = shopRepo({ drafted: true });
+  const ai = recorder();
+  const reads: string[] = [];
+  const runner: Runner = async <T>(
+    prompt: string,
+    schema: object,
+    cwd: string,
+  ) => {
+    if (prompt.startsWith("You are describing"))
+      return ai.runner<T>(prompt, schema, cwd);
+    const drafted = prompt.includes("The patch:")
+      ? ({
+          changed: [],
+          absent: [],
+          arrows: [],
+          absentArrows: [],
+          tests: null,
+          ignore: null,
+        } satisfies MapDelta)
+      : SHOP;
+    reads.push(prompt.includes("The patch:") ? "delta" : "full");
+    return { output: structuredClone(drafted) as T, costUsd: 0.1, model: "m" };
+  };
+  await read(repo.view, { runner });
+
+  assert.ok(reads.length > 0);
+  assert.equal(ai.prompts.length, 1);
+  assert.match(ai.prompts[0], /^- Sync Engine$/m);
 });
 
 test("the prompt states every writing rule, with two good and two bad examples", async () => {
