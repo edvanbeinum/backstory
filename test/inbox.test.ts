@@ -269,10 +269,6 @@ test("a branch reads as changed until you look at it, and again after a new comm
 
   markLooked(repo.commonDir, "one", tip, 5);
   assert.deepEqual(await changed(), { main: false, one: false, two: true });
-  const seen = (await buildInbox([repo.root])).rows.find(
-    (r) => r.branch === "one",
-  );
-  assert.equal(seen?.lookedAt, 5);
 
   repo.commit(one, { "one.txt": "1\n1\n" });
   assert.deepEqual(await changed(), { main: false, one: true, two: true });

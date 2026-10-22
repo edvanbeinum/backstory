@@ -76,8 +76,6 @@ export interface InboxRow {
    * Never for an archived row or one with nothing to count.
    */
   changed: boolean;
-  /** When you last opened it, or null. */
-  lookedAt: number | null;
 }
 
 /** A branch on GitHub this clone has no local branch for. */
@@ -581,7 +579,6 @@ async function buildRepo(
       archived: pr !== null && (pr.state === "MERGED" || pr.state === "CLOSED"),
       changes: null,
       changed: false,
-      lookedAt: branch ? (looked.get(branch)?.at ?? null) : null,
     };
   };
 
