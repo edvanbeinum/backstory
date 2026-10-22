@@ -165,8 +165,11 @@ async function patchFor(view: DescriptionView) {
     from,
     view.head,
   ]);
+  // Cut at the last line end before the cap, so the provider never sees half
+  // a line or a split UTF-8 character.
+  const end = bytes.lastIndexOf(0x0a, MAX_PATCH_BYTES - 1) + 1;
   return {
-    patch: bytes.subarray(0, MAX_PATCH_BYTES).toString("utf8"),
+    patch: bytes.subarray(0, end || MAX_PATCH_BYTES).toString("utf8"),
     stat: stat.trimEnd(),
   };
 }

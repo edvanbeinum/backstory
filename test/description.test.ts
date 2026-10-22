@@ -416,3 +416,18 @@ test("a patch past the cap is cut, with a summary of every file, and the prompt 
   assert.match(prompt, /src\/sync\/queue\.ts\s+\|/);
   assert.ok(Buffer.byteLength(prompt) < MAX_PATCH_BYTES + 20_000);
 });
+
+test("a patch past the cap is cut at a line end, never inside a character", async () => {
+  const repo = shopRepo();
+  const head = repo.commit(
+    { "prices.txt": `${"€".repeat(100)}\n`.repeat(2000) },
+    "Add prices",
+  );
+  const ai = recorder();
+  await read({ root: repo.root, base: repo.head, head }, { runner: ai.runner });
+
+  const prompt = ai.prompts[0];
+  assert.match(prompt, /The patch is too large to send whole/);
+  assert.ok(!prompt.includes("�"));
+  assert.ok(prompt.endsWith(`+${"€".repeat(100)}\n`));
+});
