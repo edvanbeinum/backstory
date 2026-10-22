@@ -223,6 +223,24 @@ test("with no why given, the description has none, and nothing is filled in", as
   assert.equal(toDescription({ ...ANSWER, why: "  " }).why, null);
 });
 
+test("where to look first names are trimmed and each kept once", () => {
+  assert.deepEqual(
+    toDescription({
+      ...ANSWER,
+      lookFirst: [
+        { name: "Sync Engine ", reason: "The retry count." },
+        { name: "Sync Engine", reason: "Again." },
+        { name: " ", reason: "Blank." },
+        { name: "Order", reason: "An entity." },
+      ],
+    }).lookFirst,
+    [
+      { name: "Sync Engine", reason: "The retry count." },
+      { name: "Order", reason: "An entity." },
+    ],
+  );
+});
+
 test("where to look first is matched to the map's names exactly, and a name not on it stays as text", async () => {
   const repo = shopRepo();
   await read(repo.view, {

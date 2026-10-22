@@ -220,20 +220,16 @@ async function gather(view: DescriptionView, pr: () => Promise<PrText>) {
   return inputs;
 }
 
-/** The answer, tidied: a blank why is none, and lookFirst is cut to its limit. */
+/** The answer, tidied: a blank why is none, and lookFirst is cut to its limit with each name once. */
 export function toDescription(output: DescriptionOutput): ChangeDescription {
   const why = output.why?.trim();
-  return {
-    what: output.what.trim(),
-    why: why ? why : null,
-    lookFirst: output.lookFirst
-      .filter((l) => l.name.trim())
-      .slice(0, LOOK_FIRST_MAX)
-      .map((l) => ({
-        name: l.name,
-        reason: l.reason.trim(),
-      })),
-  };
+  const lookFirst = output.lookFirst
+    .map((l) => ({ name: l.name.trim(), reason: l.reason.trim() }))
+    .filter(
+      (l, i, all) => l.name && all.findIndex((o) => o.name === l.name) === i,
+    )
+    .slice(0, LOOK_FIRST_MAX);
+  return { what: output.what.trim(), why: why ? why : null, lookFirst };
 }
 
 function enqueue(fn: () => Promise<void>) {
