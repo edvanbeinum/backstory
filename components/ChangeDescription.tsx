@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { WORKING_REV } from "@/lib/constants";
 import type { MapResponse } from "@/lib/map";
 import { viewKey, viewParams } from "@/lib/url";
 import {
@@ -76,9 +77,10 @@ export function useDescription(
     [repo, ref, rev],
   );
 
+  // Ask for none on uncommitted work, which Story shows no description for.
   useEffect(() => {
-    void request("GET");
-  }, [request]);
+    if (rev !== WORKING_REV) void request("GET");
+  }, [request, rev]);
 
   const shown = answer?.view === view ? answer : null;
   const status = shown?.status ?? null;
