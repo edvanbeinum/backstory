@@ -19,6 +19,10 @@ import { Badge, Button, Spinner } from "./ui";
  */
 function useDescription(repo: string, rev: string, gitRef: string | null) {
   const view = `${repo}\n${rev}\n${gitRef ?? ""}`;
+  const current = useRef(view);
+  useEffect(() => {
+    current.current = view;
+  }, [view]);
   const [answer, setAnswer] = useState<{
     view: string;
     status: DescriptionResponse | null;
@@ -38,6 +42,9 @@ function useDescription(repo: string, rev: string, gitRef: string | null) {
         });
         const body = (await response.json()) as
           DescriptionResponse | { error?: string };
+        // Drop an answer for a view the page has left, so it can't replace
+        // the answer for the view on screen.
+        if (current.current !== asked) return;
         if (!response.ok || !("status" in body))
           setAnswer((last) => ({
             view: asked,
@@ -46,6 +53,7 @@ function useDescription(repo: string, rev: string, gitRef: string | null) {
           }));
         else setAnswer({ view: asked, status: body, error: null });
       } catch (err) {
+        if (current.current !== asked) return;
         setAnswer((last) => ({
           view: asked,
           status: last?.view === asked ? last.status : null,
