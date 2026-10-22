@@ -192,7 +192,7 @@ primitives:
       - writeUrlState
       - viewParams
       - viewKey
-    use: "Builds and writes the page state into the URL, so a view can be shared. `viewParams` builds every view request's query, with `ref` when the repo is open on a branch it hasn't checked out, and `viewKey` names a view from that query for state kept with it."
+    use: "Builds and writes the page state into the URL, so a view can be shared, with `stop=` for the stop Story's walk is on and `walk=0` for Story on one page. `viewParams` builds every view request's query, with `ref` when the repo is open on a branch it hasn't checked out, and `viewKey` names a view from that query for state kept with it."
   - name: the open view
     block: UI tabs
     file: components/ViewContext.tsx

@@ -8,6 +8,7 @@ import {
   parseUrlState,
   resolveComment,
   resolveRev,
+  resolveStop,
   resolveTab,
   viewKey,
   viewParams,
@@ -137,6 +138,31 @@ test("Set Up Backstory's address round-trips, and other links leave it out", () 
   assert.equal(buildUrl({ setup: true }), "/?setup=1");
   assert.deepEqual(parseUrlState("?setup=1"), { ...EMPTY, setup: true });
   assert.doesNotMatch(buildUrl({ repo: "/r", setup: false }), /setup/);
+});
+
+test("the walk's stop and walk=0 round-trip, and the first stop is left out", () => {
+  const third = buildUrl({ repo: "/r", rev: "abc", stop: 3 });
+  assert.equal(third, "/?repo=/r&rev=abc&stop=3");
+  assert.equal(parseUrlState(new URL(third, "http://x").search).stop, 3);
+
+  assert.equal(
+    buildUrl({ repo: "/r", rev: "abc", stop: 1 }),
+    "/?repo=/r&rev=abc",
+  );
+  assert.equal(parseUrlState("?repo=/r&stop=1").stop, undefined);
+  assert.equal(parseUrlState("?repo=/r&stop=two").stop, undefined);
+
+  const page = buildUrl({ repo: "/r", rev: "abc", stop: 3, walk: false });
+  assert.equal(page, "/?repo=/r&rev=abc&walk=0");
+  assert.equal(parseUrlState(new URL(page, "http://x").search).walk, false);
+  assert.equal(parseUrlState("?repo=/r").walk, undefined);
+});
+
+test("a stop past the end opens on the last stop", () => {
+  assert.equal(resolveStop(3, 6), 2);
+  assert.equal(resolveStop(9, 6), 5);
+  assert.equal(resolveStop(undefined, 6), 0);
+  assert.equal(resolveStop(4, 0), 0);
 });
 
 test("every view opens on Story", () => {
