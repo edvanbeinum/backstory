@@ -790,6 +790,44 @@ function DraftFootnote({
   );
 }
 
+/** The changed entities as cards, as Show data opens them, for Story's walk. */
+export function DataCards({
+  data,
+  notes,
+}: {
+  data: DataResponse;
+  notes?: Map<string, string[]>;
+}) {
+  const shown = useMemo(() => present(data.entities), [data]);
+  const boxRef = useRef<HTMLDivElement>(null);
+  const [width, setWidth] = useState(0);
+  useEffect(() => {
+    const el = boxRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setWidth(entry.contentRect.width),
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+  return (
+    <div ref={boxRef}>
+      <p className="mb-2 text-[13px]">{summary(shown)}</p>
+      <div className="map-card">
+        {width > 0 && (
+          <DataGraph shown={shown} width={width - 2} notes={notes} />
+        )}
+      </div>
+      <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
+        {data.drafted
+          ? `Read by ${data.drafted.provider} from the code. It may be wrong.`
+          : `From ${data.label}, at the base and the head.`}{" "}
+        Click an entity for its fields.
+      </p>
+    </div>
+  );
+}
+
 /**
  * The data model's part of the line under the map. Its parts sit in the
  * line's wrapping row; the graph opens on a row of its own beneath it,
@@ -801,6 +839,7 @@ export function DataSummary({
   repo,
   rev,
   onRead,
+  phraseOnly = false,
 }: {
   data: DataResponse | null;
   notes?: Map<string, string[]>;
@@ -808,6 +847,8 @@ export function DataSummary({
   rev: string;
   /** A drafted data model was read: read the data again */
   onRead: () => void;
+  /** Never opens the cards: Story's walk shows them on a stop of their own */
+  phraseOnly?: boolean;
 }) {
   const draft = useDataDraft(repo, rev, given, onRead);
   const data = draft.data;
@@ -818,7 +859,8 @@ export function DataSummary({
   const { ref } = useView();
   const view = viewKey({ repo, ref, rev });
   const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
-  const open = toggled?.view === view ? toggled.open : changed.length > 0;
+  const open =
+    !phraseOnly && (toggled?.view === view ? toggled.open : changed.length > 0);
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -863,16 +905,20 @@ export function DataSummary({
         <b>Data</b>
         {data.drafted && <DraftedBadge />}
         <span>{whole ? noChange : summary(shown)}</span>
-        <button
-          type="button"
-          className="story-disclose"
-          aria-expanded={open}
-          onClick={() => setToggled({ view, open: !open })}
-        >
-          {open ? "Hide data" : "Show data"}
-          <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
-        </button>
-        {whole && !open && <DraftFootnote data={data} draft={draft} />}
+        {!phraseOnly && (
+          <button
+            type="button"
+            className="story-disclose"
+            aria-expanded={open}
+            onClick={() => setToggled({ view, open: !open })}
+          >
+            {open ? "Hide data" : "Show data"}
+            <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
+          </button>
+        )}
+        {(whole || (phraseOnly && data.drafted)) && !open && (
+          <DraftFootnote data={data} draft={draft} />
+        )}
       </span>
       {open && (
         <div ref={boxRef} className="basis-full pt-1">

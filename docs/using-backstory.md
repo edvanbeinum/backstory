@@ -71,11 +71,14 @@ your uncommitted work, or any one commit on it. It opens on your uncommitted
 work when there is some, and on the whole branch otherwise. Under the header are
 three tabs, as on a pull request, and every change opens on the first:
 
-- **Story** opens with a few sentences on the change, then shows the map at full
-  width, a line under it saying what it shows, then each flow as a card. Before a change is traced, one card in place of the
+- **Story** walks you through the change one part at a time, with the map
+  pinned above it (see [Walking through a change](#walking-through-a-change)).
+  **Show everything on one page** shows it all at once instead: a few sentences
+  on the change, the map at full width, a line under it saying what it shows,
+  then each flow as a card. Before a change is traced, one card in place of the
   flows offers **Trace this change**. Click a step to open its code under it;
   click it again or press `Esc` to close it, and **Show in Files changed** opens
-  the diff at the same lines.
+  the diff at the same lines. **Walk me through it** goes back to the walk.
 - **Files changed** is the diff.
 - **Comments** lists the pull request's review comments, when it has any.
 
@@ -89,6 +92,29 @@ filters above the files show only the hunks to read yourself, or the files on
 one flow; **read these yourself** beside the flows on Story opens the first.
 Marks in the gutter beside a line open what is there: `⇄ 1·7` opens flow 1, step
 7 in the story, and `💬 2` opens review comment 2 in Comments.
+
+### Walking through a change
+
+Story opens on the change's overview, then takes you through it in order:
+
+1. **Overview**: the change's description. Its places to look first go to their
+   part of the walk.
+2. **Data model**, when the change touches it: the changed entities as cards.
+3. **Each changed component**, in the map's order, top to bottom and left to
+   right: what the change does in it, the flow steps its files are on as
+   `⇄ 1·3` chips, and its files with their diffs. Leave line notes on them as
+   in Files changed, or **+ Note for the agent** for a note on the component as
+   a whole, which starts "On" and its name.
+4. **Not on the map**: the files no component has, such as tests.
+5. **Your notes**: says you've seen the whole change, or names the files you
+   haven't seen yet, then lists your notes with **Send**.
+
+The bar at the top says where you are, as "3 of 6 · Sync Engine", with a dot
+for each part and how many of the change's files you've seen. `j` and `k`, or
+**‹** and **›**, move between the parts, and clicking a changed component on
+the map goes to its part. The map outlines the component you're on and its
+arrows. A flow step's chip, or a link from Files changed or Comments to a step,
+opens it on **Show everything on one page**.
 
 **View file** — every file header has a _View file_ toggle that swaps the hunks
 for the entire file at that commit, change still highlighted in place, for when
@@ -325,15 +351,20 @@ with **open in the story**. On the Comments tab `j`/`k` move between comments.
 
 ## Shareable URLs
 
-The repo, the selected commit and the open tab live in the address bar, so a
-view can be bookmarked, reopened after a restart, or pasted to another machine
-with the same checkout. A copy button in the header copies the current one.
+The repo, the selected commit, the open tab and where you are in Story's walk
+live in the address bar, so a view can be bookmarked, reopened after a restart,
+or pasted to another machine with the same checkout. A copy button in the
+header copies the current one.
 
 ```text
 /?repo=/Users/you/code/your-repo
 /?repo=/Users/you/code/your-repo&rev=1e61946e49974e250cf688eda4c158132e12be83
 /?repo=/Users/you/code/your-repo&rev=1e61946&tab=files
+/?repo=/Users/you/code/your-repo&rev=1e61946&stop=3
 ```
+
+`stop=3` opens Story's walk on its third part, and `walk=0` opens Story with
+everything on one page.
 
 `rev` is optional and accepts a short sha, which is normalised to the full one.
 If a URL points at a commit that's since been pushed, Backstory falls back to

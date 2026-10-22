@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChangeHeader } from "@/components/ChangeHeader";
 import { ClaudeCodeGate } from "@/components/ClaudeCodeGate";
 import { Comments } from "@/components/Comments";
+import { DiffView } from "@/components/DiffView";
 import { FeedbackBar } from "@/components/FeedbackBar";
 import { FilesChanged, type FilesJump } from "@/components/FilesChanged";
 import type { StoryTarget } from "@/components/FlowCard";
@@ -16,6 +17,7 @@ import {
 } from "@/components/FlowSequence";
 import { Story } from "@/components/Story";
 import { Tabs } from "@/components/Tabs";
+import { draftNote } from "@/lib/feedback";
 import { findings as designQuestions } from "@/lib/findings";
 import type { DataResponse } from "@/lib/data/types";
 import type { MapResponse } from "@/lib/map";
@@ -170,6 +172,13 @@ export default function Page() {
     null,
   );
   const [tab, setTab] = useState<Tab>("story");
+  /** Story walks through the change; false shows it all on one page. */
+  const [walk, setWalk] = useState(true);
+  /** The stop Story's walk is on, from 1, as the URL names it. */
+  const [stop, setStop] = useState(1);
+  const walkNavRef = useRef<((delta: number) => boolean) | null>(null);
+  /** The walk's finish is on screen, showing the notes in place of the pinned bar. */
+  const [storyAtFinish, setStoryAtFinish] = useState(false);
   /** Bumped by watcher events; retriggers the working-tree diff fetch. */
   const [workingTick, setWorkingTick] = useState(0);
   /**
@@ -246,6 +255,8 @@ export default function Page() {
     setSetup(Boolean(fromUrl.setup));
     if (fromUrl.rev) setRev(fromUrl.rev);
     setTab(resolveTab(fromUrl));
+    setWalk(fromUrl.walk ?? true);
+    setStop(fromUrl.stop ?? 1);
     if (fromUrl.comment) {
       setCommentId(fromUrl.comment);
       setFocusAsk({ id: fromUrl.comment, at: Date.now() });
@@ -354,11 +365,12 @@ export default function Page() {
         comment: commentId,
         tab: inWorkspace ? tab : undefined,
         setup: setup && !inWorkspace,
+        ...(inWorkspace && { walk, stop }),
       },
       { push: inWorkspace !== wasInWorkspace.current },
     );
     wasInWorkspace.current = inWorkspace;
-  }, [ready, repoPath, ref, rev, commentId, tab, setup]);
+  }, [ready, repoPath, ref, rev, commentId, tab, setup, walk, stop]);
 
   // Someone navigating with the back/forward buttons, or editing the URL by
   // hand, should land on the view they asked for.
@@ -371,6 +383,8 @@ export default function Page() {
       setCommentId(fromUrl.comment);
       setTab(resolveTab(fromUrl));
       setSetup(Boolean(fromUrl.setup));
+      setWalk(fromUrl.walk ?? true);
+      setStop(fromUrl.stop ?? 1);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -738,8 +752,11 @@ export default function Page() {
     setTab("files");
   }, []);
 
+  // A step opens in Story on one page, where the flows are, so every link
+  // into a step works the same from the walk.
   const openStep = useCallback((mark: Pick<StepMark, "flow" | "row">) => {
     setStoryTarget({ flow: mark.flow, row: mark.row, at: Date.now() });
+    setWalk(false);
     setTab("story");
   }, []);
 
@@ -878,6 +895,8 @@ export default function Page() {
     setCommentId(null);
     setRev(WORKING_REV);
     setTab("story");
+    setWalk(true);
+    setStop(1);
   }, []);
 
   /**
@@ -895,6 +914,7 @@ export default function Page() {
     setRepoPath(trimmed);
     setSetup(false);
     setTab("story");
+    setStop(1);
   }, []);
 
   /** A change picked above the tabs: it opens on Story, as every view does. */
@@ -911,6 +931,7 @@ export default function Page() {
       }
       setRev(next);
       setTab("story");
+      setStop(1);
     },
     [session],
   );
@@ -974,9 +995,14 @@ export default function Page() {
         return;
       }
 
-      // On Story, j/k walk the steps of the topmost open flow; with none to
-      // walk, they move changes as Files changed does.
-      if (tab === "story" && flowNavRef.current?.(event.key === "j" ? 1 : -1)) {
+      // On Story, j/k move between the walk's stops, or on one page walk the
+      // steps of the topmost open flow; with none to walk, they move changes
+      // as Files changed does.
+      const delta = event.key === "j" ? 1 : -1;
+      if (
+        tab === "story" &&
+        (walkNavRef.current?.(delta) || flowNavRef.current?.(delta))
+      ) {
         event.preventDefault();
         return;
       }
@@ -996,6 +1022,7 @@ export default function Page() {
 
       event.preventDefault();
       setRev(order[next]);
+      setStop(1);
       window.scrollTo({ top: 0 });
     };
 
@@ -1107,103 +1134,155 @@ export default function Page() {
                   />
 
                   <WithReview root={session.repo.root} tick={reviewTick}>
-                    {({ notes, review, outbox }) => (
-                      <>
-                        {visited.has("story") && (
-                          <div hidden={tab !== "story"}>
-                            <Story
-                              repo={shown.repo}
-                              rev={rev}
-                              map={map}
-                              data={dataModel}
-                              entityNotes={entityNotes}
-                              onModelChange={onModelChange}
-                              mapHighlight={mapHighlight}
-                              onShowOnMap={showOnMap}
-                              onOpenFile={openFile}
-                              flows={flows}
-                              diff={diffIsCurrent ? diff : null}
-                              onShowFiles={() => setTab("files")}
-                              onShowYourself={showYourself}
-                              target={storyTarget}
-                              onTargetDone={clearStoryTarget}
-                              onShowInFiles={showInFiles}
-                              navRef={flowNavRef}
-                              components={componentInfo}
-                              dataFields={dataFields}
-                              flowNotes={flowNotes}
-                              badges={badges}
-                              onBadge={selectComment}
-                            />
-                          </div>
-                        )}
-                        {visited.has("files") && (
-                          <div hidden={tab !== "files"}>
-                            <FilesChanged
-                              view={viewId}
-                              diff={diff}
-                              loading={diffLoading}
-                              error={diffError}
-                              threads={threads}
-                              repo={session.repo}
-                              commit={commitForRev}
-                              focusedThreadId={focusedThreadId}
-                              notes={noteRev ? notes : null}
-                              noteRev={noteRev}
-                              map={map}
-                              flowSet={diffIsCurrent ? flowSet : null}
-                              marks={diffIsCurrent ? marks : null}
-                              jump={filesJump}
-                              onJumped={clearFilesJump}
-                              filterAsk={filesFilter}
-                              onShowOnMap={showOnMap}
-                              commentNumbers={commentNumbers}
-                              onStep={openStep}
-                              onComment={selectComment}
-                            />
-                          </div>
-                        )}
-                        {hasComments && visited.has("comments") && (
-                          <div hidden={tab !== "comments"}>
-                            <Comments
-                              threads={threads}
-                              focusedId={commentId}
-                              focusAsk={focusAsk}
-                              onFocus={(id) => {
-                                setCommentId(id);
-                                setFocusedThreadId(id);
-                              }}
-                              fileComponents={map?.fileComponents ?? null}
-                              threadSteps={threadSteps}
-                              onOpenStep={(at) =>
-                                openStep({ flow: at.flow - 1, row: at.row.key })
-                              }
-                              pr={session.github.pr}
-                            />
-                          </div>
-                        )}
+                    {({ notes, review, outbox }) => {
+                      const feedback = (
+                        <FeedbackBar
+                          notes={notes}
+                          noteRev={noteRev}
+                          diff={noteRev ? diff : null}
+                          session={session}
+                          review={review}
+                          outbox={outbox}
+                          onOpenNote={openNote}
+                        />
+                      );
+                      return (
+                        <>
+                          {visited.has("story") && (
+                            <div hidden={tab !== "story"}>
+                              <Story
+                                repo={shown.repo}
+                                rev={rev}
+                                map={map}
+                                data={dataModel}
+                                entityNotes={entityNotes}
+                                onModelChange={onModelChange}
+                                mapHighlight={mapHighlight}
+                                onShowOnMap={showOnMap}
+                                onOpenFile={openFile}
+                                flows={flows}
+                                diff={diffIsCurrent ? diff : null}
+                                onShowFiles={() => setTab("files")}
+                                onShowYourself={showYourself}
+                                target={storyTarget}
+                                onTargetDone={clearStoryTarget}
+                                onShowInFiles={showInFiles}
+                                navRef={flowNavRef}
+                                components={componentInfo}
+                                dataFields={dataFields}
+                                flowNotes={flowNotes}
+                                badges={badges}
+                                onBadge={selectComment}
+                                walk={walk}
+                                stop={stop}
+                                onStop={setStop}
+                                onWalk={setWalk}
+                                walkNavRef={walkNavRef}
+                                renderFiles={(files) => (
+                                  <DiffView
+                                    diff={diffIsCurrent ? diff : null}
+                                    loading={false}
+                                    error={null}
+                                    threads={threads}
+                                    repo={session.repo}
+                                    commit={commitForRev}
+                                    focusedThreadId={focusedThreadId}
+                                    notes={noteRev ? notes : null}
+                                    noteRev={noteRev}
+                                    marks={diffIsCurrent ? marks : null}
+                                    fileComponents={map?.fileComponents ?? null}
+                                    sections={[{ key: "stop", files }]}
+                                    commentNumbers={commentNumbers}
+                                    onStep={openStep}
+                                    onComment={selectComment}
+                                  />
+                                )}
+                                onNote={
+                                  noteRev
+                                    ? (body) =>
+                                        notes.save(
+                                          draftNote({
+                                            rev: noteRev,
+                                            path: null,
+                                            side: "new",
+                                            line: null,
+                                            quote: null,
+                                            body,
+                                          }),
+                                        )
+                                    : null
+                                }
+                                onStep={openStep}
+                                notesBar={feedback}
+                                onAtFinish={setStoryAtFinish}
+                              />
+                            </div>
+                          )}
+                          {visited.has("files") && (
+                            <div hidden={tab !== "files"}>
+                              <FilesChanged
+                                view={viewId}
+                                diff={diff}
+                                loading={diffLoading}
+                                error={diffError}
+                                threads={threads}
+                                repo={session.repo}
+                                commit={commitForRev}
+                                focusedThreadId={focusedThreadId}
+                                notes={noteRev ? notes : null}
+                                noteRev={noteRev}
+                                map={map}
+                                flowSet={diffIsCurrent ? flowSet : null}
+                                marks={diffIsCurrent ? marks : null}
+                                jump={filesJump}
+                                onJumped={clearFilesJump}
+                                filterAsk={filesFilter}
+                                onShowOnMap={showOnMap}
+                                commentNumbers={commentNumbers}
+                                onStep={openStep}
+                                onComment={selectComment}
+                              />
+                            </div>
+                          )}
+                          {hasComments && visited.has("comments") && (
+                            <div hidden={tab !== "comments"}>
+                              <Comments
+                                threads={threads}
+                                focusedId={commentId}
+                                focusAsk={focusAsk}
+                                onFocus={(id) => {
+                                  setCommentId(id);
+                                  setFocusedThreadId(id);
+                                }}
+                                fileComponents={map?.fileComponents ?? null}
+                                threadSteps={threadSteps}
+                                onOpenStep={(at) =>
+                                  openStep({
+                                    flow: at.flow - 1,
+                                    row: at.row.key,
+                                  })
+                                }
+                                pr={session.github.pr}
+                              />
+                            </div>
+                          )}
 
-                        {/* Pinned to the bottom of the window on every tab: an
+                          {/* Pinned to the bottom of the window on every tab: an
                         agent waiting on review must never be invisible, and
-                        notes written in Files changed are sent from anywhere. */}
-                        {(noteRev ||
-                          notes.notes.length > 0 ||
-                          review.waiting ||
-                          review.error) && (
-                          <div className="sticky bottom-4 z-20">
-                            <FeedbackBar
-                              notes={notes}
-                              noteRev={noteRev}
-                              diff={noteRev ? diff : null}
-                              session={session}
-                              review={review}
-                              outbox={outbox}
-                              onOpenNote={openNote}
-                            />
-                          </div>
-                        )}
-                      </>
-                    )}
+                        notes written in Files changed are sent from anywhere.
+                        The walk's finish shows it in its place. */}
+                          {(noteRev ||
+                            notes.notes.length > 0 ||
+                            review.waiting ||
+                            review.error) &&
+                            !(tab === "story" && storyAtFinish) && (
+                              <div className="sticky bottom-4 z-20">
+                                {feedback}
+                              </div>
+                            )}
+                        </>
+                      );
+                    }}
                   </WithReview>
                 </div>
               </main>

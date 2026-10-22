@@ -259,13 +259,17 @@ export function DiffFile({
       // scrolls, the filename would never actually stick. Corners are
       // rounded per-edge instead.
       className="rounded-md border border-[var(--border)] bg-[var(--canvas)]"
-      // Jump targets must clear the sticky app bar, or a jump lands the
-      // section header underneath it.
-      style={{ scrollMarginTop: "calc(var(--header-height, 0px) + 8px)" }}
+      // Jump targets must clear the sticky app bar, and in Story's walk the
+      // pinned bar and map under it, or a jump lands the section header
+      // underneath them.
+      style={{
+        scrollMarginTop:
+          "calc(var(--header-height, 0px) + var(--walk-top, 0px) + 8px)",
+      }}
     >
       {/* last:rounded-b-md covers the collapsed state, where the header is
           the card's only child and owns the bottom corners too. */}
-      <header className="sticky top-[var(--header-height,0px)] z-10 flex items-center gap-2 rounded-t-md border-b border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 last:rounded-b-md">
+      <header className="sticky top-[calc(var(--header-height,0px)+var(--walk-top,0px))] z-10 flex items-center gap-2 rounded-t-md border-b border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 last:rounded-b-md">
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
