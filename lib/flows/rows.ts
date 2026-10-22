@@ -305,6 +305,8 @@ export interface StepMark {
   flow: number;
   /** The step's row key in the flow's diff mode */
   row: string;
+  /** The number the step shows in its flow */
+  step: number;
   chip: string;
   /** A removed step, on the line as it was */
   was: boolean;
@@ -406,6 +408,7 @@ export function stepMarks(set: FlowSet): Map<string, StepMarks> {
           key: `${i}/${row.key}`,
           flow: i,
           row: row.key,
+          step: stepNumber(row),
           chip: `${i + 1}·${stepNumber(row)}`,
           was: row.kind === "del",
         },

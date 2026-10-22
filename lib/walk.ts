@@ -53,8 +53,6 @@ function mapOrder(map: MapResponse, nodes: MapNode[]): MapNode[] {
   return [...nodes].sort((a, b) => at(a).y - at(b).y || at(a).x - at(b).x);
 }
 
-const stepNumber = (mark: StepMark) => Number(mark.chip.split("·")[1]) || 0;
-
 /** The flow steps on any of these files, each once. */
 function stepsOn(
   marks: ReturnType<typeof stepMarks> | null,
@@ -68,9 +66,7 @@ function stepsOn(
         for (const side of Object.values(marks.get(path) ?? {}))
           for (const list of side.values())
             for (const mark of list) found.set(mark.key, mark);
-  return [...found.values()].sort(
-    (a, b) => a.flow - b.flow || stepNumber(a) - stepNumber(b),
-  );
+  return [...found.values()].sort((a, b) => a.flow - b.flow || a.step - b.step);
 }
 
 export function buildStops<F extends WalkFile>({
