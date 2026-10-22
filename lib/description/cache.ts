@@ -156,9 +156,11 @@ async function patchFor(view: DescriptionView) {
   const patch = await getRangePatch(view.root, from, view.head);
   const bytes = Buffer.from(patch);
   if (bytes.byteLength <= MAX_PATCH_BYTES) return { patch, stat: null };
+  // Widen the stat past git's 80 columns, which shorten long paths to
+  // `.../tail` that the provider can't open.
   const { stdout: stat } = await git(view.root, [
     "diff",
-    "--stat",
+    "--stat=10000",
     "--no-color",
     from,
     view.head,
