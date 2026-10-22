@@ -38,19 +38,25 @@ that marks which folders are git checkouts.
 ## The inbox and the workspace
 
 **The inbox** is the home screen: every worktree you've got checked out, across
-every repo you've opened, with how many of each pull request's review comments
-GitHub still calls unresolved. A comment counts until someone presses
-**Resolve conversation** on GitHub.
+every repo you've opened, with the branches that changed since you last looked
+at the top. Each row says what its branch changes against its base, the branch
+its pull request targets or the default branch, and when it last changed.
+Opening a branch takes it out of that count until it gets another commit.
 
 ```text
-10 unresolved comments
-across 5 branches · 21 worktrees checked out
+2 branches changed since you last looked
+21 worktrees checked out
 
 ACME-APP ──────────────────────────────────────────────────────────
- ●  feature/offline-sync-1203       #40 open     5 unresolved
-    Queue edits made offline and replay them
- ○  fix/login-timeout-36            #38 merged
- ○  feature/release-script          no PR yet
+ ●  feature/offline-sync-1203       #40 open                 +212 −38
+    Queue edits made offline and replay them      9 files · 4 commits
+                                          2 h ago · new since you looked
+ ●  feature/release-script          no PR yet                  +40 −0
+                                                   1 file · 1 commit
+                                          5 h ago · new since you looked
+ ○  fix/retry-backoff-41            #41 draft                  +18 −6
+    Back off between retries                       2 files · 2 commits
+                                                              1 day ago
 ```
 
 Under each repo, **On GitHub** lists the open pull requests and branches on

@@ -24,8 +24,8 @@ import {
 import { Button, RelativeTime, Spinner } from "./ui";
 
 /**
- * The home screen: every worktree you've got checked out, and how many of
- * each one's review threads GitHub calls unresolved.
+ * The home screen: every worktree you've got checked out, with the branches
+ * that changed since you last opened them first.
  */
 export function Inbox({
   roots,
@@ -175,19 +175,7 @@ export function Inbox({
     });
   }, [data]);
 
-  // A merged PR's threads often stay unresolved, so it doesn't count.
-  // Counting them made this read three times higher than the work waiting.
-  const live = useMemo(
-    () => (data?.rows ?? []).filter((row) => !row.archived),
-    [data],
-  );
-  const unresolved = useMemo(
-    () => live.reduce((total, row) => total + (row.pr?.unresolved ?? 0), 0),
-    [live],
-  );
-  const branchesWaiting = live.filter(
-    (row) => (row.pr?.unresolved ?? 0) > 0,
-  ).length;
+  const changed = (data?.rows ?? []).filter((row) => row.changed).length;
   // A row is a branch now, not always a worktree — a stacked PR is reviewable
   // without one, so the two counts have to be said separately.
   const checkedOut = (data?.rows ?? []).filter((row) => row.worktree).length;
@@ -242,19 +230,13 @@ export function Inbox({
               </div>
             )}
             <h1 className="text-[20px] font-semibold">
-              {unresolved === 0
-                ? data
-                  ? "No unresolved comments"
-                  : "Checking your worktrees…"
-                : `${unresolved} unresolved ${unresolved === 1 ? "comment" : "comments"}`}
+              {!data
+                ? "Checking your worktrees…"
+                : changed === 0
+                  ? "Nothing new since you last looked"
+                  : `${changed} ${changed === 1 ? "branch" : "branches"} changed since you last looked`}
             </h1>
             <p className="mt-0.5 text-[13px] text-[var(--fg-muted)]">
-              {branchesWaiting > 0 && (
-                <>
-                  across {branchesWaiting}{" "}
-                  {branchesWaiting === 1 ? "branch" : "branches"} ·{" "}
-                </>
-              )}
               {checkedOut} {checkedOut === 1 ? "worktree" : "worktrees"} checked
               out
               {branchesOnly > 0 && `, ${branchesOnly} more branches with a PR`}
@@ -292,7 +274,7 @@ export function Inbox({
                     <span>
                       {repo.unavailable} Everything below comes from git alone.
                       {repo.stale &&
-                        " Counts shown are the last ones Backstory saw."}
+                        " Pull requests shown are the last ones Backstory saw."}
                       {repo.connect && (
                         <>
                           {" "}

@@ -2,6 +2,7 @@
 
 import type { InboxRow as Row } from "@/lib/inbox";
 import { PullRequestIcon } from "./icons";
+import { RelativeTime } from "./ui";
 
 /**
  * One worktree.
@@ -12,11 +13,12 @@ import { PullRequestIcon } from "./icons";
  * `…feature-offline-manager-1471`. So the folder appears only when it
  * disagrees, as a footnote.
  *
- * The unresolved count sits in a fixed right-hand column so the counts line
- * up down the page and are one glance, not twenty.
+ * What the branch changes against its base, and when it last moved, sit in a
+ * fixed right-hand column so they line up down the page and are one glance,
+ * not twenty.
  */
 export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
-  const unresolved = row.pr?.state === "OPEN" ? row.pr.unresolved : 0;
+  const { changes } = row;
   // Worth saying only when the folder disagrees with the branch it holds —
   // one of these directories is named for a branch it stopped holding two
   // renames ago. A folder simply named after the repo isn't a disagreement.
@@ -39,7 +41,7 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
       style={{ paddingLeft: 8 + row.depth * 18 }}
     >
       <span className="mt-[5px] grid place-items-center">
-        <StatusGlyph unresolved={unresolved} />
+        <StatusGlyph changed={row.changed} />
       </span>
 
       <span className="min-w-0">
@@ -92,17 +94,36 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
         )}
       </span>
 
-      {unresolved > 0 && (
-        <span className="mono whitespace-nowrap pl-4 text-[11px] text-[var(--fg-muted)]">
-          {unresolved} unresolved
+      <span className="whitespace-nowrap pl-4 text-right text-[11px] text-[var(--fg-muted)]">
+        {changes && changes.commits > 0 && (
+          <>
+            <span className="mono block text-[12px]">
+              <span className="text-[var(--success)]">
+                +{changes.additions}
+              </span>{" "}
+              <span className="text-[var(--danger)]">−{changes.deletions}</span>
+            </span>
+            <span className="block">
+              {changes.files} {changes.files === 1 ? "file" : "files"} ·{" "}
+              {changes.commits} {changes.commits === 1 ? "commit" : "commits"}
+            </span>
+          </>
+        )}
+        <span className="block text-[var(--fg-subtle)]">
+          {row.lastCommitAt && <RelativeTime iso={row.lastCommitAt} />}
+          {row.changed && (
+            <span className="text-[var(--attention)]">
+              {row.lastCommitAt && " · "}new since you looked
+            </span>
+          )}
         </span>
-      )}
+      </span>
     </button>
   );
 }
 
-function StatusGlyph({ unresolved }: { unresolved: number }) {
-  if (unresolved === 0) {
+function StatusGlyph({ changed }: { changed: boolean }) {
+  if (!changed) {
     return (
       <svg viewBox="0 0 16 16" width={10} height={10} aria-hidden="true">
         <circle

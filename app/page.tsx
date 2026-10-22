@@ -189,6 +189,12 @@ export default function Page() {
   /** Discards out-of-order session responses from overlapping refreshes. */
   const sessionSeq = useRef(0);
   /**
+   * The repo a foreground load opened and hasn't yet marked as looked at.
+   * Whichever load of it shows first marks it, because the watch stream's
+   * background load often supersedes the one that opened the branch.
+   */
+  const lookPending = useRef<string | null>(null);
+  /**
    * Shas typed or pasted into the commit picker rather than chosen from the
    * list. The session only carries the branch's recent commits, so without
    * remembering these the next background refresh would decide the rev didn't
@@ -363,6 +369,7 @@ export default function Page() {
       // spinner flashing on every keystroke-burst would be worse than the
       // staleness it replaces.
       if (!opts.background) {
+        lookPending.current = path;
         setSessionLoading(true);
         setSessionError(null);
       }
@@ -377,6 +384,16 @@ export default function Page() {
         if (seq !== sessionSeq.current) return; // superseded by a newer fetch
         setSession(data);
         setSessionError(null);
+        const shownTip = data.commits[0]?.sha ?? data.history[0]?.sha;
+        if (lookPending.current === path && data.repo.branch && shownTip) {
+          lookPending.current = null;
+          void fetch(
+            `/api/looked?repo=${encodeURIComponent(path)}&ref=${encodeURIComponent(data.repo.branch)}&tip=${shownTip}`,
+            { method: "POST" },
+          ).catch(() => {
+            // The inbox shows the branch as changed a while longer, nothing worse.
+          });
+        }
 
         setCommentId((current) => resolveComment(current, data.github.threads));
 

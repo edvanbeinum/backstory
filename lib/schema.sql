@@ -43,3 +43,10 @@ CREATE TABLE settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+CREATE TABLE looked (
+  common_dir TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  tip TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (common_dir, branch)
+);
