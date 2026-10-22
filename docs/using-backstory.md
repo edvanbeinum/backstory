@@ -106,7 +106,8 @@ messages and the pull request, and writes **Why** only when the commits or the
 pull request say why. Click a place to look first that is on the map to outline
 it there. Opening a commit or the whole branch describes it, unless you turned
 the repo off; then **Describe this change** reads it. **Describe again** reads
-it once more.
+it once more, and shows the earlier description with the error if that read
+fails.
 
 Backstory draws what a change did to the system, so you can see its effect
 before reading its lines:

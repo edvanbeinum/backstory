@@ -386,6 +386,29 @@ test("a failed read says why, caches nothing, and Describe again reads it once m
   await read(repo.view, { runner: replaced.runner, redraft: true });
   const done = await descriptionStatus(repo.view);
   assert.equal(done.status === "done" && done.description.what, "Read again.");
+  assert.equal(done.status === "done" && done.error, undefined);
+});
+
+test("a failed Describe again keeps the earlier description, with why it failed, until a read succeeds", async () => {
+  const repo = shopRepo();
+  await read(repo.view, { runner: recorder().runner });
+  await read(repo.view, {
+    runner: recorder({ fail: "Claude Code failed: blocked" }).runner,
+    redraft: true,
+  });
+  const kept = await descriptionStatus(repo.view);
+  assert.equal(kept.status, "done");
+  assert.equal(kept.status === "done" && kept.description.what, ANSWER.what);
+  assert.equal(
+    kept.status === "done" && kept.error,
+    "Claude Code failed: blocked",
+  );
+
+  const again = recorder({ answer: { ...ANSWER, what: "Read again." } });
+  await read(repo.view, { runner: again.runner, redraft: true });
+  const done = await descriptionStatus(repo.view);
+  assert.equal(done.status === "done" && done.description.what, "Read again.");
+  assert.equal(done.status === "done" && done.error, undefined);
 });
 
 test("a provider that isn't installed, or is logged out, says so and reads nothing", async () => {

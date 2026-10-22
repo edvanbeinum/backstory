@@ -117,7 +117,7 @@ export async function descriptionStatus(
   const file = await fileFor(view);
   const job = registry.jobs.get(file);
   if (job) return { status: "running", startedAt: job.startedAt };
-  const ended = registry.ended.get(file);
+  let ended = registry.ended.get(file);
   // Ask the provider again while it was missing or signed out, so installing
   // or signing in brings the read back without a restart.
   if (ended?.status === "unavailable") {
@@ -127,8 +127,11 @@ export async function descriptionStatus(
       return { ...ended, reason };
     }
     registry.ended.delete(file);
-  } else if (ended) return ended;
+    ended = undefined;
+  }
   const cached = await readCache(file);
+  // A failed Describe again keeps showing the description it would have
+  // replaced, with the failure.
   if (cached)
     return {
       status: "done",
@@ -136,7 +139,9 @@ export async function descriptionStatus(
       provider: providerName(cached.provider),
       model: cached.model,
       readAt: cached.readAt,
+      ...(ended?.status === "failed" && { error: ended.error }),
     };
+  if (ended) return ended;
   return {
     status: "idle",
     provider: aiProvider().name,

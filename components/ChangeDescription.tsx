@@ -195,6 +195,14 @@ export function ChangeDescription({
             Describe again
           </Button>
         </span>
+        {status.error && (
+          <p className="mt-2 flex min-w-0 items-center gap-1 text-[12px] text-[var(--attention)]">
+            <AlertIcon size={11} />
+            <span className="min-w-0 truncate" title={status.error}>
+              Couldn&apos;t describe this change again: {status.error}
+            </span>
+          </p>
+        )}
       </>
     );
   else if (status.status === "running")

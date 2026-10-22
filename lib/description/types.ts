@@ -35,6 +35,8 @@ export type DescriptionStatus =
       provider: string;
       model: string | null;
       readAt: number;
+      /** Why the last Describe again failed, when it did */
+      error?: string;
     }
   | { status: "failed"; error: string }
   | { status: "unavailable"; provider: string; reason: ProviderGap };
