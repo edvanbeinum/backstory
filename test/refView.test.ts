@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { after, before, test } from "node:test";
@@ -318,4 +324,14 @@ test("a branch opened by ref measures its upstream from its own tip, not the che
   assert.equal(base.reason, "upstream");
   assert.equal(base.sha, b);
   assert.notEqual(base.sha, fork);
+});
+
+test("a ref that starts with a dash is refused before it reaches git", async () => {
+  const { root } = stack();
+  const out = path.join(root, "written-by-git");
+  const res = await diff.GET(
+    get("diff", { repo: root, ref: `--output=${out}`, rev: "branch" }),
+  );
+  assert.equal(res.status, 500);
+  assert.equal(existsSync(out), false);
 });

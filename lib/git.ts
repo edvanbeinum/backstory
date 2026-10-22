@@ -91,6 +91,11 @@ export async function resolveRepo(
 ): Promise<RepoInfo> {
   const abs = expandPath(input);
   if (!abs) throw new RepoError("No repository path given", "missing-path");
+  // Refuse a leading `-`: the ref comes from the URL and becomes `repo.tip`,
+  // which reaches git's argv on its own, where it would be read as an option.
+  if (ref?.startsWith("-")) {
+    throw new RepoError(`\`${ref}\` isn't a branch name.`, "git");
+  }
 
   try {
     const stat = await fs.stat(abs);
