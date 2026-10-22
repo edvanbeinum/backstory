@@ -51,7 +51,8 @@ export function NoteComposer({
   onCancel: () => void;
 }) {
   const [text, setText] = useState(initial);
-  const canSave = text.trim().length > 0;
+  // A note left at its starting text, such as "On Sync Engine:", says nothing.
+  const canSave = text.trim().length > 0 && text.trim() !== initial.trim();
 
   return (
     <div className="rounded-md border border-[var(--accent)] bg-[var(--canvas)]">
