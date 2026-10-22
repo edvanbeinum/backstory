@@ -1080,11 +1080,13 @@ export default function Page() {
                           <Story
                             repo={repoPath}
                             rev={rev}
+                            gitRef={ref}
                             map={map}
                             data={dataModel}
                             entityNotes={entityNotes}
                             onModelChange={onModelChange}
                             mapHighlight={mapHighlight}
+                            onShowOnMap={showOnMap}
                             onOpenFile={openFile}
                             flows={flows}
                             diff={diff && diff.rev === rev ? diff : null}
