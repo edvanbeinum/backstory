@@ -291,11 +291,10 @@ export function toDescription(output: DescriptionOutput): ChangeDescription {
     })),
   ).slice(0, LOOK_FIRST_MAX);
   const components = eachOnce(
-    (output.components ?? []).map((c) => ({
-      name: c.name.trim(),
-      sentence: c.sentence.trim(),
-    })),
-  ).filter((c) => c.sentence);
+    (output.components ?? [])
+      .map((c) => ({ name: c.name.trim(), sentence: c.sentence.trim() }))
+      .filter((c) => c.sentence),
+  );
   return {
     what: output.what.trim(),
     why: why ? why : null,

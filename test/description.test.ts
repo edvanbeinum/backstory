@@ -331,10 +331,14 @@ test("component sentences are trimmed, each name kept once, and blanks dropped",
         { name: " Sync Engine", sentence: " Retries uploads. " },
         { name: "Sync Engine", sentence: "Again." },
         { name: "Checkout", sentence: " " },
+        { name: "Checkout", sentence: "Takes cards." },
         { name: "", sentence: "No name." },
       ],
     }).components,
-    [{ name: "Sync Engine", sentence: "Retries uploads." }],
+    [
+      { name: "Sync Engine", sentence: "Retries uploads." },
+      { name: "Checkout", sentence: "Takes cards." },
+    ],
   );
 });
 
