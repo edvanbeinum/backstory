@@ -155,7 +155,7 @@ export function StopView({
   stops: Stop[];
   index: number;
   seen: Set<string>;
-  /** The change description, for the overview */
+  /** The change description with the map under it, for the overview */
   overview: React.ReactNode;
   data: DataResponse | null;
   entityNotes: Map<string, string[]>;

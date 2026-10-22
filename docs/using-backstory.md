@@ -72,7 +72,7 @@ work when there is some, and on the whole branch otherwise. Under the header are
 three tabs, as on a pull request, and every change opens on the first:
 
 - **Story** walks you through the change one part at a time, with the map
-  pinned above it (see [Walking through a change](#walking-through-a-change)).
+  pinned above each component (see [Walking through a change](#walking-through-a-change)).
   **Show everything on one page** shows it all at once instead: a few sentences
   on the change, the map at full width, a line under it saying what it shows,
   then each flow as a card. Before a change is traced, one card in place of the
@@ -97,8 +97,8 @@ Marks in the gutter beside a line open what is there: `⇄ 1·7` opens flow 1, s
 
 Story opens on the change's overview, then takes you through it in order:
 
-1. **Overview**: the change's description. Its places to look first go to their
-   part of the walk.
+1. **Overview**: the change's description, with the map under it. Its places to
+   look first go to their part of the walk.
 2. **Data model**, when the change touches it: the changed entities as cards.
 3. **Each changed component**, in the map's order, top to bottom and left to
    right: what the change does in it, the flow steps its files are on as

@@ -254,6 +254,9 @@ export function Story({
     </SystemMap>
   );
 
+  // Pin the map from the first component on; the overview has none to
+  // outline, so it reads the description first with the map under it.
+  const pinMap = rev !== WORKING_REV && current.kind !== "overview";
   if (walk)
     return (
       <div className="pt-1">
@@ -265,9 +268,7 @@ export function Story({
             onGo={go}
             onLeave={() => onWalk(false)}
           />
-          {rev !== WORKING_REV && (
-            <div className="walk-map">{mapSection(true)}</div>
-          )}
+          {pinMap && <div className="walk-map">{mapSection(true)}</div>}
         </div>
         <div
           className="walk-stop"
@@ -278,7 +279,12 @@ export function Story({
             stops={stops}
             index={index}
             seen={seen.keys}
-            overview={overview}
+            overview={
+              <>
+                {overview}
+                {rev !== WORKING_REV && mapSection(true)}
+              </>
+            }
             data={data}
             entityNotes={entityNotes}
             renderFiles={renderFiles}
