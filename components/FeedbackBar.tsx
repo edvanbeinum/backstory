@@ -16,6 +16,7 @@ import type {
   SessionResponse,
 } from "@/lib/types";
 import { pushedState } from "@/lib/pushed";
+import { viewParams } from "@/lib/url";
 import { CheckIcon, CommentIcon, CopyIcon, XIcon } from "./icons";
 import { NoteCard, NoteComposer, NoteTick } from "./NoteCard";
 import { sinceLabel } from "./Tick";
@@ -23,6 +24,7 @@ import { Button, copyToClipboard } from "./ui";
 import type { NotesApi } from "./useNotes";
 import type { OutboxApi } from "./useOutbox";
 import type { ReviewApi } from "./useReview";
+import { useView } from "./ViewContext";
 import type { OutboxRound } from "@/lib/outbox";
 
 /**
@@ -61,6 +63,7 @@ export function FeedbackBar({
   /** Show a note in Files changed, switching to the change it was left on */
   onOpenNote: (note: Note) => void;
 }) {
+  const { ref } = useView();
   const [writing, setWriting] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [sending, setSending] = useState(false);
@@ -102,7 +105,7 @@ export function FeedbackBar({
     ];
     await Promise.all(
       moving.map(async (rev) => {
-        const params = new URLSearchParams({ repo: session.repo.root, rev });
+        const params = viewParams({ repo: session.repo.root, ref, rev });
         const response = await fetch(`${DIFF_API}?${params}`, {
           cache: "no-store",
         });
@@ -111,7 +114,7 @@ export function FeedbackBar({
       }),
     );
 
-    return formatFeedback(drafts, { diffs, commits });
+    return formatFeedback(drafts, { diffs, commits, ref });
   };
 
   /**

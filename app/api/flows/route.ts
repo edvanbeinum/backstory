@@ -28,7 +28,7 @@ async function resolve(request: Request) {
       ),
     };
   }
-  const repo = await resolveRepo(repoPath);
+  const repo = await resolveRepo(repoPath, searchParams.get("ref"));
   const range = await viewRange(repo, rev);
   return { repo, range, searchParams };
 }

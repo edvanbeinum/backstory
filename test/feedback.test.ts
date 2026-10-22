@@ -333,6 +333,17 @@ test("a note on a commit names it, and says whether it's pushed — not how to f
   assert.match(text, /^```typescript\na\n```$/m);
 });
 
+test("a branch note on a branch opened by ref names that branch's tip, not HEAD", () => {
+  const text = formatFeedback(
+    [note({ rev: BRANCH_REV, path: "src/h.ts", line: 1, quote: "h" })],
+    { diffs: new Map(), commits: [], ref: "stack/b" },
+  );
+  assert.match(
+    text,
+    /^## src\/h\.ts:1 \(committed, at the tip of stack\/b\)$/m,
+  );
+});
+
 test("a commit note placed against its loaded diff uses that diff's line", () => {
   const text = formatFeedback(
     [note({ rev: NEW, line: 40, quote: "new two" })],

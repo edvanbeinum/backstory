@@ -53,10 +53,14 @@ export async function GET(request: Request) {
   }
 
   try {
-    const repo = await resolveRepo(repoPath);
+    const repo = await resolveRepo(repoPath, searchParams.get("ref"));
 
     let patch: string;
-    if (rev === WORKING_REV) {
+    if (rev === WORKING_REV && repo.ref) {
+      // Diff nothing for a branch opened by ref: the checkout's uncommitted
+      // work belongs to another branch, as in /api/diff.
+      patch = "";
+    } else if (rev === WORKING_REV) {
       const working = await getWorkingTree(repo);
       patch = await getWorkingPatch(repo.root, working.untrackedPaths, {
         context: FULL_CONTEXT,
@@ -75,7 +79,7 @@ export async function GET(request: Request) {
           { status: 404 },
         );
       }
-      patch = await getRangePatch(repo.root, info.baseSha, "HEAD", {
+      patch = await getRangePatch(repo.root, info.baseSha, repo.tip, {
         context: FULL_CONTEXT,
         pathspec: paths,
       });

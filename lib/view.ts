@@ -7,7 +7,8 @@ import type { RepoInfo } from "./types";
 /**
  * The two commits a view compares, the same ones /api/diff diffs: a commit
  * and its first parent, or for "All changes" the branch's fork point and
- * HEAD. Null for uncommitted work, which has no commit to key anything on.
+ * `repo.tip`: the branch the repo was opened to review, or HEAD. Null for
+ * uncommitted work, which has no commit to key anything on.
  */
 export async function viewRange(
   repo: RepoInfo,
@@ -21,7 +22,7 @@ export async function viewRange(
       await resolveBase(repo),
       github.pr?.baseRefName ?? null,
     );
-    const head = await resolveRev(repo.root, "HEAD");
+    const head = await resolveRev(repo.root, repo.tip);
     if (!info || !head) return null;
     return { base: info.baseSha, head };
   }
