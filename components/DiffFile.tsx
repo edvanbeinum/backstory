@@ -115,6 +115,7 @@ export function DiffFile({
   const [wholeError, setWholeError] = useState<string | null>(null);
   const [showWhole, setShowWhole] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
 
   // The whole-file response is just a DiffFile with one enormous hunk, so it
   // drops straight into the same rendering path.
@@ -222,19 +223,17 @@ export function DiffFile({
   // A flow step outside the hunks on screen asks for its line: open the whole
   // file. Files changed scrolls to the line once it renders.
   useEffect(() => {
-    const onReveal = (event: Event) => {
-      const { path } = (event as CustomEvent<{ path: string }>).detail;
-      if (path !== file.newPath && path !== file.oldPath) return;
+    const section = sectionRef.current;
+    if (!section) return;
+    const onReveal = () => {
       setCollapsed(false);
       if (!canViewWhole) return;
       setShowWhole(true);
       if (!whole && !wholeLoading) void loadWhole();
     };
-    window.addEventListener("backstory:reveal", onReveal);
-    return () => window.removeEventListener("backstory:reveal", onReveal);
+    section.addEventListener("backstory:reveal", onReveal);
+    return () => section.removeEventListener("backstory:reveal", onReveal);
   }, [
-    file.newPath,
-    file.oldPath,
     canViewWhole,
     whole,
     wholeLoading,
@@ -253,6 +252,7 @@ export function DiffFile({
 
   return (
     <section
+      ref={sectionRef}
       id={`file-${encodeURIComponent(file.path)}`}
       // No overflow-hidden here: it would make this section the sticky
       // header's containing scrollport, and since the section itself never

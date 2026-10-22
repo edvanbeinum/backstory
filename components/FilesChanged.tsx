@@ -31,13 +31,6 @@ export interface FilesJump {
   at: number;
 }
 
-/** Ask a file to show a line that's outside the hunks on screen. */
-function revealLine(path: string, side: "old" | "new", line: number) {
-  window.dispatchEvent(
-    new CustomEvent("backstory:reveal", { detail: { path, side, line } }),
-  );
-}
-
 /**
  * The file in this tab. Looked up inside the tab, since Story's walk shows
  * the same files with the same ids.
@@ -245,9 +238,12 @@ export function FilesChanged({
           void row.offsetWidth;
           row.classList.add("flash");
           done = true;
-        } else if (sectionFor(root, path) && !revealed) {
-          revealLine(path, side, line);
-          revealed = true;
+        } else if (!revealed) {
+          // Ask this tab's copy of the file to show its whole text, leaving
+          // the copy Story's walk may show as it is.
+          const section = sectionFor(root, path);
+          section?.dispatchEvent(new CustomEvent("backstory:reveal"));
+          revealed = !!section;
         }
       } else {
         done = jumpToFile(path, root);
