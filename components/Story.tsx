@@ -20,8 +20,7 @@ import type { FlowsApi } from "./useFlows";
 /**
  * The tab every view lands on, read top to bottom: what the change does, the
  * map at the column's width with a line of what it says, then each flow as a
- * card. Traced or
- * not, the map leads; the code is a click away from any step.
+ * card. The code is a click away from any step.
  */
 export function Story({
   repo,
