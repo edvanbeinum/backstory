@@ -131,15 +131,20 @@ export function Story({
   );
   // Keep the stop picked on screen when a late map, data model or diff adds
   // stops before it, rather than the stop now at its number. A stop number
-  // from a link is left alone, since the stops settle after it opens.
-  const [picked, setPicked] = useState<{ stop: number; key: string } | null>(
-    null,
-  );
+  // from a link is left alone, since the stops settle after it opens. Drop
+  // the pick on another view, whose stops may share its key or number.
+  const view = viewKey({ repo, ref, rev });
+  const [picked, setPicked] = useState<{
+    view: string;
+    stop: number;
+    key: string;
+  } | null>(null);
   const atUrl = resolveStop(stop, stops.length);
-  if (picked && picked.stop !== stop && stops[atUrl].key === picked.key)
-    setPicked({ stop, key: picked.key });
+  const pick = picked?.view === view ? picked : null;
+  if (pick && pick.stop !== stop && stops[atUrl].key === pick.key)
+    setPicked({ ...pick, stop });
   const pickedAt =
-    picked?.stop === stop ? stops.findIndex((s) => s.key === picked.key) : -1;
+    pick?.stop === stop ? stops.findIndex((s) => s.key === pick.key) : -1;
   const index = pickedAt !== -1 ? pickedAt : atUrl;
   const current = stops[index];
   useEffect(() => {
@@ -159,7 +164,6 @@ export function Story({
   }, [walk]);
 
   // The stops seen on this view, kept only for the view they were seen on.
-  const view = viewKey({ repo, ref, rev });
   const [seen, setSeen] = useState({ view, keys: new Set<string>() });
   if (seen.view !== view) setSeen({ view, keys: new Set() });
   else if (walk && !seen.keys.has(current.key))
@@ -167,7 +171,7 @@ export function Story({
 
   const go = (i: number) => {
     const to = Math.max(0, Math.min(i, stops.length - 1));
-    setPicked({ stop: to + 1, key: stops[to].key });
+    setPicked({ view, stop: to + 1, key: stops[to].key });
     onStop(to + 1);
     window.scrollTo({ top: 0 });
   };
