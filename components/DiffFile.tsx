@@ -233,12 +233,7 @@ export function DiffFile({
     };
     section.addEventListener("backstory:reveal", onReveal);
     return () => section.removeEventListener("backstory:reveal", onReveal);
-  }, [
-    canViewWhole,
-    whole,
-    wholeLoading,
-    loadWhole,
-  ]);
+  }, [canViewWhole, whole, wholeLoading, loadWhole]);
 
   // A different commit means a different file revision; drop the cached view.
   const revision = `${commit?.sha}:${file.path}`;
