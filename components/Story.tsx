@@ -129,8 +129,22 @@ export function Story({
       }),
     [description, shownMap, data, set, diff],
   );
-  const index = resolveStop(stop, stops.length);
+  // Keep the stop picked on screen when a late map, data model or diff adds
+  // stops before it, rather than the stop now at its number. A stop number
+  // from a link is left alone, since the stops settle after it opens.
+  const [picked, setPicked] = useState<{ stop: number; key: string } | null>(
+    null,
+  );
+  const atUrl = resolveStop(stop, stops.length);
+  if (picked && picked.stop !== stop && stops[atUrl].key === picked.key)
+    setPicked({ stop, key: picked.key });
+  const pickedAt =
+    picked?.stop === stop ? stops.findIndex((s) => s.key === picked.key) : -1;
+  const index = pickedAt !== -1 ? pickedAt : atUrl;
   const current = stops[index];
+  useEffect(() => {
+    if (pickedAt !== -1 && pickedAt + 1 !== stop) onStop(pickedAt + 1);
+  }, [pickedAt, stop, onStop]);
 
   // The file headers in a stop stick under the pinned bar and map, so they
   // need its height.
@@ -152,7 +166,9 @@ export function Story({
     setSeen({ view, keys: new Set([...seen.keys, current.key]) });
 
   const go = (i: number) => {
-    onStop(Math.max(0, Math.min(i, stops.length - 1)) + 1);
+    const to = Math.max(0, Math.min(i, stops.length - 1));
+    setPicked({ stop: to + 1, key: stops[to].key });
+    onStop(to + 1);
     window.scrollTo({ top: 0 });
   };
   const goRef = useRef(go);
