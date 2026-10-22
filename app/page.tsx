@@ -566,9 +566,14 @@ export default function Page() {
   // A commit's diff is immutable, so watcher ticks only matter for the two
   // views that move — uncommitted work, and the branch diff (its tip end
   // advances with every commit); pinning the key otherwise keeps background
-  // session refreshes from refetching a diff that cannot have changed.
+  // session refreshes from refetching a diff that cannot have changed. A
+  // branch opened by ref keys on its base and tip instead: saves in the
+  // checkout fire watcher ticks, but can't move another branch.
+  const branchEnds = shown.ref
+    ? `${session?.base.sha}..${session?.commits[0]?.sha}`
+    : workingTick;
   const workingDiffKey =
-    rev === WORKING_REV || rev === BRANCH_REV ? workingTick : -1;
+    rev === WORKING_REV || rev === BRANCH_REV ? branchEnds : -1;
 
   useEffect(() => {
     revRef.current = rev;
