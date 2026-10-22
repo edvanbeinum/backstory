@@ -44,7 +44,8 @@ primitives:
     file: lib/view.ts
     symbols:
       - viewRange
-    use: "The same base and head that `/api/diff` diffs, so every view of a change agrees on its commits. All changes runs to `repo.tip`, so a branch opened with `ref` is read at its own tip, not the checkout's."
+      - onBranchOnly
+    use: "The same base and head that `/api/diff` diffs, so every view of a change agrees on its commits. All changes runs to `repo.tip`, so a branch opened with `ref` is read at its own tip, not the checkout's. `onBranchOnly` says whether a commit is one of the branch's own, past that base."
   - name: patches
     block: git reader
     file: lib/git.ts

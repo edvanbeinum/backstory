@@ -6,7 +6,7 @@ import type { DescriptionResponse } from "@/lib/description/types";
 import { resolveRepo } from "@/lib/git";
 import { loadGitHubDataCached } from "@/lib/github";
 import type { ApiError } from "@/lib/types";
-import { viewRange } from "@/lib/view";
+import { onBranchOnly, viewRange } from "@/lib/view";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +58,7 @@ export async function POST(request: Request) {
         { status: 409 },
       );
     const repo = r.repo;
+    const head = r.range.head;
     return answer(
       await startDescription(
         { root: repo.root, ...r.range },
@@ -65,7 +66,8 @@ export async function POST(request: Request) {
           redraft: r.searchParams.get("redraft") === "1",
           pr: async () => {
             const { pr } = await loadGitHubDataCached(repo);
-            return pr && { title: pr.title, body: pr.body };
+            if (!pr || !(await onBranchOnly(repo, head))) return null;
+            return { title: pr.title, body: pr.body };
           },
         },
       ),

@@ -1,6 +1,6 @@
 import { BRANCH_REV, WORKING_REV } from "./constants";
 import { gitLine } from "./exec";
-import { getBranchDiffBase, resolveBase, resolveRev } from "./git";
+import { getBranchDiffBase, isOnBranch, resolveBase, resolveRev } from "./git";
 import { loadGitHubDataCached } from "./github";
 import type { RepoInfo } from "./types";
 
@@ -35,4 +35,19 @@ export async function viewRange(
     `${head}^1`,
   ]);
   return { base, head };
+}
+
+/**
+ * Whether a view's head is one of the branch's own commits, past the fork
+ * point All changes starts from, so the branch's PR is about it. A commit
+ * already on the base, such as one from main's history, isn't.
+ */
+export async function onBranchOnly(
+  repo: RepoInfo,
+  head: string,
+): Promise<boolean> {
+  const branch = await viewRange(repo, BRANCH_REV);
+  if (!branch || !(await isOnBranch(repo.root, head, branch.head)))
+    return false;
+  return !branch.base || !(await isOnBranch(repo.root, head, branch.base));
 }

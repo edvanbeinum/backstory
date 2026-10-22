@@ -7,7 +7,7 @@ import { after, test } from "node:test";
 
 import { BRANCH_REV, WORKING_REV } from "../lib/constants";
 import { resolveRepo } from "../lib/git";
-import { viewRange } from "../lib/view";
+import { onBranchOnly, viewRange } from "../lib/view";
 
 const root = mkdtempSync(path.join(os.tmpdir(), "backstory-view-"));
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -78,4 +78,8 @@ test("the whole branch runs to the tip of the branch the repo was opened with, e
     base: fork,
     head: checked,
   });
+
+  assert.equal(await onBranchOnly(reviewing, side), true);
+  assert.equal(await onBranchOnly(reviewing, fork), false);
+  assert.equal(await onBranchOnly(reviewing, checked), false);
 });
