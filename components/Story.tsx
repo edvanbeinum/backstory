@@ -94,6 +94,7 @@ export function Story({
           gitRef={gitRef}
           map={map}
           onShowOnMap={onShowOnMap}
+          onAutoChange={onModelChange}
         />
       )}
 

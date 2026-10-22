@@ -164,7 +164,7 @@ primitives:
       - startTrunkRead
       - autoRead
       - setAutoRead
-    use: "The AI provider's reading of a data model no reader finds: main read in full once (`startTrunkRead`), then each view's base derived forward from main's model and its head from its base, one small read each, cached by tree under `~/.backstory/data/`, one read at a time. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. The switch is per repo, on by default, shared by every worktree, and covers drafted maps too. Told which files have the model when `data.files` is set. `buildData` falls back to it."
+    use: "The AI provider's reading of a data model no reader finds: main read in full once (`startTrunkRead`), then each view's base derived forward from main's model and its head from its base, one small read each, cached by tree under `~/.backstory/data/`, one read at a time. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. The switch is per repo, on by default, shared by every worktree, and covers drafted maps and change descriptions too. Told which files have the model when `data.files` is set. `buildData` falls back to it."
   - name: describe a change
     block: change description
     file: lib/description/cache.ts

@@ -453,8 +453,14 @@ test("opening a view starts its read when the repo reads automatically, and wait
   const ai = recorder();
   await read(repo.view, { runner: ai.runner });
   assert.equal(ai.prompts.length, 1);
-  assert.equal(startsByItself(await descriptionStatus(repo.view)), false);
+  const done = await descriptionStatus(repo.view);
+  assert.equal(done.status === "done" && done.auto, false);
+  assert.equal(startsByItself(done), false);
   assert.equal(startsByItself({ status: "none" }), false);
+
+  await setAutoRead(repo.root, true);
+  const on = await descriptionStatus(repo.view);
+  assert.equal(on.status === "done" && on.auto, true);
 });
 
 test("a patch past the cap is cut, with a summary of every file, and the prompt says so", async () => {

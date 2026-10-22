@@ -139,6 +139,7 @@ export async function descriptionStatus(
       provider: providerName(cached.provider),
       model: cached.model,
       readAt: cached.readAt,
+      auto: await autoRead(view.root),
       ...(ended?.status === "failed" && { error: ended.error }),
     };
   if (ended) return ended;

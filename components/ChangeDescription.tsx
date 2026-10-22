@@ -11,7 +11,7 @@ import {
 } from "@/lib/description/types";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { AlertIcon } from "./icons";
-import { Elapsed } from "./SystemMap";
+import { Elapsed, setAutoReading } from "./SystemMap";
 import { Badge, Button, Spinner } from "./ui";
 
 /**
@@ -19,7 +19,12 @@ import { Badge, Button, Spinner } from "./ui";
  * so a view the page has left never shows. Polls while a read runs rather
  * than adding a watch event: reads are rare.
  */
-function useDescription(repo: string, rev: string, gitRef: string | null) {
+function useDescription(
+  repo: string,
+  rev: string,
+  gitRef: string | null,
+  onAutoChange: () => void,
+) {
   const view = `${repo}\n${rev}\n${gitRef ?? ""}`;
   const current = useRef(view);
   useEffect(() => {
@@ -89,10 +94,25 @@ function useDescription(repo: string, rev: string, gitRef: string | null) {
     void request("POST");
   }, [autoStart, view, request]);
 
+  const setAuto = async (on: boolean) => {
+    try {
+      await setAutoReading(repo, on);
+      onAutoChange();
+      await request("GET");
+    } catch (err) {
+      setAnswer({
+        view,
+        status,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  };
+
   return {
     status,
     error: shown?.error ?? null,
     start: (redraft = false) => void request("POST", redraft),
+    setAuto: (on: boolean) => void setAuto(on),
   };
 }
 
@@ -159,6 +179,7 @@ export function ChangeDescription({
   gitRef,
   map,
   onShowOnMap,
+  onAutoChange,
 }: {
   repo: string;
   rev: string;
@@ -168,8 +189,15 @@ export function ChangeDescription({
   map: MapResponse | null;
   /** Outline a component on the map */
   onShowOnMap: (name: string) => void;
+  /** The repo's reading was turned on or off: read the map and data model again */
+  onAutoChange: () => void;
 }) {
-  const { status, error, start } = useDescription(repo, rev, gitRef);
+  const { status, error, start, setAuto } = useDescription(
+    repo,
+    rev,
+    gitRef,
+    onAutoChange,
+  );
   if (!status || status.status === "none") {
     return error ? (
       <p className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
@@ -191,6 +219,28 @@ export function ChangeDescription({
           <Badge tone="draft" className="!py-0 !leading-4">
             Drawn by {status.provider}
           </Badge>
+          <span className="text-[11px] text-[var(--fg-subtle)]">
+            {status.auto ? (
+              <>
+                Read automatically ·{" "}
+                <button
+                  type="button"
+                  className="text-[var(--accent)] hover:underline"
+                  onClick={() => setAuto(false)}
+                >
+                  Turn off
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="text-[var(--accent)] hover:underline"
+                onClick={() => setAuto(true)}
+              >
+                Read automatically
+              </button>
+            )}
+          </span>
           <Button size="sm" variant="invisible" onClick={() => start(true)}>
             Describe again
           </Button>

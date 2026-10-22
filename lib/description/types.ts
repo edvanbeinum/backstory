@@ -35,6 +35,8 @@ export type DescriptionStatus =
       provider: string;
       model: string | null;
       readAt: number;
+      /** Whether the repo reads as views open, for its switch */
+      auto: boolean;
       /** Why the last Describe again failed, when it did */
       error?: string;
     }
