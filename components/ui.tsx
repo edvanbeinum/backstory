@@ -231,7 +231,7 @@ export function Ticked({ text }: { text: string }) {
     <span>
       {text.split("`").map((part, i) =>
         i % 2 ? (
-          <code key={i} className="mono">
+          <code key={i} className="ticked">
             {part}
           </code>
         ) : (

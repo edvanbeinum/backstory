@@ -350,7 +350,8 @@ tr.note-row td {
 .md a:hover {
   text-decoration: underline;
 }
-.md code {
+.md code,
+.ticked {
   font-family:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
     monospace;
