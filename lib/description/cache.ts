@@ -143,7 +143,11 @@ export async function descriptionStatus(
   if (cached)
     return {
       status: "done",
-      description: cached.description,
+      // A description cached before it named components has none.
+      description: {
+        ...cached.description,
+        components: cached.description.components ?? [],
+      },
       provider: providerName(cached.provider),
       model: cached.model,
       readAt: cached.readAt,
@@ -268,16 +272,36 @@ async function gather(view: DescriptionView, pr: () => Promise<PrText>) {
   return inputs;
 }
 
-/** The answer, tidied: a blank why is none, and lookFirst is cut to its limit with each name once. */
+/** Drops blank names, and keeps each name once. */
+const eachOnce = <T extends { name: string }>(items: T[]) =>
+  items.filter(
+    (l, i, all) => l.name && all.findIndex((o) => o.name === l.name) === i,
+  );
+
+/**
+ * The answer, tidied: a blank why is none, lookFirst is cut to its limit, and
+ * each name, in lookFirst and components, is kept once.
+ */
 export function toDescription(output: DescriptionOutput): ChangeDescription {
   const why = output.why?.trim();
-  const lookFirst = output.lookFirst
-    .map((l) => ({ name: l.name.trim(), reason: l.reason.trim() }))
-    .filter(
-      (l, i, all) => l.name && all.findIndex((o) => o.name === l.name) === i,
-    )
-    .slice(0, LOOK_FIRST_MAX);
-  return { what: output.what.trim(), why: why ? why : null, lookFirst };
+  const lookFirst = eachOnce(
+    output.lookFirst.map((l) => ({
+      name: l.name.trim(),
+      reason: l.reason.trim(),
+    })),
+  ).slice(0, LOOK_FIRST_MAX);
+  const components = eachOnce(
+    (output.components ?? []).map((c) => ({
+      name: c.name.trim(),
+      sentence: c.sentence.trim(),
+    })),
+  ).filter((c) => c.sentence);
+  return {
+    what: output.what.trim(),
+    why: why ? why : null,
+    lookFirst,
+    components,
+  };
 }
 
 function enqueue(fn: () => Promise<void>) {
