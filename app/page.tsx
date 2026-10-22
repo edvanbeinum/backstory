@@ -183,8 +183,8 @@ export default function Page() {
     view: string;
     data: DataResponse;
   } | null>(null);
-  // Two branches of a stack are reviewed from one worktree, so the path alone
-  // doesn't say which branch a view is of.
+  // Key each view by path and branch: two branches of a stack are reviewed
+  // from one worktree, so the path alone doesn't say which branch it is of.
   const openKey = ref ? `${repoPath}\n${ref}` : repoPath;
   const dataView = `${openKey}\n${rev}`;
   const openView = useMemo(() => ({ repo: repoPath, ref }), [repoPath, ref]);
