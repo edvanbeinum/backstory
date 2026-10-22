@@ -57,7 +57,8 @@ export async function GET(request: Request) {
 
     let patch: string;
     if (rev === WORKING_REV && repo.ref) {
-      // Same as /api/diff: a branch opened by ref has no uncommitted work.
+      // Diff nothing for a branch opened by ref: the checkout's uncommitted
+      // work belongs to another branch, as in /api/diff.
       patch = "";
     } else if (rev === WORKING_REV) {
       const working = await getWorkingTree(repo);
