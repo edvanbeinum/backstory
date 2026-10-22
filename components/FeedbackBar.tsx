@@ -114,7 +114,7 @@ export function FeedbackBar({
       }),
     );
 
-    return formatFeedback(drafts, { diffs, commits });
+    return formatFeedback(drafts, { diffs, commits, ref });
   };
 
   /**
