@@ -8,7 +8,7 @@ import type { DiffFile } from "@/lib/types";
 import { filesNotSeen, filesSeen, type Stop } from "@/lib/walk";
 import { DataCards } from "./DataSummary";
 import { NoteComposer } from "./NoteCard";
-import { Button } from "./ui";
+import { Button, Ticked } from "./ui";
 
 /**
  * Story's walk on screen: the bar that moves between stops, and the stop
@@ -209,7 +209,11 @@ export function StopView({
               </>
             }
           />
-          {stop.sentence && <p className="text-[14px]">{stop.sentence}</p>}
+          {stop.sentence && (
+            <p className="text-[14px]">
+              <Ticked text={stop.sentence} />
+            </p>
+          )}
           {stop.steps.length > 0 && (
             <p className="walk-steps">
               <span>On the flows at</span>
