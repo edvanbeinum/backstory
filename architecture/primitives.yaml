@@ -196,7 +196,8 @@ primitives:
       - Button
       - CopyButton
       - copyToClipboard
-    use: "The shared controls. A `Button` with `href` is a link that opens in a new window, which the Mac app hands to the browser."
+      - Ticked
+    use: "The shared controls. A `Button` with `href` is a link that opens in a new window, which the Mac app hands to the browser. `Ticked` shows each `backticked` name in AI-written text in monospace."
   - name: Claude Code notice
     block: UI tabs
     file: components/ClaudeCodeNotice.tsx

@@ -232,7 +232,7 @@ test("the prompt states every writing rule, with two good and two bad examples",
   const ai = recorder();
   await read(repo.view, { runner: ai.runner });
 
-  assert.equal(WRITING_RULES.length, 7);
+  assert.equal(WRITING_RULES.length, 8);
   assert.equal(GOOD_EXAMPLES.length, 2);
   assert.equal(BAD_EXAMPLES.length, 2);
   for (const line of [...WRITING_RULES, ...GOOD_EXAMPLES, ...BAD_EXAMPLES])
@@ -240,6 +240,7 @@ test("the prompt states every writing rule, with two good and two bad examples",
   for (const rule of [
     /Lead with the point/,
     /Use the real names given/,
+    /Put names from the code in backticks/,
     /"seamless", "robust", "leverage", "enhance", "streamline", "carries", "holds"/,
     /No openers like "This change…" or "This PR…"/,
     /A sentence that could describe any change is cut/,

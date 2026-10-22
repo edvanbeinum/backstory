@@ -224,3 +224,20 @@ export function Spinner({ className = "" }: { className?: string }) {
     />
   );
 }
+
+/** Text with each `backticked` name in monospace */
+export function Ticked({ text }: { text: string }) {
+  return (
+    <span>
+      {text.split("`").map((part, i) =>
+        i % 2 ? (
+          <code key={i} className="mono">
+            {part}
+          </code>
+        ) : (
+          part
+        ),
+      )}
+    </span>
+  );
+}

@@ -12,7 +12,7 @@ import {
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { AlertIcon } from "./icons";
 import { Elapsed, setAutoReading } from "./SystemMap";
-import { Badge, Button, Spinner } from "./ui";
+import { Badge, Button, Spinner, Ticked } from "./ui";
 
 /**
  * The view's description and its read, tagged with the view it answers for,
@@ -131,11 +131,15 @@ function Parts({
   return (
     <dl className="grid gap-x-6 gap-y-3 text-[14px] leading-6 sm:grid-cols-[max-content_1fr]">
       <dt className={`${LABEL} sm:pt-0.5`}>What it does</dt>
-      <dd className="m-0">{description.what}</dd>
+      <dd className="m-0">
+        <Ticked text={description.what} />
+      </dd>
       {description.why && (
         <>
           <dt className={`${LABEL} sm:pt-0.5`}>Why</dt>
-          <dd className="m-0">{description.why}</dd>
+          <dd className="m-0">
+            <Ticked text={description.why} />
+          </dd>
         </>
       )}
       {description.lookFirst.length > 0 && (
@@ -157,7 +161,11 @@ function Parts({
                   ) : (
                     <b className="font-semibold">{l.name}</b>
                   )}
-                  {l.reason && <>: {l.reason}</>}
+                  {l.reason && (
+                    <>
+                      : <Ticked text={l.reason} />
+                    </>
+                  )}
                 </li>
               ))}
             </ul>

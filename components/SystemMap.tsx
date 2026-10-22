@@ -14,7 +14,7 @@ import { ownsCode } from "@/lib/mapGroups";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { Badge, Button, CopyButton, Spinner } from "./ui";
+import { Badge, Button, CopyButton, Spinner, Ticked } from "./ui";
 
 /**
  * The map: the focused C4 view, open at the top of the story at the column's
@@ -481,22 +481,6 @@ function summary(map: MapResponse) {
       </span>,
     );
   return parts;
-}
-
-function Ticked({ text }: { text: string }) {
-  return (
-    <span>
-      {text.split("`").map((part, i) =>
-        i % 2 ? (
-          <code key={i} className="mono">
-            {part}
-          </code>
-        ) : (
-          part
-        ),
-      )}
-    </span>
-  );
 }
 
 /**

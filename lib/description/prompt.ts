@@ -40,6 +40,7 @@ export const descriptionSchema = () => ({
 export const WRITING_RULES = [
   "Lead with the point: the first words say what changed.",
   'Use the real names given: components, entities, screens, functions. Not "various parts of the system".',
+  "Put names from the code in backticks: functions, types, fields, files. Component and entity names stay plain.",
   'Plain, literal words. None of "seamless", "robust", "leverage", "enhance", "streamline", "carries", "holds". No metaphors or colloquialisms.',
   'No openers like "This change…" or "This PR…", and no closing summary.',
   "Each sentence says one thing. A sentence that could describe any change is cut.",
@@ -48,7 +49,7 @@ export const WRITING_RULES = [
 ];
 
 export const GOOD_EXAMPLES = [
-  "Retries a failed upload in Sync Engine three times, waiting longer each time, before it marks the order as unsynced.",
+  "Retries a failed upload in Sync Engine three times in `uploadOrder`, waiting longer each time, before it marks the order as unsynced.",
   "Saves the shopper's Basket when they sign out and loads it again on their next sign-in.",
 ];
 
