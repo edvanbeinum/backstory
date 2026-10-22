@@ -9,6 +9,7 @@ import {
   resolveComment,
   resolveRev,
   resolveTab,
+  viewParams,
 } from "../lib/url";
 
 function commit(sha: string): CommitSummary {
@@ -28,6 +29,41 @@ function commit(sha: string): CommitSummary {
 const NEWEST = "1e61946e49974e250cf688eda4c158132e12be83";
 const OLDER = "0a901d8d0161f3519c4b0065cf14da1796cee8d3";
 const COMMITS = [commit(NEWEST), commit(OLDER)];
+
+test("a view request names the branch only when the repo is open on one it hasn't checked out", () => {
+  assert.equal(
+    viewParams({ repo: "/r", rev: "branch" }).toString(),
+    "repo=%2Fr&rev=branch",
+  );
+  assert.equal(
+    viewParams({ repo: "/r", ref: null, rev: "branch" }).toString(),
+    "repo=%2Fr&rev=branch",
+  );
+  assert.equal(
+    viewParams({
+      repo: "/r",
+      ref: "stack/b",
+      rev: "branch",
+      path: "a.ts",
+      line: "3",
+      hunk: undefined,
+    }).toString(),
+    "repo=%2Fr&ref=stack%2Fb&rev=branch&path=a.ts&line=3",
+  );
+});
+
+test("a link to a branch the checkout hasn't checked out reopens on that branch", () => {
+  const url = buildUrl({
+    repo: "/r",
+    ref: "stack/prototype-01",
+    rev: "branch",
+  });
+  assert.equal(
+    parseUrlState(new URL(url, "http://x").search).ref,
+    "stack/prototype-01",
+  );
+  assert.equal(parseUrlState("?repo=/r").ref, undefined);
+});
 
 test("round-trips awkward repo paths", () => {
   for (const repo of [

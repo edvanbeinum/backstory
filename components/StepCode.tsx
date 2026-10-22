@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 
 import type { Snippet } from "@/lib/snippet";
+import { viewParams } from "@/lib/url";
 import { Spinner } from "./ui";
+import { useView } from "./ViewContext";
 
 /** Height of the inline code under a flow step; fixed, so the diagram's rows stay on their grid. */
 export const STEP_CODE_H = 268;
@@ -34,7 +36,8 @@ export function StepCode({
 }) {
   const [data, setData] = useState<Snippet | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const snippetKey = [repo, rev, path, side, line].join("\0");
+  const { ref } = useView();
+  const snippetKey = [repo, ref, rev, path, side, line].join("\0");
   const [shownKey, setShownKey] = useState(snippetKey);
   if (shownKey !== snippetKey) {
     setShownKey(snippetKey);
@@ -44,8 +47,9 @@ export function StepCode({
 
   useEffect(() => {
     let cancelled = false;
-    const params = new URLSearchParams({
+    const params = viewParams({
       repo,
+      ref,
       rev,
       path,
       side,
@@ -62,7 +66,7 @@ export function StepCode({
     return () => {
       cancelled = true;
     };
-  }, [repo, rev, path, side, line]);
+  }, [repo, ref, rev, path, side, line]);
 
   return (
     <div

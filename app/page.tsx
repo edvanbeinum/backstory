@@ -36,6 +36,7 @@ import { RepoBrowser } from "@/components/RepoBrowser";
 import { ConnectGitHubLink } from "@/components/SetupChecklist";
 import { PrTitle } from "@/components/PrTitle";
 import { useStaleReload } from "@/components/useStaleReload";
+import { ViewProvider } from "@/components/ViewContext";
 import { pushedState } from "@/lib/pushed";
 import { RepoBar } from "@/components/RepoBar";
 import {
@@ -56,6 +57,7 @@ import {
   resolveComment,
   resolveRev,
   resolveTab,
+  viewParams,
   writeUrlState,
   type Tab,
 } from "@/lib/url";
@@ -181,7 +183,11 @@ export default function Page() {
     view: string;
     data: DataResponse;
   } | null>(null);
-  const dataView = `${repoPath}\n${rev}`;
+  // Two branches of a stack are reviewed from one worktree, so the path alone
+  // doesn't say which branch a view is of.
+  const openKey = ref ? `${repoPath}\n${ref}` : repoPath;
+  const dataView = `${openKey}\n${rev}`;
+  const openView = useMemo(() => ({ repo: repoPath, ref }), [repoPath, ref]);
   const dataModel = dataRead?.view === dataView ? dataRead.data : null;
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
@@ -552,7 +558,7 @@ export default function Page() {
     setDiffError(null);
 
     getJson<DiffResponse>(
-      `/api/diff?repo=${encodeURIComponent(repoPath)}&rev=${encodeURIComponent(rev)}`,
+      `/api/diff?${viewParams({ repo: repoPath, ref, rev })}`,
     )
       .then((data) => {
         if (cancelled) return;
@@ -570,7 +576,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [repoPath, rev, haveSession, workingDiffKey]);
+  }, [repoPath, ref, rev, haveSession, workingDiffKey]);
 
   // The map follows the diff: a commit's never changes; the branch's moves
   // with HEAD.
@@ -582,20 +588,17 @@ export default function Page() {
       return;
     }
     let cancelled = false;
-    const query = `repo=${encodeURIComponent(repoPath)}&rev=${encodeURIComponent(rev)}`;
+    const query = viewParams({ repo: repoPath, ref, rev });
     getJson<MapResponse>(`/api/map?${query}`)
       .then((data) => !cancelled && setMap(data))
       .catch(() => !cancelled && setMap(null));
     getJson<DataResponse>(`/api/data?${query}`)
-      .then(
-        (data) =>
-          !cancelled && setDataRead({ view: `${repoPath}\n${rev}`, data }),
-      )
+      .then((data) => !cancelled && setDataRead({ view: dataView, data }))
       .catch(() => !cancelled && setDataRead(null));
     return () => {
       cancelled = true;
     };
-  }, [repoPath, rev, haveSession, workingDiffKey, modelTick]);
+  }, [repoPath, ref, rev, dataView, haveSession, workingDiffKey, modelTick]);
 
   const commitForRev = useMemo((): CommitSummary | null => {
     if (rev === WORKING_REV) return WORKING_COMMIT;
@@ -649,6 +652,7 @@ export default function Page() {
   // flows, or the last head's flows would sit on the new head's lines.
   const flows = useFlows(
     session ? repoPath : "",
+    ref,
     rev,
     `${flowsTick}:${workingDiffKey}`,
   );
@@ -669,7 +673,7 @@ export default function Page() {
     at: number;
   } | null>(null);
 
-  const viewKey = `${repoPath}@${rev}`;
+  const viewKey = `${openKey}@${rev}`;
   // Reset while rendering, not in an effect, so a new view never paints
   // with the last one's requests.
   const [shownView, setShownView] = useState(viewKey);
@@ -901,12 +905,12 @@ export default function Page() {
           side: note.side,
           line: note.line ?? undefined,
           note: note.id,
-          view: `${repoPath}@${note.rev}`,
+          view: `${openKey}@${note.rev}`,
           at: Date.now(),
         });
       setTab("files");
     },
-    [noteRev, pickRev, repoPath],
+    [noteRev, pickRev, openKey],
   );
 
   // j/k move through a list the way they would in a TUI, the open tab's:
@@ -1015,164 +1019,166 @@ export default function Page() {
             </div>
           </div>
         ) : session ? (
-          <div className="flex items-start">
-            <main className="min-w-0 flex-1 pb-16">
-              <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
-                {session.github.pr && <PrTitle pr={session.github.pr} />}
+          <ViewProvider value={openView}>
+            <div className="flex items-start">
+              <main className="min-w-0 flex-1 pb-16">
+                <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
+                  {session.github.pr && <PrTitle pr={session.github.pr} />}
 
-                {revNotice && (
-                  <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                    <AlertIcon
-                      size={13}
-                      className="mt-0.5 shrink-0 text-[var(--attention)]"
-                    />
-                    <span className="flex-1">
-                      <span className="mono">{revNotice}</span> isn&apos;t
-                      waiting to be pushed any more — it may already be on
-                      GitHub. Showing the latest instead.
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setRevNotice(null)}
-                      className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                    >
-                      Dismiss
-                    </button>
-                  </p>
-                )}
+                  {revNotice && (
+                    <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                      <AlertIcon
+                        size={13}
+                        className="mt-0.5 shrink-0 text-[var(--attention)]"
+                      />
+                      <span className="flex-1">
+                        <span className="mono">{revNotice}</span> isn&apos;t
+                        waiting to be pushed any more — it may already be on
+                        GitHub. Showing the latest instead.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRevNotice(null)}
+                        className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                      >
+                        Dismiss
+                      </button>
+                    </p>
+                  )}
 
-                {session.github.unavailable && !session.github.pr && (
-                  <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
-                    {session.github.unavailable}
-                    {session.github.connect && (
+                  {session.github.unavailable && !session.github.pr && (
+                    <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
+                      {session.github.unavailable}
+                      {session.github.connect && (
+                        <>
+                          {" "}
+                          <ConnectGitHubLink />
+                        </>
+                      )}
+                    </p>
+                  )}
+
+                  <ChangeHeader
+                    session={session}
+                    rev={rev}
+                    onRevChange={pickRev}
+                    commit={commitForRev}
+                    diff={diff}
+                    thread={selectedThread}
+                    pushed={revIsPushed}
+                  />
+
+                  <Tabs
+                    tab={tab}
+                    onTab={setTab}
+                    fileCount={
+                      diff && diff.rev === rev ? diff.files.length : null
+                    }
+                    threads={threads}
+                  />
+
+                  <WithReview root={session.repo.root} tick={reviewTick}>
+                    {({ notes, review, outbox }) => (
                       <>
-                        {" "}
-                        <ConnectGitHubLink />
-                      </>
-                    )}
-                  </p>
-                )}
+                        {visited.has("story") && (
+                          <div hidden={tab !== "story"}>
+                            <Story
+                              repo={repoPath}
+                              rev={rev}
+                              map={map}
+                              data={dataModel}
+                              entityNotes={entityNotes}
+                              onModelChange={onModelChange}
+                              mapHighlight={mapHighlight}
+                              onOpenFile={openFile}
+                              flows={flows}
+                              diff={diff && diff.rev === rev ? diff : null}
+                              onShowFiles={() => setTab("files")}
+                              onShowYourself={showYourself}
+                              target={storyTarget}
+                              onTargetDone={clearStoryTarget}
+                              onShowInFiles={showInFiles}
+                              navRef={flowNavRef}
+                              components={componentInfo}
+                              dataFields={dataFields}
+                              flowNotes={flowNotes}
+                              badges={badges}
+                              onBadge={selectComment}
+                            />
+                          </div>
+                        )}
+                        {visited.has("files") && (
+                          <div hidden={tab !== "files"}>
+                            <FilesChanged
+                              view={viewKey}
+                              diff={diff}
+                              loading={diffLoading}
+                              error={diffError}
+                              threads={threads}
+                              repo={session.repo}
+                              commit={commitForRev}
+                              focusedThreadId={focusedThreadId}
+                              notes={noteRev ? notes : null}
+                              noteRev={noteRev}
+                              map={map}
+                              flowSet={diffIsCurrent ? flowSet : null}
+                              marks={diffIsCurrent ? marks : null}
+                              jump={filesJump}
+                              onJumped={clearFilesJump}
+                              filterAsk={filesFilter}
+                              onShowOnMap={showOnMap}
+                              commentNumbers={commentNumbers}
+                              onStep={openStep}
+                              onComment={selectComment}
+                            />
+                          </div>
+                        )}
+                        {hasComments && visited.has("comments") && (
+                          <div hidden={tab !== "comments"}>
+                            <Comments
+                              threads={threads}
+                              focusedId={commentId}
+                              focusAsk={focusAsk}
+                              onFocus={(id) => {
+                                setCommentId(id);
+                                setFocusedThreadId(id);
+                              }}
+                              fileComponents={map?.fileComponents ?? null}
+                              threadSteps={threadSteps}
+                              onOpenStep={(at) =>
+                                openStep({ flow: at.flow - 1, row: at.row.key })
+                              }
+                              pr={session.github.pr}
+                            />
+                          </div>
+                        )}
 
-                <ChangeHeader
-                  session={session}
-                  rev={rev}
-                  onRevChange={pickRev}
-                  commit={commitForRev}
-                  diff={diff}
-                  thread={selectedThread}
-                  pushed={revIsPushed}
-                />
-
-                <Tabs
-                  tab={tab}
-                  onTab={setTab}
-                  fileCount={
-                    diff && diff.rev === rev ? diff.files.length : null
-                  }
-                  threads={threads}
-                />
-
-                <WithReview root={session.repo.root} tick={reviewTick}>
-                  {({ notes, review, outbox }) => (
-                    <>
-                      {visited.has("story") && (
-                        <div hidden={tab !== "story"}>
-                          <Story
-                            repo={repoPath}
-                            rev={rev}
-                            map={map}
-                            data={dataModel}
-                            entityNotes={entityNotes}
-                            onModelChange={onModelChange}
-                            mapHighlight={mapHighlight}
-                            onOpenFile={openFile}
-                            flows={flows}
-                            diff={diff && diff.rev === rev ? diff : null}
-                            onShowFiles={() => setTab("files")}
-                            onShowYourself={showYourself}
-                            target={storyTarget}
-                            onTargetDone={clearStoryTarget}
-                            onShowInFiles={showInFiles}
-                            navRef={flowNavRef}
-                            components={componentInfo}
-                            dataFields={dataFields}
-                            flowNotes={flowNotes}
-                            badges={badges}
-                            onBadge={selectComment}
-                          />
-                        </div>
-                      )}
-                      {visited.has("files") && (
-                        <div hidden={tab !== "files"}>
-                          <FilesChanged
-                            view={viewKey}
-                            diff={diff}
-                            loading={diffLoading}
-                            error={diffError}
-                            threads={threads}
-                            repo={session.repo}
-                            commit={commitForRev}
-                            focusedThreadId={focusedThreadId}
-                            notes={noteRev ? notes : null}
-                            noteRev={noteRev}
-                            map={map}
-                            flowSet={diffIsCurrent ? flowSet : null}
-                            marks={diffIsCurrent ? marks : null}
-                            jump={filesJump}
-                            onJumped={clearFilesJump}
-                            filterAsk={filesFilter}
-                            onShowOnMap={showOnMap}
-                            commentNumbers={commentNumbers}
-                            onStep={openStep}
-                            onComment={selectComment}
-                          />
-                        </div>
-                      )}
-                      {hasComments && visited.has("comments") && (
-                        <div hidden={tab !== "comments"}>
-                          <Comments
-                            threads={threads}
-                            focusedId={commentId}
-                            focusAsk={focusAsk}
-                            onFocus={(id) => {
-                              setCommentId(id);
-                              setFocusedThreadId(id);
-                            }}
-                            fileComponents={map?.fileComponents ?? null}
-                            threadSteps={threadSteps}
-                            onOpenStep={(at) =>
-                              openStep({ flow: at.flow - 1, row: at.row.key })
-                            }
-                            pr={session.github.pr}
-                          />
-                        </div>
-                      )}
-
-                      {/* Pinned to the bottom of the window on every tab: an
+                        {/* Pinned to the bottom of the window on every tab: an
                         agent waiting on review must never be invisible, and
                         notes written in Files changed are sent from anywhere. */}
-                      {(noteRev ||
-                        notes.notes.length > 0 ||
-                        review.waiting ||
-                        review.error) && (
-                        <div className="sticky bottom-4 z-20">
-                          <FeedbackBar
-                            notes={notes}
-                            noteRev={noteRev}
-                            diff={noteRev ? diff : null}
-                            session={session}
-                            review={review}
-                            outbox={outbox}
-                            onOpenNote={openNote}
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </WithReview>
-              </div>
-            </main>
-          </div>
+                        {(noteRev ||
+                          notes.notes.length > 0 ||
+                          review.waiting ||
+                          review.error) && (
+                          <div className="sticky bottom-4 z-20">
+                            <FeedbackBar
+                              notes={notes}
+                              noteRev={noteRev}
+                              diff={noteRev ? diff : null}
+                              session={session}
+                              review={review}
+                              outbox={outbox}
+                              onOpenNote={openNote}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </WithReview>
+                </div>
+              </main>
+            </div>
+          </ViewProvider>
         ) : null}
       </div>
     </ClaudeCodeGate>

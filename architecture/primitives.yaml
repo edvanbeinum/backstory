@@ -180,7 +180,8 @@ primitives:
     symbols:
       - buildUrl
       - writeUrlState
-    use: Builds and writes the page state into the URL, so a view can be shared.
+      - viewParams
+    use: "Builds and writes the page state into the URL, so a view can be shared. `viewParams` builds every view request's query, with `ref` when the repo is open on a branch it hasn't checked out."
   - name: buttons and copy
     block: UI tabs
     file: components/ui.tsx

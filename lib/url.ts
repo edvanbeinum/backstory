@@ -34,12 +34,14 @@ const TABS: readonly Tab[] = ["story", "files", "comments"];
 export function parseUrlState(search: string): UrlState {
   const params = new URLSearchParams(search);
   const repo = params.get("repo")?.trim();
+  const ref = params.get("ref")?.trim();
   const rev = params.get("rev")?.trim();
   const comment = params.get("comment")?.trim();
   const tab = TABS.find((t) => t === params.get("tab")?.trim());
 
   return {
     repo: repo ? repo : null,
+    ...(ref && { ref }),
     rev: rev ? rev : null,
     comment: comment ? comment : null,
     ...(tab && { tab }),
@@ -76,6 +78,30 @@ export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
   // spaces — stays encoded.
   const query = params.toString().replace(/%2F/g, "/");
   return `${pathname}${query ? `?${query}` : ""}`;
+}
+
+/**
+ * The query for a request about one view, with `ref` whenever the repo is
+ * open on a branch it hasn't checked out. Without `ref` the server reads the
+ * checkout's branch, so every view request is built here.
+ */
+export function viewParams({
+  repo,
+  ref,
+  rev,
+  ...extra
+}: {
+  repo: string;
+  ref?: string | null;
+  rev: string;
+  [extra: string]: string | null | undefined;
+}): URLSearchParams {
+  const params = new URLSearchParams({ repo });
+  if (ref) params.set("ref", ref);
+  params.set("rev", rev);
+  for (const [key, value] of Object.entries(extra))
+    if (value != null) params.set(key, value);
+  return params;
 }
 
 const EMPTY_STATE: UrlState = {

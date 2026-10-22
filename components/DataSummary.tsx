@@ -18,11 +18,13 @@ import type {
   Field,
   Relationship,
 } from "@/lib/data/types";
+import { viewParams } from "@/lib/url";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
 import { Elapsed, setAutoReading } from "./SystemMap";
 import { Badge, Button, Spinner } from "./ui";
+import { useView } from "./ViewContext";
 
 /**
  * The data model's change: a phrase on the line under the map, opening the
@@ -509,6 +511,8 @@ function useDataDraft(
   given: DataResponse | null,
   onRead: () => void,
 ) {
+  const { ref } = useView();
+  const viewId = `${repo}\n${ref ?? ""}\n${rev}`;
   const [answer, setAnswer] = useState<{
     over: DataResponse | null;
     data: DataResponse;
@@ -525,19 +529,19 @@ function useDataDraft(
   // not the read it was sent over: a page read that lands while a read starts
   // says idle, and would hide the answer that says running, so nothing would
   // poll. A page read that lands after the answer still replaces it.
-  const latest = useRef({ view: `${repo}\n${rev}`, given });
+  const latest = useRef({ view: viewId, given });
   // Try again repeats the last read: a Redraft only when that was a Redraft,
   // since one reads main in full and removes every derived model.
   const lastRedraft = useRef(false);
   useEffect(() => {
-    latest.current = { view: `${repo}\n${rev}`, given };
-  }, [repo, rev, given]);
+    latest.current = { view: viewId, given };
+  }, [viewId, given]);
 
   const request = useCallback(
     async (method: "GET" | "POST", redraft = false) => {
       if (method === "POST") lastRedraft.current = redraft;
-      const view = `${repo}\n${rev}`;
-      const params = new URLSearchParams({ repo, rev });
+      const view = viewId;
+      const params = viewParams({ repo, ref, rev });
       if (redraft) params.set("redraft", "1");
       // Drops the answer for a view the page has left.
       const over = () =>
@@ -573,7 +577,7 @@ function useDataDraft(
           });
       }
     },
-    [repo, rev],
+    [viewId, repo, ref, rev],
   );
 
   const data = answer?.over === given ? answer.data : given;
@@ -590,11 +594,10 @@ function useDataDraft(
     data?.status === "none" && data.draft?.status === "idle" && data.draft.auto;
   const autoStarted = useRef<string | null>(null);
   useEffect(() => {
-    const view = `${repo}\n${rev}`;
-    if (!autoStart || autoStarted.current === view) return;
-    autoStarted.current = view;
+    if (!autoStart || autoStarted.current === viewId) return;
+    autoStarted.current = viewId;
     void request("POST");
-  }, [autoStart, repo, rev, request]);
+  }, [autoStart, viewId, request]);
 
   const setAuto = useCallback(
     async (on: boolean) => {

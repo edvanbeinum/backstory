@@ -11,10 +11,12 @@ import {
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
 import { ownsCode } from "@/lib/mapGroups";
+import { viewParams } from "@/lib/url";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
 import { Badge, Button, CopyButton, Spinner } from "./ui";
+import { useView } from "./ViewContext";
 
 /**
  * The map: the focused C4 view, open at the top of the story at the column's
@@ -528,6 +530,8 @@ function useMapDraft(
   given: MapResponse | null,
   onRead: () => void,
 ) {
+  const { ref } = useView();
+  const viewId = `${repo}\n${ref ?? ""}\n${rev}`;
   const [answer, setAnswer] = useState<{
     over: MapResponse | null;
     map: MapResponse;
@@ -544,10 +548,10 @@ function useMapDraft(
   // not the read it was sent over: a page read that lands while a read starts
   // says idle, and would hide the answer that says running, so nothing would
   // poll. A page read that lands after the answer still replaces it.
-  const latest = useRef({ view: `${repo}\n${rev}`, given });
+  const latest = useRef({ view: viewId, given });
   useEffect(() => {
-    latest.current = { view: `${repo}\n${rev}`, given };
-  }, [repo, rev, given]);
+    latest.current = { view: viewId, given };
+  }, [viewId, given]);
   // Try again repeats the last read: a Redraft only when that was a Redraft,
   // since one reads main in full and removes every derived map.
   const lastRedraft = useRef(false);
@@ -555,8 +559,8 @@ function useMapDraft(
   const request = useCallback(
     async (method: "GET" | "POST", redraft = false) => {
       if (method === "POST") lastRedraft.current = redraft;
-      const view = `${repo}\n${rev}`;
-      const params = new URLSearchParams({ repo, rev });
+      const view = viewId;
+      const params = viewParams({ repo, ref, rev });
       if (redraft) params.set("redraft", "1");
       // Drops the answer for a view the page has left.
       const over = () =>
@@ -592,7 +596,7 @@ function useMapDraft(
           });
       }
     },
-    [repo, rev],
+    [viewId, repo, ref, rev],
   );
 
   const map = answer?.over === given ? answer.map : given;
@@ -615,15 +619,14 @@ function useMapDraft(
     map.draft.auto;
   const autoStarted = useRef<string | null>(null);
   useEffect(() => {
-    const view = `${repo}\n${rev}`;
     if (!autoStart) {
       autoStarted.current = null;
       return;
     }
-    if (autoStarted.current === view) return;
-    autoStarted.current = view;
+    if (autoStarted.current === viewId) return;
+    autoStarted.current = viewId;
     void request("POST");
-  }, [autoStart, repo, rev, request]);
+  }, [autoStart, viewId, request]);
 
   const setAuto = useCallback(
     async (on: boolean) => {
