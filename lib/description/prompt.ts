@@ -97,7 +97,7 @@ ${named(inputs.components, "This repo has no map yet, so there are no component 
 Entities the change touches:
 ${named(inputs.entities, "None.")}
 
-Pull request:
+The branch's pull request, which may cover more than this change; describe only what the patch does:
 ${inputs.pr ? `${inputs.pr.title}\n\n${inputs.pr.body.trim() || "(No description.)"}` : "None."}
 
 Commit messages:
