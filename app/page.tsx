@@ -147,6 +147,8 @@ export default function Page() {
 
   const [rev, setRev] = useState<string>(WORKING_REV);
   const [diff, setDiff] = useState<DiffResponse | null>(null);
+  /** The view the diff on screen was read for: its `rev` alone doesn't name the branch. */
+  const [diffView, setDiffView] = useState<string | null>(null);
   const [diffError, setDiffError] = useState<string | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
 
@@ -178,7 +180,11 @@ export default function Page() {
   /** Bumped when a flow run finishes. */
   const [flowsTick, setFlowsTick] = useState(0);
   const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
-  const [map, setMap] = useState<MapResponse | null>(null);
+  /** Keeps the map with the view it was read for, as `dataRead` does the data model. */
+  const [mapRead, setMapRead] = useState<{
+    view: string;
+    map: MapResponse;
+  } | null>(null);
   /** Bumped when a model or data model draft is written, so both are read again */
   const [modelTick, setModelTick] = useState(0);
   const onModelChange = useCallback(() => setModelTick((t) => t + 1), []);
@@ -192,6 +198,7 @@ export default function Page() {
     data: DataResponse;
   } | null>(null);
   const viewId = viewKey({ ...shown, rev });
+  const map = mapRead?.view === viewId ? mapRead.map : null;
   const dataModel = dataRead?.view === viewId ? dataRead.data : null;
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
@@ -571,6 +578,7 @@ export default function Page() {
       .then((data) => {
         if (cancelled) return;
         setDiff(data);
+        setDiffView(viewId);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -584,22 +592,22 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [shown, rev, haveSession, workingDiffKey]);
+  }, [shown, rev, viewId, haveSession, workingDiffKey]);
 
   // The map follows the diff: a commit's never changes; the branch's moves
   // with its tip.
   useEffect(() => {
     if (!shown.repo || !haveSession || rev === WORKING_REV) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the map where there is none, else fetches it
-      setMap(null);
+      setMapRead(null);
       setDataRead(null);
       return;
     }
     let cancelled = false;
     const query = viewParams({ repo: shown.repo, ref: shown.ref, rev });
     getJson<MapResponse>(`/api/map?${query}`)
-      .then((data) => !cancelled && setMap(data))
-      .catch(() => !cancelled && setMap(null));
+      .then((data) => !cancelled && setMapRead({ view: viewId, map: data }))
+      .catch(() => !cancelled && setMapRead(null));
     getJson<DataResponse>(`/api/data?${query}`)
       .then((data) => !cancelled && setDataRead({ view: viewId, data }))
       .catch(() => !cancelled && setDataRead(null));
@@ -734,7 +742,7 @@ export default function Page() {
 
   // The last view's diff stays on screen while this one's loads; this view's
   // flows must wait for it, or their marks sit on the old diff's lines.
-  const diffIsCurrent = diff?.rev === rev;
+  const diffIsCurrent = diff !== null && diffView === viewId;
 
   /** Every flow's steps, by the diff line each sits on, for the gutter marks. */
   const marks = useMemo(() => (flowSet ? stepMarks(flowSet) : null), [flowSet]);
@@ -896,12 +904,12 @@ export default function Page() {
   // is this change's — for a moment after switching it's still the last one,
   // and a note left then would be filed against the wrong change.
   const noteRev = useMemo(() => {
-    if (!diff || diff.rev !== rev) return null;
+    if (!diffIsCurrent) return null;
     if (rev === WORKING_REV || rev === BRANCH_REV) return rev;
     if (commitForRev && /^[0-9a-f]{40}$/.test(commitForRev.sha))
       return commitForRev.sha;
     return /^[0-9a-f]{40}$/.test(rev) ? rev : null;
-  }, [diff, rev, commitForRev]);
+  }, [diffIsCurrent, rev, commitForRev]);
 
   const openNote = useCallback(
     (note: Note) => {
@@ -1078,9 +1086,7 @@ export default function Page() {
                   <Tabs
                     tab={tab}
                     onTab={setTab}
-                    fileCount={
-                      diff && diff.rev === rev ? diff.files.length : null
-                    }
+                    fileCount={diffIsCurrent ? diff.files.length : null}
                     threads={threads}
                   />
 
@@ -1099,7 +1105,7 @@ export default function Page() {
                               mapHighlight={mapHighlight}
                               onOpenFile={openFile}
                               flows={flows}
-                              diff={diff && diff.rev === rev ? diff : null}
+                              diff={diffIsCurrent ? diff : null}
                               onShowFiles={() => setTab("files")}
                               onShowYourself={showYourself}
                               target={storyTarget}
