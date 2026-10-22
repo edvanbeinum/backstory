@@ -610,6 +610,7 @@ export async function getBranchDiffSummary(
       ...PATCH_FLAGS,
       info.baseSha,
       repo.tip,
+      "--",
     ])) ?? "";
   // " 12 files changed, 540 insertions(+), 210 deletions(-)" — any of the
   // three clauses can be absent.
@@ -627,13 +628,16 @@ export async function getRangePatch(
   to: string,
   opts: PatchOptions = {},
 ): Promise<string> {
+  // End the revisions with `--` even with no paths: `to` can be a branch
+  // opened by ref, and git refuses a branch named like a file or folder.
+  const paths = pathspecArgs(opts);
   const out = await gitTry(root, [
     "diff",
     ...PATCH_FLAGS,
     ...contextArgs(opts),
     from,
     to,
-    ...pathspecArgs(opts),
+    ...(paths.length > 0 ? paths : ["--"]),
   ]);
   return out ?? "";
 }

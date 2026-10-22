@@ -210,6 +210,18 @@ test("a branch opened by ref with no PR diffs from the default branch's fork poi
   );
 });
 
+test("a branch opened by ref that is named like a folder still diffs", async () => {
+  const { root, git } = stack();
+  git("branch", "src", "stack-b");
+  assert.deepEqual(await diffPaths({ repo: root, ref: "src", rev: "branch" }), [
+    "db/schema.sql",
+    "src/a1.ts",
+    "src/a2.ts",
+    "src/b1.ts",
+    "src/b2.ts",
+  ]);
+});
+
 test("View file and a step's code read the branch opened by ref", async () => {
   const { root } = stack();
   const view = { repo: root, ref: "stack-b", rev: "branch", path: "src/b1.ts" };
