@@ -149,7 +149,7 @@ export function Story({
   }, [walk]);
 
   // The stops seen on this view, kept only for the view they were seen on.
-  const view = `${repo}\n${rev}`;
+  const view = `${repo}\n${rev}\n${gitRef ?? ""}`;
   const [seen, setSeen] = useState({ view, keys: new Set<string>() });
   if (seen.view !== view) setSeen({ view, keys: new Set() });
   else if (walk && !seen.keys.has(current.key))
