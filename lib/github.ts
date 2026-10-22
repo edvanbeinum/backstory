@@ -373,6 +373,7 @@ query($owner: String!, $name: String!, $branch: String!) {
       nodes {
         number
         title
+        body
         url
         state
         isDraft
@@ -508,6 +509,7 @@ export async function loadGitHubData(repo: RepoInfo): Promise<GitHubData> {
 interface PullRequestRow {
   number: number;
   title: string;
+  body?: string | null;
   url: string;
   state: string;
   isDraft: boolean;
@@ -543,6 +545,7 @@ async function findPullRequest(
   return {
     number: chosen.number,
     title: chosen.title,
+    body: chosen.body ?? "",
     url: chosen.url,
     state: chosen.state,
     isDraft: chosen.isDraft,
@@ -572,7 +575,7 @@ async function listPullRequestsWithGh(
     "--limit",
     "10",
     "--json",
-    "number,title,url,state,isDraft,baseRefName,headRefName,author,isCrossRepository,headRepositoryOwner",
+    "number,title,body,url,state,isDraft,baseRefName,headRefName,author,isCrossRepository,headRepositoryOwner",
   ]);
   return JSON.parse(stdout || "[]") as PullRequestRow[];
 }
