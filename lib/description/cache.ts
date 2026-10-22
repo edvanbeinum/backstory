@@ -123,15 +123,16 @@ export async function descriptionStatus(
   if (ended?.status === "unavailable") {
     const reason = providerGap(await (status ?? aiProvider().status)());
     if (reason) {
-      registry.ended.set(file, { ...ended, reason });
-      return { ...ended, reason };
+      ended = { ...ended, reason };
+      registry.ended.set(file, ended);
+    } else {
+      registry.ended.delete(file);
+      ended = undefined;
     }
-    registry.ended.delete(file);
-    ended = undefined;
   }
   const cached = await readCache(file);
-  // A failed Describe again keeps showing the description it would have
-  // replaced, with the failure.
+  // A Describe again that failed or couldn't start keeps showing the
+  // description it would have replaced, with why.
   if (cached)
     return {
       status: "done",
@@ -141,6 +142,7 @@ export async function descriptionStatus(
       readAt: cached.readAt,
       auto: await autoRead(view.root),
       ...(ended?.status === "failed" && { error: ended.error }),
+      ...(ended?.status === "unavailable" && { gap: ended.reason }),
     };
   if (ended) return ended;
   return {

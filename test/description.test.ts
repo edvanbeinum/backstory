@@ -438,6 +438,26 @@ test("a provider that isn't installed, or is logged out, says so and reads nothi
   assert.equal(existsSync(await cacheDir(repo.root)), false);
 });
 
+test("Describe again with the provider signed out keeps the earlier description, with the notice", async () => {
+  const repo = shopRepo();
+  await read(repo.view, { runner: recorder().runner });
+  const signedOut = async () => "logged-out" as const;
+  const ai = recorder();
+  await startDescription(repo.view, {
+    runner: ai.runner,
+    status: signedOut,
+    redraft: true,
+  });
+  assert.equal(ai.prompts.length, 0);
+  const kept = await descriptionStatus(repo.view, signedOut);
+  assert.equal(kept.status, "done");
+  assert.equal(kept.status === "done" && kept.description.what, ANSWER.what);
+  assert.equal(kept.status === "done" && kept.gap, "logged-out");
+
+  const signedIn = await descriptionStatus(repo.view, ready);
+  assert.equal(signedIn.status === "done" && signedIn.gap, undefined);
+});
+
 test("opening a view starts its read when the repo reads automatically, and waits for a click when it doesn't", async () => {
   const repo = shopRepo();
   assert.equal(startsByItself(await descriptionStatus(repo.view)), true);

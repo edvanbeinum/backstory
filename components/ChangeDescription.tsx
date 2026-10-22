@@ -251,6 +251,14 @@ export function ChangeDescription({
             Describe again
           </Button>
         </span>
+        {status.gap && (
+          <p className="mt-2 text-[12px] text-[var(--attention)]">
+            <ClaudeCodeNotice
+              reason={status.gap}
+              needs="Describing this change again needs"
+            />
+          </p>
+        )}
         {status.error && (
           <p className="mt-2 flex min-w-0 items-center gap-1 text-[12px] text-[var(--attention)]">
             <AlertIcon size={11} />

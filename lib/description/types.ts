@@ -39,6 +39,8 @@ export type DescriptionStatus =
       auto: boolean;
       /** Why the last Describe again failed, when it did */
       error?: string;
+      /** Why the last Describe again couldn't start, when the provider is missing or signed out */
+      gap?: ProviderGap;
     }
   | { status: "failed"; error: string }
   | { status: "unavailable"; provider: string; reason: ProviderGap };
