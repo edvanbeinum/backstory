@@ -218,6 +218,12 @@ export default function Page() {
    * exist and bounce you off it.
    */
   const pickedRevs = useRef<string[]>([]);
+  /**
+   * Set when another repo or branch is opened, so its session starts the view
+   * afresh. A commit picked on the last branch isn't this one's, and looking
+   * it up here would claim it's already on GitHub.
+   */
+  const reopened = useRef(false);
   useEffect(() => {
     repoRef.current = repoPath;
   }, [repoPath]);
@@ -418,11 +424,14 @@ export default function Page() {
 
         setCommentId((current) => resolveComment(current, data.github.threads));
 
+        const fresh = reopened.current;
+        reopened.current = false;
+        if (fresh) pickedRevs.current = [];
         setRev((current) => {
           // History counts: a URL can point at an already-pushed commit and
           // that's a perfectly good thing to view.
           const { rev: next, notice } = resolveRev(
-            current,
+            fresh ? WORKING_REV : current,
             [...data.commits, ...data.history],
             data.working.hasChanges,
             data.branchDiff !== null,
@@ -875,6 +884,8 @@ export default function Page() {
   const selectRepo = useCallback((path: string, branch?: string | null) => {
     const trimmed = path.trim();
     window.localStorage.setItem(STORAGE_KEY, trimmed);
+    if (trimmed !== repoRef.current || (branch ?? null) !== refRef.current)
+      reopened.current = true;
     setRef(branch ?? null);
     setRepoPath(trimmed);
     setSetup(false);
