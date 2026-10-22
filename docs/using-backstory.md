@@ -133,6 +133,9 @@ before reading its lines:
     you turned off (see **Turn off** below), **Draw the map** reads one view,
     and **Read automatically** beside it turns reading back on for the repo's
     maps and data models.
+  - The map draws each component inside its container's box, and each
+    container inside its system's box. An arrow ends at the box the model
+    names, so an arrow to a container meets the container's edge.
   - The map opens by itself when the change touches a component. When it
     touches none, the line under the map says so and has **Show map**, which
     opens the whole system at the level of its containers: every container,

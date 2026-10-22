@@ -10,8 +10,9 @@ import {
 } from "react";
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
+import { ownsCode } from "@/lib/mapGroups";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
-import { edgePath, layeredLayout } from "./graph";
+import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
 import { Badge, Button, CopyButton, Spinner } from "./ui";
 
@@ -27,6 +28,14 @@ const MAX_NODE_W = 280;
 const MAX_FILES = 4;
 const COL_GAP = 18;
 const PAD = 14;
+/** A container's or system's box: the header above its children, and the space around them. */
+const GROUP_HEADER = 32;
+const GROUP_INSET = 12;
+
+const GROUP_TYPE: Record<string, string> = {
+  softwareSystem: "Software system",
+  container: "Container",
+};
 
 /**
  * A box's height before it's measured: name, the description wrapped, and
@@ -55,7 +64,7 @@ function layout(
   width: number,
   heights: Map<string, number> = new Map(),
 ) {
-  return layeredLayout(
+  return nestedLayout(
     nodes,
     edges,
     width,
@@ -67,6 +76,7 @@ function layout(
       colGap: COL_GAP,
       pad: PAD,
     },
+    { header: GROUP_HEADER, inset: GROUP_INSET },
   );
 }
 
@@ -150,6 +160,42 @@ function MapCanvas({
 
   return (
     <div className="map-canvas" style={{ height }}>
+      {[...placed.values()]
+        .filter((n) => n.group)
+        .map((n) => (
+          <div
+            key={n.id}
+            className={`map-group ${n.state} ${highlight === n.name ? "highlight" : ""}`}
+            style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
+            title={n.description || undefined}
+          >
+            <h4 style={{ height: GROUP_HEADER }}>
+              <span className="name">{n.name}</span>
+              <span className="type">{GROUP_TYPE[n.type] ?? n.type}</span>
+              {n.state === "added" && <span className="map-tag new">New</span>}
+              {n.state === "removed" && (
+                <span className="map-tag removed">Removed</span>
+              )}
+              {n.files.length > 0 && (
+                <button
+                  type="button"
+                  className="files mono"
+                  title={`${n.files.join("\n")}\nShow them in Files changed`}
+                  onClick={() => onJump(n.files[0])}
+                >
+                  {n.files.length} {n.files.length === 1 ? "file" : "files"}{" "}
+                  <span className="text-[var(--success)]">+{n.additions}</span>
+                  {n.deletions > 0 && (
+                    <span className="text-[var(--danger)]">
+                      {" "}
+                      −{n.deletions}
+                    </span>
+                  )}
+                </button>
+              )}
+            </h4>
+          </div>
+        ))}
       <svg
         className="map-edges"
         width={width}
@@ -250,6 +296,7 @@ function MapCanvas({
       })}
 
       {[...placed.values()].map((n) => {
+        if (n.group) return null;
         // "+1 more" takes a line anyway: name the file instead.
         const shown = n.fileStats.slice(
           0,
@@ -357,7 +404,11 @@ const names = (list: MapNode[]) => {
 };
 
 function summary(map: MapResponse) {
-  const changed = map.nodes.filter((n) => n.state !== "neighbour");
+  // A new or removed box is named as such, but a box around a changed
+  // component isn't a changed component itself.
+  const changed = map.nodes
+    .filter(ownsCode)
+    .filter((n) => n.state !== "neighbour");
   const added = map.nodes.filter((n) => n.state === "added");
   const removed = map.nodes.filter((n) => n.state === "removed");
   const arrows = {

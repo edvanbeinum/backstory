@@ -17,8 +17,9 @@ import { hasMainMap, mapStatus, type MapDraftStatus } from "./models/cache";
  * MIT): an element is added or removed by its identifier; an arrow by its two
  * ends, so a new label on the same pair reads as changed.
  *
- * Focused on the change: the changed elements and their direct neighbours.
- * A drafted map is compared like a committed one, base with head.
+ * Focused on the change: the changed elements and their direct neighbours,
+ * each drawn inside the boxes of its container and system. A drafted map is
+ * compared like a committed one, base with head.
  */
 
 export type NodeState = "touched" | "added" | "removed" | "neighbour";
@@ -30,6 +31,10 @@ export interface MapNode {
   description: string;
   type: string;
   state: NodeState;
+  /** The box it's drawn inside: its container or system, when that's drawn */
+  parent: string | null;
+  /** A container or system drawn as a box around others; never has files */
+  group: boolean;
   files: string[];
   /** Each file's own change, in `files` order */
   fileStats: {
@@ -76,9 +81,9 @@ export interface MapResponse {
   mainMap?: boolean;
   nodes: MapNode[];
   edges: MapEdge[];
-  /** Every component, person and external system, unchanged, when the change touches none */
+  /** Every element and arrow, unchanged, when the change touches no component */
   whole?: { nodes: MapNode[]; edges: MapEdge[] };
-  /** Elements in the model that the focused map leaves out */
+  /** Components in the model that the focused map leaves out */
   hidden: number;
   /** Each changed file's component, by name, for the diff's file headers */
   fileComponents: Record<string, string>;
@@ -146,59 +151,70 @@ async function fileStats(
 
 const leafOf = (model: Model, file: string) => model.match(file);
 
+/** An element's containers and systems, nearest first. */
+function ancestors(
+  elementOf: (id: string) => ModelElement | undefined,
+  id: string,
+) {
+  const found: string[] = [];
+  for (let p = elementOf(id)?.parent; p; p = elementOf(p)?.parent ?? null)
+    found.push(p);
+  return found;
+}
+
+/** Whether `outer` is `inner`'s container or system, at any depth. */
+const contains = (
+  elementOf: (id: string) => ModelElement | undefined,
+  outer: string,
+  inner: string,
+) => ancestors(elementOf, inner).includes(outer);
+
+const unchanged = (): Pick<
+  MapNode,
+  "files" | "fileStats" | "additions" | "deletions" | "newFiles"
+> => ({
+  files: [],
+  fileStats: [],
+  additions: 0,
+  deletions: 0,
+  newFiles: 0,
+});
+
 /**
- * The whole system, for Show map, as a container view: each container,
- * person, and software system with no containers inside, unchanged. Each
- * arrow is drawn between the boxes its ends sit in, so a component's arrow
- * becomes its container's; arrows within one box, and arrows to a system
- * drawn as its containers, are left out.
+ * The whole system, for Show map: every element unchanged, each inside its
+ * parent's box, and every arrow as the model names it. An arrow between an
+ * element and its own container or system is left out: one box contains
+ * the other.
  */
 function wholeMap(model: Model): { nodes: MapNode[]; edges: MapEdge[] } {
   const parents = new Set(
     [...model.elements.values()].map((e) => e.parent).filter(Boolean),
   );
-  const drawn = (e: ModelElement) =>
-    e.type === "container" || (e.type !== "component" && !parents.has(e.id));
-  const boxOf = (id: string): string | null => {
-    for (let e = model.elements.get(id); e;) {
-      if (drawn(e)) return e.id;
-      e = e.parent ? model.elements.get(e.parent) : undefined;
-    }
-    return null;
-  };
-  const nodes: MapNode[] = [...model.elements.values()]
-    .filter(drawn)
-    .map((e) => ({
-      id: e.id,
-      name: e.name,
-      description: e.description,
-      type: e.type,
-      state: "neighbour",
-      files: [],
-      fileStats: [],
-      additions: 0,
-      deletions: 0,
-      newFiles: 0,
+  const elementOf = (id: string) => model.elements.get(id);
+  const nodes: MapNode[] = [...model.elements.values()].map((e) => ({
+    id: e.id,
+    name: e.name,
+    description: e.description,
+    type: e.type,
+    state: "neighbour",
+    parent: e.parent && model.elements.has(e.parent) ? e.parent : null,
+    group: parents.has(e.id),
+    ...unchanged(),
+  }));
+  const edges: MapEdge[] = [...model.relationships.values()]
+    .filter(
+      (r) =>
+        !contains(elementOf, r.source, r.destination) &&
+        !contains(elementOf, r.destination, r.source),
+    )
+    .map((r) => ({
+      key: r.key,
+      source: r.source,
+      destination: r.destination,
+      description: r.description,
+      state: "same",
     }));
-  const between = new Map<string, MapEdge>();
-  for (const r of model.relationships.values()) {
-    const source = boxOf(r.source);
-    const destination = boxOf(r.destination);
-    if (!source || !destination || source === destination) continue;
-    const key = `${source} → ${destination}`;
-    const edge = between.get(key);
-    if (!edge)
-      between.set(key, {
-        key,
-        source,
-        destination,
-        description: r.description,
-        state: "same",
-      });
-    else if (!edge.description.split("; ").includes(r.description))
-      edge.description = `${edge.description}; ${r.description}`;
-  }
-  return { nodes, edges: [...between.values()] };
+  return { nodes, edges };
 }
 
 /** The focused map stays a glance: changed elements plus a few neighbours. */
@@ -256,16 +272,7 @@ export async function buildMap(
 
   // Files: each to its one leaf element. A deleted file maps by the base
   // model, where its element may still exist.
-  const touched = new Map<
-    string,
-    {
-      files: string[];
-      fileStats: MapNode["fileStats"];
-      additions: number;
-      deletions: number;
-      newFiles: number;
-    }
-  >();
+  const touched = new Map<string, ReturnType<typeof unchanged>>();
   const fileComponents: Record<string, string> = {};
   const unmapped: string[] = [];
   const ambiguous: { file: string; ids: string[] }[] = [];
@@ -282,13 +289,7 @@ export async function buildMap(
       ambiguous.push({ file: f.path, ids });
       continue;
     }
-    const entry = touched.get(ids[0]) ?? {
-      files: [],
-      fileStats: [],
-      additions: 0,
-      deletions: 0,
-      newFiles: 0,
-    };
+    const entry = touched.get(ids[0]) ?? unchanged();
     entry.files.push(f.path);
     entry.fileStats.push({
       path: f.path,
@@ -343,17 +344,13 @@ export async function buildMap(
   // changed) still counts as changed only if it's added or removed; an
   // arrow's ends are its neighbours.
   const changed = new Set([...touched.keys(), ...added, ...removed]);
-  // Containers and systems that hold changed components aren't drawn twice.
-  const parents = new Set<string>();
-  for (const id of changed) {
-    for (
-      let p = (model.elements.get(id) ?? baseModel?.elements.get(id))?.parent;
-      p;
-    ) {
-      parents.add(p);
-      p = (model.elements.get(p) ?? baseModel?.elements.get(p))?.parent ?? null;
-    }
-  }
+  // Containers and systems that contain changed components are drawn as the
+  // boxes around them, not as changed elements of their own.
+  const elementOf = (id: string) =>
+    model.elements.get(id) ?? baseModel?.elements.get(id);
+  const parents = new Set(
+    [...changed].flatMap((id) => ancestors(elementOf, id)),
+  );
   for (const p of parents) changed.delete(p);
 
   // Neighbours, best first: the far end of a changed arrow always shows;
@@ -376,9 +373,17 @@ export async function buildMap(
     ranked.filter(([, n], i) => n >= 100 || i < room).map(([id]) => id),
   );
 
+  // Every container and system around a shown element is drawn too, as the
+  // box it sits in.
   const shown = new Set([...changed, ...neighbours]);
+  for (const id of [...shown])
+    for (const p of ancestors(elementOf, id)) shown.add(p);
+  const groups = new Set(
+    [...shown].map((id) => elementOf(id)?.parent).filter(Boolean),
+  );
   const nodes: MapNode[] = [...shown].map((id) => {
-    const el = model.elements.get(id) ?? baseModel?.elements.get(id);
+    const el = elementOf(id);
+    const group = groups.has(id);
     const t = touched.get(id);
     return {
       id,
@@ -392,6 +397,8 @@ export async function buildMap(
           : t
             ? "touched"
             : "neighbour",
+      parent: el?.parent && shown.has(el.parent) ? el.parent : null,
+      group,
       files: t?.files ?? [],
       fileStats: t?.fileStats ?? [],
       additions: t?.additions ?? 0,
@@ -400,9 +407,11 @@ export async function buildMap(
     };
   });
 
-  const leaves = [...model.elements.values()].filter(
-    (e) => e.type === "component" || e.globs.length > 0,
-  ).length;
+  const leaves = new Set(
+    [...model.elements.values()]
+      .filter((e) => e.type === "component" || e.globs.length > 0)
+      .map((e) => e.id),
+  );
 
   return {
     status: "ok",
@@ -415,13 +424,14 @@ export async function buildMap(
     ...reading,
     nodes,
     edges: [...edges.values()].filter(
-      (e) => shown.has(e.source) && shown.has(e.destination),
+      (e) =>
+        shown.has(e.source) &&
+        shown.has(e.destination) &&
+        !contains(elementOf, e.source, e.destination) &&
+        !contains(elementOf, e.destination, e.source),
     ),
     ...(nodes.length === 0 ? { whole: wholeMap(model) } : {}),
-    hidden: Math.max(
-      0,
-      leaves - nodes.filter((n) => n.state !== "removed").length,
-    ),
+    hidden: leaves.size - nodes.filter((n) => leaves.has(n.id)).length,
     fileComponents,
     unmapped,
     ambiguous,

@@ -12,6 +12,13 @@ export interface ComponentGroup<F> {
 }
 
 /**
+ * Whether a node counts as a component of its own: a leaf box, or a
+ * container drawn around others whose own files the change touched.
+ */
+export const ownsCode = (n: Pick<MapNode, "group" | "files">) =>
+  !n.group || n.files.length > 0;
+
+/**
  * Changed files under the components they belong to, in the map's order,
  * with the files no component holds last, so the diff reads in the order
  * the map does. Every file lands in exactly one group.

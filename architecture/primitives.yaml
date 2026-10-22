@@ -200,5 +200,6 @@ primitives:
     file: components/graph.ts
     symbols:
       - layeredLayout
+      - nestedLayout
       - edgePath
-    use: Lays out and draws the map and data diagrams.
+    use: "Lays out and draws the map and data diagrams. `nestedLayout` lays out boxes inside boxes, so the map draws components inside their containers and containers inside their systems."
