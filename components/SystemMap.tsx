@@ -43,8 +43,10 @@ function Squares({ add, del }: { add: number; del: number }) {
 }
 
 /** Scroll the diff to a file and flash its header. */
-export function jumpToFile(path: string): boolean {
-  const section = document.getElementById(`file-${encodeURIComponent(path)}`);
+export function jumpToFile(path: string, root: ParentNode = document): boolean {
+  const section = root.querySelector<HTMLElement>(
+    `#${CSS.escape(`file-${encodeURIComponent(path)}`)}`,
+  );
   if (!section) return false;
   section.scrollIntoView({ block: "start" });
   section.classList.remove("flash");
