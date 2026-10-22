@@ -271,7 +271,7 @@ export async function dataStatus(
   return ended ?? idle;
 }
 
-/** The current read's end, for tests: nothing waits on a read otherwise. */
+/** The end of the view's current read, if one is running: the change description waits on it, as tests do. */
 export async function dataReadSettled(view: DataView): Promise<void> {
   await registry.jobs.get((await filesFor(view)).key)?.settled;
 }

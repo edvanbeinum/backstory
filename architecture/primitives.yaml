@@ -162,6 +162,7 @@ primitives:
     symbols:
       - dataStatus
       - startDataRead
+      - dataReadSettled
       - startTrunkRead
       - autoRead
       - setAutoRead
@@ -172,7 +173,7 @@ primitives:
     symbols:
       - descriptionStatus
       - startDescription
-    use: "The AI provider's change description for a view: what it does, why, and at most two places to look first, read from the view's patch (cut past the drafted reads' cap, with a `--stat`), commit messages, PR and the names of the components and entities it touches, through `withSnapshot`. Waits for the view's map read (`mapReadSettled`), starting it when the repo reads automatically, so the names are this commit's. Cached by base and head trees under `~/.backstory/descriptions/`, one read at a time. The schema and the prompt's writing rules are in `lib/description/prompt.ts`, so a read that adds to the description changes that one file."
+    use: "The AI provider's change description for a view: what it does, why, and at most two places to look first, read from the view's patch (cut past the drafted reads' cap, with a `--stat`), commit messages, PR and the names of the components and entities it touches, through `withSnapshot`. Waits for the view's map and data model reads (`mapReadSettled`, `dataReadSettled`), starting them when the repo reads automatically, so the names are this commit's. The read joins the queue only once they end. Cached by base and head trees under `~/.backstory/descriptions/`, one read at a time. The schema and the prompt's writing rules are in `lib/description/prompt.ts`, so a read that adds to the description changes that one file."
   - name: route errors
     file: lib/api.ts
     symbols:

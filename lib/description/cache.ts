@@ -7,13 +7,20 @@ import {
   type ProviderStatus,
   type Runner,
 } from "../ai/provider";
-import { autoRead, providerName } from "../data/cache";
+import {
+  autoRead,
+  dataReadSettled,
+  providerName,
+  startDataRead,
+} from "../data/cache";
+import { dataSteer, readDataModel, steerError } from "../data/readers";
 import { buildData } from "../data/build";
 import { MAX_PATCH_BYTES } from "../data/drafted";
 import { git, gitLine } from "../exec";
 import { withSnapshot } from "../flows/generate";
 import { getRangePatch, repoKey } from "../git";
 import { buildMap } from "../map";
+import { readModelAt } from "../model";
 import { mapReadSettled, startMapRead } from "../models/cache";
 import { homeDir } from "../store";
 import {
@@ -195,19 +202,35 @@ async function messagesFor(view: DescriptionView) {
   return stdout;
 }
 
+type Reads = { runner?: Runner; status?: () => Promise<ProviderStatus> };
+
 /**
- * Waits for this view's map read, so the names offered come from this
- * commit's map rather than none while it's still being drawn. Starts the read
- * when the repo reads automatically, since the page may ask for the
- * description before it asks for the map.
+ * Waits for this view's map and data model reads, so the names offered come
+ * from this commit's rather than none while they're still being read. Starts
+ * them when the repo reads automatically, since the page may ask for the
+ * description before it asks for them. A read that fails leaves its names
+ * out.
  */
-async function mapReady(
-  view: DescriptionView,
-  opts: { runner?: Runner; status?: () => Promise<ProviderStatus> },
-) {
-  if (await autoRead(view.root))
-    await startMapRead(view, opts).catch(() => null);
+async function namesReady(view: DescriptionView, opts: Reads) {
+  const auto = await autoRead(view.root);
+  await Promise.all([mapReady(view, auto, opts), dataReady(view, auto, opts)]);
+}
+
+async function mapReady(view: DescriptionView, auto: boolean, opts: Reads) {
+  if (auto) await startMapRead(view, opts).catch(() => null);
   await mapReadSettled(view);
+}
+
+/** Skips a repo whose data model a reader finds, as `/api/data` does. */
+async function dataReady(view: DescriptionView, auto: boolean, opts: Reads) {
+  const steer = dataSteer(
+    (await readModelAt(view.root, view.head))?.model?.properties,
+  );
+  if (steerError(steer) || (await readDataModel(view.root, view.head, steer)))
+    return;
+  const data = { ...view, files: steer.files };
+  if (auto) await startDataRead(data, opts).catch(() => null);
+  await dataReadSettled(data);
 }
 
 /** The names the prompt offers: the components and entities the change touches. */
@@ -319,28 +342,33 @@ export async function startDescription(
 
   registry.ended.delete(file);
   const runner = opts.runner ?? provider.run;
-  enqueue(async () => {
-    try {
-      await mapReady(view, { runner: opts.runner, status: opts.status });
-      const inputs = await gather(view, opts.pr ?? (async () => null));
-      const read = await withSnapshot(view.root, view.head, (dir) =>
-        runner<DescriptionOutput>(
-          descriptionPrompt(inputs),
-          descriptionSchema(),
-          dir,
-        ),
-      );
-      await writeCache(file, {
-        description: toDescription(read.output),
-        provider: provider.id,
-        model: read.model ?? provider.model(),
-        readAt: Date.now(),
-      });
-    } catch (err) {
-      registry.ended.set(file, { status: "failed", error: message(err) });
-    } finally {
-      release();
-    }
-  });
+  // Joins the queue only once the names are ready, so a view whose map is
+  // still being read doesn't hold up the descriptions behind it.
+  void namesReady(view, opts)
+    .catch(() => {})
+    .then(() =>
+      enqueue(async () => {
+        try {
+          const inputs = await gather(view, opts.pr ?? (async () => null));
+          const read = await withSnapshot(view.root, view.head, (dir) =>
+            runner<DescriptionOutput>(
+              descriptionPrompt(inputs),
+              descriptionSchema(),
+              dir,
+            ),
+          );
+          await writeCache(file, {
+            description: toDescription(read.output),
+            provider: provider.id,
+            model: read.model ?? provider.model(),
+            readAt: Date.now(),
+          });
+        } catch (err) {
+          registry.ended.set(file, { status: "failed", error: message(err) });
+        } finally {
+          release();
+        }
+      }),
+    );
   return descriptionStatus(view);
 }

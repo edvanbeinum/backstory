@@ -133,10 +133,19 @@ const ANSWER: DescriptionOutput = {
   lookFirst: [{ name: "Sync Engine", reason: "The retry count changed." }],
 };
 
-/** A stand-in for the AI provider: answers `answer`, or throws `fail`, and records each prompt. */
+const isDescription = (prompt: string) =>
+  prompt.startsWith("You are describing");
+const isDataRead = (prompt: string) => prompt.includes("Nothing may be run.");
+
+/**
+ * A stand-in for the AI provider: answers `answer`, or throws `fail`, and
+ * records each description prompt. Refuses the data model's reads, which the
+ * description starts in a repo with no data model.
+ */
 function recorder(opts: { answer?: DescriptionOutput; fail?: string } = {}) {
   const prompts: string[] = [];
   const runner: Runner = async <T>(prompt: string) => {
+    if (!isDescription(prompt)) throw new Error("Not a description read");
     prompts.push(prompt);
     if (opts.fail) throw new Error(opts.fail);
     return {
@@ -205,8 +214,8 @@ test("in a repo with a drafted map, the description waits for the view's map rea
     schema: object,
     cwd: string,
   ) => {
-    if (prompt.startsWith("You are describing"))
-      return ai.runner<T>(prompt, schema, cwd);
+    if (isDescription(prompt)) return ai.runner<T>(prompt, schema, cwd);
+    if (isDataRead(prompt)) throw new Error("Not a map read");
     const drafted = prompt.includes("The patch:")
       ? ({
           changed: [],
@@ -225,6 +234,27 @@ test("in a repo with a drafted map, the description waits for the view's map rea
   assert.ok(reads.length > 0);
   assert.equal(ai.prompts.length, 1);
   assert.match(ai.prompts[0], /^- Sync Engine$/m);
+});
+
+test("a view waiting for its map read doesn't hold up another view's description", async () => {
+  const waiting = shopRepo({ drafted: true });
+  let open = () => {};
+  const gate = new Promise<void>((resolve) => (open = resolve));
+  const gated: Runner = async (prompt: string) => {
+    if (isDescription(prompt) || isDataRead(prompt))
+      throw new Error("Not a map read");
+    await gate;
+    throw new Error("Map read stopped");
+  };
+  await startDescription(waiting.view, { runner: gated, status: ready });
+
+  const other = shopRepo();
+  await read(other.view, { runner: recorder().runner });
+  assert.equal((await descriptionStatus(other.view)).status, "done");
+  assert.equal((await descriptionStatus(waiting.view)).status, "running");
+
+  open();
+  await descriptionReadSettled(waiting.view);
 });
 
 test("the prompt states every writing rule, with two good and two bad examples", async () => {
@@ -347,6 +377,7 @@ test("a read is idle, then running, then done", async () => {
     schema: object,
     cwd: string,
   ) => {
+    if (!isDescription(prompt)) return inner.runner<T>(prompt, schema, cwd);
     entered();
     await gate;
     return inner.runner<T>(prompt, schema, cwd);
