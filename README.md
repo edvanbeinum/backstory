@@ -1,8 +1,8 @@
 # Backstory
 
-Stop reading diffs. Backstory shows what a change did to your system, on a C4
-map, as sequence diagrams and in the data model, so you can review an agent's
-work without reading every line. Backstory draws these with your coding agent.
+Backstory shows you what your coding agent changed: on a map of your system, as
+the steps each user action takes, and in the data model. Then you send it notes
+on what to fix.
 
 Works with Claude Code.
 
@@ -13,8 +13,8 @@ what does each user action do now, and what happens to the data?
 
 For a branch, a commit or your uncommitted work, Backstory draws:
 
-- **The map**: a C4 component view of the repo, with the components the change
-  touched, added or removed.
+- **The map**: the parts of your system, drawn from the code, with the ones the
+  change touched, added or removed.
 - **Flows**: a sequence diagram of each user action the change touches, before
   and after.
 - **The data model**: the entities, fields and relationships the change touched.
@@ -57,8 +57,9 @@ You need:
    change** under it. Claude Code reads the change through your own `claude`
    login, the same way it does when you use Claude Code in that repo. It takes
    about a minute. When it finishes, each flow appears as a card under the map.
-4. Check the map for the components the change touched. If the repo has no C4
-   model, Claude Code drafts one as the repo opens, kept outside the repo.
+4. Check the map for the parts the change touched. If the repo has no
+   hand-written map, Claude Code draws one as the repo opens, kept outside the
+   repo.
 5. Click a step in a flow to open its code under it. Press **Show in Files
    changed** to see the same lines in the diff.
 6. To ask the agent for a fix, hover a line in **Files changed**, press **+** and
@@ -78,8 +79,8 @@ Backstory's window. It checks again and opens.
 connected. Press **Connect GitHub** in the banner and approve the code on
 github.com, or run `gh auth login` and refresh the window.
 
-**The map's line on Story says it couldn't read the model, instead of drawing
-the map.** The repo's
+**The map's line on Story says it couldn't read the map, instead of drawing
+it.** The repo's
 `architecture/workspace.dsl` uses something Backstory doesn't read, such as
 `group` or `!include`.
 [The map, flows and the data model](docs/using-backstory.md#the-map-flows-and-the-data-model)
