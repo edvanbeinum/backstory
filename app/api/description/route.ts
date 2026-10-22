@@ -45,7 +45,8 @@ export async function GET(request: Request) {
 
 /** Starts reading the view's change description; `redraft=1` reads it again. */
 export async function POST(request: Request) {
-  // A read sends code to the AI provider: only Backstory's own page asks.
+  // Refuse requests from other sites, since a read sends code to the AI
+  // provider.
   const refused = crossSite(request);
   if (refused) return refused;
   try {
