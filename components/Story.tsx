@@ -178,13 +178,15 @@ export function Story({
   useEffect(() => {
     if (!walk) return;
     walkNavRef.current = (delta) => {
-      goRef.current(index + delta);
+      const to = index + delta;
+      if (to < 0 || to >= stops.length) return false;
+      goRef.current(to);
       return true;
     };
     return () => {
       walkNavRef.current = null;
     };
-  }, [walk, index, walkNavRef]);
+  }, [walk, index, stops.length, walkNavRef]);
 
   const toStop = (name: string) => {
     const i = stops.findIndex(
