@@ -13,9 +13,8 @@ import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
 import { ownsCode } from "@/lib/mapGroups";
 import { viewKey, viewParams } from "@/lib/url";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
-import { edgePath } from "./graph";
+import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { GROUP_HEADER, mapLayout, MAX_FILES } from "./mapLayout";
 import { Badge, Button, CopyButton, Spinner, Ticked } from "./ui";
 import { useView } from "./ViewContext";
 
@@ -24,10 +23,64 @@ import { useView } from "./ViewContext";
  * width, with one line under it saying what it shows.
  */
 
+const ROW_GAP = 56;
+const MIN_NODE_W = 190;
+const MAX_NODE_W = 280;
+/** Files named in a box before the rest fold into "+N more". */
+const MAX_FILES = 4;
+const COL_GAP = 18;
+const PAD = 14;
+/** A container's or system's box: the header above its children, and the space around them. */
+const GROUP_HEADER = 32;
+const GROUP_INSET = 12;
+
 const GROUP_TYPE: Record<string, string> = {
   softwareSystem: "Software system",
   container: "Container",
 };
+
+/**
+ * A box's height before it's measured: name, the description wrapped, and
+ * one line per file named. The real height replaces it after the first paint.
+ */
+function estimateHeight(n: MapNode, w: number) {
+  const inner = w - 24;
+  const descLines = n.description
+    ? Math.ceil((n.description.length * 6.4) / inner)
+    : 0;
+  const nameLines = Math.ceil(
+    (n.name.length * 7.6 +
+      (n.state === "added" || n.state === "removed" ? 60 : 0)) /
+      inner,
+  );
+  const files = Math.min(n.files.length, MAX_FILES + 1);
+  const foot = n.state === "touched" || n.state === "added" ? 24 : 0;
+  return (
+    16 + nameLines * 18 + descLines * 16 + (files ? 8 + files * 18 : 0) + foot
+  );
+}
+
+function layout(
+  nodes: MapNode[],
+  edges: MapEdge[],
+  width: number,
+  heights: Map<string, number> = new Map(),
+) {
+  return nestedLayout(
+    nodes,
+    edges,
+    width,
+    (n, w) => heights.get(n.id) ?? estimateHeight(n, w),
+    {
+      minW: MIN_NODE_W,
+      maxW: MAX_NODE_W,
+      rowGap: ROW_GAP,
+      colGap: COL_GAP,
+      pad: PAD,
+    },
+    { header: GROUP_HEADER, inset: GROUP_INSET },
+  );
+}
 
 function Squares({ add, del }: { add: number; del: number }) {
   const total = add + del;
@@ -71,6 +124,7 @@ function MapCanvas({
   focus = null,
   onJump,
   onPickNode,
+  onOrder,
 }: {
   nodes: MapNode[];
   edges: MapEdge[];
@@ -81,16 +135,26 @@ function MapCanvas({
   onJump: (path: string) => void;
   /** A changed component was clicked; its first file opens when unset */
   onPickNode?: (id: string) => void;
+  /** Each box's id, top to bottom then left to right, whenever the layout moves one */
+  onOrder?: (ids: string[]) => void;
 }) {
   const focusEdges = useMemo(() => new Set(focus?.edges ?? []), [focus]);
   const dimNode = (id: string) => focus !== null && focus.node !== id;
   const dimEdge = (key: string) => focus !== null && !focusEdges.has(key);
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const { placed, height } = useMemo(
-    () => mapLayout(nodes, edges, width, heights),
+    () => layout(nodes, edges, width, heights),
     [nodes, edges, width, heights],
   );
   const boxes = useRef(new Map<string, HTMLDivElement>());
+
+  useEffect(() => {
+    if (!onOrder) return;
+    const at = (id: string) => placed.get(id)!;
+    onOrder(
+      [...placed.keys()].sort((a, b) => at(a).y - at(b).y || at(a).x - at(b).x),
+    );
+  }, [placed, onOrder]);
 
   // Boxes size to what they say; lay out again once their real heights are
   // known, so arrows meet their edges.
@@ -844,6 +908,7 @@ export function SystemMap({
   highlight = null,
   focus = null,
   onPickNode,
+  onOrder,
   onOpenFile,
   onModelChange,
   children,
@@ -857,6 +922,8 @@ export function SystemMap({
   focus?: MapFocus | null;
   /** A changed component was clicked, for Story's walk to go to */
   onPickNode?: (id: string) => void;
+  /** The map's boxes in reading order, for Story's walk to follow */
+  onOrder?: (ids: string[]) => void;
   /** Show a file in Files changed */
   onOpenFile: (path: string) => void;
   /** A drafted map was read: read the map again */
@@ -970,6 +1037,7 @@ export function SystemMap({
             focus={focus}
             onJump={onOpenFile}
             onPickNode={onPickNode}
+            onOrder={onOrder}
           />
         )}
         <div className="map-foot">

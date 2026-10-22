@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { filePaths } from "@/lib/anchor";
 import { WORKING_REV } from "@/lib/constants";
@@ -117,23 +117,37 @@ export function Story({
   const description =
     read.status?.status === "done" ? read.status.description : null;
   const shownMap = rev !== WORKING_REV ? map : null;
+  const view = viewKey({ repo, ref, rev });
+  const [drawn, setDrawn] = useState<{ view: string; ids: string[] } | null>(
+    null,
+  );
+  const order = drawn?.view === view ? drawn.ids : null;
+  const onOrder = useCallback(
+    (ids: string[]) =>
+      setDrawn((was) =>
+        was?.view === view && was.ids.join("\n") === ids.join("\n")
+          ? was
+          : { view, ids },
+      ),
+    [view],
+  );
 
   const stops = useMemo(
     () =>
       buildStops({
         description,
         map: shownMap,
+        order,
         data,
         flows: set,
         files: diff?.files ?? [],
       }),
-    [description, shownMap, data, set, diff],
+    [description, shownMap, order, data, set, diff],
   );
   // Keep the stop picked on screen when a late map, data model or diff adds
   // stops before it, rather than the stop now at its number. A stop number
   // from a link is left alone, since the stops settle after it opens. Drop
   // the pick on another view, whose stops may share its key or number.
-  const view = viewKey({ repo, ref, rev });
   const [picked, setPicked] = useState<{
     view: string;
     stop: number;
@@ -217,6 +231,7 @@ export function Story({
       highlight={mapHighlight}
       onOpenFile={onOpenFile}
       onModelChange={onModelChange}
+      onOrder={onOrder}
       {...(focused && {
         focus:
           current.kind === "component"

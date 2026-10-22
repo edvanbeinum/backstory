@@ -1,4 +1,3 @@
-import { mapLayout } from "../components/mapLayout";
 import type { EntityDiff, DataResponse } from "./data/types";
 import type { ChangeDescription } from "./description/types";
 import { stepMarks, type StepMark } from "./flows/rows";
@@ -40,17 +39,13 @@ export type Stop<F extends WalkFile = DiffFile> = {
 );
 
 /**
- * The width the walk lays the map out at to order its components. The map
- * on screen is laid out at the column's width, which only moves a box to a
- * new line within its rank, so reading order is the same.
+ * Changed components in the map's reading order: the ids the map reports,
+ * then any it hasn't placed yet in the map's own order.
  */
-const ORDER_WIDTH = 1200;
-
-/** Changed components top to bottom, then left to right, as the map draws them. */
-function mapOrder(map: MapResponse, nodes: MapNode[]): MapNode[] {
-  const { placed } = mapLayout(map.nodes, map.edges, ORDER_WIDTH);
-  const at = (n: MapNode) => placed.get(n.id) ?? { x: 0, y: Infinity };
-  return [...nodes].sort((a, b) => at(a).y - at(b).y || at(a).x - at(b).x);
+function mapOrder(order: string[] | null, nodes: MapNode[]): MapNode[] {
+  const rank = new Map((order ?? []).map((id, i) => [id, i]));
+  const at = (n: MapNode) => rank.get(n.id) ?? Infinity;
+  return [...nodes].sort((a, b) => at(a) - at(b));
 }
 
 /** The flow steps on any of these files, each once. */
@@ -72,12 +67,15 @@ function stepsOn(
 export function buildStops<F extends WalkFile>({
   description,
   map,
+  order,
   data,
   flows,
   files,
 }: {
   description: ChangeDescription | null;
   map: MapResponse | null;
+  /** The map's box ids top to bottom, then left to right, as it's drawn; null until it's drawn */
+  order: string[] | null;
   data: DataResponse | null;
   flows: FlowSet | null;
   files: F[];
@@ -108,7 +106,10 @@ export function buildStops<F extends WalkFile>({
     }
     const marks = flows ? stepMarks(flows) : null;
     const nameOf = new Map(map.nodes.map((n) => [n.id, n.name]));
-    for (const node of mapOrder(map, [...filesOf.keys()])) {
+    for (const node of mapOrder(
+      order,
+      owners.filter((n) => filesOf.has(n)),
+    )) {
       const own = filesOf.get(node)!;
       stops.push({
         kind: "component",

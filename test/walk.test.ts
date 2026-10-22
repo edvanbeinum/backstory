@@ -166,10 +166,14 @@ const FLOWS: FlowSet = {
   durationMs: 0,
 };
 
+/** MAP's boxes as the map draws them: App with Screen above Api, then Store, then Logs. */
+const DRAWN = ["app", "screen", "api", "store", "logs"];
+
 const all = (extra: Partial<Parameters<typeof buildStops>[0]> = {}) =>
   buildStops({
     description: null,
     map: MAP,
+    order: DRAWN,
     data: CHANGED_DATA,
     flows: null,
     files: FILES,
@@ -207,39 +211,27 @@ test("stops run overview, data, components in the map's order, yourself, finish"
   );
 });
 
-test("components side by side on the map follow it left to right", () => {
-  // X points at B and Y at A, so the map draws B under X on the left and A
-  // under Y on the right.
-  const ids = ["x", "y", "a", "b"];
-  const edge = (source: string, destination: string) => ({
-    key: `${source}>${destination}`,
-    source,
-    destination,
-    state: "same" as const,
-    description: "",
-  });
-  const map: MapResponse = {
-    ...MAP,
-    nodes: ids.map((id) => node(id, [`${id}.ts`])),
-    edges: [edge("x", "b"), edge("y", "a")],
-    fileComponents: Object.fromEntries(
-      ids.map((id) => [`${id}.ts`, id.toUpperCase()]),
-    ),
-  };
-  const order = buildStops({
-    description: null,
-    map,
-    data: null,
-    flows: null,
-    files: ids.map((id) => file(`${id}.ts`)),
-  })
-    .filter((s) => s.kind === "component")
-    .map((s) => s.key);
-  assert.deepEqual(order, [
-    "component:x",
-    "component:y",
-    "component:b",
-    "component:a",
+test("components follow the order the map reports, as it's drawn at any width", () => {
+  const components = (order: string[] | null) =>
+    all({ order })
+      .filter((s) => s.kind === "component")
+      .map((s) => s.key);
+  assert.deepEqual(components(["store", "app", "api", "screen"]), [
+    "component:store",
+    "component:api",
+    "component:screen",
+  ]);
+  // Before the map is drawn, and for a box it hasn't placed, the map's own
+  // order stands.
+  assert.deepEqual(components(null), [
+    "component:store",
+    "component:api",
+    "component:screen",
+  ]);
+  assert.deepEqual(components(["screen"]), [
+    "component:screen",
+    "component:store",
+    "component:api",
   ]);
 });
 
