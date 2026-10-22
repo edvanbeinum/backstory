@@ -42,7 +42,11 @@ export async function GET(request: Request) {
     const repo = await resolveRepo(repoPath, searchParams.get("ref"));
 
     let patch: string;
-    if (rev === WORKING_REV) {
+    if (rev === WORKING_REV && repo.ref) {
+      // Return nothing for a branch opened by ref: the checkout's uncommitted
+      // work belongs to another branch, and /api/session reports none.
+      patch = "";
+    } else if (rev === WORKING_REV) {
       const working = await getWorkingTree(repo);
       patch = await getWorkingPatch(repo.root, working.untrackedPaths, {
         pathspec,

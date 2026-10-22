@@ -56,7 +56,10 @@ export async function GET(request: Request) {
     const repo = await resolveRepo(repoPath, searchParams.get("ref"));
 
     let patch: string;
-    if (rev === WORKING_REV) {
+    if (rev === WORKING_REV && repo.ref) {
+      // Same as /api/diff: a branch opened by ref has no uncommitted work.
+      patch = "";
+    } else if (rev === WORKING_REV) {
       const working = await getWorkingTree(repo);
       patch = await getWorkingPatch(repo.root, working.untrackedPaths, {
         context: FULL_CONTEXT,

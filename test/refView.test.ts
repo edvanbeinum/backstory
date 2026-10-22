@@ -326,6 +326,18 @@ test("a branch opened by ref measures its upstream from its own tip, not the che
   assert.notEqual(base.sha, fork);
 });
 
+test("a branch opened by ref has no uncommitted work, even when the checkout has some", async () => {
+  const { root } = stack();
+  writeFileSync(path.join(root, "scratch.ts"), "export const wip = 1;\n");
+  assert.deepEqual(
+    await diffPaths({ repo: root, ref: "stack-b", rev: "working" }),
+    [],
+  );
+  assert.deepEqual(await diffPaths({ repo: root, rev: "working" }), [
+    "scratch.ts",
+  ]);
+});
+
 test("a ref that starts with a dash is refused before it reaches git", async () => {
   const { root } = stack();
   const out = path.join(root, "written-by-git");
