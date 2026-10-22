@@ -36,7 +36,7 @@ import { RepoBrowser } from "@/components/RepoBrowser";
 import { ConnectGitHubLink } from "@/components/SetupChecklist";
 import { PrTitle } from "@/components/PrTitle";
 import { useStaleReload } from "@/components/useStaleReload";
-import { ViewProvider } from "@/components/ViewContext";
+import { ViewProvider, type OpenView } from "@/components/ViewContext";
 import { pushedState } from "@/lib/pushed";
 import { RepoBar } from "@/components/RepoBar";
 import {
@@ -134,6 +134,13 @@ export default function Page() {
   const checkBuild = useStaleReload();
 
   const [session, setSession] = useState<SessionResponse | null>(null);
+  /**
+   * The repo and branch the session was loaded for. Every view request uses
+   * this rather than `repoPath` and `ref`, so a switch keeps showing the last
+   * view whole until the new session, and the rev it settles on, arrive
+   * together.
+   */
+  const [shown, setShown] = useState<OpenView>({ repo: "", ref: null });
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(false);
 
@@ -185,9 +192,8 @@ export default function Page() {
   } | null>(null);
   // Key each view by path and branch: two branches of a stack are reviewed
   // from one worktree, so the path alone doesn't say which branch it is of.
-  const openKey = ref ? `${repoPath}\n${ref}` : repoPath;
+  const openKey = shown.ref ? `${shown.repo}\n${shown.ref}` : shown.repo;
   const dataView = `${openKey}\n${rev}`;
-  const openView = useMemo(() => ({ repo: repoPath, ref }), [repoPath, ref]);
   const dataModel = dataRead?.view === dataView ? dataRead.data : null;
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
@@ -371,6 +377,7 @@ export default function Page() {
       }
 
       const seq = ++sessionSeq.current;
+      const ref = refRef.current;
       // Background refreshes (watcher, focus) skip the loading state — a
       // spinner flashing on every keystroke-burst would be worse than the
       // staleness it replaces.
@@ -382,13 +389,16 @@ export default function Page() {
       try {
         const data = await getJson<SessionResponse>(
           `/api/session?repo=${encodeURIComponent(path)}` +
-            (refRef.current
-              ? `&ref=${encodeURIComponent(refRef.current)}`
-              : "") +
+            (ref ? `&ref=${encodeURIComponent(ref)}` : "") +
             (opts.fresh ? "&fresh=1" : ""),
         );
         if (seq !== sessionSeq.current) return; // superseded by a newer fetch
         setSession(data);
+        setShown((current) =>
+          current.repo === path && current.ref === ref
+            ? current
+            : { repo: path, ref },
+        );
         setSessionError(null);
         const shownTip = data.commits[0]?.sha ?? data.history[0]?.sha;
         if (lookPending.current === path && data.repo.branch && shownTip) {
@@ -548,7 +558,7 @@ export default function Page() {
 
   useEffect(() => {
     revRef.current = rev;
-    if (!repoPath || !haveSession) return;
+    if (!shown.repo || !haveSession) return;
 
     let cancelled = false;
     // Watcher-driven refetches of the working diff keep the old content on
@@ -558,7 +568,7 @@ export default function Page() {
     setDiffError(null);
 
     getJson<DiffResponse>(
-      `/api/diff?${viewParams({ repo: repoPath, ref, rev })}`,
+      `/api/diff?${viewParams({ repo: shown.repo, ref: shown.ref, rev })}`,
     )
       .then((data) => {
         if (cancelled) return;
@@ -576,19 +586,19 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [repoPath, ref, rev, haveSession, workingDiffKey]);
+  }, [shown, rev, haveSession, workingDiffKey]);
 
   // The map follows the diff: a commit's never changes; the branch's moves
   // with its tip.
   useEffect(() => {
-    if (!repoPath || !haveSession || rev === WORKING_REV) {
+    if (!shown.repo || !haveSession || rev === WORKING_REV) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the map where there is none, else fetches it
       setMap(null);
       setDataRead(null);
       return;
     }
     let cancelled = false;
-    const query = viewParams({ repo: repoPath, ref, rev });
+    const query = viewParams({ repo: shown.repo, ref: shown.ref, rev });
     getJson<MapResponse>(`/api/map?${query}`)
       .then((data) => !cancelled && setMap(data))
       .catch(() => !cancelled && setMap(null));
@@ -598,7 +608,7 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [repoPath, ref, rev, dataView, haveSession, workingDiffKey, modelTick]);
+  }, [shown, rev, dataView, haveSession, workingDiffKey, modelTick]);
 
   const commitForRev = useMemo((): CommitSummary | null => {
     if (rev === WORKING_REV) return WORKING_COMMIT;
@@ -651,8 +661,8 @@ export default function Page() {
   // "All changes" follows the branch's tip: when the diff is fetched again, so are its
   // flows, or the last head's flows would sit on the new head's lines.
   const flows = useFlows(
-    session ? repoPath : "",
-    ref,
+    session ? shown.repo : "",
+    shown.ref,
     rev,
     `${flowsTick}:${workingDiffKey}`,
   );
@@ -1019,7 +1029,7 @@ export default function Page() {
             </div>
           </div>
         ) : session ? (
-          <ViewProvider value={openView}>
+          <ViewProvider value={shown}>
             <div className="flex items-start">
               <main className="min-w-0 flex-1 pb-16">
                 <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
@@ -1083,7 +1093,7 @@ export default function Page() {
                         {visited.has("story") && (
                           <div hidden={tab !== "story"}>
                             <Story
-                              repo={repoPath}
+                              repo={shown.repo}
                               rev={rev}
                               map={map}
                               data={dataModel}
