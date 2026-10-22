@@ -21,6 +21,7 @@ import type {
   RepoInfo,
   ReviewThread,
 } from "@/lib/types";
+import { viewParams } from "@/lib/url";
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -30,6 +31,7 @@ import {
 import { NoteCard, NoteComposer } from "./NoteCard";
 import { copyToClipboard, CopyButton, Spinner } from "./ui";
 import type { NotesApi } from "./useNotes";
+import { useView } from "./ViewContext";
 
 const NO_MARKS: StepMark[] = [];
 
@@ -106,6 +108,7 @@ export function DiffFile({
   const gutter =
     Boolean(marks && (marks.old.size > 0 || marks.new.size > 0)) ||
     threads.some((t) => commentNumbers?.has(t.id));
+  const { ref } = useView();
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
   const [wholeLoading, setWholeLoading] = useState(false);
@@ -157,10 +160,7 @@ export function DiffFile({
     setWholeLoading(true);
     setWholeError(null);
     try {
-      const params = new URLSearchParams({
-        repo: repo.root,
-        rev: commit.sha,
-      });
+      const params = viewParams({ repo: repo.root, ref, rev: commit.sha });
       // Both names for a rename, so git can still pair the blobs up; the last
       // one is treated as the file's identity.
       for (const p of [file.oldPath, file.newPath]) {
@@ -179,7 +179,7 @@ export function DiffFile({
     } finally {
       setWholeLoading(false);
     }
-  }, [commit, repo.root, file]);
+  }, [commit, repo.root, ref, file]);
 
   const toggleWhole = () => {
     if (showWhole) {

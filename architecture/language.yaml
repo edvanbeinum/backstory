@@ -15,7 +15,7 @@ terms:
     avoid:
       - lane, for the data
   - name: view
-    means: 'The two commits being compared: one commit and its first parent, or "All changes" from the fork point to HEAD (`lib/view.ts`).'
+    means: 'The two commits being compared: one commit and its first parent, or "All changes" from the fork point to the reviewed branch''s tip, HEAD unless the URL has `ref` (`lib/view.ts`).'
     avoid:
       - view, for the Diff / Before / After switch
   - name: flow mode

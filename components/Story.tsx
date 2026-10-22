@@ -18,14 +18,13 @@ import { SystemMap } from "./SystemMap";
 import type { FlowsApi } from "./useFlows";
 
 /**
- * The tab every view lands on, read top to bottom: what the change does, the
+ * The tab every view lands on, read top to bottom: the change description, the
  * map at the column's width with a line of what it says, then each flow as a
  * card. The code is a click away from any step.
  */
 export function Story({
   repo,
   rev,
-  gitRef,
   map,
   data,
   entityNotes,
@@ -49,8 +48,6 @@ export function Story({
 }: {
   repo: string;
   rev: string;
-  /** The branch the view is on, when it isn't the one checked out */
-  gitRef: string | null;
   map: MapResponse | null;
   data: DataResponse | null;
   entityNotes: Map<string, string[]>;
@@ -91,7 +88,6 @@ export function Story({
         <ChangeDescription
           repo={repo}
           rev={rev}
-          gitRef={gitRef}
           map={map}
           onShowOnMap={onShowOnMap}
           onAutoChange={onModelChange}

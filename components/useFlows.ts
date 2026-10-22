@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FlowsStatus } from "@/lib/flows/types";
+import { viewKey, viewParams } from "@/lib/url";
 
 /**
  * The flows for the view on screen. Tracing takes a minute and the user's
@@ -11,7 +12,13 @@ import type { FlowsStatus } from "@/lib/flows/types";
  * finished run arrives as a "flows" watch event (`tick`); while one runs, a
  * slow poll keeps its phase current.
  */
-export function useFlows(repo: string, rev: string, tick: number | string) {
+export function useFlows(
+  repo: string,
+  ref: string | null,
+  rev: string,
+  tick: number | string,
+) {
+  const at = viewKey({ repo, ref, rev });
   // Kept with the view it answers, so a render just after a move never
   // shows the last view's status as this one's.
   const [answer, setAnswer] = useState<{
@@ -19,23 +26,23 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
     status: FlowsStatus;
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const viewRef = useRef(`${repo}@${rev}`);
+  const viewRef = useRef(at);
   /** Only the newest request's answer counts: an older one can land later. */
   const latest = useRef(0);
 
   const request = useCallback(
     async (method: "GET" | "POST", extra: Record<string, string> = {}) => {
-      const view = `${repo}@${rev}`;
+      const view = at;
       const mine = ++latest.current;
       const stale = () => mine !== latest.current || viewRef.current !== view;
-      const params = new URLSearchParams({ repo, rev, ...extra });
+      const params = viewParams({ repo, ref, rev, ...extra });
       try {
         const response = await fetch(`/api/flows?${params}`, {
           method,
           cache: "no-store",
         });
         const data = (await response.json()) as FlowsStatus | { error: string };
-        // "All changes" refetches as HEAD moves; a slower earlier answer
+        // "All changes" refetches as the branch's tip moves; a slower earlier answer
         // would put the old head's flows back beside the new diff.
         if (stale()) return null;
         // A failed request is an HTTP error; a failed run is a 200 whose
@@ -54,19 +61,19 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
         return null;
       }
     },
-    [repo, rev],
+    [at, repo, ref, rev],
   );
 
   // A new view starts blank rather than showing the last one's flows.
-  const [shownView, setShownView] = useState(`${repo}@${rev}`);
-  if (shownView !== `${repo}@${rev}`) {
-    setShownView(`${repo}@${rev}`);
+  const [shownView, setShownView] = useState(at);
+  if (shownView !== at) {
+    setShownView(at);
     setAnswer(null);
     setError(null);
   }
   useEffect(() => {
-    viewRef.current = `${repo}@${rev}`;
-  }, [repo, rev]);
+    viewRef.current = at;
+  }, [at]);
 
   useEffect(() => {
     if (!repo) return;
@@ -74,7 +81,7 @@ export function useFlows(repo: string, rev: string, tick: number | string) {
     void request("GET");
   }, [repo, rev, tick, request]);
 
-  const status = answer?.view === `${repo}@${rev}` ? answer.status : null;
+  const status = answer?.view === at ? answer.status : null;
   const running =
     status?.status === "running" ||
     (status?.status === "ready" && status.tracing.length > 0);

@@ -91,6 +91,11 @@ export async function resolveRepo(
 ): Promise<RepoInfo> {
   const abs = expandPath(input);
   if (!abs) throw new RepoError("No repository path given", "missing-path");
+  // Refuse a leading `-`: the ref comes from the URL and becomes `repo.tip`,
+  // which reaches git's argv on its own, where it would be read as an option.
+  if (ref?.startsWith("-")) {
+    throw new RepoError(`\`${ref}\` isn't a branch name.`, "git");
+  }
 
   try {
     const stat = await fs.stat(abs);
@@ -242,7 +247,13 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
     `${repo.tip}@{upstream}`,
   ]);
   if (upstream) {
-    return finishBase(root, upstream, "upstream", `ahead of ${upstream}`);
+    return finishBase(
+      root,
+      repo.tip,
+      upstream,
+      "upstream",
+      `ahead of ${upstream}`,
+    );
   }
 
   if (branch) {
@@ -254,7 +265,13 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
     ]);
     if (originBranch) {
       const ref = `origin/${branch}`;
-      return finishBase(root, ref, "origin-branch", `ahead of ${ref}`);
+      return finishBase(
+        root,
+        repo.tip,
+        ref,
+        "origin-branch",
+        `ahead of ${ref}`,
+      );
     }
   }
 
@@ -269,6 +286,7 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
       const ref = `origin/${defaultBranch}`;
       return finishBase(
         root,
+        repo.tip,
         ref,
         "default-branch",
         `branch never pushed — showing everything since ${ref}`,
@@ -285,6 +303,7 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
       if (localDefault) {
         return finishBase(
           root,
+          repo.tip,
           defaultBranch,
           "local-default",
           `no remote — showing everything since ${defaultBranch}`,
@@ -303,6 +322,7 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
 
 async function finishBase(
   root: string,
+  tip: string,
   ref: string,
   reason: BaseInfo["reason"],
   label: string,
@@ -310,7 +330,7 @@ async function finishBase(
   // The merge base, not the ref tip: if the base branch has moved on, we want
   // the diff to show *our* changes, not everyone else's in reverse.
   const sha =
-    (await gitLine(root, ["merge-base", ref, "HEAD"])) ??
+    (await gitLine(root, ["merge-base", ref, tip])) ??
     (await gitLine(root, ["rev-parse", ref]));
   return { ref, sha, reason, label };
 }
@@ -480,6 +500,7 @@ async function logRange(
     `--format=${LOG_FORMAT}%x1e`,
     `--max-count=${limit}`,
     ...rangeArgs,
+    "--",
   ]);
   if (!out) return [];
 
@@ -590,6 +611,7 @@ export async function getBranchDiffSummary(
       ...PATCH_FLAGS,
       info.baseSha,
       repo.tip,
+      "--",
     ])) ?? "";
   // " 12 files changed, 540 insertions(+), 210 deletions(-)" — any of the
   // three clauses can be absent.
@@ -607,13 +629,16 @@ export async function getRangePatch(
   to: string,
   opts: PatchOptions = {},
 ): Promise<string> {
+  // End the revisions with `--` even with no paths: `to` can be a branch
+  // opened by ref, and git refuses a branch named like a file or folder.
+  const paths = pathspecArgs(opts);
   const out = await gitTry(root, [
     "diff",
     ...PATCH_FLAGS,
     ...contextArgs(opts),
     from,
     to,
-    ...pathspecArgs(opts),
+    ...(paths.length > 0 ? paths : ["--"]),
   ]);
   return out ?? "";
 }

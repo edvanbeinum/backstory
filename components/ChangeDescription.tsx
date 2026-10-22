@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { MapResponse } from "@/lib/map";
+import { viewKey, viewParams } from "@/lib/url";
 import {
   isOnMap,
   startsByItself,
@@ -13,19 +14,16 @@ import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { AlertIcon } from "./icons";
 import { Elapsed, setAutoReading } from "./SystemMap";
 import { Badge, Button, Spinner, Ticked } from "./ui";
+import { useView } from "./ViewContext";
 
 /**
  * The view's description and its read, tagged with the view it answers for,
  * so a view the page has left never shows. Polls while a read runs rather
  * than adding a watch event: reads are rare.
  */
-function useDescription(
-  repo: string,
-  rev: string,
-  gitRef: string | null,
-  onAutoChange: () => void,
-) {
-  const view = `${repo}\n${rev}\n${gitRef ?? ""}`;
+function useDescription(repo: string, rev: string, onAutoChange: () => void) {
+  const { ref } = useView();
+  const view = viewKey({ repo, ref, rev });
   const current = useRef(view);
   useEffect(() => {
     current.current = view;
@@ -38,10 +36,13 @@ function useDescription(
 
   const request = useCallback(
     async (method: "GET" | "POST", redraft = false) => {
-      const asked = `${repo}\n${rev}\n${gitRef ?? ""}`;
-      const params = new URLSearchParams({ repo, rev });
-      if (gitRef) params.set("ref", gitRef);
-      if (redraft) params.set("redraft", "1");
+      const asked = viewKey({ repo, ref, rev });
+      const params = viewParams({
+        repo,
+        ref,
+        rev,
+        redraft: redraft ? "1" : null,
+      });
       try {
         const response = await fetch(`/api/description?${params}`, {
           method,
@@ -68,7 +69,7 @@ function useDescription(
         }));
       }
     },
-    [repo, rev, gitRef],
+    [repo, ref, rev],
   );
 
   useEffect(() => {
@@ -185,15 +186,12 @@ function Parts({
 export function ChangeDescription({
   repo,
   rev,
-  gitRef,
   map,
   onShowOnMap,
   onAutoChange,
 }: {
   repo: string;
   rev: string;
-  /** The branch the view is on, when it isn't the one checked out */
-  gitRef: string | null;
   /** The map on screen, for which places to look first link to it */
   map: MapResponse | null;
   /** Outline a component on the map */
@@ -204,7 +202,6 @@ export function ChangeDescription({
   const { status, error, start, setAuto } = useDescription(
     repo,
     rev,
-    gitRef,
     onAutoChange,
   );
   if (!status || status.status === "none") {

@@ -36,6 +36,7 @@ import { RepoBrowser } from "@/components/RepoBrowser";
 import { ConnectGitHubLink } from "@/components/SetupChecklist";
 import { PrTitle } from "@/components/PrTitle";
 import { useStaleReload } from "@/components/useStaleReload";
+import { ViewProvider, type OpenView } from "@/components/ViewContext";
 import { pushedState } from "@/lib/pushed";
 import { RepoBar } from "@/components/RepoBar";
 import {
@@ -56,6 +57,8 @@ import {
   resolveComment,
   resolveRev,
   resolveTab,
+  viewKey,
+  viewParams,
   writeUrlState,
   type Tab,
 } from "@/lib/url";
@@ -132,11 +135,20 @@ export default function Page() {
   const checkBuild = useStaleReload();
 
   const [session, setSession] = useState<SessionResponse | null>(null);
+  /**
+   * The repo and branch the session was loaded for. Every view request uses
+   * this rather than `repoPath` and `ref`, so a switch keeps showing the last
+   * view whole until the new session, and the rev it settles on, arrive
+   * together.
+   */
+  const [shown, setShown] = useState<OpenView>({ repo: "", ref: null });
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(false);
 
   const [rev, setRev] = useState<string>(WORKING_REV);
   const [diff, setDiff] = useState<DiffResponse | null>(null);
+  /** The view the diff on screen was read for: its `rev` alone doesn't name the branch. */
+  const [diffView, setDiffView] = useState<string | null>(null);
   const [diffError, setDiffError] = useState<string | null>(null);
   const [diffLoading, setDiffLoading] = useState(false);
 
@@ -168,7 +180,11 @@ export default function Page() {
   /** Bumped when a flow run finishes. */
   const [flowsTick, setFlowsTick] = useState(0);
   const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
-  const [map, setMap] = useState<MapResponse | null>(null);
+  /** Keeps the map with the view it was read for, as `dataRead` does the data model. */
+  const [mapRead, setMapRead] = useState<{
+    view: string;
+    map: MapResponse;
+  } | null>(null);
   /** Bumped when a model or data model draft is written, so both are read again */
   const [modelTick, setModelTick] = useState(0);
   const onModelChange = useCallback(() => setModelTick((t) => t + 1), []);
@@ -181,8 +197,9 @@ export default function Page() {
     view: string;
     data: DataResponse;
   } | null>(null);
-  const dataView = `${repoPath}\n${rev}`;
-  const dataModel = dataRead?.view === dataView ? dataRead.data : null;
+  const viewId = viewKey({ ...shown, rev });
+  const map = mapRead?.view === viewId ? mapRead.map : null;
+  const dataModel = dataRead?.view === viewId ? dataRead.data : null;
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
   const refRef = useRef(ref);
@@ -201,6 +218,12 @@ export default function Page() {
    * exist and bounce you off it.
    */
   const pickedRevs = useRef<string[]>([]);
+  /**
+   * Set when another repo or branch is opened, so its session starts the view
+   * afresh. A commit picked on the last branch isn't this one's, and looking
+   * it up here would claim it's already on GitHub.
+   */
+  const reopened = useRef(false);
   useEffect(() => {
     repoRef.current = repoPath;
   }, [repoPath]);
@@ -365,6 +388,7 @@ export default function Page() {
       }
 
       const seq = ++sessionSeq.current;
+      const ref = refRef.current;
       // Background refreshes (watcher, focus) skip the loading state — a
       // spinner flashing on every keystroke-burst would be worse than the
       // staleness it replaces.
@@ -376,13 +400,16 @@ export default function Page() {
       try {
         const data = await getJson<SessionResponse>(
           `/api/session?repo=${encodeURIComponent(path)}` +
-            (refRef.current
-              ? `&ref=${encodeURIComponent(refRef.current)}`
-              : "") +
+            (ref ? `&ref=${encodeURIComponent(ref)}` : "") +
             (opts.fresh ? "&fresh=1" : ""),
         );
         if (seq !== sessionSeq.current) return; // superseded by a newer fetch
         setSession(data);
+        setShown((current) =>
+          current.repo === path && current.ref === ref
+            ? current
+            : { repo: path, ref },
+        );
         setSessionError(null);
         const shownTip = data.commits[0]?.sha ?? data.history[0]?.sha;
         if (lookPending.current === path && data.repo.branch && shownTip) {
@@ -397,11 +424,14 @@ export default function Page() {
 
         setCommentId((current) => resolveComment(current, data.github.threads));
 
+        const fresh = reopened.current;
+        reopened.current = false;
+        if (fresh) pickedRevs.current = [];
         setRev((current) => {
           // History counts: a URL can point at an already-pushed commit and
           // that's a perfectly good thing to view.
           const { rev: next, notice } = resolveRev(
-            current,
+            fresh ? WORKING_REV : current,
             [...data.commits, ...data.history],
             data.working.hasChanges,
             data.branchDiff !== null,
@@ -534,15 +564,20 @@ export default function Page() {
 
   const haveSession = session !== null;
   // A commit's diff is immutable, so watcher ticks only matter for the two
-  // views that move — uncommitted work, and the branch diff (its HEAD end
+  // views that move — uncommitted work, and the branch diff (its tip end
   // advances with every commit); pinning the key otherwise keeps background
-  // session refreshes from refetching a diff that cannot have changed.
+  // session refreshes from refetching a diff that cannot have changed. A
+  // branch opened by ref keys on its base and tip instead: saves in the
+  // checkout fire watcher ticks, but can't move another branch.
+  const branchEnds = shown.ref
+    ? `${session?.base.sha}..${session?.commits[0]?.sha}`
+    : workingTick;
   const workingDiffKey =
-    rev === WORKING_REV || rev === BRANCH_REV ? workingTick : -1;
+    rev === WORKING_REV || rev === BRANCH_REV ? branchEnds : -1;
 
   useEffect(() => {
     revRef.current = rev;
-    if (!repoPath || !haveSession) return;
+    if (!shown.repo || !haveSession) return;
 
     let cancelled = false;
     // Watcher-driven refetches of the working diff keep the old content on
@@ -552,11 +587,12 @@ export default function Page() {
     setDiffError(null);
 
     getJson<DiffResponse>(
-      `/api/diff?repo=${encodeURIComponent(repoPath)}&rev=${encodeURIComponent(rev)}`,
+      `/api/diff?${viewParams({ repo: shown.repo, ref: shown.ref, rev })}`,
     )
       .then((data) => {
         if (cancelled) return;
         setDiff(data);
+        setDiffView(viewId);
       })
       .catch((err: unknown) => {
         if (cancelled) return;
@@ -570,32 +606,29 @@ export default function Page() {
     return () => {
       cancelled = true;
     };
-  }, [repoPath, rev, haveSession, workingDiffKey]);
+  }, [shown, rev, viewId, haveSession, workingDiffKey]);
 
   // The map follows the diff: a commit's never changes; the branch's moves
-  // with HEAD.
+  // with its tip.
   useEffect(() => {
-    if (!repoPath || !haveSession || rev === WORKING_REV) {
+    if (!shown.repo || !haveSession || rev === WORKING_REV) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the map where there is none, else fetches it
-      setMap(null);
+      setMapRead(null);
       setDataRead(null);
       return;
     }
     let cancelled = false;
-    const query = `repo=${encodeURIComponent(repoPath)}&rev=${encodeURIComponent(rev)}`;
+    const query = viewParams({ repo: shown.repo, ref: shown.ref, rev });
     getJson<MapResponse>(`/api/map?${query}`)
-      .then((data) => !cancelled && setMap(data))
-      .catch(() => !cancelled && setMap(null));
+      .then((data) => !cancelled && setMapRead({ view: viewId, map: data }))
+      .catch(() => !cancelled && setMapRead(null));
     getJson<DataResponse>(`/api/data?${query}`)
-      .then(
-        (data) =>
-          !cancelled && setDataRead({ view: `${repoPath}\n${rev}`, data }),
-      )
+      .then((data) => !cancelled && setDataRead({ view: viewId, data }))
       .catch(() => !cancelled && setDataRead(null));
     return () => {
       cancelled = true;
     };
-  }, [repoPath, rev, haveSession, workingDiffKey, modelTick]);
+  }, [shown, rev, viewId, haveSession, workingDiffKey, modelTick]);
 
   const commitForRev = useMemo((): CommitSummary | null => {
     if (rev === WORKING_REV) return WORKING_COMMIT;
@@ -645,10 +678,11 @@ export default function Page() {
   const [visited, setVisited] = useState<Set<Tab>>(() => new Set());
   if (ready && !visited.has(tab)) setVisited(new Set([...visited, tab]));
 
-  // "All changes" follows HEAD: when the diff is fetched again, so are its
+  // "All changes" follows the branch's tip: when the diff is fetched again, so are its
   // flows, or the last head's flows would sit on the new head's lines.
   const flows = useFlows(
-    session ? repoPath : "",
+    session ? shown.repo : "",
+    shown.ref,
     rev,
     `${flowsTick}:${workingDiffKey}`,
   );
@@ -669,14 +703,13 @@ export default function Page() {
     at: number;
   } | null>(null);
 
-  const viewKey = `${repoPath}@${rev}`;
   // Reset while rendering, not in an effect, so a new view never paints
   // with the last one's requests.
-  const [shownView, setShownView] = useState(viewKey);
-  if (shownView !== viewKey) {
-    setShownView(viewKey);
+  const [shownView, setShownView] = useState(viewId);
+  if (shownView !== viewId) {
+    setShownView(viewId);
     setStoryTarget(null);
-    if (filesJump?.view !== viewKey) setFilesJump(null);
+    if (filesJump?.view !== viewId) setFilesJump(null);
     setMapHighlight(null);
     setFilesFilter(null);
   }
@@ -723,7 +756,7 @@ export default function Page() {
 
   // The last view's diff stays on screen while this one's loads; this view's
   // flows must wait for it, or their marks sit on the old diff's lines.
-  const diffIsCurrent = diff?.rev === rev;
+  const diffIsCurrent = diff !== null && diffView === viewId;
 
   /** Every flow's steps, by the diff line each sits on, for the gutter marks. */
   const marks = useMemo(() => (flowSet ? stepMarks(flowSet) : null), [flowSet]);
@@ -856,6 +889,8 @@ export default function Page() {
   const selectRepo = useCallback((path: string, branch?: string | null) => {
     const trimmed = path.trim();
     window.localStorage.setItem(STORAGE_KEY, trimmed);
+    if (trimmed !== repoRef.current || (branch ?? null) !== refRef.current)
+      reopened.current = true;
     setRef(branch ?? null);
     setRepoPath(trimmed);
     setSetup(false);
@@ -885,12 +920,12 @@ export default function Page() {
   // is this change's — for a moment after switching it's still the last one,
   // and a note left then would be filed against the wrong change.
   const noteRev = useMemo(() => {
-    if (!diff || diff.rev !== rev) return null;
+    if (!diffIsCurrent) return null;
     if (rev === WORKING_REV || rev === BRANCH_REV) return rev;
     if (commitForRev && /^[0-9a-f]{40}$/.test(commitForRev.sha))
       return commitForRev.sha;
     return /^[0-9a-f]{40}$/.test(rev) ? rev : null;
-  }, [diff, rev, commitForRev]);
+  }, [diffIsCurrent, rev, commitForRev]);
 
   const openNote = useCallback(
     (note: Note) => {
@@ -901,12 +936,12 @@ export default function Page() {
           side: note.side,
           line: note.line ?? undefined,
           note: note.id,
-          view: `${repoPath}@${note.rev}`,
+          view: viewKey({ ...shown, rev: note.rev }),
           at: Date.now(),
         });
       setTab("files");
     },
-    [noteRev, pickRev, repoPath],
+    [noteRev, pickRev, shown],
   );
 
   // j/k move through a list the way they would in a TUI, the open tab's:
@@ -1015,166 +1050,165 @@ export default function Page() {
             </div>
           </div>
         ) : session ? (
-          <div className="flex items-start">
-            <main className="min-w-0 flex-1 pb-16">
-              <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
-                {session.github.pr && <PrTitle pr={session.github.pr} />}
+          <ViewProvider value={shown}>
+            <div className="flex items-start">
+              <main className="min-w-0 flex-1 pb-16">
+                <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
+                  {session.github.pr && <PrTitle pr={session.github.pr} />}
 
-                {revNotice && (
-                  <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
-                    <AlertIcon
-                      size={13}
-                      className="mt-0.5 shrink-0 text-[var(--attention)]"
-                    />
-                    <span className="flex-1">
-                      <span className="mono">{revNotice}</span> isn&apos;t
-                      waiting to be pushed any more — it may already be on
-                      GitHub. Showing the latest instead.
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => setRevNotice(null)}
-                      className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
-                    >
-                      Dismiss
-                    </button>
-                  </p>
-                )}
+                  {revNotice && (
+                    <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
+                      <AlertIcon
+                        size={13}
+                        className="mt-0.5 shrink-0 text-[var(--attention)]"
+                      />
+                      <span className="flex-1">
+                        <span className="mono">{revNotice}</span> isn&apos;t
+                        waiting to be pushed any more — it may already be on
+                        GitHub. Showing the latest instead.
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setRevNotice(null)}
+                        className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
+                      >
+                        Dismiss
+                      </button>
+                    </p>
+                  )}
 
-                {session.github.unavailable && !session.github.pr && (
-                  <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
-                    {session.github.unavailable}
-                    {session.github.connect && (
+                  {session.github.unavailable && !session.github.pr && (
+                    <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
+                      {session.github.unavailable}
+                      {session.github.connect && (
+                        <>
+                          {" "}
+                          <ConnectGitHubLink />
+                        </>
+                      )}
+                    </p>
+                  )}
+
+                  <ChangeHeader
+                    session={session}
+                    rev={rev}
+                    onRevChange={pickRev}
+                    commit={commitForRev}
+                    diff={diff}
+                    thread={selectedThread}
+                    pushed={revIsPushed}
+                  />
+
+                  <Tabs
+                    tab={tab}
+                    onTab={setTab}
+                    fileCount={diffIsCurrent ? diff.files.length : null}
+                    threads={threads}
+                  />
+
+                  <WithReview root={session.repo.root} tick={reviewTick}>
+                    {({ notes, review, outbox }) => (
                       <>
-                        {" "}
-                        <ConnectGitHubLink />
-                      </>
-                    )}
-                  </p>
-                )}
+                        {visited.has("story") && (
+                          <div hidden={tab !== "story"}>
+                            <Story
+                              repo={shown.repo}
+                              rev={rev}
+                              map={map}
+                              data={dataModel}
+                              entityNotes={entityNotes}
+                              onModelChange={onModelChange}
+                              mapHighlight={mapHighlight}
+                              onShowOnMap={showOnMap}
+                              onOpenFile={openFile}
+                              flows={flows}
+                              diff={diffIsCurrent ? diff : null}
+                              onShowFiles={() => setTab("files")}
+                              onShowYourself={showYourself}
+                              target={storyTarget}
+                              onTargetDone={clearStoryTarget}
+                              onShowInFiles={showInFiles}
+                              navRef={flowNavRef}
+                              components={componentInfo}
+                              dataFields={dataFields}
+                              flowNotes={flowNotes}
+                              badges={badges}
+                              onBadge={selectComment}
+                            />
+                          </div>
+                        )}
+                        {visited.has("files") && (
+                          <div hidden={tab !== "files"}>
+                            <FilesChanged
+                              view={viewId}
+                              diff={diff}
+                              loading={diffLoading}
+                              error={diffError}
+                              threads={threads}
+                              repo={session.repo}
+                              commit={commitForRev}
+                              focusedThreadId={focusedThreadId}
+                              notes={noteRev ? notes : null}
+                              noteRev={noteRev}
+                              map={map}
+                              flowSet={diffIsCurrent ? flowSet : null}
+                              marks={diffIsCurrent ? marks : null}
+                              jump={filesJump}
+                              onJumped={clearFilesJump}
+                              filterAsk={filesFilter}
+                              onShowOnMap={showOnMap}
+                              commentNumbers={commentNumbers}
+                              onStep={openStep}
+                              onComment={selectComment}
+                            />
+                          </div>
+                        )}
+                        {hasComments && visited.has("comments") && (
+                          <div hidden={tab !== "comments"}>
+                            <Comments
+                              threads={threads}
+                              focusedId={commentId}
+                              focusAsk={focusAsk}
+                              onFocus={(id) => {
+                                setCommentId(id);
+                                setFocusedThreadId(id);
+                              }}
+                              fileComponents={map?.fileComponents ?? null}
+                              threadSteps={threadSteps}
+                              onOpenStep={(at) =>
+                                openStep({ flow: at.flow - 1, row: at.row.key })
+                              }
+                              pr={session.github.pr}
+                            />
+                          </div>
+                        )}
 
-                <ChangeHeader
-                  session={session}
-                  rev={rev}
-                  onRevChange={pickRev}
-                  commit={commitForRev}
-                  diff={diff}
-                  thread={selectedThread}
-                  pushed={revIsPushed}
-                />
-
-                <Tabs
-                  tab={tab}
-                  onTab={setTab}
-                  fileCount={
-                    diff && diff.rev === rev ? diff.files.length : null
-                  }
-                  threads={threads}
-                />
-
-                <WithReview root={session.repo.root} tick={reviewTick}>
-                  {({ notes, review, outbox }) => (
-                    <>
-                      {visited.has("story") && (
-                        <div hidden={tab !== "story"}>
-                          <Story
-                            repo={repoPath}
-                            rev={rev}
-                            gitRef={ref}
-                            map={map}
-                            data={dataModel}
-                            entityNotes={entityNotes}
-                            onModelChange={onModelChange}
-                            mapHighlight={mapHighlight}
-                            onShowOnMap={showOnMap}
-                            onOpenFile={openFile}
-                            flows={flows}
-                            diff={diff && diff.rev === rev ? diff : null}
-                            onShowFiles={() => setTab("files")}
-                            onShowYourself={showYourself}
-                            target={storyTarget}
-                            onTargetDone={clearStoryTarget}
-                            onShowInFiles={showInFiles}
-                            navRef={flowNavRef}
-                            components={componentInfo}
-                            dataFields={dataFields}
-                            flowNotes={flowNotes}
-                            badges={badges}
-                            onBadge={selectComment}
-                          />
-                        </div>
-                      )}
-                      {visited.has("files") && (
-                        <div hidden={tab !== "files"}>
-                          <FilesChanged
-                            view={viewKey}
-                            diff={diff}
-                            loading={diffLoading}
-                            error={diffError}
-                            threads={threads}
-                            repo={session.repo}
-                            commit={commitForRev}
-                            focusedThreadId={focusedThreadId}
-                            notes={noteRev ? notes : null}
-                            noteRev={noteRev}
-                            map={map}
-                            flowSet={diffIsCurrent ? flowSet : null}
-                            marks={diffIsCurrent ? marks : null}
-                            jump={filesJump}
-                            onJumped={clearFilesJump}
-                            filterAsk={filesFilter}
-                            onShowOnMap={showOnMap}
-                            commentNumbers={commentNumbers}
-                            onStep={openStep}
-                            onComment={selectComment}
-                          />
-                        </div>
-                      )}
-                      {hasComments && visited.has("comments") && (
-                        <div hidden={tab !== "comments"}>
-                          <Comments
-                            threads={threads}
-                            focusedId={commentId}
-                            focusAsk={focusAsk}
-                            onFocus={(id) => {
-                              setCommentId(id);
-                              setFocusedThreadId(id);
-                            }}
-                            fileComponents={map?.fileComponents ?? null}
-                            threadSteps={threadSteps}
-                            onOpenStep={(at) =>
-                              openStep({ flow: at.flow - 1, row: at.row.key })
-                            }
-                            pr={session.github.pr}
-                          />
-                        </div>
-                      )}
-
-                      {/* Pinned to the bottom of the window on every tab: an
+                        {/* Pinned to the bottom of the window on every tab: an
                         agent waiting on review must never be invisible, and
                         notes written in Files changed are sent from anywhere. */}
-                      {(noteRev ||
-                        notes.notes.length > 0 ||
-                        review.waiting ||
-                        review.error) && (
-                        <div className="sticky bottom-4 z-20">
-                          <FeedbackBar
-                            notes={notes}
-                            noteRev={noteRev}
-                            diff={noteRev ? diff : null}
-                            session={session}
-                            review={review}
-                            outbox={outbox}
-                            onOpenNote={openNote}
-                          />
-                        </div>
-                      )}
-                    </>
-                  )}
-                </WithReview>
-              </div>
-            </main>
-          </div>
+                        {(noteRev ||
+                          notes.notes.length > 0 ||
+                          review.waiting ||
+                          review.error) && (
+                          <div className="sticky bottom-4 z-20">
+                            <FeedbackBar
+                              notes={notes}
+                              noteRev={noteRev}
+                              diff={noteRev ? diff : null}
+                              session={session}
+                              review={review}
+                              outbox={outbox}
+                              onOpenNote={openNote}
+                            />
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </WithReview>
+                </div>
+              </main>
+            </div>
+          </ViewProvider>
         ) : null}
       </div>
     </ClaudeCodeGate>
