@@ -8,7 +8,7 @@ import type { DataResponse } from "@/lib/data/types";
 import type { FlowRow, StepMark } from "@/lib/flows/rows";
 import type { MapResponse } from "@/lib/map";
 import type { DiffFile, DiffResponse } from "@/lib/types";
-import { resolveStop } from "@/lib/url";
+import { resolveStop, viewKey } from "@/lib/url";
 import { buildStops } from "@/lib/walk";
 import { ChangeDescription, useDescription } from "./ChangeDescription";
 import { DataSummary } from "./DataSummary";
@@ -19,6 +19,7 @@ import type { ComponentInfo, DataField, StepBadge } from "./FlowSequence";
 import { SystemMap } from "./SystemMap";
 import { Button } from "./ui";
 import type { FlowsApi } from "./useFlows";
+import { useView } from "./ViewContext";
 import { StopView, WalkBar } from "./Walk";
 
 /**
@@ -61,8 +62,6 @@ export function Story({
   renderFiles,
   onNote,
   onStep,
-  notesBar,
-  onAtFinish,
 }: {
   repo: string;
   rev: string;
@@ -106,10 +105,6 @@ export function Story({
   onNote: ((body: string) => void) | null;
   /** Open a flow step, leaving the walk */
   onStep: (mark: StepMark) => void;
-  /** This view's notes and Send, for the walk's finish */
-  notesBar: React.ReactNode;
-  /** Whether the walk's finish, which shows the notes, is on screen */
-  onAtFinish: (at: boolean) => void;
 }) {
   const filesInDiff = useMemo(
     () => (diff ? new Set(diff.files.flatMap(filePaths)) : null),
@@ -117,6 +112,7 @@ export function Story({
   );
   const status = flows.status;
   const set = status?.status === "ready" ? status.flows : null;
+  const { ref } = useView();
   const read = useDescription(repo, rev, onModelChange);
   const description =
     read.status?.status === "done" ? read.status.description : null;
@@ -149,7 +145,7 @@ export function Story({
   }, [walk]);
 
   // The stops seen on this view, kept only for the view they were seen on.
-  const view = `${repo}\n${rev}\n${gitRef ?? ""}`;
+  const view = viewKey({ repo, ref, rev });
   const [seen, setSeen] = useState({ view, keys: new Set<string>() });
   if (seen.view !== view) setSeen({ view, keys: new Set() });
   else if (walk && !seen.keys.has(current.key))
@@ -173,12 +169,6 @@ export function Story({
       walkNavRef.current = null;
     };
   }, [walk, index, walkNavRef]);
-
-  const atFinish = walk && current.kind === "finish";
-  useEffect(() => {
-    onAtFinish(atFinish);
-  }, [atFinish, onAtFinish]);
-  useEffect(() => () => onAtFinish(false), [onAtFinish]);
 
   const toStop = (name: string) => {
     const i = stops.findIndex(
@@ -258,7 +248,6 @@ export function Story({
             onNote={onNote}
             onStep={onStep}
             onGo={go}
-            notesBar={notesBar}
           />
         </div>
       </div>

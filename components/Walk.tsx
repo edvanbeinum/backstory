@@ -151,7 +151,6 @@ export function StopView({
   onNote,
   onStep,
   onGo,
-  notesBar,
 }: {
   stops: Stop[];
   index: number;
@@ -167,8 +166,6 @@ export function StopView({
   /** Open a flow step in Story on one page */
   onStep: (mark: StepMark) => void;
   onGo: (index: number) => void;
-  /** This view's notes, and Send */
-  notesBar: React.ReactNode;
 }) {
   const stop = stops[index];
   switch (stop.kind) {
@@ -270,7 +267,6 @@ export function StopView({
               </ul>
             </div>
           )}
-          {notesBar}
         </section>
       );
     }
