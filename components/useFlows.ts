@@ -42,7 +42,7 @@ export function useFlows(
           cache: "no-store",
         });
         const data = (await response.json()) as FlowsStatus | { error: string };
-        // "All changes" refetches as HEAD moves; a slower earlier answer
+        // "All changes" refetches as the branch's tip moves; a slower earlier answer
         // would put the old head's flows back beside the new diff.
         if (stale()) return null;
         // A failed request is an HTTP error; a failed run is a 200 whose

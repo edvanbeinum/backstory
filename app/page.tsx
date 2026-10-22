@@ -540,7 +540,7 @@ export default function Page() {
 
   const haveSession = session !== null;
   // A commit's diff is immutable, so watcher ticks only matter for the two
-  // views that move — uncommitted work, and the branch diff (its HEAD end
+  // views that move — uncommitted work, and the branch diff (its tip end
   // advances with every commit); pinning the key otherwise keeps background
   // session refreshes from refetching a diff that cannot have changed.
   const workingDiffKey =
@@ -579,7 +579,7 @@ export default function Page() {
   }, [repoPath, ref, rev, haveSession, workingDiffKey]);
 
   // The map follows the diff: a commit's never changes; the branch's moves
-  // with HEAD.
+  // with its tip.
   useEffect(() => {
     if (!repoPath || !haveSession || rev === WORKING_REV) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the map where there is none, else fetches it
@@ -648,7 +648,7 @@ export default function Page() {
   const [visited, setVisited] = useState<Set<Tab>>(() => new Set());
   if (ready && !visited.has(tab)) setVisited(new Set([...visited, tab]));
 
-  // "All changes" follows HEAD: when the diff is fetched again, so are its
+  // "All changes" follows the branch's tip: when the diff is fetched again, so are its
   // flows, or the last head's flows would sit on the new head's lines.
   const flows = useFlows(
     session ? repoPath : "",
