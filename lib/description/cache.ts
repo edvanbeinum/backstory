@@ -183,9 +183,8 @@ async function messagesFor(view: DescriptionView) {
 
 /**
  * The names the prompt offers: the components and entities the change
- * touches. `onMap` is every name drawn on the view's map, for matching
- * `lookFirst` exactly. Read from whatever map and data model are saved, so a
- * map read still going doesn't hold the description up.
+ * touches. Read from whatever map and data model are saved, so a map read
+ * still going doesn't hold the description up.
  */
 async function namesFor(view: DescriptionView) {
   const [map, data] = await Promise.all([
@@ -199,7 +198,6 @@ async function namesFor(view: DescriptionView) {
           .filter((n) => !n.group && n.state !== "neighbour")
           .map((n) => n.name)
       : null,
-    onMap: new Set(hasMap ? map.nodes.map((n) => n.name) : []),
     entities: (data?.entities ?? [])
       .filter((e) => e.state !== "same")
       .map((e) => e.name),
@@ -217,17 +215,13 @@ async function gather(view: DescriptionView, pr: () => Promise<PrText>) {
     ...patch,
     messages,
     pr: prText,
-    components: names.components,
-    entities: names.entities,
+    ...names,
   };
-  return { inputs, onMap: names.onMap };
+  return inputs;
 }
 
-/** The answer, tidied: a blank why is none, and lookFirst is cut to its limit and checked against the map. */
-export function toDescription(
-  output: DescriptionOutput,
-  onMap: Set<string>,
-): ChangeDescription {
+/** The answer, tidied: a blank why is none, and lookFirst is cut to its limit. */
+export function toDescription(output: DescriptionOutput): ChangeDescription {
   const why = output.why?.trim();
   return {
     what: output.what.trim(),
@@ -238,7 +232,6 @@ export function toDescription(
       .map((l) => ({
         name: l.name,
         reason: l.reason.trim(),
-        onMap: onMap.has(l.name),
       })),
   };
 }
@@ -307,10 +300,7 @@ export async function startDescription(
   const runner = opts.runner ?? provider.run;
   enqueue(async () => {
     try {
-      const { inputs, onMap } = await gather(
-        view,
-        opts.pr ?? (async () => null),
-      );
+      const inputs = await gather(view, opts.pr ?? (async () => null));
       const read = await withSnapshot(view.root, view.head, (dir) =>
         runner<DescriptionOutput>(
           descriptionPrompt(inputs),
@@ -319,7 +309,7 @@ export async function startDescription(
         ),
       );
       await writeCache(file, {
-        description: toDescription(read.output, onMap),
+        description: toDescription(read.output),
         provider: provider.id,
         model: read.model ?? provider.model(),
         readAt: Date.now(),

@@ -27,7 +27,8 @@ import {
   WRITING_RULES,
   type DescriptionOutput,
 } from "../lib/description/prompt";
-import { startsByItself } from "../lib/description/types";
+import { isOnMap, startsByItself } from "../lib/description/types";
+import { buildMap } from "../lib/map";
 import { MAX_PATCH_BYTES } from "../lib/data/drafted";
 import { repoKey } from "../lib/git";
 import { serializeModel } from "../lib/models/dsl";
@@ -179,7 +180,7 @@ test("a view's description is read once from its patch, commits, PR and componen
   assert.deepEqual(done.status === "done" && done.description, {
     what: ANSWER.what,
     why: ANSWER.why,
-    lookFirst: [{ ...ANSWER.lookFirst[0], onMap: true }],
+    lookFirst: [ANSWER.lookFirst[0]],
   });
   assert.equal(done.status === "done" && done.provider, "Claude Code");
   assert.equal(done.status === "done" && done.model, "test-model");
@@ -219,7 +220,7 @@ test("with no why given, the description has none, and nothing is filled in", as
   const done = await descriptionStatus(repo.view);
   assert.equal(done.status === "done" && done.description.why, null);
 
-  assert.equal(toDescription({ ...ANSWER, why: "  " }, new Set()).why, null);
+  assert.equal(toDescription({ ...ANSWER, why: "  " }).why, null);
 });
 
 test("where to look first is matched to the map's names exactly, and a name not on it stays as text", async () => {
@@ -237,23 +238,17 @@ test("where to look first is matched to the map's names exactly, and a name not 
     }).runner,
   });
   const done = await descriptionStatus(repo.view);
+  const map = await buildMap(repo.view.root, repo.view.base, repo.view.head);
   assert.deepEqual(
     done.status === "done" &&
-      done.description.lookFirst.map((l) => [l.name, l.onMap]),
+      done.description.lookFirst.map((l) => [l.name, isOnMap(l.name, map)]),
     [
       ["Sync Engine", true],
       ["Order", false],
     ],
   );
-
-  const onMap = new Set(["Sync Engine"]);
-  assert.deepEqual(
-    toDescription(
-      { ...ANSWER, lookFirst: [{ name: "sync engine", reason: "" }] },
-      onMap,
-    ).lookFirst.map((l) => l.onMap),
-    [false],
-  );
+  assert.equal(isOnMap("sync engine", map), false);
+  assert.equal(isOnMap("Sync Engine", null), false);
 });
 
 test("commits with the same trees as a described view use its description", async () => {

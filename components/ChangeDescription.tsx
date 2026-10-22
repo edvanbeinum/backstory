@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import type { MapResponse } from "@/lib/map";
 import {
+  isOnMap,
   startsByItself,
   type ChangeDescription as Description,
   type DescriptionResponse,
@@ -99,9 +101,11 @@ const LABEL =
 
 function Parts({
   description,
+  map,
   onShowOnMap,
 }: {
   description: Description;
+  map: MapResponse | null;
   onShowOnMap: (name: string) => void;
 }) {
   return (
@@ -121,7 +125,7 @@ function Parts({
             <ul className="m-0 list-none space-y-1 p-0">
               {description.lookFirst.map((l) => (
                 <li key={l.name}>
-                  {l.onMap ? (
+                  {isOnMap(l.name, map) ? (
                     <button
                       type="button"
                       className="font-semibold text-[var(--accent)] hover:underline"
@@ -153,12 +157,15 @@ export function ChangeDescription({
   repo,
   rev,
   gitRef,
+  map,
   onShowOnMap,
 }: {
   repo: string;
   rev: string;
   /** The branch the view is on, when it isn't the one checked out */
   gitRef: string | null;
+  /** The map on screen, for which places to look first link to it */
+  map: MapResponse | null;
   /** Outline a component on the map */
   onShowOnMap: (name: string) => void;
 }) {
@@ -175,7 +182,11 @@ export function ChangeDescription({
   if (status.status === "done")
     body = (
       <>
-        <Parts description={status.description} onShowOnMap={onShowOnMap} />
+        <Parts
+          description={status.description}
+          map={map}
+          onShowOnMap={onShowOnMap}
+        />
         <span className="mt-3 flex flex-wrap items-center gap-1.5">
           <Badge tone="draft" className="!py-0 !leading-4">
             Drawn by {status.provider}

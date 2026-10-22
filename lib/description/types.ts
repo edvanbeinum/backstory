@@ -1,12 +1,19 @@
 import type { ProviderGap } from "../ai/provider";
+import type { MapResponse } from "../map";
 
 /** A place to look first, as the provider named it */
 export interface LookFirst {
   name: string;
   reason: string;
-  /** Whether the name is a component on the view's map, so it can outline it */
-  onMap: boolean;
 }
+
+/**
+ * Whether a place to look first is a component on the map, matched exactly,
+ * so it can outline it. Checked against the map on screen rather than when
+ * the description is read, so a map drawn after it still links.
+ */
+export const isOnMap = (name: string, map: MapResponse | null) =>
+  map?.status === "ok" && map.nodes.some((n) => n.name === name);
 
 /** What a change does, why, and where to look first, in a few plain sentences */
 export interface ChangeDescription {

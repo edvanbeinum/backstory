@@ -93,6 +93,7 @@ export function Story({
           repo={repo}
           rev={rev}
           gitRef={gitRef}
+          map={map}
           onShowOnMap={onShowOnMap}
         />
       )}
