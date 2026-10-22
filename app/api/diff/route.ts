@@ -39,7 +39,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const repo = await resolveRepo(repoPath);
+    const repo = await resolveRepo(repoPath, searchParams.get("ref"));
 
     let patch: string;
     if (rev === WORKING_REV) {
@@ -48,7 +48,7 @@ export async function GET(request: Request) {
         pathspec,
       });
     } else if (rev === BRANCH_REV) {
-      // The combined branch diff: fork point (or push boundary) → HEAD.
+      // The combined branch diff: fork point (or push boundary) → the tip.
       // The PR's base branch decides the fork — on a stacked PR that's the
       // parent branch, not the default one. Cached, so usually free.
       const github = await loadGitHubDataCached(repo);
@@ -63,7 +63,7 @@ export async function GET(request: Request) {
           { status: 404 },
         );
       }
-      patch = await getRangePatch(repo.root, info.baseSha, "HEAD", {
+      patch = await getRangePatch(repo.root, info.baseSha, repo.tip, {
         pathspec,
       });
     } else {

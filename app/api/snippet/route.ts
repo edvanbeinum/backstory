@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     );
   }
   try {
-    const repo = await resolveRepo(repoPath);
+    const repo = await resolveRepo(repoPath, searchParams.get("ref"));
     const range = await viewRange(repo, rev);
     if (!range) {
       return NextResponse.json<ApiError>(

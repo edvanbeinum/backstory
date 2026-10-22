@@ -53,7 +53,7 @@ export async function GET(request: Request) {
   }
 
   try {
-    const repo = await resolveRepo(repoPath);
+    const repo = await resolveRepo(repoPath, searchParams.get("ref"));
 
     let patch: string;
     if (rev === WORKING_REV) {
@@ -75,7 +75,7 @@ export async function GET(request: Request) {
           { status: 404 },
         );
       }
-      patch = await getRangePatch(repo.root, info.baseSha, "HEAD", {
+      patch = await getRangePatch(repo.root, info.baseSha, repo.tip, {
         context: FULL_CONTEXT,
         pathspec: paths,
       });
