@@ -143,7 +143,8 @@ export async function descriptionStatus(
   if (cached)
     return {
       status: "done",
-      // A description cached before it named components has none.
+      // Default to no components for a description cached before it named
+      // them.
       description: {
         ...cached.description,
         components: cached.description.components ?? [],

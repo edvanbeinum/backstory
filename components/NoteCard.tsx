@@ -51,7 +51,8 @@ export function NoteComposer({
   onCancel: () => void;
 }) {
   const [text, setText] = useState(initial);
-  // A note left at its starting text, such as "On Sync Engine:", says nothing.
+  // Refuse to save a note left at its starting text, such as "On Sync
+  // Engine:", since it says nothing.
   const canSave = text.trim().length > 0 && text.trim() !== initial.trim();
 
   return (
