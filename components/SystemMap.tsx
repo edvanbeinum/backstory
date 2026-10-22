@@ -15,7 +15,7 @@ import { viewKey, viewParams } from "@/lib/url";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { Badge, Button, CopyButton, Spinner } from "./ui";
+import { Badge, Button, CopyButton, Spinner, Ticked } from "./ui";
 import { useView } from "./ViewContext";
 
 /**
@@ -485,24 +485,9 @@ function summary(map: MapResponse) {
   return parts;
 }
 
-function Ticked({ text }: { text: string }) {
-  return (
-    <span>
-      {text.split("`").map((part, i) =>
-        i % 2 ? (
-          <code key={i} className="mono">
-            {part}
-          </code>
-        ) : (
-          part
-        ),
-      )}
-    </span>
-  );
-}
-
 /**
- * Turns reading the repo's maps and data models as it opens on or off.
+ * Turns reading the repo's maps, data models and change descriptions as it
+ * opens on or off.
  * Turning it on starts main's two reads before the page reads the view again,
  * so the view's own reads wait behind them instead of reading their bases in
  * full.

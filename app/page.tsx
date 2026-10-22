@@ -1119,6 +1119,7 @@ export default function Page() {
                               entityNotes={entityNotes}
                               onModelChange={onModelChange}
                               mapHighlight={mapHighlight}
+                              onShowOnMap={showOnMap}
                               onOpenFile={openFile}
                               flows={flows}
                               diff={diffIsCurrent ? diff : null}

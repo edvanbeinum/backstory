@@ -121,8 +121,9 @@ export const PHASES = {
 const offKey = async (root: string) => `read.off.${await repoKey(root)}`;
 
 /**
- * Whether maps and data models read as the repo and its views open: on unless
- * the user turned the repo off. Keyed by repo, so every worktree shares it.
+ * Whether maps, data models and change descriptions read as the repo and its
+ * views open: on unless the user turned the repo off. Keyed by repo, so every
+ * worktree shares it.
  */
 export const autoRead = async (root: string) =>
   setting(await offKey(root)) !== "1";
@@ -270,7 +271,7 @@ export async function dataStatus(
   return ended ?? idle;
 }
 
-/** The current read's end, for tests: nothing waits on a read otherwise. */
+/** The end of the view's current read, if one is running: the change description waits on it, as tests do. */
 export async function dataReadSettled(view: DataView): Promise<void> {
   await registry.jobs.get((await filesFor(view)).key)?.settled;
 }

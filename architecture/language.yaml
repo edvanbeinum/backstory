@@ -29,7 +29,7 @@ terms:
       - panel
       - column
   - name: story
-    means: "The Story tab, where every view lands: the map at full width with one line of what it says, then each flow as a card (`components/Story.tsx`)."
+    means: "The Story tab, where every view lands: the change description, then the map at full width with one line of what it says, then each flow as a card (`components/Story.tsx`)."
     avoid:
       - strip, for the map or the data model's summary
   - name: gutter mark
@@ -82,11 +82,15 @@ terms:
     means: "`lib/models/cache.ts`: the drafted maps in `~/.backstory/maps/`, one file per tree with the tree it was derived from, plus `trunk.json` for main's map and the queue of reads that make them. The data cache's engine, copied."
     avoid:
       - store
+  - name: change description
+    means: "A few plain sentences at the top of Story: why the change was made (only when its commit messages or PR say), what it does, and at most two places to look first, each outlining its component on the map when the name is one. The AI provider reads it from the view's patch, commit messages, PR and the names of the components and entities it touches (`lib/description/`), once per view, cached by base and head trees in `~/.backstory/descriptions/`. Read as views open unless the repo is turned off, or on a click (Describe this change), and marked Drawn by the provider. Describe again reads it once more, and the earlier one stays if that read fails."
+    avoid:
+      - summary, for the description (that's the line under the map)
   - name: repo key
-    means: "The folder a repo gets under `~/.backstory/flows/`, `data/`, `maps/` and `models/` (`repoKey` in `lib/git.ts`): the main checkout's folder plus the first 8 hex characters of a hash of the common git dir. Every worktree of a repo has the same key; two repos whose checkouts share a folder name don't."
+    means: "The folder a repo gets under `~/.backstory/flows/`, `data/`, `maps/`, `descriptions/` and `models/` (`repoKey` in `lib/git.ts`): the main checkout's folder plus the first 8 hex characters of a hash of the common git dir. Every worktree of a repo has the same key; two repos whose checkouts share a folder name don't."
     avoid: []
   - name: AI provider
-    means: "The tool Backstory asks to read code and answer in a JSON schema; Claude Code for now, and required: it draws every map, data model and flow, through the user's own login (`lib/ai/provider.ts`)."
+    means: "The tool Backstory asks to read code and answer in a JSON schema; Claude Code for now, and required: it draws every map, data model, flow and change description, through the user's own login (`lib/ai/provider.ts`)."
     avoid:
       - agent (that's the coding agent under review, as in the agent review loop)
       - model, for the tool (that's the C4 or data model; the LLM is "the provider's model")
@@ -183,8 +187,14 @@ blocks:
   - name: AI provider
     code:
       - lib/ai/
-    summary: "The one seam every AI call goes through: picks the provider (`BACKSTORY_AI`, Claude Code by default) and holds the contract a provider must meet, reading a directory read-only and answering in a JSON schema."
+    summary: "The one seam every AI call goes through, for the map's and the data model's drafts, flows and the change description: picks the provider (`BACKSTORY_AI`, Claude Code by default) and holds the contract a provider must meet, reading a directory read-only and answering in a JSON schema."
     read: "`lib/ai/provider.ts` header"
+  - name: change description
+    code:
+      - lib/description/
+      - app/api/description/
+    summary: Has the AI provider describe a view's change in a few plain sentences, under writing rules that keep them specific, and caches it per view.
+    read: "`lib/description/cache.ts` header"
   - name: model reader (the map)
     code:
       - lib/dsl.ts

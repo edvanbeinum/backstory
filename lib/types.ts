@@ -169,6 +169,8 @@ export interface ReviewSummary {
 export interface PullRequestInfo {
   number: number;
   title: string;
+  /** The description its author wrote, for the change description's prompt */
+  body: string;
   url: string;
   state: string;
   isDraft: boolean;

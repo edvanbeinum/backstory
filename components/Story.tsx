@@ -8,6 +8,7 @@ import type { DataResponse } from "@/lib/data/types";
 import type { FlowRow } from "@/lib/flows/rows";
 import type { MapResponse } from "@/lib/map";
 import type { DiffResponse } from "@/lib/types";
+import { ChangeDescription } from "./ChangeDescription";
 import { DataSummary } from "./DataSummary";
 import type { StoryTarget } from "./FlowCard";
 import { FlowCoverage } from "./FlowCoverage";
@@ -17,9 +18,9 @@ import { SystemMap } from "./SystemMap";
 import type { FlowsApi } from "./useFlows";
 
 /**
- * The tab every view lands on, read top to bottom: the map at the column's
- * width with a line of what it says, then each flow as a card. Traced or
- * not, the map leads; the code is a click away from any step.
+ * The tab every view lands on, read top to bottom: the change description, the
+ * map at the column's width with a line of what it says, then each flow as a
+ * card. The code is a click away from any step.
  */
 export function Story({
   repo,
@@ -29,6 +30,7 @@ export function Story({
   entityNotes,
   onModelChange,
   mapHighlight,
+  onShowOnMap,
   onOpenFile,
   flows,
   diff,
@@ -52,6 +54,8 @@ export function Story({
   /** A model or data model draft was written: read both again */
   onModelChange: () => void;
   mapHighlight: { name: string; at: number } | null;
+  /** Outline a component on the map, from the change description */
+  onShowOnMap: (name: string) => void;
   /** A file picked on the map: show it in Files changed */
   onOpenFile: (path: string) => void;
   flows: FlowsApi;
@@ -80,6 +84,16 @@ export function Story({
 
   return (
     <div className="space-y-6 pt-1">
+      {rev !== WORKING_REV && (
+        <ChangeDescription
+          repo={repo}
+          rev={rev}
+          map={map}
+          onShowOnMap={onShowOnMap}
+          onAutoChange={onModelChange}
+        />
+      )}
+
       {rev !== WORKING_REV && (
         <section className="space-y-2">
           <div className="story-h">

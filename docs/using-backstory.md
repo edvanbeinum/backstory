@@ -71,8 +71,8 @@ your uncommitted work, or any one commit on it. It opens on your uncommitted
 work when there is some, and on the whole branch otherwise. Under the header are
 three tabs, as on a pull request, and every change opens on the first:
 
-- **Story** shows the map at full width, a line under it saying what it shows,
-  then each flow as a card. Before a change is traced, one card in place of the
+- **Story** opens with a few sentences on the change, then shows the map at full
+  width, a line under it saying what it shows, then each flow as a card. Before a change is traced, one card in place of the
   flows offers **Trace this change**. Click a step to open its code under it;
   click it again or press `Esc` to close it, and **Show in Files changed** opens
   the diff at the same lines.
@@ -99,6 +99,16 @@ Files over 5,000 lines render in full but without syntax highlighting — the
 footer says so.
 
 ## The map, flows and the data model
+
+At the top of Story, Claude Code describes the change in three parts: **Why**,
+**What it does**, and **Where to look first**. It reads the patch, the commit
+messages and the pull request, and writes **Why** only when the commits or the
+pull request say why. Click a place to look first that is on the map to outline
+it there. Opening a commit or the whole branch describes it, unless you turned
+the repo off; then **Describe this change** reads it. **Turn off** beside
+**Drawn by Claude Code** turns the repo off, for its maps and data models too.
+**Describe again** reads it once more, and shows the earlier description with
+the error if that read fails.
 
 Backstory draws what a change did to the system, so you can see its effect
 before reading its lines:
@@ -226,7 +236,7 @@ Every read runs through your own Claude Code login:
 
 - With an API key, you pay per read. Main's map or data model is about a dollar
   on a large repo and cents on a small one, and each change after it is cents. A
-  trace usually costs $0.10–0.40.
+  trace usually costs $0.10–0.40, and a change's description a few cents.
 - On a Claude subscription, reads count toward Claude's usage limits.
 - Each repo has **Turn off**, under its drawn map and data model, to stop
   reading it as it opens.
@@ -347,7 +357,7 @@ The server logs to `~/.backstory/server.log`.
 
 Its own state lives under `~/.backstory`. Notes to your agent and the outbox are
 in one database, `backstory.db`. Traced flows, drawn maps and
-data models, and hand-written maps are files beside it. Nothing Backstory writes is inside your repos.
+data models, change descriptions, and hand-written maps are files beside it. Nothing Backstory writes is inside your repos.
 
 If you connected GitHub, its token is in your login Keychain, under
 `dev.backstory.github`.
