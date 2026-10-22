@@ -20,7 +20,7 @@ import * as snippet from "../app/api/snippet/route";
 import type { DataResponse } from "../lib/data/types";
 import { onFlowsChange, startFlows } from "../lib/flows/cache";
 import type { FlowsStatus } from "../lib/flows/types";
-import { resolveBase, resolveRepo } from "../lib/git";
+import { getCommits, resolveBase, resolveRepo } from "../lib/git";
 import type { MapResponse } from "../lib/map";
 import type { Snippet } from "../lib/snippet";
 import type { DiffResponse, FileViewResponse } from "../lib/types";
@@ -220,6 +220,18 @@ test("a branch opened by ref that is named like a folder still diffs", async () 
     "src/b1.ts",
     "src/b2.ts",
   ]);
+});
+
+test("a branch opened by ref that is named like a folder still lists its commits with no base", async () => {
+  const { root, git, b } = stack();
+  git("branch", "src", "stack-b");
+  const commits = await getCommits(await resolveRepo(root, "src"), {
+    ref: "",
+    sha: null,
+    reason: "root",
+    label: "",
+  });
+  assert.equal(commits[0]?.sha, b);
 });
 
 test("View file and a step's code read the branch opened by ref", async () => {

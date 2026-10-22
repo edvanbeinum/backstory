@@ -500,6 +500,7 @@ async function logRange(
     `--format=${LOG_FORMAT}%x1e`,
     `--max-count=${limit}`,
     ...rangeArgs,
+    "--",
   ]);
   if (!out) return [];
 
