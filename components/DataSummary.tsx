@@ -621,10 +621,10 @@ function useDataDraft(
   };
 }
 
-function DraftedBadge({ provider }: { provider: string }) {
+function DraftedBadge() {
   return (
     <Badge tone="draft" className="!py-0 !leading-4">
-      Drawn by {provider}
+      Read by AI
     </Badge>
   );
 }
@@ -845,7 +845,7 @@ export function DataSummary({
     return (
       <span className="part inline-flex flex-wrap items-center gap-1.5">
         <b>Data</b>
-        {data.drafted && <DraftedBadge provider={data.drafted.provider} />}
+        {data.drafted && <DraftedBadge />}
         {noChange}
         {data.drafted && <DraftFootnote data={data} draft={draft} />}
       </span>
@@ -857,7 +857,7 @@ export function DataSummary({
     <>
       <span className="part inline-flex min-w-0 flex-wrap items-center gap-1.5">
         <b>Data</b>
-        {data.drafted && <DraftedBadge provider={data.drafted.provider} />}
+        {data.drafted && <DraftedBadge />}
         <span>{whole ? noChange : summary(shown)}</span>
         <button
           type="button"

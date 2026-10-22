@@ -218,8 +218,6 @@ export interface ModelRead {
   /** The hand-written local model's path; null otherwise */
   file: string | null;
   error: string | null;
-  /** The AI provider's id, for a drafted map */
-  provider?: string;
 }
 
 function read(
@@ -279,7 +277,6 @@ export async function readModelAt(
     source: "drafted",
     file: null,
     error: null,
-    provider: saved.provider,
   };
 }
 

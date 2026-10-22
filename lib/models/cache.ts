@@ -191,13 +191,11 @@ async function cached(files: Files) {
 export async function savedMapAt(
   root: string,
   rev: string,
-): Promise<{ workspace: Workspace; provider: string; readAt: number } | null> {
+): Promise<{ workspace: Workspace; readAt: number } | null> {
   const t = await gitLine(root, ["rev-parse", "--verify", `${rev}^{tree}`]);
   if (!t) return null;
   const map = await savedMap(await mapsDir(root), t);
-  return map
-    ? { workspace: map.workspace, provider: map.provider, readAt: map.readAt }
-    : null;
+  return map ? { workspace: map.workspace, readAt: map.readAt } : null;
 }
 
 /** Why the map at the rev isn't drafted, or null when it may be. */

@@ -126,7 +126,7 @@ before reading its lines:
     out from the nearest map already read, by reading only the patch between
     them, well under a minute. The map marks
     the components and arrows a branch added or removed, is marked **Drawn by
-    Claude Code**, and is kept in `~/.backstory/maps/`, a cache you can delete. Nothing is
+    AI**, and is kept in `~/.backstory/maps/`, a cache you can delete. Nothing is
     written into the repo, or to `~/.backstory/models/`.
   - Opening a repo starts the read of main's map, and opening a view on Story
     starts the view's read, with its progress where the map goes. For a repo
@@ -154,7 +154,7 @@ before reading its lines:
   minute. A view's base is
   worked out from main's model, and its head from its base, so a second branch
   from the same point, or a branch rebased onto main, reads only its own
-  change. The result is marked **Drawn by Claude Code** and kept in
+  change. The result is marked **Read by AI** and kept in
   `~/.backstory/data/`.
   - Reads start as a repo and a view open: opening a repo starts the reads of
     main's data model and map, and opening a view on Story starts the view's
