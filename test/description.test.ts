@@ -272,7 +272,7 @@ test("the prompt states every writing rule, with two good and two bad examples",
   const ai = recorder();
   await read(repo.view, { runner: ai.runner });
 
-  assert.equal(WRITING_RULES.length, 8);
+  assert.equal(WRITING_RULES.length, 9);
   assert.equal(GOOD_EXAMPLES.length, 2);
   assert.equal(BAD_EXAMPLES.length, 2);
   for (const line of [...WRITING_RULES, ...GOOD_EXAMPLES, ...BAD_EXAMPLES])
