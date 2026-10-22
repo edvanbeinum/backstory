@@ -57,6 +57,7 @@ import {
   resolveComment,
   resolveRev,
   resolveTab,
+  viewKey,
   viewParams,
   writeUrlState,
   type Tab,
@@ -190,11 +191,8 @@ export default function Page() {
     view: string;
     data: DataResponse;
   } | null>(null);
-  // Key each view by path and branch: two branches of a stack are reviewed
-  // from one worktree, so the path alone doesn't say which branch it is of.
-  const openKey = shown.ref ? `${shown.repo}\n${shown.ref}` : shown.repo;
-  const dataView = `${openKey}\n${rev}`;
-  const dataModel = dataRead?.view === dataView ? dataRead.data : null;
+  const viewId = viewKey({ ...shown, rev });
+  const dataModel = dataRead?.view === viewId ? dataRead.data : null;
   const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
   const refRef = useRef(ref);
@@ -603,12 +601,12 @@ export default function Page() {
       .then((data) => !cancelled && setMap(data))
       .catch(() => !cancelled && setMap(null));
     getJson<DataResponse>(`/api/data?${query}`)
-      .then((data) => !cancelled && setDataRead({ view: dataView, data }))
+      .then((data) => !cancelled && setDataRead({ view: viewId, data }))
       .catch(() => !cancelled && setDataRead(null));
     return () => {
       cancelled = true;
     };
-  }, [shown, rev, dataView, haveSession, workingDiffKey, modelTick]);
+  }, [shown, rev, viewId, haveSession, workingDiffKey, modelTick]);
 
   const commitForRev = useMemo((): CommitSummary | null => {
     if (rev === WORKING_REV) return WORKING_COMMIT;
@@ -683,14 +681,13 @@ export default function Page() {
     at: number;
   } | null>(null);
 
-  const viewKey = `${openKey}@${rev}`;
   // Reset while rendering, not in an effect, so a new view never paints
   // with the last one's requests.
-  const [shownView, setShownView] = useState(viewKey);
-  if (shownView !== viewKey) {
-    setShownView(viewKey);
+  const [shownView, setShownView] = useState(viewId);
+  if (shownView !== viewId) {
+    setShownView(viewId);
     setStoryTarget(null);
-    if (filesJump?.view !== viewKey) setFilesJump(null);
+    if (filesJump?.view !== viewId) setFilesJump(null);
     setMapHighlight(null);
     setFilesFilter(null);
   }
@@ -915,12 +912,12 @@ export default function Page() {
           side: note.side,
           line: note.line ?? undefined,
           note: note.id,
-          view: `${openKey}@${note.rev}`,
+          view: viewKey({ ...shown, rev: note.rev }),
           at: Date.now(),
         });
       setTab("files");
     },
-    [noteRev, pickRev, openKey],
+    [noteRev, pickRev, shown],
   );
 
   // j/k move through a list the way they would in a TUI, the open tab's:
@@ -1120,7 +1117,7 @@ export default function Page() {
                         {visited.has("files") && (
                           <div hidden={tab !== "files"}>
                             <FilesChanged
-                              view={viewKey}
+                              view={viewId}
                               diff={diff}
                               loading={diffLoading}
                               error={diffError}

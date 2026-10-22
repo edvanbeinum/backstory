@@ -9,6 +9,7 @@ import {
   resolveComment,
   resolveRev,
   resolveTab,
+  viewKey,
   viewParams,
 } from "../lib/url";
 
@@ -278,4 +279,15 @@ test("a hand-picked sha survives, an unknown one from a URL still falls back", (
     rev: COMMITS[0].sha,
     notice: "fc6ff8f",
   });
+});
+
+test("a view's key tells two branches of a stack apart, and is the same for the same view", () => {
+  const onB = viewKey({ repo: "/r", ref: "stack/b", rev: "branch" });
+  assert.equal(onB, viewKey({ repo: "/r", ref: "stack/b", rev: "branch" }));
+  assert.notEqual(onB, viewKey({ repo: "/r", ref: "stack/a", rev: "branch" }));
+  assert.notEqual(onB, viewKey({ repo: "/r", rev: "branch" }));
+  assert.equal(
+    viewKey({ repo: "/r", ref: null, rev: "branch" }),
+    viewKey({ repo: "/r", rev: "branch" }),
+  );
 });

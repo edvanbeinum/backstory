@@ -104,6 +104,19 @@ export function viewParams({
   return params;
 }
 
+/**
+ * Names one view for state kept with it, built from its request so the two
+ * always agree on which view it is: two branches of a stack are reviewed
+ * from one worktree, so the repo and rev alone don't tell them apart.
+ */
+export function viewKey(view: {
+  repo: string;
+  ref?: string | null;
+  rev: string;
+}): string {
+  return viewParams(view).toString();
+}
+
 const EMPTY_STATE: UrlState = {
   repo: null,
   rev: null,

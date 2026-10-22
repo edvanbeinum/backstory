@@ -181,7 +181,8 @@ primitives:
       - buildUrl
       - writeUrlState
       - viewParams
-    use: "Builds and writes the page state into the URL, so a view can be shared. `viewParams` builds every view request's query, with `ref` when the repo is open on a branch it hasn't checked out."
+      - viewKey
+    use: "Builds and writes the page state into the URL, so a view can be shared. `viewParams` builds every view request's query, with `ref` when the repo is open on a branch it hasn't checked out, and `viewKey` names a view from that query for state kept with it."
   - name: buttons and copy
     block: UI tabs
     file: components/ui.tsx

@@ -18,7 +18,7 @@ import type {
   Field,
   Relationship,
 } from "@/lib/data/types";
-import { viewParams } from "@/lib/url";
+import { viewKey, viewParams } from "@/lib/url";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
@@ -512,7 +512,7 @@ function useDataDraft(
   onRead: () => void,
 ) {
   const { ref } = useView();
-  const viewId = `${repo}\n${ref ?? ""}\n${rev}`;
+  const viewId = viewKey({ repo, ref, rev });
   const [answer, setAnswer] = useState<{
     over: DataResponse | null;
     data: DataResponse;
@@ -815,7 +815,8 @@ export function DataSummary({
   const changed = shown.filter((p) => p.state !== "same");
   // Open the graph when the view changes the data model, and keep a click's
   // open or close only for the view it was made on.
-  const view = `${repo}\n${rev}`;
+  const { ref } = useView();
+  const view = viewKey({ repo, ref, rev });
   const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
   const open = toggled?.view === view ? toggled.open : changed.length > 0;
   const boxRef = useRef<HTMLDivElement>(null);

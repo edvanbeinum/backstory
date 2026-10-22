@@ -11,7 +11,7 @@ import {
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
 import { ownsCode } from "@/lib/mapGroups";
-import { viewParams } from "@/lib/url";
+import { viewKey, viewParams } from "@/lib/url";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
@@ -531,7 +531,7 @@ function useMapDraft(
   onRead: () => void,
 ) {
   const { ref } = useView();
-  const viewId = `${repo}\n${ref ?? ""}\n${rev}`;
+  const viewId = viewKey({ repo, ref, rev });
   const [answer, setAnswer] = useState<{
     over: MapResponse | null;
     map: MapResponse;
@@ -904,7 +904,8 @@ export function SystemMap({
   const map = draft.map;
   const drafted = map?.source === "drafted";
   // Keep a click's Show map or Hide map only for the view it was made on.
-  const view = `${repo}\n${rev}`;
+  const { ref } = useView();
+  const view = viewKey({ repo, ref, rev });
   const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
   const showWhole = toggled?.view === view && toggled.open;
   const boxRef = useRef<HTMLElement>(null);

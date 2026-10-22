@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import type { FlowsStatus } from "@/lib/flows/types";
-import { viewParams } from "@/lib/url";
+import { viewKey, viewParams } from "@/lib/url";
 
 /**
  * The flows for the view on screen. Tracing takes a minute and the user's
@@ -18,7 +18,7 @@ export function useFlows(
   rev: string,
   tick: number | string,
 ) {
-  const at = `${repo}\n${ref ?? ""}@${rev}`;
+  const at = viewKey({ repo, ref, rev });
   // Kept with the view it answers, so a render just after a move never
   // shows the last view's status as this one's.
   const [answer, setAnswer] = useState<{
