@@ -30,8 +30,8 @@
   "dependencies": {
     "next": "16.4.2",
     "picomatch": "^4.0.7",
-    "react": "19.3.0",
-    "react-dom": "19.3.0",
+    "react": "19.3.1",
+    "react-dom": "19.3.1",
     "react-markdown": "^10.1.0",
     "remark-gfm": "^4.0.1",
     "shiki": "^4.5.0"
@@ -42,7 +42,7 @@
     "@types/picomatch": "^4.0.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "eslint": "^10.12.0",
+    "eslint": "^10.13.0",
     "eslint-config-next": "16.4.2",
     "eslint-config-prettier": "^10.1.8",
     "globals": "17.13.0",
