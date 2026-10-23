@@ -96,8 +96,10 @@ function Squares({ add, del }: { add: number; del: number }) {
 }
 
 /** Scroll the diff to a file and flash its header. */
-export function jumpToFile(path: string): boolean {
-  const section = document.getElementById(`file-${encodeURIComponent(path)}`);
+export function jumpToFile(path: string, root: ParentNode = document): boolean {
+  const section = root.querySelector<HTMLElement>(
+    `#${CSS.escape(`file-${encodeURIComponent(path)}`)}`,
+  );
   if (!section) return false;
   section.scrollIntoView({ block: "start" });
   section.classList.remove("flash");
@@ -108,26 +110,51 @@ export function jumpToFile(path: string): boolean {
 
 const fileName = (path: string) => path.split("/").pop() ?? path;
 
+/** One component and its arrows, outlined, with the rest of the map dimmed */
+export interface MapFocus {
+  node: string;
+  edges: string[];
+}
+
 function MapCanvas({
   nodes,
   edges,
   width,
   highlight,
+  focus = null,
   onJump,
+  onPickNode,
+  onOrder,
 }: {
   nodes: MapNode[];
   edges: MapEdge[];
   width: number;
   /** A component's name, outlined as hovering it would */
   highlight: string | null;
+  focus?: MapFocus | null;
   onJump: (path: string) => void;
+  /** A changed component was clicked; its first file opens when unset */
+  onPickNode?: (id: string) => void;
+  /** Each box's id, top to bottom then left to right, whenever the layout moves one */
+  onOrder?: (ids: string[]) => void;
 }) {
+  const focusEdges = useMemo(() => new Set(focus?.edges ?? []), [focus]);
+  const dimNode = (id: string) => focus !== null && focus.node !== id;
+  const dimEdge = (key: string) => focus !== null && !focusEdges.has(key);
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const { placed, height } = useMemo(
     () => layout(nodes, edges, width, heights),
     [nodes, edges, width, heights],
   );
   const boxes = useRef(new Map<string, HTMLDivElement>());
+
+  useEffect(() => {
+    if (!onOrder) return;
+    const at = (id: string) => placed.get(id)!;
+    onOrder(
+      [...placed.keys()].sort((a, b) => at(a).y - at(b).y || at(a).x - at(b).x),
+    );
+  }, [placed, onOrder]);
 
   // Boxes size to what they say; lay out again once their real heights are
   // known, so arrows meet their edges.
@@ -168,7 +195,7 @@ function MapCanvas({
         .map((n) => (
           <div
             key={n.id}
-            className={`map-group ${n.state} ${highlight === n.name ? "highlight" : ""}`}
+            className={`map-group ${n.state} ${highlight === n.name ? "highlight" : ""} ${focus?.node === n.id ? "here" : ""}`}
             style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
             title={n.description || undefined}
           >
@@ -183,8 +210,14 @@ function MapCanvas({
                 <button
                   type="button"
                   className="files mono"
-                  title={`${n.files.join("\n")}\nShow them in Files changed`}
-                  onClick={() => onJump(n.files[0])}
+                  title={
+                    onPickNode
+                      ? `${n.files.join("\n")}\nShow them below`
+                      : `${n.files.join("\n")}\nShow them in Files changed`
+                  }
+                  onClick={() =>
+                    onPickNode ? onPickNode(n.id) : onJump(n.files[0])
+                  }
                 >
                   {n.files.length} {n.files.length === 1 ? "file" : "files"}{" "}
                   <span className="text-[var(--success)]">+{n.additions}</span>
@@ -258,7 +291,7 @@ function MapCanvas({
               <path d={d} className="map-hit" />
               <path
                 d={d}
-                className={`map-edge ${e.state} ${hoverEdge === e.key ? "hover" : ""}`}
+                className={`map-edge ${e.state} ${hoverEdge === e.key ? "hover" : ""} ${dimEdge(e.key) ? "dim" : ""}`}
                 markerEnd={`url(#map-${kind})`}
               />
               <title>{`${a.name} → ${b.name}: ${e.description}${e.before ? ` (was: ${e.before})` : ""}`}</title>
@@ -286,7 +319,7 @@ function MapCanvas({
         return (
           <div
             key={e.key}
-            className={`map-label ${e.state}`}
+            className={`map-label ${e.state} ${dimEdge(e.key) ? "dim" : ""}`}
             style={{ left: lx, top: ly }}
           >
             {e.state === "changed" ? (
@@ -315,9 +348,13 @@ function MapCanvas({
               if (el) boxes.current.set(n.id, el);
               else boxes.current.delete(n.id);
             }}
-            className={`map-node ${n.state} ${n.files.length ? "jumps" : ""} ${highlight === n.name ? "highlight" : ""}`}
+            className={`map-node ${n.state} ${n.files.length ? "jumps" : ""} ${highlight === n.name ? "highlight" : ""} ${focus?.node === n.id ? "here" : ""} ${dimNode(n.id) ? "dim" : ""}`}
             style={{ left: n.x, top: n.y, width: n.w }}
-            onClick={() => n.files[0] && onJump(n.files[0])}
+            onClick={() => {
+              if (!n.files[0]) return;
+              if (onPickNode) onPickNode(n.id);
+              else onJump(n.files[0]);
+            }}
           >
             <h4>
               <span>{n.name}</span>
@@ -872,6 +909,9 @@ export function SystemMap({
   repo,
   rev,
   highlight = null,
+  focus = null,
+  onPickNode,
+  onOrder,
   onOpenFile,
   onModelChange,
   children,
@@ -881,6 +921,12 @@ export function SystemMap({
   rev: string;
   /** A component to outline, asked for from Files changed */
   highlight?: { name: string; at: number } | null;
+  /** The component Story's walk is on, outlined with its arrows */
+  focus?: MapFocus | null;
+  /** A changed component was clicked, for Story's walk to go to */
+  onPickNode?: (id: string) => void;
+  /** The map's boxes in reading order, for Story's walk to follow */
+  onOrder?: (ids: string[]) => void;
   /** Show a file in Files changed */
   onOpenFile: (path: string) => void;
   /** A drafted map was read: read the map again */
@@ -991,7 +1037,10 @@ export function SystemMap({
             edges={map.edges}
             width={width - 2}
             highlight={highlight?.name ?? null}
+            focus={focus}
             onJump={onOpenFile}
+            onPickNode={onPickNode}
+            onOrder={onOrder}
           />
         )}
         <div className="map-foot">

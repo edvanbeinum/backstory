@@ -173,7 +173,7 @@ primitives:
     symbols:
       - descriptionStatus
       - startDescription
-    use: "The AI provider's change description for a view: what it does, why, and at most two places to look first, read from the view's patch (cut past the drafted reads' cap, with a `--stat`), commit messages, PR and the names of the components and entities it touches, through `withSnapshot`. Waits for the view's map and data model reads (`mapReadSettled`, `dataReadSettled`), starting them when the repo reads automatically, so the names are this commit's. The read joins the queue only once they end. Cached by base and head trees under `~/.backstory/descriptions/`, one read at a time. The schema and the prompt's writing rules are in `lib/description/prompt.ts`, so a read that adds to the description changes that one file."
+    use: "The AI provider's change description for a view: what it does, why, and at most two places to look first, and one sentence per changed component for Story's walk, read from the view's patch (cut past the drafted reads' cap, with a `--stat`), commit messages, PR and the names of the components and entities it touches, through `withSnapshot`. Waits for the view's map and data model reads (`mapReadSettled`, `dataReadSettled`), starting them when the repo reads automatically, so the names are this commit's. The read joins the queue only once they end. Cached by base and head trees under `~/.backstory/descriptions/`, one read at a time. The schema and the prompt's writing rules are in `lib/description/prompt.ts`, so a read that adds to the description changes that one file."
   - name: route errors
     file: lib/api.ts
     symbols:
@@ -192,7 +192,7 @@ primitives:
       - writeUrlState
       - viewParams
       - viewKey
-    use: "Builds and writes the page state into the URL, so a view can be shared. `viewParams` builds every view request's query, with `ref` when the repo is open on a branch it hasn't checked out, and `viewKey` names a view from that query for state kept with it."
+    use: "Builds and writes the page state into the URL, so a view can be shared, with `stop=` for the stop Story's walk is on and `walk=0` for Story on one page. `viewParams` builds every view request's query, with `ref` when the repo is open on a branch it hasn't checked out, and `viewKey` names a view from that query for state kept with it."
   - name: the open view
     block: UI tabs
     file: components/ViewContext.tsx

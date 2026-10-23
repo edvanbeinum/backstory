@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { coverage } from "@/lib/flows/coverage";
 import { fileFlows, type StepMark, type StepMarks } from "@/lib/flows/rows";
@@ -31,19 +31,23 @@ export interface FilesJump {
   at: number;
 }
 
-/** Ask a file to show a line that's outside the hunks on screen. */
-function revealLine(path: string, side: "old" | "new", line: number) {
-  window.dispatchEvent(
-    new CustomEvent("backstory:reveal", { detail: { path, side, line } }),
+/**
+ * The file in this tab. Looked up inside the tab, since Story's walk shows
+ * the same files with the same ids.
+ */
+const sectionFor = (root: ParentNode, path: string) =>
+  root.querySelector<HTMLElement>(
+    `#${CSS.escape(`file-${encodeURIComponent(path)}`)}`,
   );
-}
-
-const sectionFor = (path: string) =>
-  document.getElementById(`file-${encodeURIComponent(path)}`);
 
 /** The line, once its file has rendered it. */
-const rowFor = (path: string, side: "old" | "new", line: number) =>
-  sectionFor(path)?.querySelector<HTMLElement>(
+const rowFor = (
+  root: ParentNode,
+  path: string,
+  side: "old" | "new",
+  line: number,
+) =>
+  sectionFor(root, path)?.querySelector<HTMLElement>(
     `tr[data-${side}-line="${line}"]`,
   ) ?? null;
 
@@ -210,33 +214,41 @@ export function FilesChanged({
   );
   // The tab mounts, then the diff renders: wait for the file, then the line.
   // A line outside the hunks asks its file to show the whole file first.
+  const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!jump) return;
     let tries = 0;
     let revealed = false;
     const poll = setInterval(() => {
+      const root = rootRef.current;
+      if (!root) return;
       const { path, side, line, note } = jump;
       let done = false;
-      const noteEl = note ? document.getElementById(`note-${note}`) : null;
+      const noteEl = note
+        ? root.querySelector<HTMLElement>(`#${CSS.escape(`note-${note}`)}`)
+        : null;
       if (noteEl) {
         noteEl.scrollIntoView({ block: "center" });
         done = true;
       } else if (side && line !== undefined) {
-        const row = rowFor(path, side, line);
+        const row = rowFor(root, path, side, line);
         if (row) {
           row.scrollIntoView({ block: "center" });
           row.classList.remove("flash");
           void row.offsetWidth;
           row.classList.add("flash");
           done = true;
-        } else if (sectionFor(path) && !revealed) {
-          revealLine(path, side, line);
-          revealed = true;
+        } else if (!revealed) {
+          // Ask this tab's copy of the file to show its whole text, leaving
+          // the copy Story's walk may show as it is.
+          const section = sectionFor(root, path);
+          section?.dispatchEvent(new CustomEvent("backstory:reveal"));
+          revealed = !!section;
         }
       } else {
-        done = jumpToFile(path);
+        done = jumpToFile(path, root);
       }
-      if (!done && ++tries > 50) done = jumpToFile(path) || true;
+      if (!done && ++tries > 50) done = jumpToFile(path, root) || true;
       if (done) {
         clearInterval(poll);
         onJumped();
@@ -246,7 +258,7 @@ export function FilesChanged({
   }, [jump, onJumped]);
 
   return (
-    <div className="space-y-3 pt-1">
+    <div ref={rootRef} className="space-y-3 pt-1">
       {diff && files.length > 0 && (
         <div className="files-filters">
           <span>Show</span>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { WORKING_REV } from "@/lib/constants";
 import type { MapResponse } from "@/lib/map";
 import { viewKey, viewParams } from "@/lib/url";
 import {
@@ -21,7 +22,11 @@ import { useView } from "./ViewContext";
  * so a view the page has left never shows. Polls while a read runs rather
  * than adding a watch event: reads are rare.
  */
-function useDescription(repo: string, rev: string, onAutoChange: () => void) {
+export function useDescription(
+  repo: string,
+  rev: string,
+  onAutoChange: () => void,
+) {
   const { ref } = useView();
   const view = viewKey({ repo, ref, rev });
   const current = useRef(view);
@@ -72,9 +77,10 @@ function useDescription(repo: string, rev: string, onAutoChange: () => void) {
     [repo, ref, rev],
   );
 
+  // Ask for none on uncommitted work, which Story shows no description for.
   useEffect(() => {
-    void request("GET");
-  }, [request]);
+    if (rev !== WORKING_REV) void request("GET");
+  }, [request, rev]);
 
   const shown = answer?.view === view ? answer : null;
   const status = shown?.status ?? null;
@@ -116,6 +122,8 @@ function useDescription(repo: string, rev: string, onAutoChange: () => void) {
     setAuto: (on: boolean) => void setAuto(on),
   };
 }
+
+export type DescriptionApi = ReturnType<typeof useDescription>;
 
 const LABEL =
   "text-[12px] font-semibold uppercase tracking-[0.04em] text-[var(--fg-muted)]";
@@ -184,26 +192,18 @@ function Parts({
  * automatically, or on a click.
  */
 export function ChangeDescription({
-  repo,
-  rev,
+  read,
   map,
   onShowOnMap,
-  onAutoChange,
 }: {
-  repo: string;
-  rev: string;
+  /** The view's description read, from `useDescription` */
+  read: DescriptionApi;
   /** The map on screen, for which places to look first link to it */
   map: MapResponse | null;
-  /** Outline a component on the map */
+  /** Outline a component on the map, or in Story's walk go to its stop */
   onShowOnMap: (name: string) => void;
-  /** The repo's reading was turned on or off: read the map and data model again */
-  onAutoChange: () => void;
 }) {
-  const { status, error, start, setAuto } = useDescription(
-    repo,
-    rev,
-    onAutoChange,
-  );
+  const { status, error, start, setAuto } = read;
   if (!status || status.status === "none") {
     return error ? (
       <p className="flex items-center gap-1 text-[12px] text-[var(--attention)]">

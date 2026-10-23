@@ -115,6 +115,7 @@ export function DiffFile({
   const [wholeError, setWholeError] = useState<string | null>(null);
   const [showWhole, setShowWhole] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
+  const sectionRef = useRef<HTMLElement>(null);
 
   // The whole-file response is just a DiffFile with one enormous hunk, so it
   // drops straight into the same rendering path.
@@ -222,24 +223,17 @@ export function DiffFile({
   // A flow step outside the hunks on screen asks for its line: open the whole
   // file. Files changed scrolls to the line once it renders.
   useEffect(() => {
-    const onReveal = (event: Event) => {
-      const { path } = (event as CustomEvent<{ path: string }>).detail;
-      if (path !== file.newPath && path !== file.oldPath) return;
+    const section = sectionRef.current;
+    if (!section) return;
+    const onReveal = () => {
       setCollapsed(false);
       if (!canViewWhole) return;
       setShowWhole(true);
       if (!whole && !wholeLoading) void loadWhole();
     };
-    window.addEventListener("backstory:reveal", onReveal);
-    return () => window.removeEventListener("backstory:reveal", onReveal);
-  }, [
-    file.newPath,
-    file.oldPath,
-    canViewWhole,
-    whole,
-    wholeLoading,
-    loadWhole,
-  ]);
+    section.addEventListener("backstory:reveal", onReveal);
+    return () => section.removeEventListener("backstory:reveal", onReveal);
+  }, [canViewWhole, whole, wholeLoading, loadWhole]);
 
   // A different commit means a different file revision; drop the cached view.
   const revision = `${commit?.sha}:${file.path}`;
@@ -253,19 +247,24 @@ export function DiffFile({
 
   return (
     <section
+      ref={sectionRef}
       id={`file-${encodeURIComponent(file.path)}`}
       // No overflow-hidden here: it would make this section the sticky
       // header's containing scrollport, and since the section itself never
       // scrolls, the filename would never actually stick. Corners are
       // rounded per-edge instead.
       className="rounded-md border border-[var(--border)] bg-[var(--canvas)]"
-      // Jump targets must clear the sticky app bar, or a jump lands the
-      // section header underneath it.
-      style={{ scrollMarginTop: "calc(var(--header-height, 0px) + 8px)" }}
+      // Jump targets must clear the sticky app bar, and in Story's walk the
+      // pinned bar under it, or a jump lands the section header underneath
+      // them.
+      style={{
+        scrollMarginTop:
+          "calc(var(--header-height, 0px) + var(--walk-top, 0px) + 8px)",
+      }}
     >
       {/* last:rounded-b-md covers the collapsed state, where the header is
           the card's only child and owns the bottom corners too. */}
-      <header className="sticky top-[var(--header-height,0px)] z-10 flex items-center gap-2 rounded-t-md border-b border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 last:rounded-b-md">
+      <header className="sticky top-[calc(var(--header-height,0px)+var(--walk-top,0px))] z-10 flex items-center gap-2 rounded-t-md border-b border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 last:rounded-b-md">
         <button
           type="button"
           onClick={() => setCollapsed((value) => !value)}
