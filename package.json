@@ -28,7 +28,7 @@
     "verify": "npm run check && npm run build && npm run test:mac"
   },
   "dependencies": {
-    "next": "16.4.0",
+    "next": "16.4.2",
     "picomatch": "^4.0.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",
@@ -43,7 +43,7 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "eslint": "^10.12.0",
-    "eslint-config-next": "16.4.0",
+    "eslint-config-next": "16.4.2",
     "eslint-config-prettier": "^10.1.8",
     "globals": "17.13.0",
     "prettier": "^3.9.10",
