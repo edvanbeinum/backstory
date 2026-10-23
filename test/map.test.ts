@@ -127,7 +127,16 @@ function assertTheChange(map: MapResponse) {
     Alpha: "touched",
     Beta: "touched",
     Gamma: "added",
+    Web: "neighbour",
+    App: "neighbour",
   });
+  assert.deepEqual(
+    map.nodes.filter((n) => n.group).map((n) => [n.name, n.parent]),
+    [
+      ["Web", "app"],
+      ["App", null],
+    ],
+  );
 
   const edges = Object.fromEntries(
     map.edges.map((e) => [e.key, [e.state, e.before ?? null]]),
@@ -189,9 +198,7 @@ test("a base DSL that can't be read counts as no base model, and says why", asyn
   assert.ok(map.nodes.every((n) => n.state !== "added"));
 });
 
-test("a change that touches no component has the whole system for Show map as containers, unchanged; one that touches one doesn't", async () => {
-  const repo = gitRepo();
-  const model = `workspace {
+const SHOP = (extra = "") => `workspace {
     !identifiers hierarchical
     model {
         shopper = person "Shopper"
@@ -206,6 +213,7 @@ test("a change that touches no component has the whole system for Show map as co
                 b = component "Beta"
             }
             db = container "Db"
+${extra}
         }
         shopper -> app.web.a "Uses"
         shopper -> app.web "Opens"
@@ -216,36 +224,155 @@ test("a change that touches no component has the whole system for Show map as co
     }
 }
 `;
+
+function shop(extra = "") {
+  const repo = gitRepo();
   const base = repo.commit(
-    { "src/a/one.ts": "1\n", "architecture/workspace.dsl": model },
+    { "src/a/one.ts": "1\n", "architecture/workspace.dsl": SHOP(extra) },
     "base",
   );
   const docs = repo.commit({ "README.md": "x\n" }, "docs");
-  const map = await buildMap(repo.dir, base, docs);
+  return { ...repo, base, docs };
+}
+
+test("a change that touches no component has the whole system for Show map, each element in its parent's box; one that touches one doesn't", async () => {
+  const repo = shop();
+  const map = await buildMap(repo.dir, repo.base, repo.docs);
   assert.equal(map.status, "ok");
   assert.deepEqual(map.nodes, []);
   assert.deepEqual(
-    map.whole?.nodes.map((n) => [n.id, n.state, n.files.length]).sort(),
+    map.whole?.nodes
+      .map((n) => [n.id, n.parent, n.group, n.state, n.files.length])
+      .sort(),
     [
-      ["app.db", "neighbour", 0],
-      ["app.web", "neighbour", 0],
-      ["payments", "neighbour", 0],
-      ["shopper", "neighbour", 0],
+      ["app", null, true, "neighbour", 0],
+      ["app.db", "app", false, "neighbour", 0],
+      ["app.web", "app", true, "neighbour", 0],
+      ["app.web.a", "app.web", false, "neighbour", 0],
+      ["app.web.b", "app.web", false, "neighbour", 0],
+      ["payments", null, false, "neighbour", 0],
+      ["shopper", null, false, "neighbour", 0],
     ],
   );
   assert.deepEqual(
     map.whole?.edges.map((e) => [e.key, e.description, e.state]).sort(),
     [
-      ["app.web → app.db", "Reads", "same"],
-      ["app.web → payments", "Charges", "same"],
-      ["shopper → app.web", "Uses; Opens", "same"],
+      ["app.web.a → app.web.b", "Calls", "same"],
+      ["app.web.b → app.db", "Reads", "same"],
+      ["app.web.b → payments", "Charges", "same"],
+      ["shopper → app", "Visits", "same"],
+      ["shopper → app.web", "Opens", "same"],
+      ["shopper → app.web.a", "Uses", "same"],
     ],
   );
 
   const touched = repo.commit({ "src/a/one.ts": "2\n" }, "touch");
-  const focused = await buildMap(repo.dir, docs, touched);
+  const focused = await buildMap(repo.dir, repo.docs, touched);
   assert.equal(focused.nodes.length > 0, true);
   assert.equal(focused.whole, undefined);
+});
+
+test("the focused map draws a changed component inside its container and system, and keeps arrows to them", async () => {
+  const repo = shop();
+  const touched = repo.commit({ "src/a/one.ts": "2\n" }, "touch");
+  const map = await buildMap(repo.dir, repo.docs, touched);
+  const node = (id: string) => map.nodes.find((n) => n.id === id);
+  assert.deepEqual(
+    [node("app.web.a")?.state, node("app.web.a")?.parent],
+    ["touched", "app.web"],
+  );
+  assert.deepEqual(
+    ["app.web", "app"].map((id) => [node(id)?.group, node(id)?.state]),
+    [
+      [true, "neighbour"],
+      [true, "neighbour"],
+    ],
+  );
+  assert.equal(node("app")?.parent, null);
+  assert.ok(node("shopper"));
+  const edges = Object.fromEntries(
+    map.edges.map((e) => [e.key, e.description]),
+  );
+  assert.equal(edges["shopper → app.web"], "Opens");
+  assert.equal(edges["shopper → app"], "Visits");
+});
+
+test("a container added between base and head is drawn as a new box, and a removed one as removed", async () => {
+  const repo = shop();
+  const withQueue = SHOP(`            queue = container "Queue" {
+                q = component "Worker" {
+                    properties {
+                        "code.globs" "src/q/**"
+                    }
+                }
+            }`);
+  const added = repo.commit(
+    { "architecture/workspace.dsl": withQueue, "src/q/work.ts": "w\n" },
+    "add the queue",
+  );
+  const map = await buildMap(repo.dir, repo.docs, added);
+  const queue = map.nodes.find((n) => n.id === "app.queue");
+  assert.deepEqual([queue?.group, queue?.state], [true, "added"]);
+  assert.equal(
+    map.nodes.find((n) => n.id === "app.queue.q")?.parent,
+    "app.queue",
+  );
+
+  const gone = repo.commit(
+    { "architecture/workspace.dsl": SHOP() },
+    "remove the queue",
+  );
+  const back = await buildMap(repo.dir, added, gone);
+  const removed = back.nodes.find((n) => n.id === "app.queue");
+  assert.deepEqual([removed?.group, removed?.state], [true, "removed"]);
+});
+
+test("a container whose own files changed keeps them when drawn as the box around a neighbour", async () => {
+  const api = `            api = container "Api" {
+                properties {
+                    "code.globs" "src/api/**"
+                }
+                auth = component "Auth" {
+                    properties {
+                        "code.globs" "src/auth/**"
+                    }
+                }
+            }`;
+  const repo = shop(api);
+  const touched = repo.commit(
+    {
+      "src/api/server.ts": "s\n",
+      "architecture/workspace.dsl": SHOP(
+        `${api}\n            app.api.auth -> app.db "Reads"`,
+      ),
+    },
+    "touch the api",
+  );
+  const map = await buildMap(repo.dir, repo.docs, touched);
+  const node = (id: string) => map.nodes.find((n) => n.id === id);
+  assert.deepEqual(
+    [node("app.api")?.group, node("app.api")?.state, node("app.api")?.files],
+    [true, "touched", ["src/api/server.ts"]],
+  );
+  assert.equal(node("app.api.auth")?.parent, "app.api");
+});
+
+test("hidden counts the components the focused map leaves out, never the boxes around them or the people", async () => {
+  const repo = shop(`            jobs = container "Jobs" {
+                one = component "One"
+                two = component "Two"
+                three = component "Three"
+            }`);
+  const touched = repo.commit({ "src/a/one.ts": "2\n" }, "touch");
+  const map = await buildMap(repo.dir, repo.docs, touched);
+  const leaves = map.nodes
+    .filter((n) => !n.group)
+    .map((n) => n.id)
+    .sort();
+  assert.deepEqual(leaves, ["app.web.a", "app.web.b", "shopper"]);
+  // One, Two and Three are left out. Shopper isn't a component, and Web and
+  // App are drawn as boxes, so none of them count.
+  assert.equal(map.hidden, 3);
 });
 
 test("a base with no model adds nothing", async () => {

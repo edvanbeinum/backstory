@@ -9,53 +9,33 @@ why it works the way it does. For what it does, see
 Each inbox row leads with the branch, because the branch is the identity. Folder
 names go out of date: a worktree's folder can be named after a branch it last
 had checked out two renames ago. So the folder name is shown only when it
-differs from the branch. Progress sits in a fixed right-hand column so the
-counts line up down the page.
+differs from the branch. What the branch changes sits in a fixed right-hand
+column so the counts line up down the page.
 
-This costs **one GitHub call per repository**, not per worktree: a single
-aliased GraphQL query asks for every branch at once. Three repos and twenty-one
-worktrees resolve in about half a second. The PR and counts come from GitHub:
-without GitHub connected, or without a remote, every worktree still appears
-with a note saying the counts are missing.
+A branch has **changed since you last looked** when its tip isn't the one it
+had when you last opened it, and it has at least one commit past its base.
+Opening a branch from the inbox, a `backstory://` link, Open Repo… or the
+address bar records its tip; a background refresh of a branch that's already
+open doesn't, so commits your agent makes while the branch is open still count
+as new. A merged or closed pull request never counts, and nor does the
+repo's own checkout on its default branch, which has no base to compare with.
+The tip is your local branch's: a fetch that only moves `origin/<branch>`
+doesn't count until you update the branch.
+
+The counts are local git: commits, files and lines from where the branch left
+its base. The base is the branch its pull request targets, so a stacked branch
+counts only its own work, or the default branch when it has no pull request.
+Each uses `origin/<base>` when there is one, else the local branch.
+
+Pull requests cost **one GitHub call per repository**, not per worktree: a
+single aliased GraphQL query asks for every branch at once. Three repos and
+twenty-one worktrees resolve in about half a second. Without GitHub connected,
+or without a remote, every worktree still appears, with its counts, and a note
+saying its pull requests are missing.
 
 The same call lists the repo's 50 most recently updated open pull requests and its first 100
 branches by name, for **On GitHub**: the ones this clone has no local branch for, minus
 pull requests from forks and the default branch.
-
-## Handling a comment is deliberate
-
-Backstory doesn't guess when a comment is handled. A guess, such as the newest
-commit touching the file, always finds _something_, so every comment would read
-as handled and the list couldn't work as a checklist.
-
-So there is exactly one thing that means handled: **you tick it.** Not an
-answering commit, not a drafted reply, not a reply spotted on GitHub. A
-checklist only works if you are the one checking things off.
-
-The tick is animated: the box springs, the check mark draws in, and one ring
-expands. The animation stays small, because a big effect on every comment stops
-feeling like a reward after a few. The last comment on a PR gets the larger
-effect: the panel shows that nothing is left, with a button to copy every
-drafted reply at once. Unticking isn't animated, so undoing a mistaken tick
-doesn't feel like a second event. With `prefers-reduced-motion`, the tick
-changes instantly.
-
-## Answering commits survive rebases
-
-A rebase changes only the answering commit. The work was done and only the
-record of which commit did it broke, so the comment stays handled, the count
-doesn't move, and Backstory offers to link another commit rather than demanding
-it.
-
-Squashing, amending the content or rebasing through a conflict asks you to
-choose a new answering commit on purpose: those change the diff, so attaching
-your reply to a guessed commit would be worse than saying the commit is gone.
-Same when two commits share a patch-id (revert-then-reapply): an ambiguous match
-never resolves itself.
-
-Note that "still on the branch" means _reachable from HEAD_, not "the object
-exists": rebased-away commits stay in the object database and would otherwise
-look valid.
 
 ## Browse
 

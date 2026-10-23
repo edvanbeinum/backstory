@@ -2,19 +2,19 @@ import path from "node:path";
 
 import { listWorktrees } from "./browse";
 import { run } from "./exec";
-import { parseRemote } from "./git";
+import { parseRemote, resolveDefaultBranch } from "./git";
 import { describeGhError, githubGraphql, pickPullRequest } from "./github";
-import { countProgress, type Progress } from "./progress";
-import { getAllResponses, prKey } from "./responses";
+import { lookedTips } from "./looked";
 
 /**
  * The inbox: every worktree you've got checked out, across every repo you've
- * opened, with how much of each PR's review you've worked through.
+ * opened, with what each branch changes and whether it has changed since you
+ * last looked.
  *
  * The cost is the interesting part. The obvious build — resolve each worktree,
- * find its PR, fetch its threads — is two network round trips *per worktree*,
- * so twenty worktrees is twenty seconds of GitHub latency before the home
- * screen paints. Instead one aliased GraphQL query asks for every branch of a
+ * then ask GitHub for its PR — is a network round trip *per worktree*, so
+ * twenty worktrees is seconds of GitHub latency before the home screen
+ * paints. Instead one aliased GraphQL query asks for every branch of a
  * repo at once, which makes the whole screen **one GitHub call per repository**:
  * measured at 0.48s for ten branches. Everything else is local git.
  */
@@ -27,8 +27,14 @@ export interface InboxPr {
   url: string;
   /** What this PR targets — another branch here, when it's a stack. */
   baseRefName: string;
-  /** Threads GitHub still calls unresolved. Shown, never used to tick. */
-  unresolved: number;
+}
+
+/** What a branch changes against its base. */
+export interface InboxChanges {
+  commits: number;
+  files: number;
+  additions: number;
+  deletions: number;
 }
 
 export interface InboxRow {
@@ -52,16 +58,24 @@ export interface InboxRow {
   ahead: number | null;
   lastCommitAt: string | null;
   pr: InboxPr | null;
-  progress: Progress | null;
   /** How deep in a stack of PRs, from the base each one targets. */
   depth: number;
   /**
-   * Merged or closed: the review is over, so it can't need a response. Kept
-   * rather than dropped — three of these are worktrees still on disk, and
-   * this is the only screen that lists what you have checked out — but it
-   * doesn't count and doesn't compete for the top of the list.
+   * Merged or closed: the review is over. Kept rather than dropped — three
+   * of these are worktrees still on disk, and this is the only screen that
+   * lists what you have checked out — but it doesn't count and doesn't compete for the top of the list.
    */
   archived: boolean;
+  /**
+   * Against its PR's base, or the default branch without a PR. Null with no
+   * base to count from (the default branch itself) or no tip (detached).
+   */
+  changes: InboxChanges | null;
+  /**
+   * Its tip isn't the one you last opened, and it has commits past its base.
+   * Never for an archived row or one with nothing to count.
+   */
+  changed: boolean;
 }
 
 /** A branch on GitHub this clone has no local branch for. */
@@ -89,7 +103,7 @@ export interface InboxRepo {
   unavailable: string | null;
   /** The fix is Connect GitHub, so the inbox links to the setup checklist */
   connect: boolean;
-  /** Served from cache after a live failure, so the counts may lag. */
+  /** Served from cache after a live failure, so its pull requests may lag. */
   stale: boolean;
   /**
    * Open same-repo PRs first, most recently updated first, then branches
@@ -141,32 +155,75 @@ async function identify(
 interface BranchFacts {
   ahead: number | null;
   lastCommitAt: string | null;
+  tip: string;
 }
 
 /**
- * Ahead-count and last-commit date for every branch in the repo, in one call.
- * Per-worktree this would be a `rev-list` each; here it's free.
+ * Ahead-count, last-commit date and tip for every branch in the repo, in one
+ * call. Per-worktree this would be a `rev-list` each; here it's free.
  */
 async function branchFacts(root: string): Promise<Map<string, BranchFacts>> {
   const out = await git(root, [
     "for-each-ref",
-    "--format=%(refname:short)%09%(upstream:track)%09%(committerdate:iso8601)",
+    "--format=%(refname:short)%09%(upstream:track)%09%(committerdate:iso8601-strict)%09%(objectname)",
     "refs/heads/",
   ]);
   const facts = new Map<string, BranchFacts>();
   if (!out) return facts;
 
   for (const line of out.split("\n")) {
-    const [name, track, date] = line.split("\t");
-    if (!name) continue;
+    const [name, track, date, tip] = line.split("\t");
+    if (!name || !tip) continue;
     // "[ahead 3]", "[ahead 3, behind 1]", "[gone]", or empty.
     const ahead = track?.match(/ahead (\d+)/);
     facts.set(name, {
       ahead: ahead ? Number(ahead[1]) : track === "" ? 0 : null,
       lastCommitAt: date || null,
+      tip,
     });
   }
   return facts;
+}
+
+/**
+ * The ref a base branch is counted from: origin's copy when there is one, as
+ * that's what the PR is compared against, else the local branch.
+ */
+async function baseRef(root: string, name: string): Promise<string | null> {
+  for (const ref of [`refs/remotes/origin/${name}`, `refs/heads/${name}`]) {
+    if (
+      await git(root, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`])
+    )
+      return ref;
+  }
+  return null;
+}
+
+/** What `tip` changes since it forked from `base`. */
+async function changesFrom(
+  root: string,
+  base: string,
+  tip: string,
+): Promise<InboxChanges | null> {
+  const [count, stat] = await Promise.all([
+    git(root, ["rev-list", "--count", `${base}..${tip}`]),
+    git(root, [
+      "diff",
+      "--no-ext-diff",
+      "--no-textconv",
+      "--shortstat",
+      `${base}...${tip}`,
+    ]),
+  ]);
+  if (count === null || stat === null) return null;
+  // " 3 files changed, 5 insertions(+), 1 deletion(-)", each part left out at zero.
+  const part = (pattern: RegExp) => Number(stat.match(pattern)?.[1] ?? 0);
+  return {
+    commits: Number(count),
+    files: part(/(\d+) files? changed/),
+    additions: part(/(\d+) insertions?\(\+\)/),
+    deletions: part(/(\d+) deletions?\(-\)/),
+  };
 }
 
 const FRAGMENT = `
@@ -174,8 +231,6 @@ fragment F on PullRequest {
   number title state isDraft url updatedAt baseRefName
   isCrossRepository
   headRepositoryOwner { login }
-  reviewThreads(first: 100) { totalCount nodes { id isResolved } }
-  reviews(first: 50) { nodes { id body } }
 }`;
 
 interface GqlInboxPr {
@@ -188,11 +243,6 @@ interface GqlInboxPr {
   baseRefName: string;
   isCrossRepository: boolean;
   headRepositoryOwner: { login: string } | null;
-  reviewThreads: {
-    totalCount: number;
-    nodes: Array<{ id: string; isResolved: boolean }>;
-  };
-  reviews: { nodes: Array<{ id: string; body: string }> };
 }
 
 interface GqlOpenPr {
@@ -383,22 +433,13 @@ export async function buildInbox(
     [...groups.values()].map((identity) => buildRepo(identity, opts)),
   );
 
-  // Most outstanding first, then alphabetically — Promise.all resolves in
-  // whatever order the network felt like, which is no order at all.
-  // Only live PRs count. A merged one can't need a response, and letting it
-  // count made the headline three times the real number.
-  const outstanding = (rows: InboxRow[]) =>
-    rows.reduce(
-      (n, row) =>
-        n +
-        (row.archived || !row.progress
-          ? 0
-          : row.progress.total - row.progress.done),
-      0,
-    );
+  // Most changed branches first, then alphabetically — Promise.all resolves
+  // in whatever order the network felt like, which is no order at all.
+  const changed = (rows: InboxRow[]) =>
+    rows.filter((row) => row.changed).length;
   results.sort(
     (a, b) =>
-      outstanding(b.rows) - outstanding(a.rows) ||
+      changed(b.rows) - changed(a.rows) ||
       a.repo.label.localeCompare(b.repo.label),
   );
 
@@ -423,12 +464,13 @@ async function buildRepo(
     : identity.root;
   const label = path.basename(root);
 
-  const [worktrees, facts, remoteUrl, responses] = await Promise.all([
+  const [worktrees, facts, remoteUrl, defaultBranch] = await Promise.all([
     listWorktrees(root),
     branchFacts(root),
     git(root, ["remote", "get-url", "origin"]),
-    getAllResponses(),
+    resolveDefaultBranch(root),
   ]);
+  const looked = lookedTips(commonDir);
 
   const { host, owner, name } = parseRemote(remoteUrl);
   const repo: InboxRepo = {
@@ -503,36 +545,16 @@ async function buildRepo(
       ? pickPullRequest(prs.get(branch) ?? [], owner)
       : null;
 
-    let pr: InboxPr | null = null;
-    let progress: Progress | null = null;
-
-    if (chosen) {
-      pr = {
-        number: chosen.number,
-        title: chosen.title,
-        state: chosen.state,
-        isDraft: chosen.isDraft,
-        url: chosen.url,
-        baseRefName: chosen.baseRefName,
-        unresolved: chosen.reviewThreads.nodes.filter((t) => !t.isResolved)
-          .length,
-      };
-
-      const key = prKey(owner, name, chosen.number);
-      // An empty review body is the envelope around inline comments, not
-      // something to respond to.
-      const ids = [
-        ...chosen.reviewThreads.nodes.map((t) => t.id),
-        ...chosen.reviews.nodes
-          .filter((r) => r.body.trim().length > 0)
-          .map((r) => r.id),
-      ];
-      progress = countProgress(ids, key ? (responses[key] ?? {}) : {}, {
-        reportedTotal:
-          chosen.reviewThreads.totalCount +
-          (ids.length - chosen.reviewThreads.nodes.length),
-      });
-    }
+    const pr: InboxPr | null = chosen
+      ? {
+          number: chosen.number,
+          title: chosen.title,
+          state: chosen.state,
+          isDraft: chosen.isDraft,
+          url: chosen.url,
+          baseRefName: chosen.baseRefName,
+        }
+      : null;
 
     return {
       id: branch ?? worktree?.path ?? "",
@@ -553,23 +575,48 @@ async function buildRepo(
       ahead: fact?.ahead ?? null,
       lastCommitAt: fact?.lastCommitAt ?? null,
       pr,
-      progress,
       depth: 0,
       archived: pr !== null && (pr.state === "MERGED" || pr.state === "CLOSED"),
+      changes: null,
+      changed: false,
     };
   };
 
-  const rows: InboxRow[] = [
+  const bases = new Map<string, Promise<string | null>>();
+  const baseFor = (name: string) => {
+    if (!bases.has(name)) bases.set(name, baseRef(root, name));
+    return bases.get(name) as Promise<string | null>;
+  };
+
+  const counted = async (row: InboxRow): Promise<InboxRow> => {
+    const tip = row.branch ? facts.get(row.branch)?.tip : undefined;
+    const baseName = row.pr?.baseRefName ?? defaultBranch;
+    if (!row.branch || !tip || !baseName || baseName === row.branch) return row;
+    const base = await baseFor(baseName);
+    const changes = base ? await changesFrom(root, base, tip) : null;
+    return {
+      ...row,
+      changes,
+      changed:
+        !row.archived &&
+        changes !== null &&
+        changes.commits > 0 &&
+        looked.get(row.branch)?.tip !== tip,
+    };
+  };
+
+  const listed: InboxRow[] = [
     // Every worktree, so a branchless or PR-less checkout still shows.
     ...worktrees.map((worktree) => build(worktree.branch, worktree)),
     // Plus any branch with a PR that no worktree holds. Without a PR it's
     // just a local branch — a `backup/*` or a scratch name — and listing
-    // those would bury the ones that need a response.
+    // those would bury the ones under review.
     ...branches
       .filter((branch) => !byBranch.has(branch))
       .map((branch) => build(branch, null))
       .filter((row) => row.pr !== null),
   ];
+  const rows = await Promise.all(listed.map(counted));
 
   // Nested separately so an open PR whose base has already merged still
   // reads at the top level rather than indenting under something that isn't
@@ -616,11 +663,11 @@ function nest(rows: InboxRow[]): InboxRow[] {
     }
   }
 
-  const left = (row: InboxRow) =>
-    row.archived || !row.progress ? -1 : row.progress.total - row.progress.done;
+  // Compare times, not strings: git's dates include the committer's UTC offset.
+  const time = (row: InboxRow) =>
+    row.lastCommitAt ? Date.parse(row.lastCommitAt) : 0;
   const order = (a: InboxRow, b: InboxRow) =>
-    left(b) - left(a) ||
-    (b.lastCommitAt ?? "").localeCompare(a.lastCommitAt ?? "");
+    Number(b.changed) - Number(a.changed) || time(b) - time(a);
 
   const out: InboxRow[] = [];
   const walk = (row: InboxRow, depth: number) => {

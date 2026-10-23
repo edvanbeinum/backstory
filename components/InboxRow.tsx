@@ -1,7 +1,8 @@
 "use client";
 
 import type { InboxRow as Row } from "@/lib/inbox";
-import { CheckIcon, PullRequestIcon } from "./icons";
+import { PullRequestIcon } from "./icons";
+import { RelativeTime } from "./ui";
 
 /**
  * One worktree.
@@ -12,12 +13,12 @@ import { CheckIcon, PullRequestIcon } from "./icons";
  * `…feature-offline-manager-1471`. So the folder appears only when it
  * disagrees, as a footnote.
  *
- * Progress sits in a fixed right-hand column so the counts line up down the
- * page and "what still needs me" is one glance, not twenty.
+ * What the branch changes against its base, and when it last moved, sit in a
+ * fixed right-hand column so they line up down the page and are one glance,
+ * not twenty.
  */
 export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
-  const progress = row.progress;
-  const allHandled = progress !== null && progress.done === progress.total;
+  const { changes } = row;
   // Worth saying only when the folder disagrees with the branch it holds —
   // one of these directories is named for a branch it stopped holding two
   // renames ago. A folder simply named after the repo isn't a disagreement.
@@ -34,13 +35,13 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
       onClick={onOpen}
       disabled={row.worktree?.missing}
       className={`grid w-full grid-cols-[16px_minmax(0,1fr)_auto] items-start gap-x-3 rounded-md py-3 pr-2 text-left hover:bg-[var(--canvas-subtle)] disabled:cursor-not-allowed ${
-        allHandled || row.worktree?.missing ? "opacity-60" : ""
+        row.worktree?.missing ? "opacity-60" : ""
       }`}
       // A stacked PR targets the branch below it, so the indent is the stack.
       style={{ paddingLeft: 8 + row.depth * 18 }}
     >
       <span className="mt-[5px] grid place-items-center">
-        <StatusGlyph row={row} allHandled={allHandled} />
+        <StatusGlyph changed={row.changed} />
       </span>
 
       <span className="min-w-0">
@@ -93,25 +94,36 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
         )}
       </span>
 
-      {progress && progress.total > 0 && (
-        <span className="flex flex-col items-end gap-1 pl-4">
-          <Meter done={progress.done} total={progress.total} />
-          <span className="mono whitespace-nowrap text-[11px] text-[var(--fg-muted)]">
-            {allHandled
-              ? "all handled"
-              : `${progress.done} of ${progress.total} handled`}
-            {progress.truncated && " +"}
-          </span>
+      <span className="whitespace-nowrap pl-4 text-right text-[11px] text-[var(--fg-muted)]">
+        {changes && changes.commits > 0 && (
+          <>
+            <span className="mono block text-[12px]">
+              <span className="text-[var(--success)]">
+                +{changes.additions}
+              </span>{" "}
+              <span className="text-[var(--danger)]">−{changes.deletions}</span>
+            </span>
+            <span className="block">
+              {changes.files} {changes.files === 1 ? "file" : "files"} ·{" "}
+              {changes.commits} {changes.commits === 1 ? "commit" : "commits"}
+            </span>
+          </>
+        )}
+        <span className="block text-[var(--fg-subtle)]">
+          {row.lastCommitAt && <RelativeTime iso={row.lastCommitAt} />}
+          {row.changed && (
+            <span className="text-[var(--attention)]">
+              {row.lastCommitAt && " · "}new since you looked
+            </span>
+          )}
         </span>
-      )}
+      </span>
     </button>
   );
 }
 
-function StatusGlyph({ row, allHandled }: { row: Row; allHandled: boolean }) {
-  if (!row.progress || row.progress.total === 0) {
-    // Nothing to respond to — an outline, so it reads as "not applicable"
-    // rather than "not done".
+function StatusGlyph({ changed }: { changed: boolean }) {
+  if (!changed) {
     return (
       <svg viewBox="0 0 16 16" width={10} height={10} aria-hidden="true">
         <circle
@@ -124,9 +136,6 @@ function StatusGlyph({ row, allHandled }: { row: Row; allHandled: boolean }) {
         />
       </svg>
     );
-  }
-  if (allHandled) {
-    return <CheckIcon size={13} className="text-[var(--handled)]" />;
   }
   return (
     <span className="block h-2.5 w-2.5 rounded-full bg-[var(--attention)]" />
@@ -157,38 +166,6 @@ function NoPrPill() {
   return (
     <span className="inline-flex items-center rounded-full border border-[var(--border)] px-2.5 text-[11px] font-medium leading-[17px] text-[var(--fg-muted)]">
       no PR yet
-    </span>
-  );
-}
-
-/**
- * One bar per comment rather than a continuous fill. At these counts — three,
- * seven — "four left" is a thing you can see without reading the number.
- */
-function Meter({ done, total }: { done: number; total: number }) {
-  // Above a dozen the bars get too thin to read, so it becomes a plain bar.
-  if (total > 12) {
-    return (
-      <span className="block h-1.5 w-[92px] overflow-hidden rounded-sm bg-[var(--border)]">
-        <span
-          className="block h-full rounded-sm bg-[var(--handled)]"
-          style={{ width: `${Math.round((done / total) * 100)}%` }}
-        />
-      </span>
-    );
-  }
-
-  return (
-    <span className="flex gap-[2px]">
-      {Array.from({ length: total }, (_, i) => (
-        <span
-          key={i}
-          className="block h-1.5 w-3.5 rounded-sm"
-          style={{
-            background: i < done ? "var(--handled)" : "var(--border)",
-          }}
-        />
-      ))}
     </span>
   );
 }

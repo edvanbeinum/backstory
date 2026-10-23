@@ -38,13 +38,14 @@ primitives:
       - repoKey
       - repoKeyOf
       - gitCommonDir
-    use: "The folder name a repo gets under `~/.backstory/flows/`, `data/`, `maps/` and `models/`: the main checkout's folder plus a hash of the common git dir, the same from every worktree and different for two repos with the same folder name."
+    use: "The folder name a repo gets under `~/.backstory/flows/`, `data/`, `maps/`, `descriptions/` and `models/`: the main checkout's folder plus a hash of the common git dir, the same from every worktree and different for two repos with the same folder name."
   - name: a view's commits
     block: git reader
     file: lib/view.ts
     symbols:
       - viewRange
-    use: "The same base and head that `/api/diff` diffs, so every view of a change agrees on its commits."
+      - onBranchOnly
+    use: "The same base and head that `/api/diff` diffs, so every view of a change agrees on its commits. All changes runs to `repo.tip`, so a branch opened with `ref` is read at its own tip, not the checkout's. `onBranchOnly` says whether a commit is one of the branch's own, past that base."
   - name: patches
     block: git reader
     file: lib/git.ts
@@ -107,7 +108,7 @@ primitives:
       - KEY
       - setting
       - setSetting
-    use: "Every read and write of notes, rounds, responses and settings, in the SQLite database `~/.backstory/backstory.db`. `db` opens it on first use, makes the schema from `lib/schema.sql` and upgrades an older database from `lib/upgrades/<version>.sql`; `transaction` runs a synchronous write in one transaction, joining one already open, so a module's write can be part of a larger one; `reading` runs a read and returns an empty result when the database can't be opened or read. `homeDir` is the one directory everything on this machine lives in (the database, the flow cache, the data cache, the map cache, local models). `KEY` is the shape of an id the store accepts. `setting` and `setSetting` read and write one setting, such as `read.off.<repoKey>`."
+    use: "Every read and write of notes, rounds, seen sessions, settings and the branch tips you last looked at, in the SQLite database `~/.backstory/backstory.db`. `db` opens it on first use, makes the schema from `lib/schema.sql` and upgrades an older database from `lib/upgrades/<version>.sql`; `transaction` runs a synchronous write in one transaction, joining one already open, so a module's write can be part of a larger one; `reading` runs a read and returns an empty result when the database can't be opened or read. `homeDir` is the one directory everything on this machine lives in (the database, the flow cache, the data cache, the map cache, local models). `KEY` is the shape of an id the store accepts. `setting` and `setSetting` read and write one setting, such as `read.off.<repoKey>`."
   - name: run the AI provider
     block: AI provider
     file: lib/ai/provider.ts
@@ -142,6 +143,7 @@ primitives:
     symbols:
       - mapStatus
       - startMapRead
+      - mapReadSettled
       - startMapTrunkRead
       - mapRefusal
       - savedMapAt
@@ -160,10 +162,18 @@ primitives:
     symbols:
       - dataStatus
       - startDataRead
+      - dataReadSettled
       - startTrunkRead
       - autoRead
       - setAutoRead
-    use: "The AI provider's reading of a data model no reader finds: main read in full once (`startTrunkRead`), then each view's base derived forward from main's model and its head from its base, one small read each, cached by tree under `~/.backstory/data/`, one read at a time. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. The switch is per repo, on by default, shared by every worktree, and covers drafted maps too. Told which files have the model when `data.files` is set. `buildData` falls back to it."
+    use: "The AI provider's reading of a data model no reader finds: main read in full once (`startTrunkRead`), then each view's base derived forward from main's model and its head from its base, one small read each, cached by tree under `~/.backstory/data/`, one read at a time. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. The switch is per repo, on by default, shared by every worktree, and covers drafted maps and change descriptions too. Told which files have the model when `data.files` is set. `buildData` falls back to it."
+  - name: describe a change
+    block: change description
+    file: lib/description/cache.ts
+    symbols:
+      - descriptionStatus
+      - startDescription
+    use: "The AI provider's change description for a view: what it does, why, and at most two places to look first, read from the view's patch (cut past the drafted reads' cap, with a `--stat`), commit messages, PR and the names of the components and entities it touches, through `withSnapshot`. Waits for the view's map and data model reads (`mapReadSettled`, `dataReadSettled`), starting them when the repo reads automatically, so the names are this commit's. The read joins the queue only once they end. Cached by base and head trees under `~/.backstory/descriptions/`, one read at a time. The schema and the prompt's writing rules are in `lib/description/prompt.ts`, so a read that adds to the description changes that one file."
   - name: route errors
     file: lib/api.ts
     symbols:
@@ -180,7 +190,16 @@ primitives:
     symbols:
       - buildUrl
       - writeUrlState
-    use: Builds and writes the page state into the URL, so a view can be shared.
+      - viewParams
+      - viewKey
+    use: "Builds and writes the page state into the URL, so a view can be shared. `viewParams` builds every view request's query, with `ref` when the repo is open on a branch it hasn't checked out, and `viewKey` names a view from that query for state kept with it."
+  - name: the open view
+    block: UI tabs
+    file: components/ViewContext.tsx
+    symbols:
+      - ViewProvider
+      - useView
+    use: "Gives the page's components the repo and the branch it's open on, so a view request or key never forgets `ref`. The page sets it from the session it has loaded."
   - name: buttons and copy
     block: UI tabs
     file: components/ui.tsx
@@ -188,7 +207,8 @@ primitives:
       - Button
       - CopyButton
       - copyToClipboard
-    use: "The shared controls. A `Button` with `href` is a link that opens in a new window, which the Mac app hands to the browser."
+      - Ticked
+    use: "The shared controls. A `Button` with `href` is a link that opens in a new window, which the Mac app hands to the browser. `Ticked` shows each `backticked` name in AI-written text in monospace."
   - name: Claude Code notice
     block: UI tabs
     file: components/ClaudeCodeNotice.tsx
@@ -200,5 +220,6 @@ primitives:
     file: components/graph.ts
     symbols:
       - layeredLayout
+      - nestedLayout
       - edgePath
-    use: Lays out and draws the map and data diagrams; edgePath routes an arrow around the boxes between its ends.
+    use: "Lays out and draws the map and data diagrams. `nestedLayout` lays out boxes inside boxes, so the map draws components inside their containers and containers inside their systems. `edgePath` routes an arrow around the boxes between its ends."

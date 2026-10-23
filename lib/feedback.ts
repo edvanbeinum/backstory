@@ -106,6 +106,8 @@ export interface FeedbackContext {
   diffs: Map<string, DiffFile[]>;
   /** The branch's commits, oldest first — the order the message follows */
   commits: NoteCommit[];
+  /** The branch opened by ref, whose tip is the branch diff's end, not HEAD */
+  ref?: string | null;
 }
 
 /**
@@ -117,9 +119,11 @@ function whereQualifier(
   note: Note,
   commits: NoteCommit[],
   mixed: boolean,
+  ref: string | null,
 ): string | null {
   if (note.rev === WORKING_REV) return mixed ? "uncommitted" : null;
-  if (note.rev === BRANCH_REV) return "committed, at HEAD";
+  if (note.rev === BRANCH_REV)
+    return ref ? `committed, at the tip of ${ref}` : "committed, at HEAD";
   const commit = commits.find((c) => c.sha === note.rev);
   const short = note.rev.slice(0, 7);
   if (!commit) return `in ${short}, which is no longer on this branch`;
@@ -227,7 +231,7 @@ export function formatFeedback(
   ];
 
   for (const { note, files, file, at } of placed) {
-    const where = whereQualifier(note, commits, mixed);
+    const where = whereQualifier(note, commits, mixed, context.ref ?? null);
     const lines = [`## ${heading(note, files, at, where)}`];
     if (note.quote !== null) {
       const f = fence(note.quote);

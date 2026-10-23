@@ -38,17 +38,25 @@ that marks which folders are git checkouts.
 ## The inbox and the workspace
 
 **The inbox** is the home screen: every worktree you've got checked out, across
-every repo you've opened, with how far through each one's review you are.
+every repo you've opened, with the branches that changed since you last looked
+at the top. Each row says what its branch changes against its base, the branch
+its pull request targets or the default branch, and when it last changed.
+Opening a branch takes it out of that count until it gets another commit.
 
 ```text
-10 comments need a response
-across 5 branches · 21 worktrees checked out
+2 branches changed since you last looked
+21 worktrees checked out
 
 ACME-APP ──────────────────────────────────────────────────────────
- ●  feature/offline-sync-1203       #40 merged   ▓▓░░░░░  2 of 7 handled
-    Queue edits made offline and replay them
- ✓  fix/login-timeout-36            #38 merged   ▓▓▓▓     all handled
- ○  feature/release-script          no PR yet
+ ●  feature/offline-sync-1203       #40 open                 +212 −38
+    Queue edits made offline and replay them      9 files · 4 commits
+                                          2 h ago · new since you looked
+ ●  feature/release-script          no PR yet                  +40 −0
+                                                   1 file · 1 commit
+                                          5 h ago · new since you looked
+ ○  fix/retry-backoff-41            #41 draft                  +18 −6
+    Back off between retries                       2 files · 2 commits
+                                                              1 day ago
 ```
 
 Under each repo, **On GitHub** lists the open pull requests and branches on
@@ -63,8 +71,8 @@ your uncommitted work, or any one commit on it. It opens on your uncommitted
 work when there is some, and on the whole branch otherwise. Under the header are
 three tabs, as on a pull request, and every change opens on the first:
 
-- **Story** shows the map at full width, a line under it saying what it shows,
-  then each flow as a card. Before a change is traced, one card in place of the
+- **Story** opens with a few sentences on the change, then shows the map at full
+  width, a line under it saying what it shows, then each flow as a card. Before a change is traced, one card in place of the
   flows offers **Trace this change**. Click a step to open its code under it;
   click it again or press `Esc` to close it, and **Show in Files changed** opens
   the diff at the same lines.
@@ -72,10 +80,6 @@ three tabs, as on a pull request, and every change opens on the first:
 - **Comments** lists the pull request's review comments, when it has any.
 
 The tab is in the address bar, so a link opens on the tab it was copied from.
-When the PR has review comments, a checklist spine runs down the left edge.
-
-Whatever change is selected says how many review comments are on it, which is
-the reverse lookup: given a commit, which review comments does it answer?
 
 In **Files changed**, files are grouped by the map's components, each group
 with an **On the map** link that outlines its component on Story; **By path**
@@ -96,43 +100,59 @@ footer says so.
 
 ## The map, flows and the data model
 
+At the top of Story, Claude Code describes the change in three parts: **Why**,
+**What it does**, and **Where to look first**. It reads the patch, the commit
+messages and the pull request, and writes **Why** only when the commits or the
+pull request say why. Click a place to look first that is on the map to outline
+it there. Opening a commit or the whole branch describes it, unless you turned
+the repo off; then **Describe this change** reads it. **Turn off** beside
+**Drawn by Claude Code** turns the repo off, for its maps and data models too.
+**Describe again** reads it once more, and shows the earlier description with
+the error if that read fails.
+
 Backstory draws what a change did to the system, so you can see its effect
 before reading its lines:
 
-- **The map** is a C4 component view of the repo, with the components and
-  arrows the change touched, added or removed. It reads
-  `architecture/workspace.dsl`, a [Structurizr](https://docs.structurizr.com)
-  model, from the repo at the change's base and head.
-  - A repo that doesn't commit a model can have one written by hand at
+- **The map** shows the parts of your system, with the ones the change touched,
+  added or removed, and the arrows between them. Claude Code draws it from the
+  code, unless the repo has a hand-written map.
+  - A hand-written map is a C4 model in
+    [Structurizr](https://docs.structurizr.com) DSL. A repo can commit one at
+    `architecture/workspace.dsl`, which Backstory reads at the change's base
+    and head.
+  - A repo that doesn't commit one can have one written by hand at
     `~/.backstory/models/<folder>-<hash>/workspace.dsl`, where `<folder>` is
     the main checkout's folder and `<hash>` is 8 characters that tell apart
     repos with the same folder name. Every worktree of the repo reads it, and
     the line under the map on Story shows its path, or where it goes when
     there isn't one yet. The hash comes from where the checkout is on disk, so
     after you move or rename the checkout, rename its folder under
-    `~/.backstory/models/` to the one that line shows. It's the same model for
+    `~/.backstory/models/` to the one that line shows. It's the same map for
     every commit, so the map shows which components a change touched, but not
     what it added or removed.
-  - Any other repo can have its map drafted by Claude Code, the same way as
-    the data model. It reads main's map in full once per repo, a minute or two
+  - Any other repo has its map drawn by Claude Code, the same way as the data
+    model is read. It reads main in full once per repo, a minute or two
     on a small repo and more on a large one. Every other commit's map is worked
     out from the nearest map already read, by reading only the patch between
     them, well under a minute. The map marks
-    the components and arrows a branch added or removed, is marked as a draft,
-    and is kept in `~/.backstory/maps/`, a cache you can delete. Nothing is
+    the components and arrows a branch added or removed, is marked **Drawn by
+    AI**, and is kept in `~/.backstory/maps/`, a cache you can delete. Nothing is
     written into the repo, or to `~/.backstory/models/`.
   - Opening a repo starts the read of main's map, and opening a view on Story
     starts the view's read, with its progress where the map goes. For a repo
-    you turned off (see **Turn off** below), **Draft a model** reads one view,
+    you turned off (see **Turn off** below), **Draw the map** reads one view,
     and **Read automatically** beside it turns reading back on for the repo's
     maps and data models.
+  - The map draws each component inside its container's box, and each
+    container inside its system's box. An arrow ends at the box the model
+    names, so an arrow to a container meets the container's edge.
   - The map opens by itself when the change touches a component. When it
     touches none, the line under the map says so and has **Show map**, which
     opens the whole system at the level of its containers: every container,
     person and external system, with the arrows between them. A component's
     arrow is drawn from or to its container. **Hide map** closes it.
-  - Under a drafted map, the line has **Turn off**, which stops reading this
-    repo's maps and data models as it opens, and **Redraft**, which reads
+  - Under a drawn map, the line has **Turn off**, which stops reading this
+    repo's maps and data models as it opens, and **Draw again**, which reads
     main's map in full again and removes every map worked out from the old
     one. Once the repo is turned off, **Read automatically** takes the place of
     **Turn off** and turns reading back on.
@@ -140,24 +160,25 @@ before reading its lines:
   relationships and rules. It reads `db/schema.rb` and the models (Rails), the
   `.xcdatamodeld` (Core Data), or SQL schema files: the `CREATE TABLE`
   statements in a `schema.sql`, a `structure.sql` or a `schema/` folder, outside
-  migrations and tests. Any other repo can have its data model drafted by
-  Claude Code. It reads main's data model in full once per repo, a few minutes
+  migrations and tests. Any other repo has its data model read by Claude
+  Code. It reads main's data model in full once per repo, a few minutes
   on a large repo. Every other commit's model is worked out from the nearest
   model already read, by reading only the patch between them, well under a
   minute. A view's base is
   worked out from main's model, and its head from its base, so a second branch
   from the same point, or a branch rebased onto main, reads only its own
-  change. The result is marked as a draft and kept in `~/.backstory/data/`.
+  change. The result is marked **Read by AI** and kept in
+  `~/.backstory/data/`.
   - Reads start as a repo and a view open: opening a repo starts the reads of
     main's data model and map, and opening a view on Story starts the view's
     reads, with the data model's progress on the Data line. **Turn off**, under
-    each drafted map and data model, stops new reads of either kind for that
+    each drawn map and data model, stops new reads of either kind for that
     repo and all its worktrees; a read already running finishes. For a repo
-    you turned off, **Draft the data model** under the map on Story reads one
+    you turned off, **Read the data model** under the map on Story reads one
     view, and **Read automatically** beside it turns reading back on and starts
     this view's read.
-  - On a drafted view, the Data line has **Turn off**, or **Read automatically**
-    for a repo you turned off, and **Redraft**. **Show
+  - On a view Claude Code read, the Data line has **Turn off**, or **Read
+    automatically** for a repo you turned off, and **Read again**. **Show
     data** opens the whole model when the change touches none of it.
   - The Data line's graph opens by itself when the change touches the data
     model; **Hide data** closes it.
@@ -165,13 +186,14 @@ before reading its lines:
     the read that view's base needed is main's change since, and the base
     becomes main's model. Main is read in full again only when the patch from
     its model to a commit on main is too large to send, which reads that
-    commit in full, or when you press **Redraft**. Redraft reads main in full
+    commit in full, or when you press **Read again**, which reads main in full
     again and removes every model worked out from the old one, since a mistake
     in main's model is copied into each of them.
 - **Flows** are sequence diagrams of what the code does for each user action the
   change touches, before and after, beside the code they come from.
 
-Backstory reads the part of the DSL that describes elements and arrows:
+In a hand-written map, Backstory reads the part of the DSL that describes
+elements and arrows:
 
 - `workspace`, `!identifiers hierarchical` (or the default `flat`), `model`, and
   `properties` at the top and inside elements. `code.globs` on an element says
@@ -214,9 +236,9 @@ Every read runs through your own Claude Code login:
 
 - With an API key, you pay per read. Main's map or data model is about a dollar
   on a large repo and cents on a small one, and each change after it is cents. A
-  trace usually costs $0.10–0.40.
+  trace usually costs $0.10–0.40, and a change's description a few cents.
 - On a Claude subscription, reads count toward Claude's usage limits.
-- Each repo has **Turn off**, under its drafted map and data model, to stop
+- Each repo has **Turn off**, under its drawn map and data model, to stop
   reading it as it opens.
 
 ## Reviewing an agent's work
@@ -292,44 +314,14 @@ its server to come up before asking for the review.
 
 ## Review comments from GitHub
 
-When a branch has a PR with review comments, Backstory turns them into a
-checklist to work through.
+When a branch has a PR with review comments, Backstory shows them as they are on
+GitHub, numbered oldest first. To reply or resolve one, open it on GitHub. In
+**Files changed**, each sits on its line as `💬` and its number.
 
-The **spine** is the checklist: one square per comment, filled when handled. It
-shows how far through you are, and a square opens Comments on that comment. In a
-narrow window it runs across the top instead.
-
-**Comments** shows every comment as a card: its file and line, its component,
-whether it's handled, the lines it was written against, and the comment. On the
-Comments tab `j`/`k` move between comments and `x` ticks the one outlined.
-
-The **response** sits under each comment: the tick, a drafted reply, and
-optionally its **answering commits**, the commits you link to the comment as the
-ones that answer it. All three are independent.
-
-Only you decide when a comment is handled: you tick it. An answering commit, a
-drafted reply or a reply on GitHub never ticks it for you.
-[How it works](how-it-works.md#handling-a-comment-is-deliberate) says why.
-
-A comment answered without any code change is one you tick with no answering
-commit — the reply templates drop `Addressed in <commit>` and offer a plain 👍
-or "No change needed".
-
-### Answering commits survive rebases
-
-Rebasing a stack rewrites every sha. So each answering commit is stored with its
-**patch-id**, a hash of its diff alone, as well as its sha. A rebased commit
-keeps its patch-id, so Backstory finds the rewritten commit automatically and
-marks it _re-matched after a rebase_.
-
-| you did                                              | result                                          |
-| ---------------------------------------------------- | ----------------------------------------------- |
-| rebase / restack (clean)                             | re-matched automatically                        |
-| reword a commit message                              | re-matched: same diff, same patch-id            |
-| squash, amend the content, rebase through a conflict | `26ef8f7 gone`, asks you to choose a new commit |
-
-**A rebase never unticks anything.** It changes only the answering commit, so
-the comment stays handled and Backstory offers to link another.
+**Comments** shows every comment as a card, oldest first: its file and line, its
+component, the lines it was written against, the comment and its replies, and
+**Open on GitHub**. A comment on a line a flow passes through says which step,
+with **open in the story**. On the Comments tab `j`/`k` move between comments.
 
 ## Shareable URLs
 
@@ -363,9 +355,9 @@ The server logs to `~/.backstory/server.log`.
 
 ## What Backstory keeps
 
-Its own state lives under `~/.backstory`. Notes, ticks, drafted replies and the
-outbox are in one database, `backstory.db`. Traced flows, drafted maps and
-data models, and hand-written models are files beside it. Nothing Backstory writes is inside your repos.
+Its own state lives under `~/.backstory`. Notes to your agent and the outbox are
+in one database, `backstory.db`. Traced flows, drawn maps and
+data models, change descriptions, and hand-written maps are files beside it. Nothing Backstory writes is inside your repos.
 
 If you connected GitHub, its token is in your login Keychain, under
 `dev.backstory.github`.
@@ -379,8 +371,8 @@ If you connected GitHub, its token is in your login Keychain, under
    **Remove**. If you connected GitHub, choose **Backstory → Disconnect
    GitHub**. It deletes Backstory's GitHub token from your Keychain.
 2. Turn off **Open at Login**, quit Backstory, and delete `Backstory.app`.
-3. Delete Backstory's data: notes, ticks, the outbox, traced flows, drafted
-   models and data models, and the log.
+3. Delete Backstory's data: notes, the outbox, traced flows, drawn
+   maps and data models, and the log.
 
    ```bash
    rm -rf ~/.backstory

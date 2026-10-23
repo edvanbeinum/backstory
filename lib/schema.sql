@@ -39,16 +39,14 @@ CREATE TABLE seen (
   at INTEGER NOT NULL,
   PRIMARY KEY (root, session)
 );
-CREATE TABLE responses (
-  pr TEXT NOT NULL,
-  thread TEXT NOT NULL,
-  done INTEGER NOT NULL CHECK (done IN (0, 1)),
-  done_at INTEGER,
-  reply TEXT,
-  commits TEXT NOT NULL CHECK (json_valid(commits)),
-  PRIMARY KEY (pr, thread)
-);
 CREATE TABLE settings (
   key TEXT PRIMARY KEY,
   value TEXT NOT NULL
+);
+CREATE TABLE looked (
+  common_dir TEXT NOT NULL,
+  branch TEXT NOT NULL,
+  tip TEXT NOT NULL,
+  at INTEGER NOT NULL,
+  PRIMARY KEY (common_dir, branch)
 );

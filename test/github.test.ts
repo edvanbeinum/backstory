@@ -24,6 +24,7 @@ const CONNECT = "GitHub isn't connected.";
 const PR = {
   number: 7,
   title: "Add things",
+  body: "Shoppers asked to keep a basket between visits.",
   url: "https://github.com/acme/app/pull/7",
   state: "OPEN",
   isDraft: false,
@@ -167,6 +168,8 @@ test("with a saved token and no gh, the PR, its threads and reviews come from Gi
   assert.equal(data.unavailable, null);
   assert.equal(data.connect, false);
   assert.equal(data.pr?.number, 7);
+  assert.equal(data.pr?.body, PR.body);
+  assert.match(calls[0].query, /\bbody\b/);
   assert.deepEqual(
     data.threads.map((t) => [t.id, t.comments[0].body]),
     [["t1", "Why?"]],
@@ -196,10 +199,12 @@ test("with no token and a signed-in gh, the PR comes from gh pr list, which foll
 
   assert.equal(data.unavailable, null);
   assert.equal(data.pr?.number, 7);
+  assert.equal(data.pr?.body, PR.body);
   assert.equal(data.threads.length, 1);
   assert.equal(data.reviews.length, 1);
   assert.equal(calls.length, 0);
   assert.match(on.ghLog(), /^pr list --head feature --state all /m);
+  assert.match(on.ghLog(), /--json \S*\bbody\b/);
   assert.match(on.ghLog(), /^api graphql -f query=/m);
   assert.match(on.ghLog(), /-F number=7/);
 });

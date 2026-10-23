@@ -24,13 +24,8 @@ import {
 import { Button, RelativeTime, Spinner } from "./ui";
 
 /**
- * The home screen: every worktree you've got checked out, and how much of each
- * one's review is still waiting on you.
- *
- * Before this, Backstory could only ever show one branch, and getting to it
- * meant typing or browsing a path. With twenty worktrees across two repos, "what's
- * outstanding everywhere I'm working" had no answer at all — which is a
- * strange gap in something that's meant to be a TODO tracker.
+ * The home screen: every worktree you've got checked out, with the branches
+ * that changed since you last opened them first.
  */
 export function Inbox({
   roots,
@@ -180,24 +175,7 @@ export function Inbox({
     });
   }, [data]);
 
-  // A merged PR can't need a response, so it doesn't count. Counting them
-  // made this read three times higher than the work actually waiting.
-  const live = useMemo(
-    () => (data?.rows ?? []).filter((row) => !row.archived),
-    [data],
-  );
-  const outstanding = useMemo(
-    () =>
-      live.reduce(
-        (total, row) =>
-          total + (row.progress ? row.progress.total - row.progress.done : 0),
-        0,
-      ),
-    [live],
-  );
-  const branchesWaiting = live.filter(
-    (row) => row.progress && row.progress.done < row.progress.total,
-  ).length;
+  const changed = (data?.rows ?? []).filter((row) => row.changed).length;
   // A row is a branch now, not always a worktree — a stacked PR is reviewable
   // without one, so the two counts have to be said separately.
   const checkedOut = (data?.rows ?? []).filter((row) => row.worktree).length;
@@ -252,19 +230,13 @@ export function Inbox({
               </div>
             )}
             <h1 className="text-[20px] font-semibold">
-              {outstanding === 0
-                ? data
-                  ? "Nothing needs a response"
-                  : "Checking your worktrees…"
-                : `${outstanding} ${outstanding === 1 ? "comment needs" : "comments need"} a response`}
+              {!data
+                ? "Checking your worktrees…"
+                : changed === 0
+                  ? "Nothing new since you last looked"
+                  : `${changed} ${changed === 1 ? "branch" : "branches"} changed since you last looked`}
             </h1>
             <p className="mt-0.5 text-[13px] text-[var(--fg-muted)]">
-              {branchesWaiting > 0 && (
-                <>
-                  across {branchesWaiting}{" "}
-                  {branchesWaiting === 1 ? "branch" : "branches"} ·{" "}
-                </>
-              )}
               {checkedOut} {checkedOut === 1 ? "worktree" : "worktrees"} checked
               out
               {branchesOnly > 0 && `, ${branchesOnly} more branches with a PR`}
@@ -302,7 +274,7 @@ export function Inbox({
                     <span>
                       {repo.unavailable} Everything below comes from git alone.
                       {repo.stale &&
-                        " Counts shown are the last ones Backstory saw."}
+                        " Pull requests shown are the last ones Backstory saw."}
                       {repo.connect && (
                         <>
                           {" "}

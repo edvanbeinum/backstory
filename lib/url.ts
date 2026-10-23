@@ -34,12 +34,14 @@ const TABS: readonly Tab[] = ["story", "files", "comments"];
 export function parseUrlState(search: string): UrlState {
   const params = new URLSearchParams(search);
   const repo = params.get("repo")?.trim();
+  const ref = params.get("ref")?.trim();
   const rev = params.get("rev")?.trim();
   const comment = params.get("comment")?.trim();
   const tab = TABS.find((t) => t === params.get("tab")?.trim());
 
   return {
     repo: repo ? repo : null,
+    ...(ref && { ref }),
     rev: rev ? rev : null,
     comment: comment ? comment : null,
     ...(tab && { tab }),
@@ -78,6 +80,43 @@ export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
   return `${pathname}${query ? `?${query}` : ""}`;
 }
 
+/**
+ * The query for a request about one view, with `ref` whenever the repo is
+ * open on a branch it hasn't checked out. Without `ref` the server reads the
+ * checkout's branch, so every view request is built here.
+ */
+export function viewParams({
+  repo,
+  ref,
+  rev,
+  ...extra
+}: {
+  repo: string;
+  ref?: string | null;
+  rev: string;
+  [extra: string]: string | null | undefined;
+}): URLSearchParams {
+  const params = new URLSearchParams({ repo });
+  if (ref) params.set("ref", ref);
+  params.set("rev", rev);
+  for (const [key, value] of Object.entries(extra))
+    if (value != null) params.set(key, value);
+  return params;
+}
+
+/**
+ * Names one view for state kept with it, built from its request so the two
+ * always agree on which view it is: two branches of a stack are reviewed
+ * from one worktree, so the repo and rev alone don't tell them apart.
+ */
+export function viewKey(view: {
+  repo: string;
+  ref?: string | null;
+  rev: string;
+}): string {
+  return viewParams(view).toString();
+}
+
 const EMPTY_STATE: UrlState = {
   repo: null,
   rev: null,
@@ -108,33 +147,18 @@ export function writeUrlState(state: UrlState, opts: { push?: boolean } = {}) {
   }
 }
 
-export interface CommentResolution {
-  commentId: string | null;
-  /** The requested id, when it's no longer in the PR */
-  notice: string | null;
-}
-
 /**
- * Decide which comment to show, given what a URL (or the previous session)
- * asked for and what threads the PR actually has.
- *
- * A thread can vanish — deleted, or the branch now matches a different PR —
- * so a stale `?comment=` falls back to the first open thread and says so,
- * the same way resolveRev handles a rev that has gone. Falling back to *open*
- * rather than merely first matches the workflow: the list is a to-do.
+ * The comment to focus: the one a URL (or the previous session) asked for,
+ * while the PR still has it. A thread can vanish — deleted, or the branch now
+ * matches a different PR — and then nothing is focused.
  */
 export function resolveComment(
   requested: string | null,
-  threads: Array<{ id: string; isResolved: boolean }>,
-): CommentResolution {
-  const fallback =
-    threads.find((t) => !t.isResolved)?.id ?? threads[0]?.id ?? null;
-
-  if (!requested) return { commentId: fallback, notice: null };
-  if (threads.some((t) => t.id === requested)) {
-    return { commentId: requested, notice: null };
-  }
-  return { commentId: fallback, notice: requested };
+  threads: Array<{ id: string }>,
+): string | null {
+  return requested && threads.some((t) => t.id === requested)
+    ? requested
+    : null;
 }
 
 export interface RevResolution {

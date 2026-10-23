@@ -30,10 +30,8 @@ const NO_FIELDS: DataField[] = [];
 export interface StepBadge {
   /** The thread's id */
   id: string;
-  /** Its number, in the spine's order */
+  /** Its number, oldest first */
   n: number;
-  /** Ticked as handled */
-  done: boolean;
 }
 
 /** A step by side and id, the same in every flow mode. */
@@ -411,8 +409,8 @@ export function FlowSequence({
                             <button
                               key={b.id}
                               type="button"
-                              className={`mark c ${b.done ? "done" : ""}`}
-                              title={`Review comment ${b.n}${b.done ? ", handled" : ""}: open it in Comments`}
+                              className="mark c"
+                              title={`Review comment ${b.n}: open it in Comments`}
                               onClick={(e) => {
                                 e.stopPropagation();
                                 onBadge?.(b.id);

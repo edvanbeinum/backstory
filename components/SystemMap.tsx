@@ -10,10 +10,13 @@ import {
 } from "react";
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
+import { ownsCode } from "@/lib/mapGroups";
+import { viewKey, viewParams } from "@/lib/url";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
-import { edgePath, layeredLayout } from "./graph";
+import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { Badge, Button, CopyButton, Spinner } from "./ui";
+import { Badge, Button, CopyButton, Spinner, Ticked } from "./ui";
+import { useView } from "./ViewContext";
 
 /**
  * The map: the focused C4 view, open at the top of the story at the column's
@@ -27,6 +30,14 @@ const MAX_NODE_W = 280;
 const MAX_FILES = 4;
 const COL_GAP = 18;
 const PAD = 14;
+/** A container's or system's box: the header above its children, and the space around them. */
+const GROUP_HEADER = 32;
+const GROUP_INSET = 12;
+
+const GROUP_TYPE: Record<string, string> = {
+  softwareSystem: "Software system",
+  container: "Container",
+};
 
 /**
  * A box's height before it's measured: name, the description wrapped, and
@@ -55,7 +66,7 @@ function layout(
   width: number,
   heights: Map<string, number> = new Map(),
 ) {
-  return layeredLayout(
+  return nestedLayout(
     nodes,
     edges,
     width,
@@ -67,6 +78,7 @@ function layout(
       colGap: COL_GAP,
       pad: PAD,
     },
+    { header: GROUP_HEADER, inset: GROUP_INSET },
   );
 }
 
@@ -151,6 +163,42 @@ function MapCanvas({
 
   return (
     <div className="map-canvas" style={{ height }}>
+      {[...placed.values()]
+        .filter((n) => n.group)
+        .map((n) => (
+          <div
+            key={n.id}
+            className={`map-group ${n.state} ${highlight === n.name ? "highlight" : ""}`}
+            style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
+            title={n.description || undefined}
+          >
+            <h4 style={{ height: GROUP_HEADER }}>
+              <span className="name">{n.name}</span>
+              <span className="type">{GROUP_TYPE[n.type] ?? n.type}</span>
+              {n.state === "added" && <span className="map-tag new">New</span>}
+              {n.state === "removed" && (
+                <span className="map-tag removed">Removed</span>
+              )}
+              {n.files.length > 0 && (
+                <button
+                  type="button"
+                  className="files mono"
+                  title={`${n.files.join("\n")}\nShow them in Files changed`}
+                  onClick={() => onJump(n.files[0])}
+                >
+                  {n.files.length} {n.files.length === 1 ? "file" : "files"}{" "}
+                  <span className="text-[var(--success)]">+{n.additions}</span>
+                  {n.deletions > 0 && (
+                    <span className="text-[var(--danger)]">
+                      {" "}
+                      −{n.deletions}
+                    </span>
+                  )}
+                </button>
+              )}
+            </h4>
+          </div>
+        ))}
       <svg
         className="map-edges"
         width={width}
@@ -253,6 +301,7 @@ function MapCanvas({
       })}
 
       {[...placed.values()].map((n) => {
+        if (n.group) return null;
         // "+1 more" takes a line anyway: name the file instead.
         const shown = n.fileStats.slice(
           0,
@@ -360,7 +409,11 @@ const names = (list: MapNode[]) => {
 };
 
 function summary(map: MapResponse) {
-  const changed = map.nodes.filter((n) => n.state !== "neighbour");
+  // A new or removed box is named as such, but a box around a changed
+  // component isn't a changed component itself.
+  const changed = map.nodes
+    .filter(ownsCode)
+    .filter((n) => n.state !== "neighbour");
   const added = map.nodes.filter((n) => n.state === "added");
   const removed = map.nodes.filter((n) => n.state === "removed");
   const arrows = {
@@ -383,15 +436,16 @@ function summary(map: MapResponse) {
       </>,
       names(changed),
       map.local ? (
-        "local model, no structural diff"
+        "hand-written map on this machine, so nothing shows as new or removed"
       ) : map.baseModel ? (
         "no structural change"
       ) : map.baseError ? (
         <span className="text-[var(--attention)]" title={map.baseError}>
-          couldn&apos;t read the base model, so nothing shows as new or removed
+          couldn&apos;t read the base&apos;s map, so nothing shows as new or
+          removed
         </span>
       ) : (
-        "no model at base"
+        "no map at the base to compare with"
       ),
     );
     return parts;
@@ -434,24 +488,9 @@ function summary(map: MapResponse) {
   return parts;
 }
 
-function Ticked({ text }: { text: string }) {
-  return (
-    <span>
-      {text.split("`").map((part, i) =>
-        i % 2 ? (
-          <code key={i} className="mono">
-            {part}
-          </code>
-        ) : (
-          part
-        ),
-      )}
-    </span>
-  );
-}
-
 /**
- * Turns reading the repo's maps and data models as it opens on or off.
+ * Turns reading the repo's maps, data models and change descriptions as it
+ * opens on or off.
  * Turning it on starts main's two reads before the page reads the view again,
  * so the view's own reads wait behind them instead of reading their bases in
  * full.
@@ -479,6 +518,8 @@ function useMapDraft(
   given: MapResponse | null,
   onRead: () => void,
 ) {
+  const { ref } = useView();
+  const viewId = viewKey({ repo, ref, rev });
   const [answer, setAnswer] = useState<{
     over: MapResponse | null;
     map: MapResponse;
@@ -495,10 +536,10 @@ function useMapDraft(
   // not the read it was sent over: a page read that lands while a read starts
   // says idle, and would hide the answer that says running, so nothing would
   // poll. A page read that lands after the answer still replaces it.
-  const latest = useRef({ view: `${repo}\n${rev}`, given });
+  const latest = useRef({ view: viewId, given });
   useEffect(() => {
-    latest.current = { view: `${repo}\n${rev}`, given };
-  }, [repo, rev, given]);
+    latest.current = { view: viewId, given };
+  }, [viewId, given]);
   // Try again repeats the last read: a Redraft only when that was a Redraft,
   // since one reads main in full and removes every derived map.
   const lastRedraft = useRef(false);
@@ -506,8 +547,8 @@ function useMapDraft(
   const request = useCallback(
     async (method: "GET" | "POST", redraft = false) => {
       if (method === "POST") lastRedraft.current = redraft;
-      const view = `${repo}\n${rev}`;
-      const params = new URLSearchParams({ repo, rev });
+      const view = viewId;
+      const params = viewParams({ repo, ref, rev });
       if (redraft) params.set("redraft", "1");
       // Drops the answer for a view the page has left.
       const over = () =>
@@ -543,7 +584,7 @@ function useMapDraft(
           });
       }
     },
-    [repo, rev],
+    [viewId, repo, ref, rev],
   );
 
   const map = answer?.over === given ? answer.map : given;
@@ -566,15 +607,14 @@ function useMapDraft(
     map.draft.auto;
   const autoStarted = useRef<string | null>(null);
   useEffect(() => {
-    const view = `${repo}\n${rev}`;
     if (!autoStart) {
       autoStarted.current = null;
       return;
     }
-    if (autoStarted.current === view) return;
-    autoStarted.current = view;
+    if (autoStarted.current === viewId) return;
+    autoStarted.current = viewId;
     void request("POST");
-  }, [autoStart, repo, rev, request]);
+  }, [autoStart, viewId, request]);
 
   const setAuto = useCallback(
     async (on: boolean) => {
@@ -647,7 +687,7 @@ function DraftProgress({ draft }: { draft: DraftApi }) {
   if (job?.status === "unavailable")
     return (
       <span className="text-[12px] text-[var(--attention)]">
-        <ClaudeCodeNotice reason={job.reason} needs="Drafting the map needs" />
+        <ClaudeCodeNotice reason={job.reason} needs="Drawing the map needs" />
       </span>
     );
   return null;
@@ -670,7 +710,7 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
       <h3>
         {mainMap
           ? "This change isn't on the map yet"
-          : "This repo has no map yet"}
+          : "Backstory hasn't drawn this repo yet"}
       </h3>
       {mainMap ? (
         <p>
@@ -680,16 +720,15 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
         </p>
       ) : (
         <p>
-          Backstory draws the map from a C4 model of the system.{" "}
-          {provider ?? "The AI provider"} reads the code, read-only: main&apos;s
-          map once, then only what the diff changes. The map stays on this
-          machine.
+          Backstory draws a map of your system from the code.{" "}
+          {provider ?? "The AI provider"} reads main once, read-only, then only
+          what each diff changes. The map stays on this machine.
         </p>
       )}
       {idle && (
         <span className="flex flex-wrap justify-center gap-2">
           <Button variant="primary" onClick={() => draft.start()}>
-            Draft a model
+            Draw the map
           </Button>
           {offerAuto && (
             <Button onClick={draft.turnOn}>Read automatically</Button>
@@ -718,7 +757,7 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
             <CopyButton
               value={file}
               variant="invisible"
-              title="Copy the path a local model goes at, to write one by hand"
+              title="Copy the path a hand-written map goes at, to write one"
               label="Copy path"
             />
           </span>
@@ -728,7 +767,7 @@ function DraftOffer({ draft }: { draft: DraftApi }) {
   );
 }
 
-/** A hand-written local model's path, to correct it. */
+/** A hand-written map's path, to correct it. */
 function LocalModel({ map }: { map: MapResponse }) {
   if (!map.modelFile) return null;
   return (
@@ -739,14 +778,14 @@ function LocalModel({ map }: { map: MapResponse }) {
       <CopyButton
         value={map.modelFile}
         variant="invisible"
-        title="Copy the model file's path, to correct it"
+        title="Copy the hand-written map's path, to correct it"
         label="Copy path"
       />
     </div>
   );
 }
 
-/** A drafted map's footnote: the Draft badge, whether reads start by themselves, Turn off or Read automatically, and Redraft. */
+/** A drafted map's footnote: the Drawn by AI badge, whether reads start by themselves, Turn off or Read automatically, and Draw again. */
 function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   const running = map.draft?.status === "running";
   const parts: React.ReactNode[] = [];
@@ -774,7 +813,7 @@ function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
   return (
     <span className="part inline-flex flex-wrap items-center gap-1.5">
       <Badge tone="draft" className="!py-0 !leading-4">
-        Draft
+        Drawn by AI
       </Badge>
       <span className="text-[11px] text-[var(--fg-subtle)]">
         {parts.map((part, i) => (
@@ -784,11 +823,11 @@ function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
           </span>
         ))}
       </span>
-      {/* Offers Draft a model when the head has a map but its base doesn't,
-          so reading the base isn't left to Redraft, which reads main in full. */}
+      {/* Offers Draw the map when the head has a map but its base doesn't,
+          so reading the base isn't left to Draw again, which reads main in full. */}
       {!map.baseModel && map.draft?.status === "idle" && !map.auto && (
         <Button size="sm" variant="invisible" onClick={() => draft.start()}>
-          Draft a model
+          Draw the map
         </Button>
       )}
       {!running && (
@@ -798,13 +837,13 @@ function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
           onClick={() => {
             if (
               window.confirm(
-                "Redraft the map? Main's map is read again in full and this view is worked out from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current map is kept if it fails.",
+                `Draw the map again? Main is read again in full and this view is worked out from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current map is kept if it fails.`,
               )
             )
               draft.start(true);
           }}
         >
-          Redraft
+          Draw again
         </Button>
       )}
       <DraftProgress draft={draft} />
@@ -853,7 +892,8 @@ export function SystemMap({
   const map = draft.map;
   const drafted = map?.source === "drafted";
   // Keep a click's Show map or Hide map only for the view it was made on.
-  const view = `${repo}\n${rev}`;
+  const { ref } = useView();
+  const view = viewKey({ repo, ref, rev });
   const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
   const showWhole = toggled?.view === view && toggled.open;
   const boxRef = useRef<HTMLElement>(null);
@@ -888,13 +928,13 @@ export function SystemMap({
           <div className="story-line">
             {map.error ? (
               <span className="flex items-center gap-1 text-[var(--attention)]">
-                <AlertIcon size={11} /> Couldn&apos;t read the model:{" "}
+                <AlertIcon size={11} /> Couldn&apos;t read the map:{" "}
                 <Ticked text={map.error} />
               </span>
             ) : (
               <span>
                 {map.status === "none"
-                  ? "No architecture/workspace.dsl in this repo, and no local model"
+                  ? "This repo has no map"
                   : "This change touches no mapped component"}
               </span>
             )}
@@ -1008,7 +1048,7 @@ export function SystemMap({
           >
             {map.unmapped.length > 0 &&
               (map.local
-                ? `${map.unmapped.length} ${map.unmapped.length === 1 ? "file" : "files"} the local model has no place for`
+                ? `${map.unmapped.length} ${map.unmapped.length === 1 ? "file" : "files"} the hand-written map has no place for`
                 : `${map.unmapped.length} unmapped`)}
             {map.unmapped.length > 0 && map.ambiguous.length > 0 && " · "}
             {map.ambiguous.length > 0 && `${map.ambiguous.length} ambiguous`}

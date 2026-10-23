@@ -17,9 +17,7 @@ import type {
  * and never writes to the repo.
  *
  * The base of "All changes" comes from the PR's `baseRefName` when there is
- * a PR, so a stacked PR doesn't also show its parent branches. A commit
- * linked to a thread survives a rebase because the link is kept by patch-id,
- * not sha.
+ * a PR, so a stacked PR doesn't also show its parent branches.
  */
 
 export class RepoError extends Error {
@@ -93,6 +91,11 @@ export async function resolveRepo(
 ): Promise<RepoInfo> {
   const abs = expandPath(input);
   if (!abs) throw new RepoError("No repository path given", "missing-path");
+  // Refuse a leading `-`: the ref comes from the URL and becomes `repo.tip`,
+  // which reaches git's argv on its own, where it would be read as an option.
+  if (ref?.startsWith("-")) {
+    throw new RepoError(`\`${ref}\` isn't a branch name.`, "git");
+  }
 
   try {
     const stat = await fs.stat(abs);
@@ -244,7 +247,13 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
     `${repo.tip}@{upstream}`,
   ]);
   if (upstream) {
-    return finishBase(root, upstream, "upstream", `ahead of ${upstream}`);
+    return finishBase(
+      root,
+      repo.tip,
+      upstream,
+      "upstream",
+      `ahead of ${upstream}`,
+    );
   }
 
   if (branch) {
@@ -256,7 +265,13 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
     ]);
     if (originBranch) {
       const ref = `origin/${branch}`;
-      return finishBase(root, ref, "origin-branch", `ahead of ${ref}`);
+      return finishBase(
+        root,
+        repo.tip,
+        ref,
+        "origin-branch",
+        `ahead of ${ref}`,
+      );
     }
   }
 
@@ -271,6 +286,7 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
       const ref = `origin/${defaultBranch}`;
       return finishBase(
         root,
+        repo.tip,
         ref,
         "default-branch",
         `branch never pushed — showing everything since ${ref}`,
@@ -287,6 +303,7 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
       if (localDefault) {
         return finishBase(
           root,
+          repo.tip,
           defaultBranch,
           "local-default",
           `no remote — showing everything since ${defaultBranch}`,
@@ -305,6 +322,7 @@ export async function resolveBase(repo: RepoInfo): Promise<BaseInfo> {
 
 async function finishBase(
   root: string,
+  tip: string,
   ref: string,
   reason: BaseInfo["reason"],
   label: string,
@@ -312,7 +330,7 @@ async function finishBase(
   // The merge base, not the ref tip: if the base branch has moved on, we want
   // the diff to show *our* changes, not everyone else's in reverse.
   const sha =
-    (await gitLine(root, ["merge-base", ref, "HEAD"])) ??
+    (await gitLine(root, ["merge-base", ref, tip])) ??
     (await gitLine(root, ["rev-parse", ref]));
   return { ref, sha, reason, label };
 }
@@ -482,6 +500,7 @@ async function logRange(
     `--format=${LOG_FORMAT}%x1e`,
     `--max-count=${limit}`,
     ...rangeArgs,
+    "--",
   ]);
   if (!out) return [];
 
@@ -592,6 +611,7 @@ export async function getBranchDiffSummary(
       ...PATCH_FLAGS,
       info.baseSha,
       repo.tip,
+      "--",
     ])) ?? "";
   // " 12 files changed, 540 insertions(+), 210 deletions(-)" — any of the
   // three clauses can be absent.
@@ -609,13 +629,16 @@ export async function getRangePatch(
   to: string,
   opts: PatchOptions = {},
 ): Promise<string> {
+  // End the revisions with `--` even with no paths: `to` can be a branch
+  // opened by ref, and git refuses a branch named like a file or folder.
+  const paths = pathspecArgs(opts);
   const out = await gitTry(root, [
     "diff",
     ...PATCH_FLAGS,
     ...contextArgs(opts),
     from,
     to,
-    ...pathspecArgs(opts),
+    ...(paths.length > 0 ? paths : ["--"]),
   ]);
   return out ?? "";
 }
@@ -744,66 +767,6 @@ export async function isOnBranch(
     timeout: 10_000,
   }).catch(() => ({ code: 1 }));
   return code === 0;
-}
-
-/**
- * A commit's patch-id: a hash of its diff, ignoring parent and metadata.
- * Rebasing rewrites shas but preserves patch-ids, which is what lets a pin
- * survive a restack. Null for empty commits, merges, or if git declines.
- */
-export async function getPatchId(
-  root: string,
-  sha: string,
-): Promise<string | null> {
-  const { stdout } = await run(
-    "sh",
-    [
-      "-c",
-      // patch-id reads a patch on stdin; --stable keeps the hash independent
-      // of hunk ordering, which is what makes it comparable across rebases.
-      'git diff-tree -p --no-color --no-ext-diff "$1" | git patch-id --stable',
-      "sh",
-      sha,
-    ],
-    { cwd: root, timeout: 15_000 },
-  ).catch(() => ({ stdout: "" }));
-
-  const id = stdout.trim().split(/\s+/)[0];
-  return id && /^[0-9a-f]{40}$/.test(id) ? id : null;
-}
-
-/**
- * Patch-id → sha for every commit in `range`, in one pipeline rather than
- * one process per commit. Used to re-match pins after a rebase.
- *
- * A patch-id occurring more than once (revert-then-reapply, cherry-picked
- * duplicates) maps to null: an ambiguous match must not be guessed at.
- */
-export async function getPatchIdMap(
-  root: string,
-  range: string,
-): Promise<Map<string, string | null>> {
-  const { stdout } = await run(
-    "sh",
-    [
-      "-c",
-      'git log --format="%H" "$1" | while read sha; do ' +
-        'git diff-tree -p --no-color --no-ext-diff "$sha" | ' +
-        "git patch-id --stable; done",
-      "sh",
-      range,
-    ],
-    { cwd: root, timeout: 60_000 },
-  ).catch(() => ({ stdout: "" }));
-
-  const map = new Map<string, string | null>();
-  for (const line of stdout.split("\n")) {
-    const [patchId, sha] = line.trim().split(/\s+/);
-    if (!patchId || !sha) continue;
-    // Second sighting of a patch-id makes it ambiguous, permanently.
-    map.set(patchId, map.has(patchId) ? null : sha);
-  }
-  return map;
 }
 
 /** The patch for a single commit. Merges are diffed against their first parent. */

@@ -18,11 +18,13 @@ import type {
   Field,
   Relationship,
 } from "@/lib/data/types";
+import { viewKey, viewParams } from "@/lib/url";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
 import { Elapsed, setAutoReading } from "./SystemMap";
 import { Badge, Button, Spinner } from "./ui";
+import { useView } from "./ViewContext";
 
 const COL_GAP = 22;
 
@@ -513,6 +515,8 @@ function useDataDraft(
   given: DataResponse | null,
   onRead: () => void,
 ) {
+  const { ref } = useView();
+  const viewId = viewKey({ repo, ref, rev });
   const [answer, setAnswer] = useState<{
     over: DataResponse | null;
     data: DataResponse;
@@ -529,19 +533,19 @@ function useDataDraft(
   // not the read it was sent over: a page read that lands while a read starts
   // says idle, and would hide the answer that says running, so nothing would
   // poll. A page read that lands after the answer still replaces it.
-  const latest = useRef({ view: `${repo}\n${rev}`, given });
+  const latest = useRef({ view: viewId, given });
   // Try again repeats the last read: a Redraft only when that was a Redraft,
   // since one reads main in full and removes every derived model.
   const lastRedraft = useRef(false);
   useEffect(() => {
-    latest.current = { view: `${repo}\n${rev}`, given };
-  }, [repo, rev, given]);
+    latest.current = { view: viewId, given };
+  }, [viewId, given]);
 
   const request = useCallback(
     async (method: "GET" | "POST", redraft = false) => {
       if (method === "POST") lastRedraft.current = redraft;
-      const view = `${repo}\n${rev}`;
-      const params = new URLSearchParams({ repo, rev });
+      const view = viewId;
+      const params = viewParams({ repo, ref, rev });
       if (redraft) params.set("redraft", "1");
       // Drops the answer for a view the page has left.
       const over = () =>
@@ -577,7 +581,7 @@ function useDataDraft(
           });
       }
     },
-    [repo, rev],
+    [viewId, repo, ref, rev],
   );
 
   const data = answer?.over === given ? answer.data : given;
@@ -594,11 +598,10 @@ function useDataDraft(
     data?.status === "none" && data.draft?.status === "idle" && data.draft.auto;
   const autoStarted = useRef<string | null>(null);
   useEffect(() => {
-    const view = `${repo}\n${rev}`;
-    if (!autoStart || autoStarted.current === view) return;
-    autoStarted.current = view;
+    if (!autoStart || autoStarted.current === viewId) return;
+    autoStarted.current = viewId;
     void request("POST");
-  }, [autoStart, repo, rev, request]);
+  }, [autoStart, viewId, request]);
 
   const setAuto = useCallback(
     async (on: boolean) => {
@@ -628,7 +631,7 @@ function useDataDraft(
 function DraftedBadge() {
   return (
     <Badge tone="draft" className="!py-0 !leading-4">
-      Draft
+      Read by AI
     </Badge>
   );
 }
@@ -671,14 +674,14 @@ function DraftProgress({
       <span className="text-[12px] text-[var(--attention)]">
         <ClaudeCodeNotice
           reason={job.reason}
-          needs="Drafting the data model needs"
+          needs="Reading the data model needs"
         />
       </span>
     );
   return null;
 }
 
-/** What a view with no data model shows: the formats looked for, and the offer to draft one. */
+/** What a view with no data model shows: the formats looked for, and the offer to read one. */
 function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
   const job = data.draft;
   const idle =
@@ -700,7 +703,7 @@ function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
         )}
         {job && idle && (
           <Button size="sm" variant="primary" onClick={() => draft.start()}>
-            Draft the data model
+            Read the data model
           </Button>
         )}
         {offerAuto && (
@@ -732,13 +735,13 @@ function Redraft({ data, draft }: { data: DataResponse; draft: DraftApi }) {
           onClick={() => {
             if (
               window.confirm(
-                `Redraft the data model? ${data.drafted?.provider ?? "The AI provider"} reads main's data model again in full and works out this view from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current reading is kept if it fails.`,
+                `Read the data model again? ${data.drafted?.provider ?? "The AI provider"} reads main's data model again in full and works out this view from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current reading is kept if it fails.`,
               )
             )
               draft.start(true);
           }}
         >
-          Redraft
+          Read again
         </Button>
       )}
       <DraftProgress data={data} draft={draft} />
@@ -746,7 +749,7 @@ function Redraft({ data, draft }: { data: DataResponse; draft: DraftApi }) {
   );
 }
 
-/** A drafted view's footnote: whether reads start by themselves, Turn off or Read automatically, and Redraft. */
+/** A drafted view's footnote: whether reads start by themselves, Turn off or Read automatically, and Read again. */
 function DraftFootnote({
   data,
   draft,
@@ -816,7 +819,8 @@ export function DataSummary({
   const changed = shown.filter((p) => p.state !== "same");
   // Open the graph when the view changes the data model, and keep a click's
   // open or close only for the view it was made on.
-  const view = `${repo}\n${rev}`;
+  const { ref } = useView();
+  const view = viewKey({ repo, ref, rev });
   const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
   const open = toggled?.view === view ? toggled.open : changed.length > 0;
   const boxRef = useRef<HTMLDivElement>(null);
@@ -883,10 +887,10 @@ export function DataSummary({
           </div>
           <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
             {data.drafted
-              ? `Drafted by ${data.drafted.provider}: a model read once in full, then updated from what each diff changes. It may be wrong.`
+              ? `Read by ${data.drafted.provider} from the code: main once in full, then updated from what each diff changes. It may be wrong.`
               : `From ${data.label}, at the base and the head.`}{" "}
             {whole
-              ? `Every entity at the head; ${data.baseModel ? "this change touches none of them" : "there is no model at the base to compare with"}. Arrows point from the entity that has a link to the one it links to.`
+              ? `Every entity at the head; ${data.baseModel ? "this change touches none of them" : "there is no data model at the base to compare with"}. Arrows point from the entity that has a link to the one it links to.`
               : "Click an entity for its fields. Arrows point from the entity that has a link to the one it links to; grey boxes are unchanged entities a changed one links to."}
           </p>
           {data.drafted && (

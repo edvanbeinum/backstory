@@ -5,11 +5,10 @@ import type { DatabaseSync } from "node:sqlite";
 
 import { importNotes } from "./notes";
 import { importOutbox } from "./outbox";
-import { importResponses } from "./responses";
 
 /**
- * The SQLite database behind notes, rounds, responses and settings:
- * `backstory.db` in `homeDir`.
+ * The SQLite database behind notes, rounds, seen sessions, settings and the
+ * branch tips you last looked at: `backstory.db` in `homeDir`.
  *
  * One database, so a write that touches two kinds of record commits or fails
  * as one (Send files a round and marks its notes sent), and so the schema is
@@ -36,7 +35,7 @@ export function homeDir(): string {
 }
 
 const FILE = "backstory.db";
-const VERSION = 2;
+const VERSION = 4;
 
 // Read from the working directory, not beside this module: bundled, the
 // module is a `.next` chunk. The dev server and tests run from the repo root,
@@ -128,7 +127,6 @@ function importJson(database: DatabaseSync, home: string): string[] {
   const importers: [string, (d: DatabaseSync, legacy: Legacy) => void][] = [
     ["notes.json", importNotes],
     ["outbox.json", importOutbox],
-    ["responses.json", importResponses],
   ];
   const read: string[] = [];
   for (const [name, importer] of importers) {

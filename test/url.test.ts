@@ -9,6 +9,8 @@ import {
   resolveComment,
   resolveRev,
   resolveTab,
+  viewKey,
+  viewParams,
 } from "../lib/url";
 
 function commit(sha: string): CommitSummary {
@@ -28,6 +30,41 @@ function commit(sha: string): CommitSummary {
 const NEWEST = "1e61946e49974e250cf688eda4c158132e12be83";
 const OLDER = "0a901d8d0161f3519c4b0065cf14da1796cee8d3";
 const COMMITS = [commit(NEWEST), commit(OLDER)];
+
+test("a view request names the branch only when the repo is open on one it hasn't checked out", () => {
+  assert.equal(
+    viewParams({ repo: "/r", rev: "branch" }).toString(),
+    "repo=%2Fr&rev=branch",
+  );
+  assert.equal(
+    viewParams({ repo: "/r", ref: null, rev: "branch" }).toString(),
+    "repo=%2Fr&rev=branch",
+  );
+  assert.equal(
+    viewParams({
+      repo: "/r",
+      ref: "stack/b",
+      rev: "branch",
+      path: "a.ts",
+      line: "3",
+      hunk: undefined,
+    }).toString(),
+    "repo=%2Fr&ref=stack%2Fb&rev=branch&path=a.ts&line=3",
+  );
+});
+
+test("a link to a branch the checkout hasn't checked out reopens on that branch", () => {
+  const url = buildUrl({
+    repo: "/r",
+    ref: "stack/prototype-01",
+    rev: "branch",
+  });
+  assert.equal(
+    parseUrlState(new URL(url, "http://x").search).ref,
+    "stack/prototype-01",
+  );
+  assert.equal(parseUrlState("?repo=/r").ref, undefined);
+});
 
 test("round-trips awkward repo paths", () => {
   for (const repo of [
@@ -144,44 +181,19 @@ test("a ?comment= link opens Comments, unless it names another tab", () => {
   assert.equal(parsed.comment, "PRRT_x");
 });
 
-test("a comment id resolves, falling back to the first OPEN thread", () => {
-  const threads = [
-    { id: "resolved-one", isResolved: true },
-    { id: "open-one", isResolved: false },
-    { id: "open-two", isResolved: false },
-  ];
-
-  // A known id is honoured, resolved or not
-  assert.deepEqual(resolveComment("resolved-one", threads), {
-    commentId: "resolved-one",
-    notice: null,
-  });
-
-  // Nothing requested → first open, not merely first
-  assert.deepEqual(resolveComment(null, threads), {
-    commentId: "open-one",
-    notice: null,
-  });
-
-  // A stale id falls back and reports what was asked for
-  assert.deepEqual(resolveComment("gone-thread", threads), {
-    commentId: "open-one",
-    notice: "gone-thread",
-  });
+test("a comment id the PR still has is focused", () => {
+  const threads = [{ id: "one" }, { id: "two" }];
+  assert.equal(resolveComment("two", threads), "two");
 });
 
-test("comment resolution copes with all-resolved and empty PRs", () => {
-  const allResolved = [{ id: "only", isResolved: true }];
-  assert.equal(resolveComment(null, allResolved).commentId, "only");
+test("a comment id that's gone focuses nothing", () => {
+  assert.equal(resolveComment("gone-thread", [{ id: "one" }]), null);
+  assert.equal(resolveComment("gone", []), null);
+});
 
-  assert.deepEqual(resolveComment(null, []), {
-    commentId: null,
-    notice: null,
-  });
-  assert.deepEqual(resolveComment("gone", []), {
-    commentId: null,
-    notice: "gone",
-  });
+test("no comment asked for focuses nothing", () => {
+  assert.equal(resolveComment(null, [{ id: "one" }]), null);
+  assert.equal(resolveComment(null, []), null);
 });
 
 test("a short sha from a hand-typed URL resolves to the full one", () => {
@@ -267,4 +279,15 @@ test("a hand-picked sha survives, an unknown one from a URL still falls back", (
     rev: COMMITS[0].sha,
     notice: "fc6ff8f",
   });
+});
+
+test("a view's key tells two branches of a stack apart, and is the same for the same view", () => {
+  const onB = viewKey({ repo: "/r", ref: "stack/b", rev: "branch" });
+  assert.equal(onB, viewKey({ repo: "/r", ref: "stack/b", rev: "branch" }));
+  assert.notEqual(onB, viewKey({ repo: "/r", ref: "stack/a", rev: "branch" }));
+  assert.notEqual(onB, viewKey({ repo: "/r", rev: "branch" }));
+  assert.equal(
+    viewKey({ repo: "/r", ref: null, rev: "branch" }),
+    viewKey({ repo: "/r", rev: "branch" }),
+  );
 });

@@ -15,7 +15,7 @@ terms:
     avoid:
       - lane, for the data
   - name: view
-    means: 'The two commits being compared: one commit and its first parent, or "All changes" from the fork point to HEAD (`lib/view.ts`).'
+    means: 'The two commits being compared: one commit and its first parent, or "All changes" from the fork point to the reviewed branch''s tip, HEAD unless the URL has `ref` (`lib/view.ts`).'
     avoid:
       - view, for the Diff / Before / After switch
   - name: flow mode
@@ -29,7 +29,7 @@ terms:
       - panel
       - column
   - name: story
-    means: "The Story tab, where every view lands: the map at full width with one line of what it says, then each flow as a card (`components/Story.tsx`)."
+    means: "The Story tab, where every view lands: the change description, then the map at full width with one line of what it says, then each flow as a card (`components/Story.tsx`)."
     avoid:
       - strip, for the map or the data model's summary
   - name: gutter mark
@@ -48,7 +48,7 @@ terms:
     means: "`data.files` and `data.format` in a workspace's properties: which files hold the data model, and which data reader reads them. Read at the head and used at both ends of a view."
     avoid: []
   - name: drafted data model
-    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read as repos and views open, unless the repo is turned off (Turn off under a drafted data model or map), or on a click, and marked drafted wherever it's shown."
+    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read as repos and views open, unless the repo is turned off (Turn off under a drafted data model or map), or on a click (Read the data model), and marked Read by AI wherever it's shown. Read again reads main's data model in full again."
     avoid: []
   - name: main's data model
     means: "The drafted data model of the repo's default branch that every view's base is derived from, pointed at by `trunk.json` in the repo's data folder (`lib/data/cache.ts`). Read in full once, and moved forward when a view's base is on main past it."
@@ -59,7 +59,7 @@ terms:
     avoid:
       - store
   - name: store
-    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes, rounds and responses, one table each, plus `seen` and `settings`."
+    means: "`lib/store.ts`: the SQLite database `~/.backstory/backstory.db` (in `homeDir`) that has notes and rounds, one table each, plus `seen`, `settings` and `looked`."
     avoid:
       - store, for the flow cache, the data cache or the map cache
   - name: flow cache
@@ -67,11 +67,11 @@ terms:
     avoid:
       - store
   - name: local model
-    means: "A C4 model written by hand on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo key>/workspace.dsl` (`localModelFile` in `lib/model.ts`). It wins over a drafted map, and Backstory never writes it. One with the `backstory.drafted` property is the old single drafted model, and is skipped."
+    means: "A C4 model written by hand on this machine for a repo that doesn't commit one, at `~/.backstory/models/<repo key>/workspace.dsl` (`localModelFile` in `lib/model.ts`). It wins over a drafted map, and Backstory never writes it. One with the `backstory.drafted` property is the old single drafted model, and is skipped. The UI calls it the hand-written map; the docs use that name for a committed model too."
     avoid:
-      - draft alone, for the model (reply drafts are `lib/drafts.ts`)
+      - draft alone, for the model
   - name: drafted map
-    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off, or on a click (Draft a model), and marked Draft under the map."
+    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off, or on a click (Draw the map), and marked Drawn by AI under the map. Draw again reads main in full again."
     avoid:
       - local model, for a drafted map
   - name: main's map
@@ -82,11 +82,15 @@ terms:
     means: "`lib/models/cache.ts`: the drafted maps in `~/.backstory/maps/`, one file per tree with the tree it was derived from, plus `trunk.json` for main's map and the queue of reads that make them. The data cache's engine, copied."
     avoid:
       - store
+  - name: change description
+    means: "A few plain sentences at the top of Story: why the change was made (only when its commit messages or PR say), what it does, and at most two places to look first, each outlining its component on the map when the name is one. The AI provider reads it from the view's patch, commit messages, PR and the names of the components and entities it touches (`lib/description/`), once per view, cached by base and head trees in `~/.backstory/descriptions/`. Read as views open unless the repo is turned off, or on a click (Describe this change), and marked Drawn by the provider. Describe again reads it once more, and the earlier one stays if that read fails."
+    avoid:
+      - summary, for the description (that's the line under the map)
   - name: repo key
-    means: "The folder a repo gets under `~/.backstory/flows/`, `data/`, `maps/` and `models/` (`repoKey` in `lib/git.ts`): the main checkout's folder plus the first 8 hex characters of a hash of the common git dir. Every worktree of a repo has the same key; two repos whose checkouts share a folder name don't."
+    means: "The folder a repo gets under `~/.backstory/flows/`, `data/`, `maps/`, `descriptions/` and `models/` (`repoKey` in `lib/git.ts`): the main checkout's folder plus the first 8 hex characters of a hash of the common git dir. Every worktree of a repo has the same key; two repos whose checkouts share a folder name don't."
     avoid: []
   - name: AI provider
-    means: "The tool Backstory asks to read code and answer in a JSON schema; Claude Code for now, and required: it draws every map, data model and flow, through the user's own login (`lib/ai/provider.ts`)."
+    means: "The tool Backstory asks to read code and answer in a JSON schema; Claude Code for now, and required: it draws every map, data model, flow and change description, through the user's own login (`lib/ai/provider.ts`)."
     avoid:
       - agent (that's the coding agent under review, as in the agent review loop)
       - model, for the tool (that's the C4 or data model; the LLM is "the provider's model")
@@ -115,10 +119,13 @@ terms:
     avoid:
       - log in, for this (`gh auth login` is `gh`'s own sign-in)
       - OAuth, in copy
-  - name: answering commit
-    means: "A commit you link to a review comment as one that answers it, kept in the comment's response beside the tick and the drafted reply (`commits` in `lib/responses.ts`). It stores the commit's patch-id as well as its sha, so a rebase re-matches it (`healed`); when nothing matches it's `missing` and you choose another. It never ticks the comment."
+  - name: inbox
+    means: "The home screen: the changes waiting for you, as every worktree and every branch with a pull request across the repos you've opened, each with its commits, files and lines against its base and when it last changed, the branches changed since you last looked first (`components/Inbox.tsx`, `buildInbox` in `lib/inbox.ts`)."
+  - name: changed since you last looked
+    means: "A branch whose tip isn't the one stored when you last opened it, with at least one commit past its base. Opening a branch, but not a background refresh, stores its tip (`markLooked` in `lib/looked.ts`, `POST /api/looked`). Never a merged or closed pull request, or the repo's own checkout on its default branch."
     avoid:
-      - link, as a noun (link stays the verb, as in "Link another…")
+      - unread
+      - reviewed
   - name: On GitHub
     means: "The inbox's fold under each repo listing the open pull requests and branches on GitHub this clone has no local branch for. Opening one fetches it into a local branch and reviews it (`onGitHub` in `lib/inbox.ts`)."
     avoid:
@@ -166,10 +173,10 @@ blocks:
       - lib/store.ts
       - lib/schema.sql
       - lib/upgrades/
-      - lib/responses.ts
-      - lib/drafts.ts
       - lib/notes.ts
       - lib/outbox.ts
+      - lib/looked.ts
+      - app/api/looked/
     summary: The SQLite database `~/.backstory/backstory.db` and the modules that keep its records.
     read: "`lib/store.ts` header"
   - name: flow engine
@@ -180,8 +187,14 @@ blocks:
   - name: AI provider
     code:
       - lib/ai/
-    summary: "The one seam every AI call goes through: picks the provider (`BACKSTORY_AI`, Claude Code by default) and holds the contract a provider must meet, reading a directory read-only and answering in a JSON schema."
+    summary: "The one seam every AI call goes through, for the map's and the data model's drafts, flows and the change description: picks the provider (`BACKSTORY_AI`, Claude Code by default) and holds the contract a provider must meet, reading a directory read-only and answering in a JSON schema."
     read: "`lib/ai/provider.ts` header"
+  - name: change description
+    code:
+      - lib/description/
+      - app/api/description/
+    summary: Has the AI provider describe a view's change in a few plain sentences, under writing rules that keep them specific, and caches it per view.
+    read: "`lib/description/cache.ts` header"
   - name: model reader (the map)
     code:
       - lib/dsl.ts
@@ -189,7 +202,7 @@ blocks:
       - lib/map.ts
       - lib/mapGroups.ts
       - lib/models/
-    summary: Reads the repo's C4 model from its Structurizr DSL and marks the components a change touched, added or removed. Has the AI provider draft a map for a repo with none, main's once and each view's forward from it.
+    summary: Reads the repo's C4 model from its Structurizr DSL and marks the components a change touched, added or removed, drawing each component inside its container's box and each container inside its system's. Has the AI provider draft a map for a repo with none, main's once and each view's forward from it.
     read: "`lib/model.ts` header"
   - name: data model reader
     code:

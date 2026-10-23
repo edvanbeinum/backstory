@@ -20,18 +20,17 @@ export interface LayoutOptions {
   pad: number;
 }
 
-export function layeredLayout<N extends { id: string }>(
-  nodes: N[],
-  edges: { source: string; destination: string }[],
-  width: number,
-  height: (node: N, w: number) => number,
-  o: LayoutOptions,
-): { placed: Map<string, N & Box>; height: number } {
-  const ids = nodes.map((n) => n.id);
+type Edge = { source: string; destination: string };
+type Laid<N> = { placed: Map<string, N & Box>; height: number };
+
+function arrowsInto(ids: string[], edges: Edge[]) {
   const into = new Map<string, string[]>(ids.map((id) => [id, []]));
   for (const e of edges)
     if (e.source !== e.destination) into.get(e.destination)?.push(e.source);
+  return into;
+}
 
+function ranks(ids: string[], into: Map<string, string[]>) {
   const rank = new Map<string, number>();
   const visiting = new Set<string>();
   const rankOf = (id: string): number => {
@@ -44,10 +43,30 @@ export function layeredLayout<N extends { id: string }>(
     return r;
   };
   for (const id of ids) rankOf(id);
+  return rank;
+}
+
+/**
+ * `widthOf` gives a node a preferred width, kept up to the width available.
+ * Nodes without one share what's left of their line, at most `maxW` each,
+ * and a line takes as many nodes as fit at `minW`.
+ */
+export function layeredLayout<N extends { id: string }>(
+  nodes: N[],
+  edges: Edge[],
+  width: number,
+  height: (node: N, w: number) => number,
+  o: LayoutOptions,
+  widthOf: (node: N, available: number) => number | undefined = () => undefined,
+): Laid<N> {
+  const ids = nodes.map((n) => n.id);
+  const into = arrowsInto(ids, edges);
+  const rank = ranks(ids, into);
 
   const rows: N[][] = [];
   for (const n of nodes) (rows[rank.get(n.id)!] ??= []).push(n);
 
+  const available = width - 2 * o.pad;
   const placed = new Map<string, N & Box>();
   let y = o.pad;
   for (const row of rows.filter(Boolean)) {
@@ -60,27 +79,38 @@ export function layeredLayout<N extends { id: string }>(
         : Infinity;
     };
     row.sort((a, b) => pos(a) - pos(b));
-    const perLine = Math.max(
-      1,
-      Math.min(
-        row.length,
-        Math.floor((width - 2 * o.pad + o.colGap) / (o.minW + o.colGap)),
-      ),
-    );
-    for (let start = 0; start < row.length; start += perLine) {
-      const line = row.slice(start, start + perLine);
-      const w = Math.min(
+    const kept = row.map((n) => {
+      const w = widthOf(n, available);
+      return w === undefined ? undefined : Math.min(w, available);
+    });
+    for (let start = 0; start < row.length;) {
+      let end = start + 1;
+      let used = kept[start] ?? o.minW;
+      while (
+        end < row.length &&
+        used + o.colGap + (kept[end] ?? o.minW) <= available
+      )
+        used += o.colGap + (kept[end++] ?? o.minW);
+      const line = row.slice(start, end);
+      const fixed = kept.slice(start, end);
+      const share = Math.min(
         o.maxW,
-        (width - 2 * o.pad - (line.length - 1) * o.colGap) / line.length,
+        (available -
+          fixed.reduce<number>((a, w) => a + (w ?? 0), 0) -
+          (line.length - 1) * o.colGap) /
+          fixed.filter((w) => w === undefined).length,
       );
-      const total = line.length * w + (line.length - 1) * o.colGap;
+      const ws = fixed.map((w) => w ?? share);
+      const total =
+        ws.reduce((a, w) => a + w, 0) + (line.length - 1) * o.colGap;
       let x = (width - total) / 2;
-      const hs = line.map((n) => height(n, w));
+      const hs = line.map((n, i) => height(n, ws[i]));
       line.forEach((n, i) => {
-        placed.set(n.id, { ...n, x, y, w, h: hs[i] });
-        x += w + o.colGap;
+        placed.set(n.id, { ...n, x, y, w: ws[i], h: hs[i] });
+        x += ws[i] + o.colGap;
       });
       y += Math.max(...hs) + o.rowGap;
+      start = end;
     }
   }
   return { placed, height: y - o.rowGap + o.pad };
@@ -89,6 +119,115 @@ export function layeredLayout<N extends { id: string }>(
 export interface Around {
   boxes: Box[];
   clearance: number;
+}
+
+/**
+ * Boxes inside boxes, for the map's C4 view: each level is a
+ * `layeredLayout`, and a group's children are laid out inside it, below its
+ * header. A level is ranked by the arrows between the boxes their ends sit
+ * in at that level, so a component's arrow to another container's component
+ * puts its own container above that one.
+ */
+export function nestedLayout<
+  N extends { id: string; parent: string | null; group: boolean },
+>(
+  nodes: N[],
+  edges: Edge[],
+  width: number,
+  height: (node: N, w: number) => number,
+  o: LayoutOptions,
+  { header, inset }: { header: number; inset: number },
+): Laid<N> {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const parentOf = (n: N) =>
+    n.parent !== null && byId.has(n.parent) ? n.parent : null;
+  const children = new Map<string | null, N[]>();
+  for (const n of nodes) {
+    const p = parentOf(n);
+    children.set(p, [...(children.get(p) ?? []), n]);
+  }
+  // The ancestor of `id`, or `id` itself, that sits directly in `level`.
+  const at = (id: string, level: string | null): string | null => {
+    for (let n = byId.get(id); n;) {
+      const p = parentOf(n);
+      if (p === level) return n.id;
+      if (p === null) return null;
+      n = byId.get(p);
+    }
+    return null;
+  };
+  const lifted = new Map<string | null, Edge[]>();
+  const edgesIn = (level: string | null) => {
+    if (!lifted.has(level))
+      lifted.set(
+        level,
+        edges.flatMap((e) => {
+          const source = at(e.source, level);
+          const destination = at(e.destination, level);
+          return source && destination && source !== destination
+            ? [{ source, destination }]
+            : [];
+        }),
+      );
+    return lifted.get(level)!;
+  };
+
+  // The width that fits a group's widest row side by side, leaves at `maxW`.
+  const natural = new Map<string, number>();
+  const naturalWidth = (g: N): number => {
+    if (natural.has(g.id)) return natural.get(g.id)!;
+    const kids = children.get(g.id) ?? [];
+    const ids = kids.map((k) => k.id);
+    const rank = ranks(ids, arrowsInto(ids, edgesIn(g.id)));
+    const rows = new Map<number, number[]>();
+    for (const k of kids) {
+      const r = rank.get(k.id)!;
+      rows.set(r, [...(rows.get(r) ?? []), k.group ? naturalWidth(k) : o.maxW]);
+    }
+    const widest = Math.max(
+      o.minW,
+      ...[...rows.values()].map(
+        (ws) => ws.reduce((a, w) => a + w, 0) + (ws.length - 1) * o.colGap,
+      ),
+    );
+    natural.set(g.id, widest + 2 * inset);
+    return widest + 2 * inset;
+  };
+
+  // Each call starts a new cache: measured heights change between calls,
+  // and a group's size depends on its children's.
+  const inside = { ...o, pad: 0 };
+  const cache = new Map<string, Laid<N>>();
+  const level = (parent: string | null, w: number): Laid<N> => {
+    const key = `${parent}\n${w}`;
+    let laid = cache.get(key);
+    if (!laid) {
+      laid = layeredLayout(
+        children.get(parent) ?? [],
+        edgesIn(parent),
+        w,
+        (n, nw) =>
+          n.group
+            ? header + level(n.id, nw - 2 * inset).height + inset
+            : height(n, nw),
+        parent === null ? o : inside,
+        (n) => (n.group ? naturalWidth(n) : undefined),
+      );
+      cache.set(key, laid);
+    }
+    return laid;
+  };
+
+  const placed = new Map<string, N & Box>();
+  const place = (parent: string | null, w: number, dx: number, dy: number) => {
+    for (const b of level(parent, w).placed.values()) {
+      placed.set(b.id, { ...b, x: b.x + dx, y: b.y + dy });
+      if (b.group)
+        place(b.id, b.w - 2 * inset, b.x + dx + inset, b.y + dy + header);
+    }
+  };
+  place(null, width, 0, 0);
+  return { placed, height: level(null, width).height };
 }
 
 /**

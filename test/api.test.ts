@@ -14,14 +14,17 @@ import { test } from "node:test";
 import * as fetchRoute from "../app/api/fetch/route";
 import * as ai from "../app/api/ai/route";
 import * as data from "../app/api/data/route";
+import * as description from "../app/api/description/route";
 import * as githubLogin from "../app/api/github/login/route";
+import * as looked from "../app/api/looked/route";
 import * as map from "../app/api/map/route";
 import * as notes from "../app/api/notes/route";
 import * as outbox from "../app/api/outbox/route";
-import * as responses from "../app/api/responses/route";
 import * as review from "../app/api/review/route";
 import { crossSite } from "../lib/api";
 import { autoRead } from "../lib/data/cache";
+import { gitCommonDir } from "../lib/git";
+import { lookedTips } from "../lib/looked";
 import { waitingReview } from "../lib/review";
 import type { ApiError } from "../lib/types";
 import { quietLoginShell, SECURITY, standIns } from "./standins";
@@ -162,15 +165,6 @@ test("a cross-site request to a route that writes is refused and writes nothing"
       outbox.DELETE(send(at("outbox", `repo=${repo}&id=r1`), "DELETE", EVIL)),
     ],
     [
-      "responses POST",
-      responses.POST(
-        send(at("responses", "key=acme/app%2342"), "POST", EVIL, {
-          threadId: "t1",
-          done: true,
-        }),
-      ),
-    ],
-    [
       "review POST",
       review.POST(send(at("review", `repo=${repo}`), "POST", EVIL)),
     ],
@@ -211,12 +205,22 @@ test("a cross-site request to a route that writes is refused and writes nothing"
       map.POST(send(at("map", `repo=${repo}&rev=HEAD`), "POST", EVIL)),
     ],
     [
+      "description read",
+      description.POST(
+        send(at("description", `repo=${repo}&rev=HEAD`), "POST", EVIL),
+      ),
+    ],
+    [
       "data auto on",
       data.POST(send(at("data", `repo=${repo}&auto=1`), "POST", EVIL)),
     ],
     [
       "data auto off",
       data.POST(send(at("data", `repo=${repo}&auto=0`), "POST", EVIL)),
+    ],
+    [
+      "looked POST",
+      looked.POST(send(at("looked", `repo=${repo}&ref=main`), "POST", EVIL)),
     ],
   ];
 
@@ -283,6 +287,54 @@ test("auto=0 turns reading off for that repo and its worktrees only, and auto=1 
 
   const bare = await data.POST(send(at("data", "auto=0"), "POST", {}));
   assert.equal(bare.status, 400);
+});
+
+test("GET /api/description wants both a repo and a rev", async () => {
+  const get = (query: string) =>
+    description.GET(send(at("description", query), "GET", {}));
+  assert.equal((await get(`repo=${encodeURIComponent(REPO)}`)).status, 400);
+  assert.equal((await get("rev=HEAD")).status, 400);
+});
+
+test("POST /api/looked stores the tip the page showed, else the branch's tip, and wants both a repo and a branch", async () => {
+  process.env.BACKSTORY_HOME = mkdtempSync(
+    path.join(tmpdir(), "backstory-api-"),
+  );
+  const dir = tempRepo();
+  const mark = (query: string) =>
+    looked.POST(send(at("looked", query), "POST", {}));
+
+  assert.equal((await mark(`repo=${encodeURIComponent(dir)}`)).status, 400);
+  assert.equal((await mark("ref=main")).status, 400);
+  assert.equal(
+    (await mark(`repo=${encodeURIComponent(dir)}&ref=nope`)).status,
+    400,
+  );
+  assert.equal(
+    (await mark(`repo=${encodeURIComponent(dir)}&ref=main~0`)).status,
+    400,
+  );
+
+  const res = await mark(`repo=${encodeURIComponent(dir)}&ref=main`);
+  assert.equal(res.status, 200);
+  const tip = execFileSync("git", ["-C", dir, "rev-parse", "main"], {
+    encoding: "utf8",
+  }).trim();
+  assert.deepEqual(await res.json(), { tip });
+  assert.equal(lookedTips(await gitCommonDir(dir)).get("main")?.tip, tip);
+
+  const shown = "a".repeat(40);
+  const sent = await mark(
+    `repo=${encodeURIComponent(dir)}&ref=main&tip=${shown}`,
+  );
+  assert.equal(sent.status, 200);
+  assert.equal(lookedTips(await gitCommonDir(dir)).get("main")?.tip, shown);
+  assert.equal(
+    (await mark(`repo=${encodeURIComponent(dir)}&ref=main&tip=HEAD`)).status,
+    400,
+  );
+  const empty = await mark(`repo=${encodeURIComponent(dir)}&ref=main&tip=`);
+  assert.deepEqual(await empty.json(), { tip });
 });
 
 /**

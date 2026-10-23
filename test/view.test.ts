@@ -5,9 +5,9 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
-import { WORKING_REV } from "../lib/constants";
+import { BRANCH_REV, WORKING_REV } from "../lib/constants";
 import { resolveRepo } from "../lib/git";
-import { viewRange } from "../lib/view";
+import { onBranchOnly, viewRange } from "../lib/view";
 
 const root = mkdtempSync(path.join(os.tmpdir(), "backstory-view-"));
 after(() => rmSync(root, { recursive: true, force: true }));
@@ -42,4 +42,44 @@ test("uncommitted work and a rev that isn't a commit have no view", async () => 
   const repo = await resolveRepo(root);
   assert.equal(await viewRange(repo, WORKING_REV), null);
   assert.equal(await viewRange(repo, "no-such-branch"), null);
+});
+
+test("the whole branch runs to the tip of the branch the repo was opened with, else HEAD", async () => {
+  const stack = mkdtempSync(path.join(os.tmpdir(), "backstory-view-stack-"));
+  after(() => rmSync(stack, { recursive: true, force: true }));
+  const sh = (...a: string[]) =>
+    execFileSync("git", ["-C", stack, ...a], { encoding: "utf8" }).trim();
+  const commit = (file: string, message: string) => {
+    writeFileSync(path.join(stack, file), `${message}\n`);
+    sh("add", "-A");
+    sh("commit", "-qm", message);
+    return sh("rev-parse", "HEAD");
+  };
+  sh("init", "-q", "-b", "main");
+  sh("config", "user.email", "t@example.com");
+  sh("config", "user.name", "T");
+  const fork = commit("base.ts", "Start");
+  sh("checkout", "-qb", "side");
+  const side = commit("side.ts", "Side");
+  sh("checkout", "-q", "main");
+  sh("checkout", "-qb", "checked");
+  const checked = commit("checked.ts", "Checked out");
+
+  assert.deepEqual(await viewRange(await resolveRepo(stack), BRANCH_REV), {
+    base: fork,
+    head: checked,
+  });
+  const reviewing = await resolveRepo(stack, "side");
+  assert.deepEqual(await viewRange(reviewing, BRANCH_REV), {
+    base: fork,
+    head: side,
+  });
+  assert.deepEqual(await viewRange(reviewing, checked), {
+    base: fork,
+    head: checked,
+  });
+
+  assert.equal(await onBranchOnly(reviewing, side), true);
+  assert.equal(await onBranchOnly(reviewing, fork), false);
+  assert.equal(await onBranchOnly(reviewing, checked), false);
 });

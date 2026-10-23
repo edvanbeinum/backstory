@@ -7,8 +7,7 @@ import { test } from "node:test";
 
 import { pickPullRequest } from "../lib/github";
 import { buildInbox } from "../lib/inbox";
-import { countProgress } from "../lib/progress";
-import type { ResponseRecord } from "../lib/responses";
+import { markLooked } from "../lib/looked";
 import {
   githubApiStandIn,
   quietLoginShell,
@@ -19,24 +18,23 @@ import {
 } from "./standins";
 
 quietLoginShell();
+// Strip the user's git config and any `GIT_*` a pre-push hook exported, so
+// git sees only the temp repos it's given.
+for (const key of Object.keys(process.env)) {
+  if (key.startsWith("GIT_")) delete process.env[key];
+}
+process.env.GIT_CONFIG_GLOBAL = "/dev/null";
+process.env.GIT_CONFIG_NOSYSTEM = "1";
 process.env.BACKSTORY_HOME ??= mkdtempSync(
   path.join(os.tmpdir(), "backstory-inbox-"),
 );
-
-const record = (over: Partial<ResponseRecord> = {}): ResponseRecord => ({
-  done: false,
-  doneAt: null,
-  reply: null,
-  commits: [],
-  ...over,
-});
 
 /**
  * Matching a PR on head branch alone reaches into forks. These five are the
  * real ones `headRefName: "trunk"` returns for cli/cli — every contributor who
  * pushed a branch called trunk to their own fork. Without filtering, opening a
  * worktree on `main` would attach a stranger's PR and show their review
- * comments as your checklist.
+ * comments as yours.
  */
 const CLI_TRUNK = [
   {
@@ -125,48 +123,6 @@ test("nothing to pick from is null, not a throw", () => {
   assert.equal(pickPullRequest([], "cli"), null);
 });
 
-test("progress counts threads and review bodies alike", () => {
-  const responses = {
-    t1: record({ done: true }),
-    t2: record({ reply: "drafted, not ticked" }),
-    r1: record({ done: true }),
-  };
-  const progress = countProgress(["t1", "t2", "t3", "r1"], responses);
-  assert.deepEqual(progress, { done: 2, total: 4, truncated: false });
-});
-
-test("a tick on a thread GitHub has since deleted can't inflate the count", () => {
-  // Otherwise `done` could climb past `total` and the meter would overflow.
-  const responses = {
-    gone: record({ done: true }),
-    t1: record({ done: true }),
-  };
-  const progress = countProgress(["t1"], responses);
-  assert.equal(progress.done, 1);
-  assert.equal(progress.total, 1);
-});
-
-test("more threads than one page returned is reported, not hidden", () => {
-  const progress = countProgress(
-    ["t1"],
-    { t1: record({ done: true }) },
-    {
-      reportedTotal: 140,
-    },
-  );
-  assert.equal(progress.total, 140);
-  assert.equal(progress.truncated, true);
-});
-
-test("neither a linked commit nor a draft counts as handled", () => {
-  // The whole point: only the tick means done.
-  const responses = {
-    t1: record({ commits: [{ sha: "abc1234", patchId: null }] }),
-    t2: record({ reply: "Addressed in abc1234" }),
-  };
-  assert.equal(countProgress(["t1", "t2"], responses).done, 0);
-});
-
 /** A repo on branch `feature` whose origin is `acme/<name>` on github.com. */
 function repoOnGitHub(name: string): string {
   const root = mkdtempSync(path.join(os.tmpdir(), "backstory-inbox-repo-"));
@@ -192,31 +148,25 @@ const INBOX_PR = {
   baseRefName: "main",
   isCrossRepository: false,
   headRepositoryOwner: { login: "acme" },
-  reviewThreads: {
-    totalCount: 2,
-    nodes: [
-      { id: "t1", isResolved: false },
-      { id: "t2", isResolved: true },
-    ],
-  },
-  reviews: { nodes: [{ id: "r1", body: "Hi" }] },
 };
 
-/** Answers each branch alias, with the PR for `feature`. */
-const inboxApi = (call: ApiCall): ApiAnswer => ({
-  json: {
-    data: {
-      repository: Object.fromEntries(
-        Object.entries(call.variables)
-          .filter(([key]) => /^b\d+$/.test(key))
-          .map(([key, branch]) => [
-            `w${key.slice(1)}`,
-            { nodes: branch === "feature" ? [INBOX_PR] : [] },
-          ]),
-      ),
+/** Answers each branch alias from `byBranch`, by default the PR for `feature`. */
+const inboxApi =
+  (byBranch: Record<string, object[]> = { feature: [INBOX_PR] }) =>
+  (call: ApiCall): ApiAnswer => ({
+    json: {
+      data: {
+        repository: Object.fromEntries(
+          Object.entries(call.variables)
+            .filter(([key]) => /^b\d+$/.test(key))
+            .map(([key, branch]) => [
+              `w${key.slice(1)}`,
+              { nodes: byBranch[branch as string] ?? [] },
+            ]),
+        ),
+      },
     },
-  },
-});
+  });
 
 /** The inbox on a machine with a saved token, no `gh`, and `answer` for GitHub. */
 async function inboxWithToken(
@@ -246,8 +196,11 @@ async function inboxWithToken(
   }
 }
 
-test("with a saved token and no gh, the inbox counts come from GitHub's API", async () => {
-  const { inbox, calls } = await inboxWithToken(repoOnGitHub("app"), inboxApi);
+test("with a saved token and no gh, the inbox's pull requests come from GitHub's API", async () => {
+  const { inbox, calls } = await inboxWithToken(
+    repoOnGitHub("app"),
+    inboxApi(),
+  );
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0].authorization, "Bearer gho_saved1");
@@ -255,8 +208,172 @@ test("with a saved token and no gh, the inbox counts come from GitHub's API", as
   assert.equal(inbox.repos[0].connect, false);
   const row = inbox.rows.find((r) => r.branch === "feature");
   assert.equal(row?.pr?.number, 7);
-  assert.equal(row?.pr?.unresolved, 1);
-  assert.deepEqual(row?.progress, { done: 0, total: 3, truncated: false });
+  assert.equal("unresolved" in (row?.pr ?? {}), false);
+});
+
+/**
+ * A repo on `main` with one commit, its origin `acme/<name>` on github.com
+ * when named, and helpers to commit and to check out a new branch beside it.
+ */
+function repoOnMain(name: string | null) {
+  const root = mkdtempSync(path.join(os.tmpdir(), "backstory-inbox-main-"));
+  const git = (cwd: string, ...args: string[]) =>
+    execFileSync("git", ["-C", cwd, ...args], { encoding: "utf8" }).trim();
+  git(root, "init", "-q", "-b", "main");
+  git(root, "config", "user.email", "t@example.com");
+  git(root, "config", "user.name", "T");
+  if (name) {
+    git(root, "remote", "add", "origin", `git@github.com:acme/${name}.git`);
+  }
+  const commit = (
+    cwd: string,
+    files: Record<string, string>,
+    at = "2026-10-01T00:00:00Z",
+  ) => {
+    for (const [file, text] of Object.entries(files)) {
+      writeFileSync(path.join(cwd, file), text);
+    }
+    git(cwd, "add", "-A");
+    execFileSync("git", ["-C", cwd, "commit", "-qm", "Change"], {
+      env: { ...process.env, GIT_AUTHOR_DATE: at, GIT_COMMITTER_DATE: at },
+    });
+    return git(cwd, "rev-parse", "HEAD");
+  };
+  const worktree = (branch: string, from = "main") => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "backstory-inbox-wt-"));
+    git(root, "worktree", "add", "-q", "-b", branch, dir, from);
+    return dir;
+  };
+  commit(root, { "a.txt": "a\n" });
+  const commonDir = git(
+    root,
+    "rev-parse",
+    "--path-format=absolute",
+    "--git-common-dir",
+  );
+  return { root, commonDir, commit, worktree };
+}
+
+test("a branch reads as changed until you look at it, and again after a new commit", async () => {
+  const repo = repoOnMain(null);
+  const one = repo.worktree("one");
+  const two = repo.worktree("two");
+  const tip = repo.commit(one, { "one.txt": "1\n" });
+  repo.commit(two, { "two.txt": "2\n" });
+  const changed = async () =>
+    Object.fromEntries(
+      (await buildInbox([repo.root])).rows.map((r) => [r.branch, r.changed]),
+    );
+
+  assert.deepEqual(await changed(), { main: false, one: true, two: true });
+
+  markLooked(repo.commonDir, "one", tip, 5);
+  assert.deepEqual(await changed(), { main: false, one: false, two: true });
+
+  repo.commit(one, { "one.txt": "1\n1\n" });
+  assert.deepEqual(await changed(), { main: false, one: true, two: true });
+});
+
+test("the main checkout on the default branch has nothing to count and never reads as changed", async () => {
+  const repo = repoOnMain(null);
+  repo.commit(repo.root, { "b.txt": "b\n" });
+
+  const main = (await buildInbox([repo.root])).rows.find(
+    (r) => r.branch === "main",
+  );
+  assert.equal(main?.isMain, true);
+  assert.equal(main?.changes, null);
+  assert.equal(main?.changed, false);
+});
+
+test("a branch counts its commits, files and lines from where it left main, not main's own later work", async () => {
+  const repo = repoOnMain(null);
+  const dir = repo.worktree("feature");
+  repo.commit(dir, { "x.txt": "1\n2\n", "y.txt": "y\n" });
+  repo.commit(dir, { "a.txt": "b\n" });
+  repo.commit(repo.root, { "later.txt": "on main\n" });
+
+  const row = (await buildInbox([repo.root])).rows.find(
+    (r) => r.branch === "feature",
+  );
+  assert.deepEqual(row?.changes, {
+    commits: 2,
+    files: 3,
+    additions: 4,
+    deletions: 1,
+  });
+});
+
+test("a stacked branch counts from the branch its PR targets, not main", async () => {
+  const repo = repoOnMain("stacked");
+  const bottom = repo.worktree("bottom");
+  repo.commit(bottom, { "b.txt": "b\n" });
+  const top = repo.worktree("top", "bottom");
+  repo.commit(top, { "t.txt": "t\n" });
+
+  const { inbox } = await inboxWithToken(
+    repo.root,
+    inboxApi({ top: [{ ...INBOX_PR, number: 12, baseRefName: "bottom" }] }),
+  );
+  const changes = (branch: string) =>
+    inbox.rows.find((r) => r.branch === branch)?.changes;
+  assert.deepEqual(changes("top"), {
+    commits: 1,
+    files: 1,
+    additions: 1,
+    deletions: 0,
+  });
+  assert.deepEqual(changes("bottom"), {
+    commits: 1,
+    files: 1,
+    additions: 1,
+    deletions: 0,
+  });
+});
+
+test("changed rows come first, then newest commit first, and merged PRs last", async () => {
+  const repo = repoOnMain("ordered");
+  const early = repo.worktree("early");
+  repo.commit(early, { "e.txt": "e\n" }, "2026-10-02T00:00:00Z");
+  const seen = repo.worktree("seen");
+  const tip = repo.commit(seen, { "s.txt": "s\n" }, "2026-10-04T00:00:00Z");
+  const merged = repo.worktree("merged");
+  repo.commit(merged, { "m.txt": "m\n" }, "2026-10-05T00:00:00Z");
+  const late = repo.worktree("late");
+  repo.commit(late, { "l.txt": "l\n" }, "2026-10-03T00:00:00Z");
+  markLooked(repo.commonDir, "seen", tip);
+
+  const { inbox } = await inboxWithToken(
+    repo.root,
+    inboxApi({
+      seen: [{ ...INBOX_PR, number: 8 }],
+      merged: [{ ...INBOX_PR, number: 9, state: "MERGED" }],
+    }),
+  );
+
+  assert.deepEqual(
+    inbox.rows.map((r) => [r.branch, r.changed]),
+    [
+      ["late", true],
+      ["early", true],
+      ["seen", false],
+      ["main", false],
+      ["merged", false],
+    ],
+  );
+});
+
+test("newest commit first compares times, not the dates' text across UTC offsets", async () => {
+  const repo = repoOnMain(null);
+  const older = repo.worktree("older");
+  repo.commit(older, { "o.txt": "o\n" }, "2026-10-25T01:30:00+01:00");
+  const newer = repo.worktree("newer");
+  repo.commit(newer, { "n.txt": "n\n" }, "2026-10-25T01:10:00+00:00");
+
+  assert.deepEqual(
+    (await buildInbox([repo.root])).rows.map((r) => r.branch).slice(0, 2),
+    ["newer", "older"],
+  );
 });
 
 test("with a refused token and gh signed out, the repo asks to Connect GitHub and still lists its rows", async () => {
@@ -293,7 +410,7 @@ const head = (name: string, committedDate = "2026-10-01T00:00:00Z") => ({
 
 /** The branch aliases as `inboxApi` answers them, plus what On GitHub reads. */
 const onGitHubApi = (call: ApiCall): ApiAnswer => {
-  const answer = inboxApi(call).json as {
+  const answer = inboxApi()(call).json as {
     data: { repository: Record<string, unknown> };
   };
   Object.assign(answer.data.repository, {

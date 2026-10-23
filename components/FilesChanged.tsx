@@ -6,7 +6,7 @@ import { coverage } from "@/lib/flows/coverage";
 import { fileFlows, type StepMark, type StepMarks } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
 import type { MapResponse } from "@/lib/map";
-import { groupByComponent } from "@/lib/mapGroups";
+import { groupByComponent, ownsCode } from "@/lib/mapGroups";
 import type {
   CommitSummary,
   DiffResponse,
@@ -98,7 +98,7 @@ export function FilesChanged({
   filterAsk?: { filter: "yourself"; at: number } | null;
   /** Outline a component on the story's map */
   onShowOnMap: (component: string) => void;
-  /** Each thread's number, in the spine's order, for its gutter mark */
+  /** Each thread's number, oldest first, for its gutter mark */
   commentNumbers: Map<string, number>;
   /** Open a step's gutter mark in the story */
   onStep: (mark: StepMark) => void;
@@ -164,37 +164,36 @@ export function FilesChanged({
 
   const grouped =
     !byPath && map?.status === "ok" && map.nodes.length > 0 ? map : null;
-  // The map can name a component it doesn't draw, such as a container
-  // dropped for a changed component inside it, which has nothing to outline.
-  const drawn = new Set(grouped?.nodes.map((n) => n.name));
+  // Group files only by boxes that own them: a container drawn around a
+  // changed component has nothing of its own to outline.
+  const leaves = grouped?.nodes.filter(ownsCode) ?? [];
+  const drawn = new Set(leaves.map((n) => n.name));
   const sections: DiffSection[] = grouped
-    ? groupByComponent(shownFiles, grouped.fileComponents, grouped.nodes).map(
-        (g) => ({
-          key: g.component ?? "\u0000none",
-          files: g.files,
-          header: (
-            <h4 className="files-group">
-              {g.component ?? "Not on the map"}
-              <small>
-                {g.files.length} {g.files.length === 1 ? "file" : "files"} ·{" "}
-                <span className="text-[var(--success)]">
-                  +{g.files.reduce((n, f) => n + f.additions, 0)}
-                </span>
-              </small>
-              <span className="flex-1" />
-              {g.component && drawn.has(g.component) && (
-                <button
-                  type="button"
-                  onClick={() => onShowOnMap(g.component!)}
-                  className="text-[12px] font-normal text-[var(--accent)] hover:underline"
-                >
-                  On the map
-                </button>
-              )}
-            </h4>
-          ),
-        }),
-      )
+    ? groupByComponent(shownFiles, grouped.fileComponents, leaves).map((g) => ({
+        key: g.component ?? "\u0000none",
+        files: g.files,
+        header: (
+          <h4 className="files-group">
+            {g.component ?? "Not on the map"}
+            <small>
+              {g.files.length} {g.files.length === 1 ? "file" : "files"} ·{" "}
+              <span className="text-[var(--success)]">
+                +{g.files.reduce((n, f) => n + f.additions, 0)}
+              </span>
+            </small>
+            <span className="flex-1" />
+            {g.component && drawn.has(g.component) && (
+              <button
+                type="button"
+                onClick={() => onShowOnMap(g.component!)}
+                className="text-[12px] font-normal text-[var(--accent)] hover:underline"
+              >
+                On the map
+              </button>
+            )}
+          </h4>
+        ),
+      }))
     : [{ key: "all", files: shownFiles }];
 
   const additions = files.reduce((n, f) => n + f.additions, 0);

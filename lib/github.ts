@@ -7,7 +7,6 @@ import type {
   ReviewComment,
   ReviewSummary,
   ReviewThread,
-  ThreadResponse,
 } from "./types";
 
 /**
@@ -19,18 +18,6 @@ import type {
  * throwing, because GitHub is a level up, not a requirement: the commits and
  * diffs still work without it.
  */
-
-/**
- * Threads arrive from GitHub with nothing attached; the session route reads
- * the store and replaces this. Shared and frozen so a stray write can't leak
- * one thread's state onto another.
- */
-export const NO_RESPONSE: ThreadResponse = Object.freeze({
-  done: false,
-  doneAt: null,
-  reply: null,
-  commits: [],
-});
 
 export function gh(cwd: string, args: string[]) {
   return run("gh", args, {
@@ -386,6 +373,7 @@ query($owner: String!, $name: String!, $branch: String!) {
       nodes {
         number
         title
+        body
         url
         state
         isDraft
@@ -521,6 +509,7 @@ export async function loadGitHubData(repo: RepoInfo): Promise<GitHubData> {
 interface PullRequestRow {
   number: number;
   title: string;
+  body?: string | null;
   url: string;
   state: string;
   isDraft: boolean;
@@ -556,6 +545,7 @@ async function findPullRequest(
   return {
     number: chosen.number,
     title: chosen.title,
+    body: chosen.body ?? "",
     url: chosen.url,
     state: chosen.state,
     isDraft: chosen.isDraft,
@@ -585,7 +575,7 @@ async function listPullRequestsWithGh(
     "--limit",
     "10",
     "--json",
-    "number,title,url,state,isDraft,baseRefName,headRefName,author,isCrossRepository,headRepositoryOwner",
+    "number,title,body,url,state,isDraft,baseRefName,headRefName,author,isCrossRepository,headRepositoryOwner",
   ]);
   return JSON.parse(stdout || "[]") as PullRequestRow[];
 }
@@ -617,8 +607,6 @@ async function loadThreads(repo: RepoInfo, number: number) {
       originalLine: node.originalLine,
       startLine: node.startLine,
       side: node.diffSide,
-      // Filled in by the session route, which is where the store is read.
-      response: NO_RESPONSE,
       comments: node.comments.nodes.map((c): ReviewComment => ({
         id: c.id,
         databaseId: c.databaseId,
@@ -698,7 +686,7 @@ export function describeGhError(err: unknown): {
  * trunk to their own fork — measured against cli/cli, five of them, all
  * `isCrossRepository`. Without this, opening a worktree sitting on `main` or
  * `master` would attach a stranger's pull request and present their review
- * comments as your checklist.
+ * comments as yours.
  *
  * Shared by the workspace and the inbox on purpose. If they picked
  * differently the home screen's counts would describe a different PR from the
