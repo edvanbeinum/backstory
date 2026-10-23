@@ -1728,16 +1728,6 @@ tr.step-code-target td.diff-num {
   font-size: 12px;
   color: var(--fg-muted);
 }
-/* The map stays a glance above the stop: past a third of the window it
-   scrolls inside itself. */
-.walk-map {
-  max-height: 34vh;
-  margin-top: 8px;
-  overflow-y: auto;
-}
-.walk-map .map-key {
-  display: none;
-}
 .walk-stop {
   padding-top: 12px;
 }

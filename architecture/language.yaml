@@ -33,7 +33,7 @@ terms:
     avoid:
       - strip, for the map or the data model's summary
   - name: walk
-    means: "Story as it opens: the change one stop at a time under a pinned bar and map, which outlines the component the walk is on (`lib/walk.ts`, `components/Walk.tsx`). `stop=` in the URL names the stop, and `walk=0` opens Story on one page. The UI never says walk: it offers Walk me through it and Show everything on one page."
+    means: "Story as it opens: the change one stop at a time under a pinned bar, with the map on each component stop outlining it (`lib/walk.ts`, `components/Walk.tsx`). `stop=` in the URL names the stop, and `walk=0` opens Story on one page. The UI never says walk: it offers Walk me through it and Show everything on one page."
     avoid:
       - tour (reads as an app's onboarding tour)
   - name: stop

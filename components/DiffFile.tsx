@@ -255,8 +255,8 @@ export function DiffFile({
       // rounded per-edge instead.
       className="rounded-md border border-[var(--border)] bg-[var(--canvas)]"
       // Jump targets must clear the sticky app bar, and in Story's walk the
-      // pinned bar and map under it, or a jump lands the section header
-      // underneath them.
+      // pinned bar under it, or a jump lands the section header underneath
+      // them.
       style={{
         scrollMarginTop:
           "calc(var(--header-height, 0px) + var(--walk-top, 0px) + 8px)",

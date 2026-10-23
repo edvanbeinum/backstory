@@ -24,9 +24,10 @@ import { StopView, WalkBar } from "./Walk";
 
 /**
  * The tab every view lands on. It opens as a walk through the change, one
- * stop at a time under the pinned map: an overview with the description,
- * the data model when it changed, each changed component in the map's
- * order, the files no component has, and a finish with your notes. Show
+ * stop at a time under a pinned bar: an overview with the description and
+ * the map, the data model when it changed, each changed component in the
+ * map's order with the map outlining it, the files no component has, and a
+ * finish with your notes. Show
  * everything on one page reads it top to bottom instead: the description,
  * the map at the column's width with a line of what it says, then each flow
  * as a card. The code is a click away from any step.
@@ -165,8 +166,8 @@ export function Story({
     if (pickedAt !== -1 && pickedAt + 1 !== stop) onStop(pickedAt + 1);
   }, [pickedAt, stop, onStop]);
 
-  // The file headers in a stop stick under the pinned bar and map, so they
-  // need its height.
+  // The file headers in a stop stick under the pinned bar, so they need its
+  // height.
   const topRef = useRef<HTMLDivElement>(null);
   const [topHeight, setTopHeight] = useState(0);
   useEffect(() => {
@@ -254,9 +255,6 @@ export function Story({
     </SystemMap>
   );
 
-  // Pin the map from the first component on; the overview has none to
-  // outline, so it reads the description first with the map under it.
-  const pinMap = rev !== WORKING_REV && current.kind !== "overview";
   if (walk)
     return (
       <div className="pt-1">
@@ -268,7 +266,6 @@ export function Story({
             onGo={go}
             onLeave={() => onWalk(false)}
           />
-          {pinMap && <div className="walk-map">{mapSection(true)}</div>}
         </div>
         <div
           className="walk-stop"
@@ -285,6 +282,7 @@ export function Story({
                 {rev !== WORKING_REV && mapSection(true)}
               </>
             }
+            map={rev !== WORKING_REV ? mapSection(true) : null}
             data={data}
             entityNotes={entityNotes}
             renderFiles={renderFiles}

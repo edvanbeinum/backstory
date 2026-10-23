@@ -145,6 +145,7 @@ export function StopView({
   index,
   seen,
   overview,
+  map,
   data,
   entityNotes,
   renderFiles,
@@ -157,6 +158,8 @@ export function StopView({
   seen: Set<string>;
   /** The change description with the map under it, for the overview */
   overview: React.ReactNode;
+  /** The map, outlining the component a stop is on */
+  map: React.ReactNode;
   data: DataResponse | null;
   entityNotes: Map<string, string[]>;
   /** The files as Files changed draws them, taking line notes */
@@ -230,6 +233,7 @@ export function StopView({
               ))}
             </p>
           )}
+          {map}
           {onNote && <NoteFor name={stop.node.name} onNote={onNote} />}
           {renderFiles(stop.files)}
         </section>

@@ -71,8 +71,7 @@ your uncommitted work, or any one commit on it. It opens on your uncommitted
 work when there is some, and on the whole branch otherwise. Under the header are
 three tabs, as on a pull request, and every change opens on the first:
 
-- **Story** walks you through the change one part at a time, with the map
-  pinned above each component (see [Walking through a change](#walking-through-a-change)).
+- **Story** walks you through the change one part at a time (see [Walking through a change](#walking-through-a-change)).
   **Show everything on one page** shows it all at once instead: a few sentences
   on the change, the map at full width, a line under it saying what it shows,
   then each flow as a card. Before a change is traced, one card in place of the
@@ -102,7 +101,7 @@ Story opens on the change's overview, then takes you through it in order:
 2. **Data model**, when the change touches it: the changed entities as cards.
 3. **Each changed component**, in the map's order, top to bottom and left to
    right: what the change does in it, the flow steps its files are on as
-   `⇄ 1·3` chips, and its files with their diffs. Leave line notes on them as
+   `⇄ 1·3` chips, the map outlining it, and its files with their diffs. Leave line notes on them as
    in Files changed, or **+ Note for the agent** for a note on the component as
    a whole, which starts "On" and its name.
 4. **Not on the map**: the files no component has, such as tests.
@@ -112,7 +111,7 @@ Story opens on the change's overview, then takes you through it in order:
 The bar at the top says where you are, as "3 of 6 · Sync Engine", with a dot
 for each part and how many of the change's files you've seen. `j` and `k`, or
 **‹** and **›**, move between the parts, and clicking a changed component on
-the map goes to its part. The map outlines the component you're on and its
+the map goes to its part. On each component, the map outlines it and its
 arrows. A flow step's chip, or a link from Files changed or Comments to a step,
 opens it on **Show everything on one page**.
 
