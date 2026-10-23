@@ -116,6 +116,11 @@ export function layeredLayout<N extends { id: string }>(
   return { placed, height: y - o.rowGap + o.pad };
 }
 
+export interface Around {
+  boxes: Box[];
+  clearance: number;
+}
+
 /**
  * Boxes inside boxes, for the map's C4 view: each level is a
  * `layeredLayout`, and a group's children are laid out inside it, below its
@@ -227,7 +232,10 @@ export function nestedLayout<
 
 /**
  * An arrow from one box to another, leaving and arriving at evenly spread
- * points along the facing edges, so several arrows don't stack.
+ * points along the facing edges, so several arrows don't stack. Given
+ * `around`, an arrow that spans rows steps aside of each box between its
+ * ends, `clearance` past the box's edge, and puts its label in the gap
+ * above its destination, so it never runs behind a card or labels a field.
  */
 export function edgePath(
   a: Box,
@@ -236,29 +244,13 @@ export function edgePath(
   an: number,
   bi: number,
   bn: number,
+  around?: Around,
 ) {
   const ax = a.x + (a.w * (ai + 1)) / (an + 1);
   const bx = b.x + (b.w * (bi + 1)) / (bn + 1);
-  if (b.y > a.y + a.h / 2) {
-    const y1 = a.y + a.h;
-    const y2 = b.y;
-    const mid = (y1 + y2) / 2;
-    return {
-      d: `M${ax} ${y1} C${ax} ${mid} ${bx} ${mid} ${bx} ${y2 - 1}`,
-      lx: (ax + bx) / 2,
-      ly: mid,
-    };
-  }
-  if (b.y + b.h < a.y + a.h / 2) {
-    const y1 = a.y;
-    const y2 = b.y + b.h;
-    const mid = (y1 + y2) / 2;
-    return {
-      d: `M${ax} ${y1} C${ax} ${mid} ${bx} ${mid} ${bx} ${y2 + 1}`,
-      lx: (ax + bx) / 2,
-      ly: mid,
-    };
-  }
+  if (b.y > a.y + a.h / 2) return descend(ax, a.y + a.h, bx, b.y, around, 1);
+  if (b.y + b.h < a.y + a.h / 2)
+    return descend(ax, -a.y, bx, -(b.y + b.h), around, -1);
   // Same row: loop underneath.
   const y1 = a.y + a.h;
   const y2 = b.y + b.h;
@@ -268,4 +260,71 @@ export function edgePath(
     lx: (ax + bx) / 2,
     ly: dip - 6,
   };
+}
+
+/**
+ * Routes an arrow downward from (ax, y1) to (bx, y2) as vertical runs joined
+ * by S-curves, each curve bending in the gap above the next box it steps
+ * around. `flip` -1 mirrors an upward arrow into this frame: the caller
+ * passes negated ys and every point negates back on the way out.
+ */
+function descend(
+  ax: number,
+  y1: number,
+  bx: number,
+  y2: number,
+  around: Around | undefined,
+  flip: 1 | -1,
+) {
+  const boxes = (around?.boxes ?? []).map((c) =>
+    flip === 1 ? c : { ...c, y: -(c.y + c.h) },
+  );
+  const inWay = boxes
+    .filter((c) => c.y >= y1 && c.y + c.h <= y2)
+    .sort((p, q) => p.y - q.y);
+  const clearance = around?.clearance ?? 0;
+  const at = (x: number, y: number) => `${x} ${flip * y}`;
+
+  let x = ax;
+  let y = y1;
+  let d = `M${at(ax, y1)}`;
+  // Bend in the gap just above `top`, clear of every box the curve sweeps
+  // across: below those ending above it and above those starting in it. A
+  // taller card beside either end reaches into that gap, so the bend can't
+  // be measured from the end's own box.
+  const curve = (nx: number, top: number, end: number) => {
+    const across = boxes.filter(
+      (c) => c.x < Math.max(x, nx) && c.x + c.w > Math.min(x, nx),
+    );
+    const from = Math.max(
+      y1,
+      ...inWay.map((c) => c.y + c.h).filter((bottom) => bottom <= top),
+      ...across.map((c) => c.y + c.h).filter((bottom) => bottom <= top),
+    );
+    const to = Math.min(
+      top,
+      ...across.map((c) => c.y).filter((t) => t >= from),
+    );
+    if (from > y) d += ` L${at(x, from)}`;
+    const mid = (from + to) / 2;
+    d += ` C${at(x, mid)} ${at(nx, mid)} ${at(nx, Math.min(to, end))}`;
+    if (end > to) d += ` L${at(nx, end)}`;
+    x = nx;
+    return mid;
+  };
+
+  for (const c of inWay) {
+    const left = c.x - clearance;
+    const right = c.x + c.w + clearance;
+    // Treat a run on the edge of a card's clearance, give or take rounding, as
+    // clear of it: the middle of a column gap is that edge for the cards on
+    // both sides, and a run stepped into one row's gap lands on it in the next.
+    if (c.y < y || x <= left + 1e-6 || x >= right - 1e-6) continue;
+    curve(Math.abs(left - bx) <= Math.abs(right - bx) ? left : right, c.y, c.y);
+    y = c.y + c.h;
+    d += ` L${at(x, y)}`;
+  }
+  const lx = (x + bx) / 2;
+  const mid = curve(bx, y2, y2 - 1);
+  return { d, lx, ly: flip * mid };
 }

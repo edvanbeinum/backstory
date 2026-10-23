@@ -26,6 +26,8 @@ import { Elapsed, setAutoReading } from "./SystemMap";
 import { Badge, Button, Spinner } from "./ui";
 import { useView } from "./ViewContext";
 
+const COL_GAP = 22;
+
 /**
  * The data model's change: a phrase on the line under the map, opening the
  * changed entities beneath it as cards that diff like code. Between the
@@ -343,7 +345,7 @@ function DataGraph({
           minW: 220,
           maxW: 300,
           rowGap: 64,
-          colGap: 22,
+          colGap: COL_GAP,
           pad: 12,
         },
       ),
@@ -384,6 +386,7 @@ function DataGraph({
     }
     return { out, inn };
   }, [edges, placed]);
+  const around = { boxes: [...placed.values()], clearance: COL_GAP / 2 };
 
   const route = (e: DataEdge) => {
     const a = placed.get(e.source);
@@ -398,6 +401,7 @@ function DataGraph({
       outs.length,
       ins.indexOf(e.key),
       ins.length,
+      around,
     );
   };
 

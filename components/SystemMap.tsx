@@ -159,6 +159,7 @@ function MapCanvas({
     }
     return { out, inn };
   }, [edges, placed]);
+  const around = { boxes: [...placed.values()], clearance: COL_GAP / 2 };
 
   return (
     <div className="map-canvas" style={{ height }}>
@@ -238,6 +239,7 @@ function MapCanvas({
             outs.length,
             ins.indexOf(e.key),
             ins.length,
+            around,
           );
           const kind =
             e.state === "added"
@@ -279,6 +281,7 @@ function MapCanvas({
           outs.length,
           ins.indexOf(e.key),
           ins.length,
+          around,
         );
         return (
           <div

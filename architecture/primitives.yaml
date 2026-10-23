@@ -222,4 +222,4 @@ primitives:
       - layeredLayout
       - nestedLayout
       - edgePath
-    use: "Lays out and draws the map and data diagrams. `nestedLayout` lays out boxes inside boxes, so the map draws components inside their containers and containers inside their systems."
+    use: "Lays out and draws the map and data diagrams. `nestedLayout` lays out boxes inside boxes, so the map draws components inside their containers and containers inside their systems. `edgePath` routes an arrow around the boxes between its ends."
