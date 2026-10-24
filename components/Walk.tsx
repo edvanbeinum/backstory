@@ -15,7 +15,7 @@ import { Button, Ticked } from "./ui";
  * it's on. The UI says neither "walk" nor "stop": the bar reads "3 of 6".
  */
 
-export function stopName(stop: Stop): string {
+function stopName(stop: Stop): string {
   switch (stop.kind) {
     case "overview":
       return "Overview";

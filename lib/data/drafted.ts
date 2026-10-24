@@ -93,7 +93,7 @@ export const headSchema = () => ({
   },
 });
 
-export const deltaSchema = () => ({
+const deltaSchema = () => ({
   type: "object",
   additionalProperties: false,
   required: ["changed", "absent"],
@@ -127,7 +127,7 @@ Be precise and complete for the records that are stored; leave out everything el
 
 // Steer the delta as the model it starts from was steered: unsteered, it can
 // report a record from outside the files, an entity the start never had.
-export const deltaPrompt = (
+const deltaPrompt = (
   from: DraftedHead,
   patch: string,
   files: string[] | null = null,

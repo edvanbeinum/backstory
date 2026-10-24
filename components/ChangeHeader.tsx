@@ -13,7 +13,7 @@ import { CommitHeader } from "./CommitHeader";
 import { CommitPicker } from "./CommitPicker";
 import { FileDiffIcon, GitCommitIcon, PencilIcon } from "./icons";
 
-export interface ChangeOption {
+interface ChangeOption {
   rev: string;
   label: string;
   hint: string;
@@ -27,7 +27,7 @@ export interface ChangeOption {
  * where you are when you check a comment mid-fix, and it's the one thing a
  * commit-only view can never show.
  */
-export function changesFor(
+function changesFor(
   thread: ReviewThread | null,
   session: SessionResponse,
 ): ChangeOption[] {

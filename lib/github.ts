@@ -157,7 +157,7 @@ class GitHubOffline extends Error {}
  * refused one, and `gh` missing or signed out. The fix is Connect GitHub. The
  * message is short because the page puts a Connect GitHub link after it.
  */
-export class GitHubConnectError extends Error {
+class GitHubConnectError extends Error {
   constructor() {
     super("GitHub isn't connected.");
     this.name = "GitHubConnectError";

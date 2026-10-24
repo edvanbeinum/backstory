@@ -44,7 +44,7 @@ export interface MapDelta {
 const strings = { type: "array", items: { type: "string" } };
 const stringsOrNull = { type: ["array", "null"], items: { type: "string" } };
 
-export const mapDeltaSchema = () => ({
+const mapDeltaSchema = () => ({
   type: "object",
   additionalProperties: false,
   required: ["changed", "absent", "arrows", "absentArrows", "tests", "ignore"],
@@ -115,7 +115,7 @@ function startJson(from: Workspace) {
   };
 }
 
-export const mapDeltaPrompt = (from: Workspace, patch: string) =>
+const mapDeltaPrompt = (from: Workspace, patch: string) =>
   `You are reading the code of one commit of a repository, in the current directory. Read files with Read, Grep and Glob. Don't modify anything.
 
 Below is a C4 model of another commit of this repository, and the patch from that commit to this one. Work out THIS commit's model by applying what the patch changes in the system's structure to the model below. Return only the difference:

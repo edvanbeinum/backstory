@@ -8,7 +8,7 @@ import type { FlowHunk, FlowSet } from "./types";
  * zero-context hunk that Claude placed on a flow.
  */
 
-export interface ViewHunk {
+interface ViewHunk {
   file: string;
   /** The first changed line, for jumping to it */
   line: number;

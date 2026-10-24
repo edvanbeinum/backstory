@@ -7,7 +7,7 @@ import type { Flow, FlowHunk, FlowSet, FlowStep } from "./types";
  */
 
 export type FlowMode = "diff" | "before" | "after";
-export type RowKind = "ctx" | "add" | "del";
+type RowKind = "ctx" | "add" | "del";
 
 export interface FlowRow {
   key: string;

@@ -14,9 +14,9 @@ import { randomUUID } from "node:crypto";
  * the route that opens a request and the one that answers it must share it.
  */
 
-export type ReviewState = "waiting" | "answered" | "dismissed" | "superseded";
+type ReviewState = "waiting" | "answered" | "dismissed" | "superseded";
 
-export interface ReviewRequest {
+interface ReviewRequest {
   id: string;
   root: string;
   createdAt: number;
@@ -94,7 +94,7 @@ export function openReview(root: string): ReviewRequest {
   return request;
 }
 
-export function getReview(id: string): ReviewRequest | null {
+function getReview(id: string): ReviewRequest | null {
   prune();
   return registry.requests.get(id) ?? null;
 }

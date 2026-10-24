@@ -10,7 +10,7 @@ import type { CommitSummary } from "./types";
  * statically prerendered client component, and `useSearchParams` would drag it
  * into a Suspense boundary for no benefit here.
  */
-export interface UrlState {
+interface UrlState {
   repo: string | null;
   /**
    * A branch to review instead of whatever the worktree has checked out.
@@ -178,7 +178,7 @@ export function resolveComment(
     : null;
 }
 
-export interface RevResolution {
+interface RevResolution {
   rev: string;
   /** The rev that was asked for but isn't available, if any. */
   notice: string | null;

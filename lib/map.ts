@@ -28,8 +28,8 @@ import {
  * compared like a committed one, base with head.
  */
 
-export type NodeState = "touched" | "added" | "removed" | "neighbour";
-export type EdgeState = "added" | "removed" | "changed" | "same";
+type NodeState = "touched" | "added" | "removed" | "neighbour";
+type EdgeState = "added" | "removed" | "changed" | "same";
 
 export interface MapNode {
   id: string;

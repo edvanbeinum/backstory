@@ -39,7 +39,7 @@ import type { Flow, FlowParticipant, FlowSet, FlowStep } from "./types";
 /** git's empty tree, the base of a repository's first commit. */
 const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
-export interface GenerateOptions {
+interface GenerateOptions {
   root: string;
   base: string | null;
   head: string;

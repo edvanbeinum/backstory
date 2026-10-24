@@ -167,7 +167,7 @@ function finalize(file: DiffFile): DiffFile {
   return file;
 }
 
-export interface ParseOptions {
+interface ParseOptions {
   /**
    * Stop keeping line content past this many lines in a single file. The file
    * still appears with its stats, flagged `truncated`, so a 40k-line generated

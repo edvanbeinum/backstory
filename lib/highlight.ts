@@ -11,7 +11,7 @@ const LIGHT = "github-light";
 const DARK = "github-dark";
 
 /** Above this many diff lines in one request, ship plain text and stay fast. */
-export const MAX_HIGHLIGHT_LINES = 8_000;
+const MAX_HIGHLIGHT_LINES = 8_000;
 
 /**
  * The whole-file view is one file fetched on demand, so it can afford a higher
@@ -51,7 +51,7 @@ async function ensureLang(lang: string): Promise<boolean> {
   }
 }
 
-export function escapeHtml(text: string): string {
+function escapeHtml(text: string): string {
   return text
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

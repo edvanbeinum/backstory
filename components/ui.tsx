@@ -184,7 +184,7 @@ const UNITS: Array<[number, Intl.RelativeTimeFormatUnit]> = [
   [Number.POSITIVE_INFINITY, "year"],
 ];
 
-export function relativeTime(iso: string): string {
+function relativeTime(iso: string): string {
   const then = new Date(iso).getTime();
   if (Number.isNaN(then)) return "";
 

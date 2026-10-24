@@ -105,7 +105,7 @@ export function refreshLoginShellDirs(): Promise<string[]> {
   return loginDirs();
 }
 
-export interface ExecResult {
+interface ExecResult {
   stdout: string;
   stderr: string;
   code: number;

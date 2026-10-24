@@ -30,7 +30,7 @@ export interface ModelElement {
   globs: string[];
 }
 
-export interface ModelRelationship {
+interface ModelRelationship {
   /** "source → destination", by identifier */
   key: string;
   source: string;
@@ -207,11 +207,11 @@ export async function localModelFile(root: string): Promise<string> {
  * day it was drafted. A local model with it is skipped: the drafted map
  * replaced it. One whose property was taken off counts as hand-written.
  */
-export const DRAFTED_PROPERTY = "backstory.drafted";
+const DRAFTED_PROPERTY = "backstory.drafted";
 
 export type ModelSource = "committed" | "local" | "drafted";
 
-export interface ModelRead {
+interface ModelRead {
   /** Null when the file is there but couldn't be read: see `error` */
   model: Model | null;
   source: ModelSource;

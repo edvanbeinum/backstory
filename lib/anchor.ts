@@ -1,6 +1,6 @@
 import type { DiffFile, ReviewThread } from "./types";
 
-export interface AnchoredThreads {
+interface AnchoredThreads {
   /** New-side line number → threads that belong on it */
   byNewLine: Map<number, ReviewThread[]>;
   /** Old-side line number → threads that belong on it */

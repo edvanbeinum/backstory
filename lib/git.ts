@@ -647,7 +647,7 @@ export async function getRangePatch(
   return out ?? "";
 }
 
-export function commitUrl(repo: RepoInfo, sha: string): string | null {
+function commitUrl(repo: RepoInfo, sha: string): string | null {
   if (!repo.owner || !repo.name) return null;
   return `https://github.com/${repo.owner}/${repo.name}/commit/${sha}`;
 }
@@ -721,7 +721,7 @@ export async function isMergeCommit(
   return out.trim().split(/\s+/).length > 2;
 }
 
-export interface PatchOptions {
+interface PatchOptions {
   /**
    * Lines of context around each change. The default of 3 is git's own.
    * FULL_CONTEXT turns the patch into the entire file as a single hunk, which

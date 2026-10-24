@@ -10,7 +10,7 @@ import type { DiffFile, Note } from "./types";
  * don't need a store.
  */
 
-export interface AnchoredNotes {
+interface AnchoredNotes {
   /** New-side line number → notes on it, where the note's line is now */
   byNewLine: Map<number, Note[]>;
   byOldLine: Map<number, Note[]>;
@@ -97,7 +97,7 @@ export interface NoteCommit {
 }
 
 /** What the formatter knows about the changes the notes were left on. */
-export interface FeedbackContext {
+interface FeedbackContext {
   /**
    * Diffs by rev, for finding where a note's line is now. A commit's needn't
    * be here — its lines can't move — but uncommitted work and the branch
