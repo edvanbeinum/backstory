@@ -634,8 +634,8 @@ export function useMapDraft(
   // With reading turned on, a view with no map yet, or with a drafted head
   // but no base to compare it with, starts its read on open. It starts once
   // until the view's read status changes: a read that fails or can't run
-  // stays that way, while the branch view, whose rev stays "branch" as HEAD
-  // moves, reads again once its new head needs it.
+  // stays that way, while the branch view and uncommitted work, whose revs
+  // stay the same as HEAD moves, read again once their new head needs it.
   const autoStart =
     !map?.error &&
     (map?.status === "none" || (map?.source === "drafted" && !map.baseModel)) &&
