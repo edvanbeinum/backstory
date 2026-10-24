@@ -76,6 +76,34 @@ git config core.hooksPath .githooks
 This sets the hooks path for this repo only, so it overrides any global
 `core.hooksPath` you have here. `git push --no-verify` skips the hook once.
 
+## Update the site's demo
+
+[stopreadingdiffs.com/demo](https://stopreadingdiffs.com/demo/) is Backstory's
+own page, bundled from `app/page.tsx` and answered from a recording of pull
+request #117 in `demo/pr-117.json`. The site's workflow rebuilds it whenever the
+app changes. Record it again when a route's answer changes shape:
+
+1. Run Backstory from a checkout, as above.
+2. Check out the pull request's branch in a worktree of its own:
+
+   ```sh
+   git fetch origin refs/pull/117/head
+   git worktree add ../backstory-117 -b edvanbeinum/inbox-changes-waiting-108 FETCH_HEAD
+   ```
+
+3. Record it. The script opens the change, traces it if it isn't traced yet,
+   and clicks every step and part:
+
+   ```sh
+   npm run demo:record -- http://127.0.0.1:3000 ../backstory-117 demo/pr-117.json
+   ```
+
+4. Build the demo and open `site/demo/index.html` through a local web server:
+
+   ```sh
+   npm run demo:build
+   ```
+
 ## Find your way around the code
 
 `architecture/language.yaml` lists Backstory's building blocks: what each one
