@@ -79,7 +79,7 @@ terms:
     avoid:
       - draft alone, for the model
   - name: drafted map
-    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off (Turn off in Story's footnote), or on a click (Draw the map). Draw the map again, in Story's footnote, reads main in full again."
+    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off (Turn off in Story's footnote), or on a click (Draw the map). With the repo turned off, the map card also has Read automatically, since the footnote only shows once something was drawn. Draw the map again, in Story's footnote, reads main in full again."
     avoid:
       - local model, for a drafted map
   - name: main's map

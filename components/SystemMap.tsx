@@ -667,19 +667,50 @@ const offered = (map: MapResponse) =>
   map.draft?.status === "idle" ? !map.draft.auto : map.draft?.status === "done";
 
 /**
- * Where the map goes before there is one: with the repo turned off, the one
- * button that draws it; otherwise empty, since Story's progress line says
- * what is happening.
+ * Where the map goes before there is one: with the repo turned off, the
+ * button that draws it and the repo's switch, since the footnote that also
+ * has the switch only shows once something was drawn; otherwise empty, since
+ * Story's progress line says what is happening.
  */
-function DraftOffer({ draft }: { draft: MapDraftApi }) {
+function DraftOffer({
+  draft,
+  onSetAuto,
+}: {
+  draft: MapDraftApi;
+  onSetAuto?: (on: boolean) => Promise<void>;
+}) {
+  const [switchError, setSwitchError] = useState<string | null>(null);
   if (!draft.map || !offered(draft.map))
     return <div className="story-card map-pending" />;
   return (
     <div className="story-card">
       <h3>The map hasn&apos;t been drawn yet</h3>
-      <Button variant="primary" onClick={() => draft.start()}>
-        Draw the map
-      </Button>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="primary" onClick={() => draft.start()}>
+          Draw the map
+        </Button>
+        {onSetAuto && (
+          <Button
+            onClick={() =>
+              onSetAuto(true).then(
+                () => setSwitchError(null),
+                (err: unknown) =>
+                  setSwitchError(
+                    err instanceof Error ? err.message : String(err),
+                  ),
+              )
+            }
+          >
+            Read automatically
+          </Button>
+        )}
+      </div>
+      {switchError && (
+        <p className="mt-2 flex items-center gap-1 text-[12px] text-[var(--attention)]">
+          <AlertIcon size={11} /> Couldn&apos;t turn on:{" "}
+          <Ticked text={switchError} />
+        </p>
+      )}
     </div>
   );
 }
@@ -745,10 +776,13 @@ export function SystemMap({
   onPickNode,
   onOrder,
   onOpenFile,
+  onSetAuto,
   children,
 }: {
   /** The view's map and its read, from `useMapDraft` */
   draft: MapDraftApi;
+  /** The repo's switch for reading as it opens, from `useDescription` */
+  onSetAuto?: (on: boolean) => Promise<void>;
   repo: string;
   rev: string;
   /** A component to outline, asked for from Files changed */
@@ -797,7 +831,7 @@ export function SystemMap({
     return (
       <>
         {offer ? (
-          <DraftOffer draft={draft} />
+          <DraftOffer draft={draft} onSetAuto={onSetAuto} />
         ) : (
           <div className="story-line">
             {map.error ? (

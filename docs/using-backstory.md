@@ -188,7 +188,8 @@ before reading its lines:
     repo, or to `~/.backstory/models/`.
   - Opening a repo starts the read of main's map, and opening a view on Story
     starts the view's read. For a repo you turned off, **Draw the map** where
-    the map goes reads one view.
+    the map goes reads one view, and **Read automatically** beside it turns
+    reading back on.
   - The map draws each component inside its container's box, and each
     container inside its system's box. An arrow ends at the box the model
     names, so an arrow to a container meets the container's edge.

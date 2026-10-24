@@ -248,6 +248,7 @@ export function Story({
   const mapSection = (focused: boolean, withData = true) => (
     <SystemMap
       draft={mapDraft}
+      onSetAuto={describes?.setAuto}
       repo={repo}
       rev={rev}
       highlight={mapHighlight}
