@@ -652,28 +652,11 @@ export function useMapDraft(
     void request("POST");
   }, [autoStart, viewId, request]);
 
-  const setAuto = useCallback(
-    async (on: boolean) => {
-      try {
-        await setAutoReading(repo, on);
-        onReadRef.current();
-      } catch (err) {
-        setError({
-          over: given,
-          message: err instanceof Error ? err.message : String(err),
-        });
-      }
-    },
-    [repo, given],
-  );
-
   return {
     map,
     error: error?.over === given ? error.message : null,
     start: (redraft = false) => void request("POST", redraft),
     retry: () => void request("POST", lastRedraft.current),
-    turnOn: () => void setAuto(true),
-    turnOff: () => void setAuto(false),
   };
 }
 
