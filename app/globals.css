@@ -1660,6 +1660,10 @@ tr.step-code-target td.diff-num {
   font-size: 12px;
   color: var(--fg-muted);
 }
+/* Hide the line when the data model's summary has nothing to say. */
+.story-line:empty {
+  display: none;
+}
 .story-line b {
   font-weight: 600;
   color: var(--fg);
