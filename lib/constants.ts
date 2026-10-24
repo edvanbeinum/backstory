@@ -20,6 +20,13 @@ export const DRAWS_WITH_CLAUDE_CODE =
   "Backstory draws each repo's map, data model and flows with Claude Code, through your own Claude Code login.";
 
 /**
+ * The tracked-file count from which a repo is big: its first read takes
+ * minutes, so Story and the inbox say so. Counted rather than measured in
+ * bytes, which would mean reading every blob before anything runs.
+ */
+export const BIG_REPO_FILES = 5000;
+
+/**
  * Backstory's OAuth App on GitHub, with Device Flow on. Safe to ship: the
  * device flow needs no client secret.
  */

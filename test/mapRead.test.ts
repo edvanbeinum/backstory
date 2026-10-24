@@ -16,6 +16,7 @@ import { after, test } from "node:test";
 
 import * as mapRoute from "../app/api/map/route";
 import type { Runner } from "../lib/ai/provider";
+import { BIG_REPO_FILES } from "../lib/constants";
 import { setAutoRead } from "../lib/data/cache";
 import { repoKey } from "../lib/git";
 import { buildMap } from "../lib/map";
@@ -24,6 +25,7 @@ import {
   mapReadSettled,
   mapStatus,
   mapTrunkReadSettled,
+  mapTrunkStatus,
   PHASES,
   startMapRead,
   startMapTrunkRead,
@@ -792,10 +794,10 @@ test("a view queued behind main's read shows main's phase, and fails with it", a
   await startMapRead(view, { runner: failing.runner, status: ready });
   await reading;
   const waiting = await mapStatus(view);
-  assert.equal(waiting.status, "running");
-  assert.equal(waiting.status === "running" && waiting.phase, PHASES.firstMain);
-
   open();
+  assert.equal(waiting.status, "running");
+  assert.equal(waiting.status === "running" && waiting.phase, PHASES.main);
+
   await mapTrunkReadSettled(repo.root);
   await mapReadSettled(view);
   assert.deepEqual(failing.calls, ["full"]);
@@ -805,6 +807,136 @@ test("a view queued behind main's read shows main's phase, and fails with it", a
   });
   const dir = await mapsFolder(repo.root);
   assert.deepEqual(existsSync(dir) ? readdirSync(dir) : [], []);
+});
+
+test("a view's read says which of its trees it is on, with main's read first while it waits on main", async () => {
+  const repo = mainRepo();
+  const base = repo.commit({ "src/app/basket.ts": "1\n" }, "Basket");
+  const head = repo.commit({ "src/app/total.ts": "1\n" }, "Total");
+  const view = { root: repo.root, base, head };
+
+  let open = () => {};
+  const gate = new Promise<void>((resolve) => (open = resolve));
+  let entered = () => {};
+  const reading = new Promise<void>((resolve) => (entered = resolve));
+  const main = recorder();
+  const gated: Runner = async <T>(
+    prompt: string,
+    schema: object,
+    cwd: string,
+  ) => {
+    entered();
+    await gate;
+    return main.runner<T>(prompt, schema, cwd);
+  };
+  const steps: unknown[] = [];
+  const ai = recorder();
+  const stepping: Runner = async <T>(
+    prompt: string,
+    schema: object,
+    cwd: string,
+  ) => {
+    const status = await mapStatus(view);
+    steps.push(status.status === "running" && status.step);
+    return ai.runner<T>(prompt, schema, cwd);
+  };
+
+  assert.equal(await mapTrunkStatus(repo.root), null);
+  assert.equal(
+    await startMapTrunkRead(repo.root, { runner: gated, status: ready }),
+    true,
+  );
+  await startMapRead(view, { runner: stepping, status: ready });
+  await reading;
+  const waiting = await mapStatus(view);
+  const trunkRead = await mapTrunkStatus(repo.root);
+  open();
+  assert.deepEqual(
+    waiting.status === "running" && [waiting.phase, waiting.step],
+    [PHASES.main, { at: 1, of: 3 }],
+  );
+  assert.deepEqual(
+    trunkRead?.status === "running" && [trunkRead.step, trunkRead.big],
+    [{ at: 1, of: 1 }, false],
+  );
+
+  await mapTrunkReadSettled(repo.root);
+  await mapReadSettled(view);
+  assert.deepEqual(ai.calls, ["delta", "delta"]);
+  assert.deepEqual(steps, [
+    { at: 2, of: 3 },
+    { at: 3, of: 3 },
+  ]);
+  assert.equal((await mapTrunkStatus(repo.root))?.status, "done");
+
+  // A view whose base is saved reads only its head.
+  const next = repo.commit({ "src/app/pin.ts": "1\n" }, "Pin");
+  const after = { root: repo.root, base: head, head: next };
+  const seen: unknown[] = [];
+  const one: Runner = async <T>(
+    prompt: string,
+    schema: object,
+    cwd: string,
+  ) => {
+    const status = await mapStatus(after);
+    seen.push(status.status === "running" && status.step);
+    return ai.runner<T>(prompt, schema, cwd);
+  };
+  await read(after, { runner: one });
+  assert.deepEqual(seen, [{ at: 1, of: 1 }]);
+});
+
+test("main's read says a repo of BIG_REPO_FILES tracked files or more is big, and a repo with a model has no main read", async () => {
+  const repo = tempRepo();
+  repo.commit(
+    {
+      ...START,
+      ...Object.fromEntries(
+        Array.from({ length: BIG_REPO_FILES }, (_, i) => [
+          `src/app/gen/${i}.ts`,
+          "1\n",
+        ]),
+      ),
+    },
+    "Start a big shop",
+  );
+  repo.git("branch", "-M", "main");
+
+  let open = () => {};
+  const gate = new Promise<void>((resolve) => (open = resolve));
+  let entered = () => {};
+  const reading = new Promise<void>((resolve) => (entered = resolve));
+  const ai = recorder();
+  const gated: Runner = async <T>(
+    prompt: string,
+    schema: object,
+    cwd: string,
+  ) => {
+    entered();
+    await gate;
+    return ai.runner<T>(prompt, schema, cwd);
+  };
+  await startMapTrunkRead(repo.root, { runner: gated, status: ready });
+  await reading;
+  const big = await mapTrunkStatus(repo.root);
+  open();
+  await mapTrunkReadSettled(repo.root);
+  assert.equal(big?.status === "running" && big.big, true);
+
+  const committed = tempRepo();
+  committed.commit(
+    { ...START, "architecture/workspace.dsl": serializeModel(SHOP) },
+    "Commit a model",
+  );
+  committed.git("branch", "-M", "main");
+  assert.equal(
+    await startMapTrunkRead(committed.root, {
+      runner: recorder().runner,
+      status: ready,
+    }),
+    false,
+  );
+  assert.equal(await mapTrunkStatus(committed.root), null);
 });
 
 test("Redraft reads main in full again and removes derived maps, and a failed Redraft keeps what was saved", async () => {

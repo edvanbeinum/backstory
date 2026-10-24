@@ -19,11 +19,9 @@ import type {
   Relationship,
 } from "@/lib/data/types";
 import { viewKey, viewParams } from "@/lib/url";
-import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, layeredLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { Elapsed, setAutoReading } from "./SystemMap";
-import { Badge, Button, Spinner } from "./ui";
+import { Button } from "./ui";
 import { useView } from "./ViewContext";
 
 const COL_GAP = 22;
@@ -502,14 +500,12 @@ function DataGraph({
   );
 }
 
-type DraftApi = ReturnType<typeof useDataDraft>;
-
 /**
  * The view's data, replaced by what a draft request answered until the page
  * reads it again. Polls while a read runs rather than adding a watch event:
  * reads are rare.
  */
-function useDataDraft(
+export function useDataDraft(
   repo: string,
   rev: string,
   given: DataResponse | null,
@@ -603,196 +599,15 @@ function useDataDraft(
     void request("POST");
   }, [autoStart, viewId, request]);
 
-  const setAuto = useCallback(
-    async (on: boolean) => {
-      try {
-        await setAutoReading(repo, on);
-        onReadRef.current();
-      } catch (err) {
-        setError({
-          over: given,
-          message: err instanceof Error ? err.message : String(err),
-        });
-      }
-    },
-    [repo, given],
-  );
-
   return {
     data,
     error: error?.over === given ? error.message : null,
     start: (redraft = false) => void request("POST", redraft),
     retry: () => void request("POST", lastRedraft.current),
-    turnOn: () => void setAuto(true),
-    turnOff: () => void setAuto(false),
   };
 }
 
-function DraftedBadge() {
-  return (
-    <Badge tone="draft" className="!py-0 !leading-4">
-      Read by AI
-    </Badge>
-  );
-}
-
-function DraftProgress({
-  data,
-  draft,
-}: {
-  data: DataResponse;
-  draft: DraftApi;
-}) {
-  const job = data.draft;
-  if (draft.error)
-    return (
-      <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
-        <AlertIcon size={11} /> {draft.error}
-      </span>
-    );
-  if (job?.status === "running")
-    return (
-      <span className="flex items-center gap-1.5 text-[12px] text-[var(--fg-muted)]">
-        <Spinner className="!h-3 !w-3" />
-        {job.phase} · <Elapsed since={job.startedAt} />
-      </span>
-    );
-  if (job?.status === "failed")
-    return (
-      <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--attention)]">
-        <AlertIcon size={11} />
-        <span className="truncate" title={job.error}>
-          The read failed: {job.error}
-        </span>
-        <Button size="sm" onClick={draft.retry}>
-          Try again
-        </Button>
-      </span>
-    );
-  if (job?.status === "unavailable")
-    return (
-      <span className="text-[12px] text-[var(--attention)]">
-        <ClaudeCodeNotice
-          reason={job.reason}
-          needs="Reading the data model needs"
-        />
-      </span>
-    );
-  return null;
-}
-
-/** What a view with no data model shows: the formats looked for, and the offer to read one. */
-function DraftOffer({ data, draft }: { data: DataResponse; draft: DraftApi }) {
-  const job = data.draft;
-  const idle =
-    !job ||
-    job.status === "idle" ||
-    job.status === "unavailable" ||
-    job.status === "done";
-  const provider = job?.status === "idle" ? job.provider : null;
-  const offerAuto = job?.status === "idle" && !job.auto;
-  return (
-    <div className="flex min-w-0 flex-1 flex-col gap-1">
-      <div className="flex flex-wrap items-center gap-2">
-        {data.error ? (
-          <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
-            <AlertIcon size={11} /> {data.error}
-          </span>
-        ) : (
-          <span>no data model found ({data.readers.join(", ")})</span>
-        )}
-        {job && idle && (
-          <Button size="sm" variant="primary" onClick={() => draft.start()}>
-            Read the data model
-          </Button>
-        )}
-        {offerAuto && (
-          <Button size="sm" onClick={draft.turnOn}>
-            Read automatically
-          </Button>
-        )}
-        <DraftProgress data={data} draft={draft} />
-      </div>
-      {provider && (
-        <span className="text-[11px] text-[var(--fg-subtle)]">
-          {provider} reads the code, read-only: main&apos;s data model once,
-          then only what the diff changes. The first read can take a few minutes
-          and uses your {provider} account. The result is kept on this machine.
-        </span>
-      )}
-    </div>
-  );
-}
-
-function Redraft({ data, draft }: { data: DataResponse; draft: DraftApi }) {
-  const running = data.draft?.status === "running";
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
-      {!running && (
-        <Button
-          size="sm"
-          variant="invisible"
-          onClick={() => {
-            if (
-              window.confirm(
-                `Read the data model again? ${data.drafted?.provider ?? "The AI provider"} reads main's data model again in full and works out this view from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current reading is kept if it fails.`,
-              )
-            )
-              draft.start(true);
-          }}
-        >
-          Read again
-        </Button>
-      )}
-      <DraftProgress data={data} draft={draft} />
-    </span>
-  );
-}
-
-/** A drafted view's footnote: whether reads start by themselves, Turn off or Read automatically, and Read again. */
-function DraftFootnote({
-  data,
-  draft,
-}: {
-  data: DataResponse;
-  draft: DraftApi;
-}) {
-  const parts: React.ReactNode[] = [];
-  if (data.auto)
-    parts.push(
-      "Read automatically",
-      <button
-        type="button"
-        className="text-[var(--accent)] hover:underline"
-        onClick={draft.turnOff}
-      >
-        Turn off
-      </button>,
-    );
-  else
-    parts.push(
-      <button
-        type="button"
-        className="text-[var(--accent)] hover:underline"
-        onClick={draft.turnOn}
-      >
-        Read automatically
-      </button>,
-    );
-  return (
-    <span className="inline-flex flex-wrap items-center gap-1.5">
-      <span className="text-[11px] text-[var(--fg-subtle)]">
-        {parts.map((part, i) => (
-          <span key={i}>
-            {i > 0 && " · "}
-            {part}
-          </span>
-        ))}
-      </span>
-      <Redraft data={data} draft={draft} />
-    </span>
-  );
-}
+export type DataDraftApi = ReturnType<typeof useDataDraft>;
 
 /** The changed entities as cards, as Show data opens them, for Story's walk. */
 export function DataCards({
@@ -838,23 +653,17 @@ export function DataCards({
  * pushing the flows down.
  */
 export function DataSummary({
-  data: given,
+  draft,
   notes,
   repo,
   rev,
-  onRead,
-  phraseOnly = false,
 }: {
-  data: DataResponse | null;
+  /** The view's data model and its read, from `useDataDraft` */
+  draft: DataDraftApi;
   notes?: Map<string, string[]>;
   repo: string;
   rev: string;
-  /** A drafted data model was read: read the data again */
-  onRead: () => void;
-  /** Never opens the cards: Story's walk shows them on a stop of their own */
-  phraseOnly?: boolean;
 }) {
-  const draft = useDataDraft(repo, rev, given, onRead);
   const data = draft.data;
   const shown = useMemo(() => present(data?.entities ?? []), [data]);
   const changed = shown.filter((p) => p.state !== "same");
@@ -863,8 +672,7 @@ export function DataSummary({
   const { ref } = useView();
   const view = viewKey({ repo, ref, rev });
   const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
-  const open =
-    !phraseOnly && (toggled?.view === view ? toggled.open : changed.length > 0);
+  const open = toggled?.view === view ? toggled.open : changed.length > 0;
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -880,12 +688,26 @@ export function DataSummary({
 
   if (!data) return null;
   if (data.status === "none") {
-    return (
-      <span className="part inline-flex min-w-0 items-start gap-1.5">
-        <b>Data</b>
-        <DraftOffer data={data} draft={draft} />
+    if (data.error)
+      return (
+        <span className="part inline-flex items-center gap-1.5">
+          <b>Data</b>
+          <span className="flex items-center gap-1 text-[var(--attention)]">
+            <AlertIcon size={11} /> {data.error}
+          </span>
+        </span>
+      );
+    // With reading on there is nothing to say: Story's progress line says
+    // what is being read.
+    const job = data.draft;
+    const offer = job?.status === "idle" ? !job.auto : job?.status === "done";
+    return offer ? (
+      <span className="part">
+        <Button size="sm" onClick={() => draft.start()}>
+          Read the data model
+        </Button>
       </span>
-    );
+    ) : null;
   }
   const noChange = data.baseModel
     ? "no data model change"
@@ -895,9 +717,7 @@ export function DataSummary({
     return (
       <span className="part inline-flex flex-wrap items-center gap-1.5">
         <b>Data</b>
-        {data.drafted && <DraftedBadge />}
         {noChange}
-        {data.drafted && <DraftFootnote data={data} draft={draft} />}
       </span>
     );
   }
@@ -907,22 +727,16 @@ export function DataSummary({
     <>
       <span className="part inline-flex min-w-0 flex-wrap items-center gap-1.5">
         <b>Data</b>
-        {data.drafted && <DraftedBadge />}
         <span>{whole ? noChange : summary(shown)}</span>
-        {!phraseOnly && (
-          <button
-            type="button"
-            className="story-disclose"
-            aria-expanded={open}
-            onClick={() => setToggled({ view, open: !open })}
-          >
-            {open ? "Hide data" : "Show data"}
-            <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
-          </button>
-        )}
-        {(whole || (phraseOnly && data.drafted)) && !open && (
-          <DraftFootnote data={data} draft={draft} />
-        )}
+        <button
+          type="button"
+          className="story-disclose"
+          aria-expanded={open}
+          onClick={() => setToggled({ view, open: !open })}
+        >
+          {open ? "Hide data" : "Show data"}
+          <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
+        </button>
       </span>
       {open && (
         <div ref={boxRef} className="basis-full pt-1">
@@ -939,11 +753,6 @@ export function DataSummary({
               ? `Every entity at the head; ${data.baseModel ? "this change touches none of them" : "there is no data model at the base to compare with"}. Arrows point from the entity that has a link to the one it links to.`
               : "Click an entity for its fields. Arrows point from the entity that has a link to the one it links to; grey boxes are unchanged entities a changed one links to."}
           </p>
-          {data.drafted && (
-            <div className="px-1">
-              <DraftFootnote data={data} draft={draft} />
-            </div>
-          )}
         </div>
       )}
     </>

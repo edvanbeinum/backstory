@@ -148,7 +148,8 @@ primitives:
       - mapRefusal
       - savedMapAt
       - hasMainMap
-    use: "The AI provider's drafted map for a repo with no committed or hand-written model: main read in full once (`startMapTrunkRead`), then each view's base derived forward from main's map and its head from its base, one small read each that returns only what the patch changed (`lib/models/delta.ts`), cached by tree under `~/.backstory/maps/`, one read at a time. The data model's engine, copied with its own queue. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. `readModelAt` reads the saved map through `savedMapAt`; `hasMainMap` says whether main's map is saved."
+      - mapTrunkStatus
+    use: "The AI provider's drafted map for a repo with no committed or hand-written model: main read in full once (`startMapTrunkRead`), then each view's base derived forward from main's map and its head from its base, one small read each that returns only what the patch changed (`lib/models/delta.ts`), cached by tree under `~/.backstory/maps/`, one read at a time. The data model's engine, copied with its own queue. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. `readModelAt` reads the saved map through `savedMapAt`; `hasMainMap` says whether main's map is saved. A running read's status has its `step`, which of the trees it reads it is on, counting main's when it waits on main; `mapTrunkStatus` is main's read, with `big` for a repo of `BIG_REPO_FILES` tracked files or more."
   - name: data readers
     block: data model reader
     file: lib/data/readers.ts
@@ -166,7 +167,9 @@ primitives:
       - startTrunkRead
       - autoRead
       - setAutoRead
-    use: "The AI provider's reading of a data model no reader finds: main read in full once (`startTrunkRead`), then each view's base derived forward from main's model and its head from its base, one small read each, cached by tree under `~/.backstory/data/`, one read at a time. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. The switch is per repo, on by default, shared by every worktree, and covers drafted maps and change descriptions too. Told which files have the model when `data.files` is set. `buildData` falls back to it."
+      - dataTrunkStatus
+      - bigRepo
+    use: "The AI provider's reading of a data model no reader finds: main read in full once (`startTrunkRead`), then each view's base derived forward from main's model and its head from its base, one small read each, cached by tree under `~/.backstory/data/`, one read at a time. Reads start as repos and views open, unless `autoRead(root)` says the repo is turned off, or on a click. The switch is per repo, on by default, shared by every worktree, and covers drafted maps and change descriptions too. Told which files have the model when `data.files` is set. `buildData` falls back to it. A running read's status has its `step`, as the map's does; `dataTrunkStatus` is main's read, with `big` from `bigRepo`, which counts tracked files against `BIG_REPO_FILES`."
   - name: describe a change
     block: change description
     file: lib/description/cache.ts

@@ -130,10 +130,28 @@ At the top of Story, Claude Code describes the change in three parts: **Why**,
 messages and the pull request, and writes **Why** only when the commits or the
 pull request say why. Click a place to look first that is on the map to outline
 it there. Opening a commit or the whole branch describes it, unless you turned
-the repo off; then **Describe this change** reads it. **Turn off** beside
-**Drawn by Claude Code** turns the repo off, for its maps and data models too.
-**Describe again** reads it once more, and shows the earlier description with
-the error if that read fails.
+the repo off; then **Describe this change** reads it.
+
+While Claude Code reads, one line at the top of Story says which reads are
+running and how far each has got, such as "Drawing the map: Reading the base ·
+2 of 3 · Describing the change". A read that fails shows its error on that line
+with **Try again**. On a repo of 5,000 tracked files or more, a second line says
+the first read takes a while and you can leave the window open. The inbox shows
+main's read in the repo's header until it ends.
+
+Once Claude Code has drawn anything on the page, one footnote at the bottom of
+Story says so and has:
+
+- **Turn off**, which stops reading this repo's maps, data models and
+  descriptions as it and its worktrees open; a read already running finishes.
+  Once the repo is turned off, **Read automatically** takes its place and turns
+  reading back on.
+- **Draw the map again**, which reads main's map in full again and removes every
+  map worked out from the old one.
+- **Read the data model again**, when Claude Code read the data model, which
+  does the same for the data model.
+- **Describe again**, which reads the description once more, and keeps the
+  earlier description if that read fails.
 
 Backstory draws what a change did to the system, so you can see its effect
 before reading its lines:
@@ -149,25 +167,29 @@ before reading its lines:
     `~/.backstory/models/<folder>-<hash>/workspace.dsl`, where `<folder>` is
     the main checkout's folder and `<hash>` is 8 characters that tell apart
     repos with the same folder name. Every worktree of the repo reads it, and
-    the line under the map on Story shows its path, or where it goes when
-    there isn't one yet. The hash comes from where the checkout is on disk, so
-    after you move or rename the checkout, rename its folder under
-    `~/.backstory/models/` to the one that line shows. It's the same map for
+    the line under the map on Story shows its path. It's the same map for
     every commit, so the map shows which components a change touched, but not
     what it added or removed.
+  - The hash comes from where the checkout is on disk, so after you move or
+    rename the checkout, rename its folder under `~/.backstory/models/` to the
+    name this prints when you run it in the checkout:
+
+    ```sh
+    d=$(git rev-parse --path-format=absolute --git-common-dir); echo "$(basename "$(dirname "$d")")-$(printf %s "$d" | shasum | cut -c1-8)"
+    ```
+
   - Any other repo has its map drawn by Claude Code, the same way as the data
     model is read. It reads main in full once per repo, a minute or two
     on a small repo and more on a large one. Every other commit's map is worked
     out from the nearest map already read, by reading only the patch between
     them, well under a minute. The map marks
-    the components and arrows a branch added or removed, is marked **Drawn by
-    AI**, and is kept in `~/.backstory/maps/`, a cache you can delete. Nothing is
-    written into the repo, or to `~/.backstory/models/`.
+    the components and arrows a branch added or removed, and is kept in
+    `~/.backstory/maps/`, a cache you can delete. Nothing is written into the
+    repo, or to `~/.backstory/models/`.
   - Opening a repo starts the read of main's map, and opening a view on Story
-    starts the view's read, with its progress where the map goes. For a repo
-    you turned off (see **Turn off** below), **Draw the map** reads one view,
-    and **Read automatically** beside it turns reading back on for the repo's
-    maps and data models.
+    starts the view's read. For a repo you turned off, **Draw the map** where
+    the map goes reads one view, and **Read automatically** beside it turns
+    reading back on.
   - The map draws each component inside its container's box, and each
     container inside its system's box. An arrow ends at the box the model
     names, so an arrow to a container meets the container's edge.
@@ -176,11 +198,6 @@ before reading its lines:
     opens the whole system at the level of its containers: every container,
     person and external system, with the arrows between them. A component's
     arrow is drawn from or to its container. **Hide map** closes it.
-  - Under a drawn map, the line has **Turn off**, which stops reading this
-    repo's maps and data models as it opens, and **Draw again**, which reads
-    main's map in full again and removes every map worked out from the old
-    one. Once the repo is turned off, **Read automatically** takes the place of
-    **Turn off** and turns reading back on.
 - **The data model** shows the entities the change touched: new fields,
   relationships and rules. It reads `db/schema.rb` and the models (Rails), the
   `.xcdatamodeld` (Core Data), or SQL schema files: the `CREATE TABLE`
@@ -192,26 +209,20 @@ before reading its lines:
   minute. A view's base is
   worked out from main's model, and its head from its base, so a second branch
   from the same point, or a branch rebased onto main, reads only its own
-  change. The result is marked **Read by AI** and kept in
-  `~/.backstory/data/`.
+  change. The result is kept in `~/.backstory/data/`.
   - Reads start as a repo and a view open: opening a repo starts the reads of
     main's data model and map, and opening a view on Story starts the view's
-    reads, with the data model's progress on the Data line. **Turn off**, under
-    each drawn map and data model, stops new reads of either kind for that
-    repo and all its worktrees; a read already running finishes. For a repo
-    you turned off, **Read the data model** under the map on Story reads one
-    view, and **Read automatically** beside it turns reading back on and starts
-    this view's read.
-  - On a view Claude Code read, the Data line has **Turn off**, or **Read
-    automatically** for a repo you turned off, and **Read again**. **Show
-    data** opens the whole model when the change touches none of it.
+    reads. For a repo you turned off, **Read the data model** under the map on
+    Story reads one view.
+  - On a view Claude Code read, **Show data** opens the whole model when the
+    change touches none of it.
   - The Data line's graph opens by itself when the change touches the data
     model; **Hide data** closes it.
   - Main's data model moves forward when a view's base is on main and past it:
     the read that view's base needed is main's change since, and the base
     becomes main's model. Main is read in full again only when the patch from
     its model to a commit on main is too large to send, which reads that
-    commit in full, or when you press **Read again**, which reads main in full
+    commit in full, or when you press **Read the data model again**, which reads main in full
     again and removes every model worked out from the old one, since a mistake
     in main's model is copied into each of them.
 - **Flows** are sequence diagrams of what the code does for each user action the
@@ -263,7 +274,7 @@ Every read runs through your own Claude Code login:
   on a large repo and cents on a small one, and each change after it is cents. A
   trace usually costs $0.10–0.40, and a change's description a few cents.
 - On a Claude subscription, reads count toward Claude's usage limits.
-- Each repo has **Turn off**, under its drawn map and data model, to stop
+- Each repo has **Turn off**, in the footnote at the bottom of Story, to stop
   reading it as it opens.
 
 ## Reviewing an agent's work

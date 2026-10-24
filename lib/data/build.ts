@@ -1,5 +1,11 @@
 import { readModelAt, type Model } from "../model";
-import { autoRead, dataStatus, providerName, readDrafted } from "./cache";
+import {
+  autoRead,
+  dataStatus,
+  dataTrunkStatus,
+  providerName,
+  readDrafted,
+} from "./cache";
 import { diffModels } from "./diff";
 import { DATA_READERS, dataSteer, readDataModel, steerError } from "./readers";
 import type { DataResponse, EntityDiff } from "./types";
@@ -48,8 +54,9 @@ export async function buildData(
   if (!after) {
     const view = { root, base, head, files: steer.files };
     const draft = await dataStatus(view);
+    const mainRead = await dataTrunkStatus(root);
     const drafted = await readDrafted(view);
-    if (!drafted) return { ...noDataModel(), draft };
+    if (!drafted) return { ...noDataModel(), draft, mainRead };
     return {
       ...noDataModel(),
       status: "ok",
@@ -59,6 +66,7 @@ export async function buildData(
         model: drafted.model,
       },
       draft,
+      mainRead,
       auto: await autoRead(root),
       baseModel: drafted.base !== null,
       entities: withComponents(

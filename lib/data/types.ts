@@ -102,6 +102,8 @@ export interface DataResponse {
   auto?: boolean;
   /** When no reader found a model: the AI provider's read, for this view */
   draft?: DataDraftStatus;
+  /** When no reader found a model: main's read, for whether the repo is big */
+  mainRead?: TrunkReadStatus | null;
   /** Why no reader was tried: a `data.format` Backstory doesn't read */
   error?: string;
 }
@@ -114,8 +116,22 @@ export type DataDraftStatus =
    * starts the read without a click
    */
   | { status: "idle"; provider: string; auto: boolean }
-  | { status: "running"; phase: string; startedAt: number }
+  | {
+      status: "running";
+      phase: string;
+      startedAt: number;
+      /** Which of the read's trees it is on, main's first when it waits on main; null while it waits on another read */
+      step: { at: number; of: number } | null;
+    }
   | { status: "done"; costUsd: number; durationMs: number }
   | { status: "failed"; error: string }
   /** The provider isn't ready: its name and why */
   | { status: "unavailable"; provider: string; reason: ProviderGap };
+
+/**
+ * Main's read for a repo, as the inbox and Story show it. `big` is a repo of
+ * `BIG_REPO_FILES` tracked files or more, whose first read takes a while.
+ */
+export type TrunkReadStatus =
+  | (Extract<DataDraftStatus, { status: "running" }> & { big: boolean })
+  | Extract<DataDraftStatus, { status: "done" | "failed" }>;

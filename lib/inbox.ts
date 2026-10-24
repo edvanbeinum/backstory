@@ -1,10 +1,12 @@
 import path from "node:path";
 
 import { listWorktrees } from "./browse";
+import { dataTrunkStatus } from "./data/cache";
 import { run } from "./exec";
 import { parseRemote, resolveDefaultBranch } from "./git";
 import { describeGhError, githubGraphql, pickPullRequest } from "./github";
 import { lookedTips } from "./looked";
+import { mapTrunkStatus } from "./models/cache";
 
 /**
  * The inbox: every worktree you've got checked out, across every repo you've
@@ -110,6 +112,12 @@ export interface InboxRepo {
    * without one, newest commit first.
    */
   onGitHub: RemoteBranch[];
+  /** Main's map or data model read while it runs, in the words Story's progress line uses */
+  reading: {
+    phase: string;
+    step: { at: number; of: number } | null;
+    big: boolean;
+  } | null;
 }
 
 export interface InboxResult {
@@ -117,6 +125,21 @@ export interface InboxResult {
   rows: InboxRow[];
   /** Requested paths that no longer resolve — offer to forget them. */
   unresolved: Array<{ path: string; error: string }>;
+}
+
+async function mainRead(root: string): Promise<InboxRepo["reading"]> {
+  const reads = [
+    ["Drawing the map", await mapTrunkStatus(root)],
+    ["Reading the data model", await dataTrunkStatus(root)],
+  ] as const;
+  for (const [name, read] of reads)
+    if (read?.status === "running")
+      return {
+        phase: `${name}: ${read.phase}`,
+        step: read.step,
+        big: read.big,
+      };
+  return null;
 }
 
 async function git(cwd: string, args: string[]): Promise<string | null> {
@@ -464,12 +487,14 @@ async function buildRepo(
     : identity.root;
   const label = path.basename(root);
 
-  const [worktrees, facts, remoteUrl, defaultBranch] = await Promise.all([
-    listWorktrees(root),
-    branchFacts(root),
-    git(root, ["remote", "get-url", "origin"]),
-    resolveDefaultBranch(root),
-  ]);
+  const [worktrees, facts, remoteUrl, defaultBranch, reading] =
+    await Promise.all([
+      listWorktrees(root),
+      branchFacts(root),
+      git(root, ["remote", "get-url", "origin"]),
+      resolveDefaultBranch(root),
+      mainRead(root),
+    ]);
   const looked = lookedTips(commonDir);
 
   const { host, owner, name } = parseRemote(remoteUrl);
@@ -483,6 +508,7 @@ async function buildRepo(
     connect: false,
     stale: false,
     onGitHub: [],
+    reading,
   };
 
   // Every local branch, not just the checked-out ones. A stacked workflow

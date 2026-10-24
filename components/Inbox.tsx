@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { InboxRepo, InboxResult, RemoteBranch } from "@/lib/inbox";
 import { requestFetch } from "./fetchBranch";
@@ -109,13 +109,17 @@ export function Inbox({
 
   const key = useMemo(() => [...roots].sort().join("\0"), [roots]);
 
+  const latest = useRef(0);
   const load = useCallback(
-    async (opts: { fresh?: boolean } = {}) => {
+    async (opts: { fresh?: boolean; quiet?: boolean } = {}) => {
+      // Keep only the newest load's answer, so a poll that resolves after a
+      // refresh, or after a root is removed, can't put back what it replaced.
+      const n = ++latest.current;
       if (roots.length === 0) {
         setData(null);
         return;
       }
-      setLoading(true);
+      if (!opts.quiet) setLoading(true);
       try {
         const params = new URLSearchParams();
         for (const root of roots) params.append("root", root);
@@ -125,6 +129,7 @@ export function Inbox({
         });
         if (!response.ok) throw new Error("Couldn't scan your checkouts.");
         const result = (await response.json()) as InboxResult;
+        if (n !== latest.current) return;
         setData(result);
         setError(null);
 
@@ -140,9 +145,10 @@ export function Inbox({
           onForget(result.unresolved.map((entry) => entry.path));
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        if (n === latest.current)
+          setError(err instanceof Error ? err.message : String(err));
       } finally {
-        setLoading(false);
+        if (!opts.quiet) setLoading(false);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -162,6 +168,15 @@ export function Inbox({
     window.addEventListener("focus", onFocus);
     return () => window.removeEventListener("focus", onFocus);
   }, [load]);
+
+  // Polls while main is read in any repo, as Story's drawings poll their
+  // reads, so each repo's header follows its read until it ends.
+  const reading = data?.repos.some((repo) => repo.reading) ?? false;
+  useEffect(() => {
+    if (!reading) return;
+    const timer = setInterval(() => void load({ quiet: true }), 4000);
+    return () => clearInterval(timer);
+  }, [reading, load]);
 
   const rowsByRepo = useMemo(() => {
     if (!data) return [];
@@ -262,8 +277,27 @@ export function Inbox({
                   <h2 className="mono text-[11px] font-semibold uppercase tracking-wider text-[var(--fg-muted)]">
                     {repo.label}
                   </h2>
+                  {repo.reading && (
+                    <span
+                      className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--fg-muted)]"
+                      role="status"
+                    >
+                      <Spinner className="!h-3 !w-3 shrink-0" />
+                      <span className="truncate">
+                        {repo.reading.phase}
+                        {repo.reading.step &&
+                          ` · ${repo.reading.step.at} of ${repo.reading.step.of}`}
+                      </span>
+                    </span>
+                  )}
                   <span className="h-px flex-1 bg-[var(--border)]" />
                 </div>
+                {repo.reading?.big && (
+                  <p className="mt-1 text-[12px] text-[var(--fg-subtle)]">
+                    This is a big repo, the first read takes a while. You can
+                    leave this open.
+                  </p>
+                )}
 
                 {repo.unavailable && (
                   <p className="mt-2 flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">

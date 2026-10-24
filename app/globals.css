@@ -1660,6 +1660,10 @@ tr.step-code-target td.diff-num {
   font-size: 12px;
   color: var(--fg-muted);
 }
+/* Hide the line when the data model's summary has nothing to say. */
+.story-line:empty {
+  display: none;
+}
 .story-line b {
   font-weight: 600;
   color: var(--fg);
@@ -1806,10 +1810,23 @@ tr.step-code-target td.diff-num {
 .story-card p:last-child {
   margin-bottom: 0;
 }
-.story-card .est {
-  display: block;
-  margin-top: 10px;
+/* Where the map goes while its read runs: the space it will take, empty. */
+.story-card.map-pending {
+  min-height: 180px;
+  border-style: dashed;
+}
+
+/* Story's one line about its reads, and its one footnote about what the AI drew. */
+.read-line {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 2px;
   font-size: 12px;
+}
+.read-footnote {
+  padding: 8px 2px 0;
+  font-size: 11px;
   color: var(--fg-subtle);
 }
 

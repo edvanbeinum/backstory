@@ -1,4 +1,5 @@
 import { autoRead } from "./data/cache";
+import type { TrunkReadStatus } from "./data/types";
 import { git } from "./exec";
 import {
   isAppCode,
@@ -8,7 +9,12 @@ import {
   type ModelElement,
   type ModelSource,
 } from "./model";
-import { hasMainMap, mapStatus, type MapDraftStatus } from "./models/cache";
+import {
+  hasMainMap,
+  mapStatus,
+  mapTrunkStatus,
+  type MapDraftStatus,
+} from "./models/cache";
 
 /**
  * The system map for a view: which C4 elements the change touched, which
@@ -79,6 +85,8 @@ export interface MapResponse {
   handFile?: string;
   /** When the repo has no model of its own: whether main's map is saved */
   mainMap?: boolean;
+  /** When the repo has no model of its own: main's read, for whether the repo is big */
+  mainRead?: TrunkReadStatus | null;
   nodes: MapNode[];
   edges: MapEdge[];
   /** Every element and arrow, unchanged, when the change touches no component */
@@ -250,6 +258,7 @@ export async function buildMap(
         auto: await autoRead(root),
         handFile: await localModelFile(root),
         mainMap: await hasMainMap(root),
+        mainRead: await mapTrunkStatus(root),
       }
     : {};
   if (!headRead) return { ...empty, ...reading };
