@@ -29,7 +29,7 @@ terms:
       - panel
       - column
   - name: story
-    means: "The Story tab, where every view lands: the walk through the change, or with Show everything on one page the change description, then the map at full width with one line of what it says, then each flow as a card (`components/Story.tsx`)."
+    means: "The Story tab, where every view lands: the walk through the change, or with Show everything on one page the change description, then the map at full width with one line of what it says, then each flow as a card (`components/Story.tsx`). Story holds the map's, the data model's and the description's reads: one progress line at the top says which run, with each one's phase and step, a failed read's error and Try again, and a line for a big repo (`components/ReadLine.tsx`); one footnote at the bottom, once the AI drew anything, says who drew it and has Turn off and each drawing's Read again (`components/ReadFootnote.tsx`)."
     avoid:
       - strip, for the map or the data model's summary
   - name: walk
@@ -56,7 +56,7 @@ terms:
     means: "`data.files` and `data.format` in a workspace's properties: which files hold the data model, and which data reader reads them. Read at the head and used at both ends of a view."
     avoid: []
   - name: drafted data model
-    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read as repos and views open, unless the repo is turned off (Turn off under a drafted data model or map), or on a click (Read the data model), and marked Read by AI wherever it's shown. Read again reads main's data model in full again."
+    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read as repos and views open, unless the repo is turned off (Turn off in Story's footnote), or on a click (Read the data model). Read the data model again, in Story's footnote, reads main's data model in full again."
     avoid: []
   - name: main's data model
     means: "The drafted data model of the repo's default branch that every view's base is derived from, pointed at by `trunk.json` in the repo's data folder (`lib/data/cache.ts`). Read in full once, and moved forward when a view's base is on main past it."
@@ -79,7 +79,7 @@ terms:
     avoid:
       - draft alone, for the model
   - name: drafted map
-    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off, or on a click (Draw the map), and marked Drawn by AI under the map. Draw again reads main in full again."
+    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off (Turn off in Story's footnote), or on a click (Draw the map). Draw the map again, in Story's footnote, reads main in full again."
     avoid:
       - local model, for a drafted map
   - name: main's map
@@ -91,7 +91,7 @@ terms:
     avoid:
       - store
   - name: change description
-    means: "A few plain sentences at the top of Story: why the change was made (only when its commit messages or PR say), what it does, and at most two places to look first, each outlining its component on the map when the name is one. The AI provider reads it from the view's patch, commit messages, PR and the names of the components and entities it touches (`lib/description/`), once per view, cached by base and head trees in `~/.backstory/descriptions/`. Read as views open unless the repo is turned off, or on a click (Describe this change), and marked Drawn by the provider. Describe again reads it once more, and the earlier one stays if that read fails."
+    means: "A few plain sentences at the top of Story: why the change was made (only when its commit messages or PR say), what it does, and at most two places to look first, each outlining its component on the map when the name is one. The AI provider reads it from the view's patch, commit messages, PR and the names of the components and entities it touches (`lib/description/`), once per view, cached by base and head trees in `~/.backstory/descriptions/`. Read as views open unless the repo is turned off (Turn off in Story's footnote), or on a click (Describe this change). Describe again, in Story's footnote, reads it once more, and the earlier one stays if that read fails."
     avoid:
       - summary, for the description (that's the line under the map)
   - name: repo key
