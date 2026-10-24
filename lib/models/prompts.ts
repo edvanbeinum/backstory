@@ -10,17 +10,17 @@ export interface DraftElement {
   description: string;
 }
 
-export interface DraftComponent extends DraftElement {
+interface DraftComponent extends DraftElement {
   technology: string;
   globs: string[];
 }
 
-export interface DraftContainer extends DraftElement {
+interface DraftContainer extends DraftElement {
   technology: string;
   components: DraftComponent[];
 }
 
-export interface DraftRelationship {
+interface DraftRelationship {
   source: string;
   destination: string;
   description: string;

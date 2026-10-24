@@ -110,7 +110,7 @@ export function jumpToFile(path: string, root: ParentNode = document): boolean {
 const fileName = (path: string) => path.split("/").pop() ?? path;
 
 /** One component and its arrows, outlined, with the rest of the map dimmed */
-export interface MapFocus {
+interface MapFocus {
   node: string;
   edges: string[];
 }

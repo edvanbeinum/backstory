@@ -223,7 +223,7 @@ function change<T>(
   });
 }
 
-export interface NewRound {
+interface NewRound {
   noteIds: string[];
   message: string;
   at: number;

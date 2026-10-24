@@ -25,7 +25,7 @@ import {
 /** Paths the glob fix-up is shown, so a draft that missed most files stays one bounded call. */
 const MAX_FIX_PATHS = 200;
 
-export interface DraftResult {
+interface DraftResult {
   workspace: Workspace;
   costUsd: number;
   model: string | null;

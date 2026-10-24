@@ -14,7 +14,7 @@ import type {
  * models' declarations. Read as text; nothing is loaded or run.
  */
 
-export interface RailsSources {
+interface RailsSources {
   schema: string;
   /** Model files' contents, by path */
   models: Map<string, string>;

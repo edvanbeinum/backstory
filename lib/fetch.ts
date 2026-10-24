@@ -13,7 +13,7 @@ import { githubToken } from "./github";
  * worktree has checked out, and never one with commits origin doesn't have.
  */
 
-export type FetchOutcome =
+type FetchOutcome =
   "created" | "updated" | "unchanged" | "kept" | "checked-out";
 
 export interface FetchResult {

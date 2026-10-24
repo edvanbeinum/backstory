@@ -69,7 +69,7 @@ export interface MapView {
 export type MapDraftStatus = DataDraftStatus;
 
 /** Why a map isn't drafted: the repo commits a model, or has a hand-written one. */
-export interface MapRefusal {
+interface MapRefusal {
   status: "refused";
   reason: "committed" | "local";
 }

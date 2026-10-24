@@ -1,4 +1,4 @@
-export type DiffLineType = "context" | "add" | "del";
+type DiffLineType = "context" | "add" | "del";
 
 export interface DiffLine {
   type: DiffLineType;
@@ -21,8 +21,7 @@ export interface DiffHunk {
   lines: DiffLine[];
 }
 
-export type FileStatus =
-  "added" | "deleted" | "modified" | "renamed" | "copied";
+type FileStatus = "added" | "deleted" | "modified" | "renamed" | "copied";
 
 export interface DiffFile {
   oldPath: string | null;
@@ -62,7 +61,7 @@ export interface CommitSummary {
  * never mysterious — "unpushed" means different things with and without an
  * upstream, and some branches have neither an upstream nor an origin ref.
  */
-export type BaseReason =
+type BaseReason =
   "upstream" | "origin-branch" | "default-branch" | "local-default" | "root";
 
 export interface BaseInfo {

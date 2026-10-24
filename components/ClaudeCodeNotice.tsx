@@ -3,7 +3,7 @@
 import type { ProviderGap } from "@/lib/ai/provider";
 import { Button, CopyButton } from "./ui";
 
-export const CLAUDE_CODE_INSTALL =
+const CLAUDE_CODE_INSTALL =
   "https://code.claude.com/docs/en/setup#install-claude-code";
 
 /**

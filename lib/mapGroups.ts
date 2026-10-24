@@ -5,7 +5,7 @@ import type { MapNode } from "./map";
  * `lib/map.ts`, which runs git, so the page can import it.
  */
 
-export interface ComponentGroup<F> {
+interface ComponentGroup<F> {
   /** The component's name; null for "Not on the map" */
   component: string | null;
   files: F[];

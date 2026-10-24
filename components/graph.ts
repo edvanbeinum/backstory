@@ -12,7 +12,7 @@ export interface Box {
   h: number;
 }
 
-export interface LayoutOptions {
+interface LayoutOptions {
   minW: number;
   maxW: number;
   rowGap: number;
@@ -116,7 +116,7 @@ export function layeredLayout<N extends { id: string }>(
   return { placed, height: y - o.rowGap + o.pad };
 }
 
-export interface Around {
+interface Around {
   boxes: Box[];
   clearance: number;
 }

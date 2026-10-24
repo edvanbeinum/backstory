@@ -10,7 +10,7 @@ import type { FlowSet, FlowStep } from "./flows/types";
  * reader's call, and the reviewer's.
  */
 
-export interface Evidence {
+interface Evidence {
   /** A flow and the step that shows it, for jumping there */
   flow?: number;
   step?: string;
@@ -51,7 +51,7 @@ function vendorOf(participant: string): string | null {
 }
 
 /** Outside systems the change talks to, from its participants and its new namespaces. */
-export function vendors(
+function vendors(
   set: FlowSet | null,
   data: DataResponse | null,
   known: string[] = [],

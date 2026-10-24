@@ -2,7 +2,7 @@ import type { ProviderGap } from "../ai/provider";
 import type { MapResponse } from "../map";
 
 /** A place to look first, as the provider named it */
-export interface LookFirst {
+interface LookFirst {
   name: string;
   reason: string;
 }
@@ -16,7 +16,7 @@ export const isOnMap = (name: string, map: MapResponse | null) =>
   map?.status === "ok" && map.nodes.some((n) => n.name === name);
 
 /** One sentence on what the change does in a component, by its name on the map */
-export interface ComponentSentence {
+interface ComponentSentence {
   name: string;
   sentence: string;
 }

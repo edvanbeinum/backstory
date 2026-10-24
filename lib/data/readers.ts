@@ -43,7 +43,7 @@ export const DATA_READERS: DataReader[] = [
 ];
 
 /** Data steering: `data.files` and `data.format` from the workspace's properties. */
-export interface DataSteer {
+interface DataSteer {
   /** Globs for the files that hold the data model */
   files: string[] | null;
   /** The one reader's `source` to try */
@@ -68,7 +68,7 @@ export function steerError(steer: DataSteer): string | null {
   return `data.format says "${steer.format}"; Backstory reads ${known.slice(0, -1).join(", ")} and ${known.at(-1)}`;
 }
 
-export function revFiles(
+function revFiles(
   root: string,
   rev: string,
   files: string[] | null = null,

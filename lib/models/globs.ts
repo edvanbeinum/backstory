@@ -1,6 +1,6 @@
 import { isAppCode, parseDsl } from "../model";
 
-export interface GlobCheck {
+interface GlobCheck {
   unmatched: string[];
   ambiguous: { file: string; ids: string[] }[];
 }

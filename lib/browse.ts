@@ -14,14 +14,14 @@ import { expandPath } from "./git";
  * is — read-only, directory names only, never file contents.
  */
 
-export interface DirEntry {
+interface DirEntry {
   name: string;
   path: string;
   /** A git work tree — worth offering as a one-click choice */
   isRepo: boolean;
 }
 
-export interface WorktreeEntry {
+interface WorktreeEntry {
   path: string;
   name: string;
   branch: string | null;
