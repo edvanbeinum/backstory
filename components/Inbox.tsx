@@ -142,7 +142,7 @@ export function Inbox({
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err));
       } finally {
-        setLoading(false);
+        if (!opts.quiet) setLoading(false);
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
