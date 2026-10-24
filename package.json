@@ -25,7 +25,9 @@
     "mac:appcast": "bash mac/appcast.sh",
     "test:mac": "if [ \"$(uname)\" = Darwin ]; then xcodebuild test -quiet -project mac/backstory/Backstory.xcodeproj -scheme Backstory -destination platform=macOS -derivedDataPath mac/build/DerivedData -only-testing:BackstoryTests CODE_SIGNING_ALLOWED=NO; fi",
     "check": "npm run typecheck && npm run lint && npm run format:check && npm test",
-    "verify": "npm run check && npm run build && npm run test:mac"
+    "verify": "npm run check && npm run build && npm run test:mac",
+    "demo:record": "node demo/record.mjs",
+    "demo:build": "node demo/build.mjs"
   },
   "dependencies": {
     "next": "16.4.2",
@@ -42,10 +44,13 @@
     "@types/picomatch": "^4.0.3",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "esbuild": "^0.28.2",
     "eslint": "^10.13.0",
     "eslint-config-next": "16.4.2",
     "eslint-config-prettier": "^10.1.8",
     "globals": "17.13.0",
+    "playwright": "^1.64.1",
+    "postcss": "^8.5.31",
     "prettier": "^3.9.10",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",

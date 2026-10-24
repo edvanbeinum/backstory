@@ -3,6 +3,10 @@
 terms:
   - name: Backstory
     means: "The product: the Mac app, the server it runs, the page and the `backstory` command."
+  - name: site demo
+    means: "Backstory's real page at stopreadingdiffs.com/demo, answered from a recording of one pull request instead of a server (`demo/`). `npm run demo:record` records it from a running server, and `npm run demo:build` bundles it into `site/demo`."
+    avoid:
+      - mockup
   - name: flow
     means: "What the code does for one user action a change touches: the data, a card in the story and the feature."
     drawing: sequence

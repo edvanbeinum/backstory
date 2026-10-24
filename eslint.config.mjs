@@ -13,9 +13,10 @@ export default defineConfig([
     "build/**",
     "next-env.d.ts",
     "mac/build/**",
+    "site/demo/app.js",
   ]),
   {
-    files: ["bin/**/*.mjs", "mac/*.mjs"],
+    files: ["bin/**/*.mjs", "mac/*.mjs", "demo/*.mjs"],
     languageOptions: { globals: globals.node },
   },
   {

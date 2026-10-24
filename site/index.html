@@ -367,6 +367,15 @@
         max-width: 640px;
       }
 
+      .try {
+        display: grid;
+        gap: 14px;
+        justify-items: start;
+      }
+      .try h2 {
+        margin: 0;
+      }
+
       /* Closing */
       .close {
         margin-top: 88px;
@@ -677,6 +686,27 @@
             </p>
           </div>
         </div>
+      </section>
+
+      <section aria-labelledby="try-h" class="try">
+        <h2 id="try-h">Try it on a real pull request</h2>
+        <p class="sub">
+          Pull request #117 in Backstory's own repo makes the inbox a list of
+          changes waiting for you: 18 files, +631 −145. Look at it both ways.
+        </p>
+        <div class="ctas">
+          <a
+            class="btn lg"
+            href="https://github.com/edvanbeinum/backstory/pull/117/files"
+          >
+            See it on GitHub
+          </a>
+          <a class="btn primary lg" href="demo/">See it in Backstory</a>
+        </div>
+        <p class="note">
+          The Backstory version runs in your browser, on a recording of the app
+          reviewing that pull request.
+        </p>
       </section>
 
       <div class="close">
