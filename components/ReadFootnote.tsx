@@ -31,7 +31,10 @@ export function ReadFootnote({
   if (!drawnMap && !drawnData && !described) return null;
 
   const provider =
-    described?.provider ?? drawnData?.drafted?.provider ?? "Claude Code";
+    described?.provider ??
+    drawnData?.drafted?.provider ??
+    (drawnMap?.draft?.status === "idle" ? drawnMap.draft.provider : null) ??
+    "Claude Code";
   const auto = drawnMap?.auto ?? drawnData?.auto ?? described?.auto ?? true;
   const setAuto = (on: boolean) =>
     description?.setAuto(on).then(
