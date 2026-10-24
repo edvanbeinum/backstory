@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="Backstory shows you what your coding agent changed: on a map of your system, as the steps each user action takes, and in the data model. Then you send it notes on what to fix. Stop reading diffs."
+      content="Backstory is a change visualizer for Claude Code. It draws what your agent changed: on a map of your system, as the steps each user action takes, and in the data model. Then you send the agent notes on what to fix."
     />
     <title>Backstory · Stop reading diffs</title>
     <link rel="icon" href="img/logo/backstory-icon.svg" type="image/svg+xml" />
@@ -527,118 +527,163 @@
       <div class="pr">
         <h1>How am I supposed to review all this</h1>
         <p class="lede">
-          Backstory shows you what your coding agent changed: on a map of your
-          system, as the steps each user action takes, and in the data model.
-          Then you send it notes on what to fix.
+          In the last 12 months our coding tools have completely changed... but
+          our review tools are still the same. What if our code review tools
+          helped us understand the change, the system design and data model
+          changes instead of just the code lines that changed?
         </p>
         <figure class="shot">
           <img
-            src="img/map.png"
-            width="2000"
-            height="1005"
-            alt="Backstory's map: four components touched, page shell, map strip, flow engine and model reader, each with its changed files and line counts."
+            src="img/flow.png"
+            width="2496"
+            height="1988"
+            alt="A Backstory flow for opening the inbox, before and after the change: 5 steps removed in red, 11 added in green, across the inbox screens, the API routes, inbox discovery and a new part, looked-at branches."
           />
         </figure>
         <p class="shot-cap">
-          This is a real branch. 1,611 lines of code and here's what changes in
-          the system, drawn by your coding agent.
+          This is a real change from Backstory's own repo: what opening the
+          inbox does, before and after.
         </p>
-        <p class="shot-cap">Works with Claude Code.</p>
       </div>
 
       <section>
         <div class="sub">
-          <p>
-            AI can write PRs faster than I can understand them, but I'm still
-            responsible for what ships. If our job as software engineers is
-            increasingly about design and architecture, why do our PR review
-            tools still just show us a code diff?
-          </p>
-          <p>What if our PR review tools answered these questions for us:</p>
+          <p>When I look at a change, I want to know:</p>
           <ul>
-            <li>What parts of the system does this change touch?</li>
+            <li>What did it do, and why?</li>
+            <li>Which parts of the system did it touch?</li>
             <li>What does each user action do now?</li>
             <li>What happens to the data?</li>
           </ul>
           <p>
-            We've used sequence diagrams and C4 maps for decades; why not use
-            them to help us understand code changes?
+            Backstory is a code review visualizer built on top of Claude Code
+            that is conceived entirely on answering those questions. We already
+            have sequence diagrams and C4 maps - let's use those!
           </p>
         </div>
       </section>
 
       <section aria-labelledby="basics-h">
-        <h2 id="basics-h">What might a PR review tool for 2026 look like?</h2>
+        <h2 id="basics-h">What did my agent just do?</h2>
+
+        <div class="feature wide">
+          <div class="text">
+            <div><span class="lbl">What it did</span></div>
+            <h3>Start with a few plain sentences</h3>
+            <p>Every change opens with what it does and where to look first.</p>
+          </div>
+          <figure class="shot">
+            <img
+              src="img/describe.png"
+              width="2528"
+              height="532"
+              loading="lazy"
+              alt="Backstory's description of a change: why, what it does, and where to look first, with links to the parts of the system to start with."
+            />
+          </figure>
+        </div>
 
         <div class="feature">
           <div class="text">
-            <div><span class="lbl">Help understand the architecture</span></div>
-            <h3>See where things have changed</h3>
+            <div><span class="lbl">Where it changed</span></div>
+            <h3>See which parts of your system it touched</h3>
             <p>
-              A
-              <a href="https://www.youtube.com/watch?v=x2-rSnhpw0g">C4 map</a>
-              highlights the components the change touches. See how it fits into
-              the system before digging into individual files.
+              It shows you a map of the system, outlining the parts the change
+              added or removed so you can understand how the change fits in
+              before you open a file.
             </p>
           </div>
           <figure class="shot">
             <img
-              src="img/map-zoom.png"
-              width="960"
-              height="640"
+              src="img/map.png"
+              width="1410"
+              height="2340"
               loading="lazy"
-              alt="A close-up of the map: the map strip, the flow engine and the model reader, which has two new files, route.ts and draft.ts."
+              alt="Backstory's map of the change: six parts touched across the web UI and the local server, with a new part, looked-at branches, outlined in green and four new arrows."
             />
           </figure>
         </div>
 
         <div class="feature flip">
           <div class="text">
-            <div><span class="lbl green">Help understand the flows</span></div>
-            <h3>Understand the data flow and API</h3>
+            <div><span class="lbl green">What each action does</span></div>
+            <h3>Follow each user action, step by step</h3>
             <p>
-              A sequence diagram for each user action. I want to know the calls
-              between components and what data passes between them.
+              It shows you a sequence diagram for each user action: the calls
+              between the parts of your system and the data that passes between
+              them.
             </p>
           </div>
           <figure class="shot">
             <img
-              src="img/flow.png"
-              width="2000"
-              height="1535"
+              src="img/flow-new.png"
+              width="2496"
+              height="1188"
               loading="lazy"
-              alt='A Backstory flow: a 12-step sequence diagram of what happens when the user clicks "Draft a model".'
+              alt="A new flow: when you open a branch, the page posts to /api/looked, which checks the branch and stores its tip in the looked table, in 8 steps."
             />
           </figure>
         </div>
 
         <div class="feature">
           <div class="text">
-            <div><span class="lbl">Help understand the data model</span></div>
+            <div><span class="lbl">What happens to the data</span></div>
             <h3>Data models are tricky</h3>
             <p>
-              A flaw in the data model layer is what bites us in the butt later,
-              so our PR review tools should show us the changes to entities,
-              fields and relationships before we merge.
+              A flaw in the data model is what bites us in the butt later, so
+              Backstory highlights the changes to entities, fields and
+              relationships before you merge.
             </p>
           </div>
           <figure class="shot">
             <img
               src="img/data.png"
-              width="1262"
-              height="868"
+              width="1250"
+              height="340"
               loading="lazy"
-              alt='Backstory&apos;s data view on a Mastodon pull request, "Add email subscriptions": a new EmailSubscription entity with four new fields, confirmation_token, confirmed_at, email and locale, linked to the existing Account.'
+              alt="The data model: a new Looked entity in the local store, with four new fields, common_dir, branch, tip and at."
             />
           </figure>
+        </div>
+
+        <div class="feature wide">
+          <div class="text">
+            <div><span class="lbl">One part at a time</span></div>
+            <h3>Walk through the change</h3>
+            <p>
+              Knowing where to start when looking at a diff is tricky, so
+              Backstory takes you through the change one part of your system at
+              a time, each with its steps and its files.
+            </p>
+          </div>
+          <figure class="shot">
+            <img
+              src="img/walk.png"
+              width="2528"
+              height="400"
+              loading="lazy"
+              alt="Part 6 of 10 of a walk through a change, inbox and repo discovery: 5 of 18 files seen, a sentence on what changed in this part, and the flow steps it is on."
+            />
+          </figure>
+        </div>
+
+        <div class="feature wide">
+          <div class="text">
+            <div><span class="lbl green">What to fix</span></div>
+            <h3>Send your notes back to the agent</h3>
+            <p>
+              If you open Backstory from an agent session, you can send your
+              notes back to the agent, directly from the app.
+            </p>
+          </div>
         </div>
       </section>
 
       <div class="close">
-        <h2>Would you review a PR this way?</h2>
+        <h2>Would you review your agent's work this way?</h2>
         <p>
           Backstory is me playing around with this concept, to get me up to
-          speed quickly when a change needs my attention.<br /><br />I'd love
+          speed quickly when my agent hands me a change.<br /><br />I'd love
           your take: would this help you judge a change? What would you still
           need before you'd merge?
         </p>
@@ -647,7 +692,7 @@
             class="btn primary lg"
             href="https://github.com/edvanbeinum/backstory/releases/latest"
           >
-            Download Backstory for Mac
+            Download Backstory BETA for Mac
           </a>
           <a class="btn lg" href="https://github.com/edvanbeinum/backstory">
             Star on GitHub
