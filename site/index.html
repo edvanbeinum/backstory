@@ -18,7 +18,7 @@
       href="https://fonts.googleapis.com/css2?family=Mona+Sans:wght@500;600;700;800&display=swap"
     />
     <style>
-      /* Layout: GitHub's own vocabulary (Primer tokens, Boxes, Labels, diff rows) around real screenshots of the app; text and screenshot alternate down a 1120px column. */
+      /* Layout: GitHub's own vocabulary (Primer tokens, Boxes, Labels, diff rows) around real screenshots of the app, down one 1120px column: each feature is its question, its answer, then its screenshot. */
       :root {
         --canvas: #ffffff;
         --canvas-subtle: #f6f8fa;
@@ -42,6 +42,16 @@
           0 1px 0 rgba(31, 35, 40, 0.04),
           0 12px 32px -12px rgba(31, 35, 40, 0.18);
         --on-emphasis: #ffffff;
+        --done: #8250df;
+        --shot-bg: #ffffff;
+
+        --space-xs: 4px;
+        --space-sm: 12px;
+        --space-md: 20px;
+        --space-lg: 24px;
+        --space-xl: 40px;
+        --space-2xl: 56px;
+        --space-3xl: 88px;
 
         --font-display:
           "Mona Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
@@ -69,6 +79,7 @@
           --success: #3fb950;
           --success-emphasis: #238636;
           --success-hover: #29903b;
+          --done: #8957e5;
           --danger: #f85149;
           --diff-add-bg: rgba(46, 160, 67, 0.15);
           --diff-add-num-bg: rgba(46, 160, 67, 0.3);
@@ -93,6 +104,7 @@
         --success: #3fb950;
         --success-emphasis: #238636;
         --success-hover: #29903b;
+        --done: #8957e5;
         --danger: #f85149;
         --diff-add-bg: rgba(46, 160, 67, 0.15);
         --diff-add-num-bg: rgba(46, 160, 67, 0.3);
@@ -234,14 +246,12 @@
         gap: 8px;
         padding-top: 4px;
       }
-      /* Hero */
-      .pr {
-        padding-top: 40px;
+      /* Hero: the question, then the pull request to try it on */
+      .hero {
+        padding-top: var(--space-2xl);
+        display: grid;
+        gap: var(--space-md);
       }
-      .pr .lede {
-        padding-block: 16px 24px;
-      }
-
       h1 {
         margin: 0;
         font-family: var(--font-display);
@@ -250,47 +260,94 @@
         line-height: 1.1;
         letter-spacing: -0.025em;
         text-wrap: balance;
+        overflow-wrap: anywhere;
+        min-width: 0;
       }
       .lede {
         margin: 0;
         font-size: 18px;
-        line-height: 1.5;
+        line-height: 1.55;
         color: var(--fg-muted);
-        max-width: 38em;
+        max-width: 40em;
         text-wrap: pretty;
       }
       .note {
         margin: 0;
-        font-size: 14px;
-        color: var(--fg-muted);
-      }
-
-      /* Screenshots: real captures in a plain Box, no drawn chrome */
-      .shot {
-        margin: 0;
-        border: 1px solid var(--border);
-        border-radius: 12px;
-        overflow: hidden;
-        background: #ffffff;
-        box-shadow: var(--shadow);
-      }
-      .shot img {
-        display: block;
-        width: 100%;
-        height: auto;
-      }
-      .shot-cap {
-        margin: 10px 2px 0;
         font-size: 13px;
         color: var(--fg-muted);
       }
 
-      /* Section heads */
+      /* The try-it card, drawn as a pull request row */
+      .pr-card {
+        margin-top: var(--space-md);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--canvas);
+        box-shadow: var(--shadow);
+        overflow: hidden;
+      }
+      .pr-card .row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: var(--space-sm) var(--space-md);
+        align-items: center;
+        padding: var(--space-md) var(--space-lg);
+      }
+      .pr-card .merged {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 3px 10px;
+        border-radius: 2em;
+        background: var(--done);
+        color: var(--on-emphasis);
+        font-size: 13px;
+        font-weight: 500;
+        white-space: nowrap;
+      }
+      .pr-card .merged svg {
+        width: 14px;
+        height: 14px;
+        fill: currentColor;
+      }
+      .pr-card .title {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.35;
+      }
+      .pr-card .title span {
+        color: var(--fg-muted);
+        font-weight: 400;
+      }
+      .pr-card .meta {
+        margin: 2px 0 0;
+        font-size: 13px;
+        color: var(--fg-muted);
+      }
+      .pr-card .meta .add {
+        color: var(--success);
+        font-family: var(--font-mono);
+      }
+      .pr-card .meta .del {
+        color: var(--danger);
+        font-family: var(--font-mono);
+      }
+      .pr-card .foot {
+        padding: var(--space-sm) var(--space-lg);
+        border-top: 1px solid var(--border-muted);
+        background: var(--canvas-subtle);
+      }
+
+      /* Sections share one rhythm */
       section {
-        padding-block: 72px 0;
+        padding-top: var(--space-3xl);
+      }
+      .hero + section {
+        padding-top: var(--space-2xl);
       }
       h2 {
-        margin: 0 0 12px;
+        margin: 0 0 var(--space-sm);
         font-family: var(--font-display);
         font-weight: 700;
         font-size: clamp(24px, 2.8vw, 30px);
@@ -299,81 +356,86 @@
         text-wrap: balance;
       }
       h3 {
-        margin: 0 0 6px;
+        margin: 0;
         font-family: var(--font-display);
         font-weight: 700;
         font-size: 22px;
+        line-height: 1.25;
         letter-spacing: -0.01em;
       }
-      .sub {
-        margin: 0;
+      .prose {
+        max-width: 40em;
         font-size: 18px;
         color: var(--fg-muted);
-        max-width: 40em;
         text-wrap: pretty;
       }
-      .sub p {
-        margin: 0 0 12px;
+      .prose p {
+        margin: 0 0 var(--space-sm);
       }
-      .sub ul {
+      .questions {
         list-style: none;
-        margin: 0 0 12px;
+        margin: 0 0 var(--space-md);
         padding: 0;
         display: grid;
         gap: 6px;
       }
-      .sub li {
+      .questions li {
         display: grid;
         grid-template-columns: 20px minmax(0, 1fr);
         color: var(--fg);
       }
-      .sub li::before {
+      .questions li::before {
         content: "+";
         font-family: var(--font-mono);
         font-weight: 700;
         color: var(--success);
       }
-      /* Feature rows: text beside screenshot */
+
+      /* Each feature: its question, the answer, then the screenshot */
       .feature {
         display: grid;
-        grid-template-columns: minmax(0, 4fr) minmax(0, 7fr);
-        gap: 40px;
-        align-items: start;
-        padding-block: 40px;
-        border-top: 1px solid var(--border-muted);
+        gap: var(--space-sm);
+        padding-top: var(--space-2xl);
       }
-      .feature:first-of-type {
-        border-top: 0;
+      .feature .ask {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+        color: var(--success);
       }
-      .feature .text {
-        display: grid;
-        gap: 10px;
-        align-content: start;
+      .feature .ask::before {
+        content: "+ ";
+        font-family: var(--font-mono);
       }
       .feature p {
         margin: 0;
+        max-width: 40em;
         color: var(--fg-muted);
-      }
-      .feature.flip {
-        grid-template-columns: minmax(0, 7fr) minmax(0, 4fr);
-      }
-      .feature.flip .text {
-        order: 2;
-      }
-      .feature.wide {
-        grid-template-columns: minmax(0, 1fr);
-      }
-      .feature.wide .text {
-        max-width: 640px;
+        text-wrap: pretty;
       }
 
-      .try {
+      /* Screenshots: real captures in one frame, no drawn chrome. A narrow
+         capture sits centred at a readable size rather than stretching. */
+      .shot {
+        margin: var(--space-sm) 0 0;
+        padding: var(--space-lg);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        background: var(--canvas-subtle);
         display: grid;
-        gap: 14px;
-        justify-items: start;
+        justify-items: center;
       }
-      .try h2 {
-        margin: 0;
+      .shot img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 1px solid var(--border-muted);
+        border-radius: 8px;
+        background: var(--shot-bg);
+        box-shadow: var(--shadow);
+      }
+      .shot.small img {
+        max-width: 640px;
       }
 
       /* Closing */
@@ -418,13 +480,18 @@
       }
 
       @media (max-width: 860px) {
-        .feature,
-        .feature.flip {
+        .pr-card .row {
           grid-template-columns: minmax(0, 1fr);
-          gap: 20px;
+          padding: var(--space-md);
         }
-        .feature.flip .text {
-          order: 0;
+        .pr-card .row .merged {
+          justify-self: start;
+        }
+        .pr-card .foot {
+          padding: var(--space-sm) var(--space-md);
+        }
+        .shot {
+          padding: var(--space-sm);
         }
         .close {
           padding: 28px 20px;
@@ -533,7 +600,7 @@
     </header>
 
     <main id="top" class="wrap">
-      <div class="pr">
+      <div class="hero">
         <h1>How am I supposed to review all this</h1>
         <p class="lede">
           In the last 12 months our coding tools have completely changed... but
@@ -541,24 +608,49 @@
           helped us understand the change, the system design and data model
           changes instead of just the code lines that changed?
         </p>
-        <figure class="shot">
-          <img
-            src="img/flow.png"
-            width="2496"
-            height="1988"
-            alt="A Backstory flow for opening the inbox, before and after the change: 5 steps removed in red, 11 added in green, across the inbox screens, the API routes, inbox discovery and a new part, looked-at branches."
-          />
-        </figure>
-        <p class="shot-cap">
-          This is a real change from Backstory's own repo: what opening the
-          inbox does, before and after.
-        </p>
+
+        <div class="pr-card" aria-labelledby="try-h">
+          <div class="row">
+            <span class="merged">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <path
+                  d="M5.45 5.154A4.25 4.25 0 0 0 9.25 7.5h1.378a2.251 2.251 0 1 1 0 1.5H9.25A5.734 5.734 0 0 1 5 7.123v3.505a2.25 2.25 0 1 1-1.5 0V5.372a2.25 2.25 0 1 1 1.95-.218ZM4.25 13.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Zm8.5-4.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5ZM5 3.25a.75.75 0 1 0 0 .005V3.25Z"
+                />
+              </svg>
+              Merged
+            </span>
+            <div>
+              <h2 id="try-h" class="title">
+                Make the inbox a list of changes waiting for you
+                <span>#117</span>
+              </h2>
+              <p class="meta">
+                Try it on a real pull request from Backstory's own repo · 18
+                files <span class="add">+631</span>
+                <span class="del">−145</span>
+              </p>
+            </div>
+            <div class="ctas">
+              <a
+                class="btn"
+                href="https://github.com/edvanbeinum/backstory/pull/117/files"
+              >
+                See it on GitHub
+              </a>
+              <a class="btn primary" href="demo/">See it in Backstory</a>
+            </div>
+          </div>
+          <p class="foot note">
+            The Backstory version runs in your browser, on a recording of the
+            app reviewing that pull request.
+          </p>
+        </div>
       </div>
 
       <section>
-        <div class="sub">
+        <div class="prose">
           <p>When I look at a change, I want to know:</p>
-          <ul>
+          <ul class="questions">
             <li>What did it do, and why?</li>
             <li>Which parts of the system did it touch?</li>
             <li>What does each user action do now?</li>
@@ -575,12 +667,10 @@
       <section aria-labelledby="basics-h">
         <h2 id="basics-h">What did my agent just do?</h2>
 
-        <div class="feature wide">
-          <div class="text">
-            <div><span class="lbl">What it did</span></div>
-            <h3>Start with a few plain sentences</h3>
-            <p>Every change opens with what it does and where to look first.</p>
-          </div>
+        <div class="feature">
+          <p class="ask">What did it do, and why?</p>
+          <h3>Start with a few plain sentences</h3>
+          <p>Every change opens with what it does and where to look first.</p>
           <figure class="shot">
             <img
               src="img/describe.png"
@@ -593,36 +683,32 @@
         </div>
 
         <div class="feature">
-          <div class="text">
-            <div><span class="lbl">Where it changed</span></div>
-            <h3>See which parts of your system it touched</h3>
-            <p>
-              It shows you a map of the system, outlining the parts the change
-              added or removed so you can understand how the change fits in
-              before you open a file.
-            </p>
-          </div>
-          <figure class="shot">
+          <p class="ask">Which parts of the system did it touch?</p>
+          <h3>See which parts of your system it touched</h3>
+          <p>
+            It shows you a map of the system, outlining the parts the change
+            added or removed so you can understand how the change fits in before
+            you open a file.
+          </p>
+          <figure class="shot small">
             <img
               src="img/map.png"
               width="1410"
-              height="2340"
+              height="1150"
               loading="lazy"
-              alt="Backstory's map of the change: six parts touched across the web UI and the local server, with a new part, looked-at branches, outlined in green and four new arrows."
+              alt="Part of Backstory's map of the change: a new part, looked-at branches, outlined in green, with new arrows from inbox discovery and to the local store."
             />
           </figure>
         </div>
 
-        <div class="feature flip">
-          <div class="text">
-            <div><span class="lbl green">What each action does</span></div>
-            <h3>Follow each user action, step by step</h3>
-            <p>
-              It shows you a sequence diagram for each user action: the calls
-              between the parts of your system and the data that passes between
-              them.
-            </p>
-          </div>
+        <div class="feature">
+          <p class="ask">What does each user action do now?</p>
+          <h3>Follow each user action, step by step</h3>
+          <p>
+            It shows you a sequence diagram for each user action: the calls
+            between the parts of your system and the data that passes between
+            them.
+          </p>
           <figure class="shot">
             <img
               src="img/flow-new.png"
@@ -635,16 +721,14 @@
         </div>
 
         <div class="feature">
-          <div class="text">
-            <div><span class="lbl">What happens to the data</span></div>
-            <h3>Data models are tricky</h3>
-            <p>
-              A flaw in the data model is what bites us in the butt later, so
-              Backstory highlights the changes to entities, fields and
-              relationships before you merge.
-            </p>
-          </div>
-          <figure class="shot">
+          <p class="ask">What happens to the data?</p>
+          <h3>Data models are tricky</h3>
+          <p>
+            A flaw in the data model is what bites us in the butt later, so
+            Backstory highlights the changes to entities, fields and
+            relationships before you merge.
+          </p>
+          <figure class="shot small">
             <img
               src="img/data.png"
               width="1250"
@@ -655,16 +739,14 @@
           </figure>
         </div>
 
-        <div class="feature wide">
-          <div class="text">
-            <div><span class="lbl">One part at a time</span></div>
-            <h3>Walk through the change</h3>
-            <p>
-              Knowing where to start when looking at a diff is tricky, so
-              Backstory takes you through the change one part of your system at
-              a time, each with its steps and its files.
-            </p>
-          </div>
+        <div class="feature">
+          <p class="ask">Where do I start?</p>
+          <h3>Walk through the change</h3>
+          <p>
+            Knowing where to start when looking at a diff is tricky, so
+            Backstory takes you through the change one part of your system at a
+            time, each with its steps and its files.
+          </p>
           <figure class="shot">
             <img
               src="img/walk.png"
@@ -676,37 +758,14 @@
           </figure>
         </div>
 
-        <div class="feature wide">
-          <div class="text">
-            <div><span class="lbl green">What to fix</span></div>
-            <h3>Send your notes back to the agent</h3>
-            <p>
-              If you open Backstory from an agent session, you can send your
-              notes back to the agent, directly from the app.
-            </p>
-          </div>
+        <div class="feature">
+          <p class="ask">What should I ask it to fix?</p>
+          <h3>Send your notes back to the agent</h3>
+          <p>
+            If you open Backstory from an agent session, you can send your notes
+            back to the agent, directly from the app.
+          </p>
         </div>
-      </section>
-
-      <section aria-labelledby="try-h" class="try">
-        <h2 id="try-h">Try it on a real pull request</h2>
-        <p class="sub">
-          Pull request #117 in Backstory's own repo makes the inbox a list of
-          changes waiting for you: 18 files, +631 −145. Look at it both ways.
-        </p>
-        <div class="ctas">
-          <a
-            class="btn lg"
-            href="https://github.com/edvanbeinum/backstory/pull/117/files"
-          >
-            See it on GitHub
-          </a>
-          <a class="btn primary lg" href="demo/">See it in Backstory</a>
-        </div>
-        <p class="note">
-          The Backstory version runs in your browser, on a recording of the app
-          reviewing that pull request.
-        </p>
       </section>
 
       <div class="close">
