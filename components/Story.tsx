@@ -18,7 +18,7 @@ import { Flows } from "./Flows";
 import type { ComponentInfo, DataField, StepBadge } from "./FlowSequence";
 import { ReadFootnote } from "./ReadFootnote";
 import { ReadLine } from "./ReadLine";
-import { SystemMap, useMapDraft } from "./SystemMap";
+import { setAutoReading, SystemMap, useMapDraft } from "./SystemMap";
 import { Button } from "./ui";
 import type { FlowsApi } from "./useFlows";
 import { useView } from "./ViewContext";
@@ -132,6 +132,12 @@ export function Story({
     onModelChange,
   );
   const describes = rev !== WORKING_REV ? read : null;
+  // Gives the map card the repo's switch on uncommitted work too, where there
+  // is no description to own it.
+  const setAuto = async (on: boolean) => {
+    await setAutoReading(repo, on);
+    onModelChange();
+  };
   const readLine = (
     <ReadLine map={mapDraft} data={dataDraft} description={describes} />
   );
@@ -247,7 +253,7 @@ export function Story({
   const mapSection = (focused: boolean) => (
     <SystemMap
       draft={mapDraft}
-      onSetAuto={describes?.setAuto}
+      onSetAuto={describes?.setAuto ?? setAuto}
       repo={repo}
       rev={rev}
       highlight={mapHighlight}
