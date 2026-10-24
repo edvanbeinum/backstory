@@ -9,7 +9,8 @@ import {
   type ProviderStatus,
   type Runner,
 } from "../ai/provider";
-import { gitLine } from "../exec";
+import { BIG_REPO_FILES } from "../constants";
+import { gitLine, gitTry } from "../exec";
 import { isOnBranch, repoKey, resolveRepo } from "../git";
 import { readModelAt } from "../model";
 import { homeDir, setSetting, setting } from "../store";
@@ -21,7 +22,7 @@ import {
   type DraftedHead,
 } from "./drafted";
 import { dataSteer, readDataModel, steerError } from "./readers";
-import type { DataDraftStatus, DataModel } from "./types";
+import type { DataDraftStatus, DataModel, TrunkReadStatus } from "./types";
 
 /**
  * Drafted data models and the reads that make them.
@@ -89,6 +90,12 @@ interface Trunk {
 interface Job {
   startedAt: number;
   phase: string;
+  /** The tree the read is on, from 1, or 0 before its first */
+  at: number;
+  /** How many trees the read reads, main's first when it waits on main */
+  of: number;
+  /** For main's read: whether the repo is big, once its files are counted */
+  big?: boolean;
   settled: Promise<void>;
   /** The key of main's read, when this job was queued behind it */
   behind?: string;
@@ -129,6 +136,12 @@ export const autoRead = async (root: string) =>
   setting(await offKey(root)) !== "1";
 export const setAutoRead = async (root: string, on: boolean) =>
   setSetting(await offKey(root), on ? "0" : "1");
+
+/** Whether the repo tracks `BIG_REPO_FILES` files or more. */
+export async function bigRepo(root: string): Promise<boolean> {
+  const out = await gitTry(root, ["ls-files", "-z"]);
+  return (out?.split("\0").length ?? 1) - 1 >= BIG_REPO_FILES;
+}
 
 interface Files {
   dir: string;
@@ -242,11 +255,18 @@ export async function dataStatus(
       job.behind && job.phase === PHASES.waiting
         ? registry.jobs.get(job.behind)
         : undefined;
-    const shown = main ?? job;
+    if (main)
+      return {
+        status: "running",
+        phase: main.phase === PHASES.firstMain ? PHASES.main : main.phase,
+        startedAt: main.startedAt,
+        step: { at: 1, of: Math.max(job.of, 1) },
+      };
     return {
       status: "running",
-      phase: shown.phase,
-      startedAt: shown.startedAt,
+      phase: job.phase,
+      startedAt: job.startedAt,
+      step: stepOf(job),
     };
   }
   const idle = {
@@ -269,6 +289,27 @@ export async function dataStatus(
     return { ...ended, reason };
   }
   return ended ?? idle;
+}
+
+const stepOf = (job: Job) =>
+  job.at > 0 ? { at: job.at, of: Math.max(job.of, job.at) } : null;
+
+/** Main's read for the repo: running, or how it last ended; null when none ran. */
+export async function dataTrunkStatus(
+  root: string,
+): Promise<TrunkReadStatus | null> {
+  const key = trunkKey(await dataDir(root));
+  const job = registry.jobs.get(key);
+  if (job)
+    return {
+      status: "running",
+      phase: job.phase,
+      startedAt: job.startedAt,
+      step: stepOf(job),
+      big: job.big ?? false,
+    };
+  const ended = registry.ended.get(key);
+  return ended?.status === "done" || ended?.status === "failed" ? ended : null;
 }
 
 /** The end of the view's current read, if one is running: the change description waits on it, as tests do. */
@@ -296,6 +337,8 @@ function claim(key: string) {
   const job: Job = {
     startedAt: Date.now(),
     phase: "Starting",
+    at: 0,
+    of: 0,
     settled: new Promise((resolve) => (settle = resolve)),
   };
   registry.jobs.set(key, job);
@@ -378,6 +421,7 @@ async function modelAt(
     const saved = await savedModel(c.dir, at.tree, c.files);
     if (saved) return saved;
   }
+  c.job.at += 1;
   const patch = start ? await forwardPatch(c.root, start.tree, at.tree) : null;
   let model: ModelFile;
   if (start && patch === "") {
@@ -425,6 +469,28 @@ async function modelAt(
   c.made.set(at.tree, model);
   if (!c.fresh) await writeJson(modelPath(c.dir, at.tree), model);
   return model;
+}
+
+/**
+ * How many trees `readView` reads: main's on a Redraft, then the base and the
+ * head unless saved, each tree once.
+ */
+async function treesToRead(
+  c: Chain,
+  view: DataView,
+  files: Files,
+): Promise<number> {
+  const main = c.fresh ? await mainTip(c.root) : null;
+  const unread = new Set<string>();
+  for (const t of [
+    main && (await tree(c.root, main)),
+    view.base && files.base,
+    files.head,
+  ]) {
+    if (!t || unread.has(t)) continue;
+    if (c.fresh || !(await savedModel(c.dir, t, c.files))) unread.add(t);
+  }
+  return unread.size;
 }
 
 /**
@@ -555,6 +621,8 @@ export async function startDataRead(
     runner: opts.runner,
     fresh: opts.redraft,
   });
+  const behind = job.behind ? 1 : 0;
+  job.of = behind + (await treesToRead(c, view, files).catch(() => 0));
   void enqueue(async () => {
     const started = Date.now();
     try {
@@ -562,6 +630,9 @@ export async function startDataRead(
       // base instead would cost as much and fail the same way.
       const mainEnded = job.behind ? registry.ended.get(job.behind) : null;
       if (mainEnded?.status === "failed") throw new Error(mainEnded.error);
+      // Count again: main's read, or another view's, may have saved a tree since.
+      job.at = behind;
+      job.of = behind + (await treesToRead(c, view, files));
       const trunk = await readView(c, view, files);
       if (c.fresh) await saveRedraft(c, trunk);
       registry.ended.set(files.key, {
@@ -618,6 +689,7 @@ export async function startTrunkRead(
   if (!ready) return false;
 
   job.phase = PHASES.waiting;
+  job.of = 1;
   const { tip, files } = ready;
   const c = chain(root, dir, files, job, { runner: opts.runner });
   void enqueue(async () => {
@@ -625,6 +697,7 @@ export async function startTrunkRead(
     try {
       // A view's read queued ahead of this one may have saved main's model.
       if (await readJson<Trunk>(trunkPath(dir))) return;
+      job.big = await bigRepo(root);
       const t = await tree(root, tip);
       await modelAt(c, { tree: t, rev: tip }, null, {
         full: PHASES.firstMain,

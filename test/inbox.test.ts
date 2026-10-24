@@ -5,9 +5,15 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
+import type { Runner } from "../lib/ai/provider";
 import { pickPullRequest } from "../lib/github";
 import { buildInbox } from "../lib/inbox";
 import { markLooked } from "../lib/looked";
+import {
+  mapTrunkReadSettled,
+  PHASES,
+  startMapTrunkRead,
+} from "../lib/models/cache";
 import {
   githubApiStandIn,
   quietLoginShell,
@@ -272,6 +278,39 @@ test("a branch reads as changed until you look at it, and again after a new comm
 
   repo.commit(one, { "one.txt": "1\n1\n" });
   assert.deepEqual(await changed(), { main: false, one: true, two: true });
+});
+
+test("a repo whose main is being read says so on the inbox until the read ends", async () => {
+  const repo = repoOnMain(null);
+  const reading = async () => (await buildInbox([repo.root])).repos[0].reading;
+  assert.equal(await reading(), null);
+
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => (release = resolve));
+  let entered = () => {};
+  const started = new Promise<void>((resolve) => (entered = resolve));
+  const waits: Runner = async () => {
+    entered();
+    await gate;
+    throw new Error("Claude Code failed: blocked");
+  };
+  assert.equal(
+    await startMapTrunkRead(repo.root, {
+      runner: waits,
+      status: async () => "ready",
+    }),
+    true,
+  );
+  await started;
+  const running = await reading();
+  release();
+  await mapTrunkReadSettled(repo.root);
+  assert.deepEqual(running, {
+    phase: `Drawing the map: ${PHASES.firstMain}`,
+    step: { at: 1, of: 1 },
+    big: false,
+  });
+  assert.equal(await reading(), null);
 });
 
 test("the main checkout on the default branch has nothing to count and never reads as changed", async () => {

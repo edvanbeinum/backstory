@@ -19,6 +19,7 @@ import {
   autoRead,
   dataReadSettled,
   dataStatus,
+  dataTrunkStatus,
   PHASES,
   setAutoRead,
   startDataRead,
@@ -1398,10 +1399,10 @@ test("a view queued behind main's read shows main's phase, and fails with it", a
   await startDataRead(view, { runner: failing.runner, status: ready });
   await reading;
   const waiting = await dataStatus(view);
-  assert.equal(waiting.status, "running");
-  assert.equal(waiting.status === "running" && waiting.phase, PHASES.firstMain);
-
   open();
+  assert.equal(waiting.status, "running");
+  assert.equal(waiting.status === "running" && waiting.phase, PHASES.main);
+
   await trunkReadSettled(repo.root);
   await dataReadSettled(view);
   assert.deepEqual(failing.calls, ["head"]);
@@ -1411,6 +1412,89 @@ test("a view queued behind main's read shows main's phase, and fails with it", a
   });
   const dir = await dataFolder(repo.root);
   assert.deepEqual(existsSync(dir) ? readdirSync(dir) : [], []);
+});
+
+test("a view's data read says which of its trees it is on, with main's read first while it waits on main", async () => {
+  const repo = mainRepo();
+  const base = repo.on(["id", "body", "rev"]);
+  const head = repo.on(["id", "body", "rev", "at"]);
+  const view = { root: repo.root, base, head };
+
+  let open = () => {};
+  const gate = new Promise<void>((resolve) => (open = resolve));
+  let entered = () => {};
+  const reading = new Promise<void>((resolve) => (entered = resolve));
+  const main = recorder();
+  const gated: Runner = async <T>(
+    prompt: string,
+    schema: object,
+    cwd: string,
+  ) => {
+    entered();
+    await gate;
+    return main.runner<T>(prompt, schema, cwd);
+  };
+  const steps: unknown[] = [];
+  const ai = recorder();
+  const stepping =
+    (on: DataView): Runner =>
+    async <T>(prompt: string, schema: object, cwd: string) => {
+      const status = await dataStatus(on);
+      steps.push(status.status === "running" && status.step);
+      return ai.runner<T>(prompt, schema, cwd);
+    };
+
+  assert.equal(await dataTrunkStatus(repo.root), null);
+  assert.equal(
+    await startTrunkRead(repo.root, { runner: gated, status: ready }),
+    true,
+  );
+  await startDataRead(view, { runner: stepping(view), status: ready });
+  await reading;
+  const waiting = await dataStatus(view);
+  const trunkRead = await dataTrunkStatus(repo.root);
+  open();
+  assert.deepEqual(
+    waiting.status === "running" && [waiting.phase, waiting.step],
+    [PHASES.main, { at: 1, of: 3 }],
+  );
+  assert.deepEqual(
+    trunkRead?.status === "running" && [trunkRead.step, trunkRead.big],
+    [{ at: 1, of: 1 }, false],
+  );
+
+  await trunkReadSettled(repo.root);
+  await dataReadSettled(view);
+  assert.deepEqual(ai.calls, ["delta", "delta"]);
+  assert.deepEqual(steps.splice(0), [
+    { at: 2, of: 3 },
+    { at: 3, of: 3 },
+  ]);
+  assert.equal((await dataTrunkStatus(repo.root))?.status, "done");
+
+  // A view whose base is saved reads only its head.
+  const after = {
+    root: repo.root,
+    base: head,
+    head: repo.on(["id", "body", "rev", "at", "by"]),
+  };
+  await read(after, { runner: stepping(after) });
+  assert.deepEqual(steps, [{ at: 1, of: 1 }]);
+});
+
+test("a repo a data reader reads has no main read", async () => {
+  const repo = tempRepo();
+  repo.write("db/schema.sql", "CREATE TABLE notes (id TEXT PRIMARY KEY);\n");
+  repo.commit("Add the schema");
+  repo.git("branch", "-M", "main");
+  assert.equal(
+    await startTrunkRead(repo.root, {
+      runner: recorder().runner,
+      status: ready,
+    }),
+    false,
+  );
+  assert.equal(await dataTrunkStatus(repo.root), null);
 });
 
 test("a failed read of main isn't started again when the repo opens again", async () => {
