@@ -65,7 +65,11 @@ export async function gitCommonDir(root: string): Promise<string> {
   );
 }
 
-/** Builds `repoKey` from a common git dir already in hand. */
+/**
+ * Builds `repoKey` from a common git dir already in hand. Change the shell
+ * command in `docs/using-backstory.md` with it, since that's how someone finds
+ * a moved checkout's hand-written map folder.
+ */
 export function repoKeyOf(common: string): string {
   const name = path
     .basename(path.dirname(common))

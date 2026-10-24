@@ -167,11 +167,17 @@ before reading its lines:
     `~/.backstory/models/<folder>-<hash>/workspace.dsl`, where `<folder>` is
     the main checkout's folder and `<hash>` is 8 characters that tell apart
     repos with the same folder name. Every worktree of the repo reads it, and
-    the line under the map on Story shows its path. The hash comes from where
-    the checkout is on disk, so after you move or rename the checkout, rename
-    its folder under `~/.backstory/models/` to the one that line showed. It's the same map for
+    the line under the map on Story shows its path. It's the same map for
     every commit, so the map shows which components a change touched, but not
     what it added or removed.
+  - The hash comes from where the checkout is on disk, so after you move or
+    rename the checkout, rename its folder under `~/.backstory/models/` to the
+    name this prints when you run it in the checkout:
+
+    ```sh
+    d=$(git rev-parse --path-format=absolute --git-common-dir); echo "$(basename "$(dirname "$d")")-$(printf %s "$d" | shasum | cut -c1-8)"
+    ```
+
   - Any other repo has its map drawn by Claude Code, the same way as the data
     model is read. It reads main in full once per repo, a minute or two
     on a small repo and more on a large one. Every other commit's map is worked
