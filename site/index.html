@@ -278,6 +278,13 @@
       }
 
       /* The try-it card, drawn as a pull request row */
+      .tee {
+        margin: var(--space-xl) 0 0;
+        max-width: 40em;
+        font-size: 18px;
+        color: var(--fg);
+        text-wrap: pretty;
+      }
       .pr-card {
         margin-top: var(--space-md);
         border: 1px solid var(--border);
@@ -396,6 +403,9 @@
         display: grid;
         gap: var(--space-sm);
         padding-top: var(--space-2xl);
+      }
+      section > .feature:first-child {
+        padding-top: 0;
       }
       .feature .ask {
         margin: 0;
@@ -608,7 +618,28 @@
           helped us understand the change, the system design and data model
           changes instead of just the code lines that changed?
         </p>
+      </div>
 
+      <section>
+        <div class="prose">
+          <p>When I look at a change, I want to know:</p>
+          <ul class="questions">
+            <li>What did it do, and why?</li>
+            <li>Which parts of the system did it touch?</li>
+            <li>What does each user action do now?</li>
+            <li>What happens to the data?</li>
+          </ul>
+          <p>
+            Backstory is a code review visualizer built on top of Claude Code
+            that is conceived entirely on answering those questions. We already
+            have sequence diagrams and C4 maps - let's use those!
+          </p>
+        </div>
+        <p class="tee">
+          Try it yourself on a real PR from the Backstory repo. This PR changed
+          the inbox from being based on review comments you hadn't seen, to code
+          changes you hadn't seen. Compare that to the GitHub diff!
+        </p>
         <div class="pr-card" aria-labelledby="try-h">
           <div class="row">
             <span class="merged">
@@ -625,8 +656,7 @@
                 <span>#117</span>
               </h2>
               <p class="meta">
-                Try it on a real pull request from Backstory's own repo · 18
-                files <span class="add">+631</span>
+                Backstory's own repo · 18 files <span class="add">+631</span>
                 <span class="del">−145</span>
               </p>
             </div>
@@ -645,28 +675,9 @@
             app reviewing that pull request.
           </p>
         </div>
-      </div>
-
-      <section>
-        <div class="prose">
-          <p>When I look at a change, I want to know:</p>
-          <ul class="questions">
-            <li>What did it do, and why?</li>
-            <li>Which parts of the system did it touch?</li>
-            <li>What does each user action do now?</li>
-            <li>What happens to the data?</li>
-          </ul>
-          <p>
-            Backstory is a code review visualizer built on top of Claude Code
-            that is conceived entirely on answering those questions. We already
-            have sequence diagrams and C4 maps - let's use those!
-          </p>
-        </div>
       </section>
 
-      <section aria-labelledby="basics-h">
-        <h2 id="basics-h">What did my agent just do?</h2>
-
+      <section>
         <div class="feature">
           <p class="ask">What did it do, and why?</p>
           <h3>Start with a few plain sentences</h3>
