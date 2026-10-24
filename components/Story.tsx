@@ -121,11 +121,10 @@ export function Story({
   const read = useDescription(repo, rev, onModelChange);
   const description =
     read.status?.status === "done" ? read.status.description : null;
-  const shownMap = rev !== WORKING_REV ? map : null;
   // Story holds the drawings' reads, not the drawings, so its one progress
   // line knows each read and the data model reads in the walk, whose maps
   // show no data phrase.
-  const mapDraft = useMapDraft(repo, rev, shownMap, onModelChange);
+  const mapDraft = useMapDraft(repo, rev, map, onModelChange);
   const dataDraft = useDataDraft(
     repo,
     rev,
@@ -158,13 +157,13 @@ export function Story({
     () =>
       buildStops({
         description,
-        map: shownMap,
+        map,
         order,
         data,
         flows: set,
         files: diff?.files ?? [],
       }),
-    [description, shownMap, order, data, set, diff],
+    [description, map, order, data, set, diff],
   );
   // Keep the stop picked on screen when a late map, data model or diff adds
   // stops before it, rather than the stop now at its number. A stop number
@@ -301,10 +300,10 @@ export function Story({
             overview={
               <>
                 {overview}
-                {rev !== WORKING_REV && mapSection(true)}
+                {mapSection(true)}
               </>
             }
-            map={rev !== WORKING_REV ? mapSection(true) : null}
+            map={mapSection(true)}
             data={data}
             entityNotes={entityNotes}
             renderFiles={renderFiles}
@@ -328,14 +327,12 @@ export function Story({
 
       {overview}
 
-      {rev !== WORKING_REV && (
-        <section className="space-y-2">
-          <div className="story-h">
-            <h3>Map</h3>
-          </div>
-          {mapSection(false)}
-        </section>
-      )}
+      <section className="space-y-2">
+        <div className="story-h">
+          <h3>Map</h3>
+        </div>
+        {mapSection(false)}
+      </section>
 
       <section className="space-y-2">
         <div className="story-h">

@@ -621,9 +621,10 @@ export default function Page() {
   }, [shown, rev, viewId, haveSession, workingDiffKey]);
 
   // The map follows the diff: a commit's never changes; the branch's moves
-  // with its tip.
+  // with its tip, and uncommitted work's with each save. The data model reads
+  // files at a commit, so uncommitted work has none.
   useEffect(() => {
-    if (!shown.repo || !haveSession || rev === WORKING_REV) {
+    if (!shown.repo || !haveSession) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the map where there is none, else fetches it
       setMapRead(null);
       setDataRead(null);
@@ -634,9 +635,11 @@ export default function Page() {
     getJson<MapResponse>(`/api/map?${query}`)
       .then((data) => !cancelled && setMapRead({ view: viewId, map: data }))
       .catch(() => !cancelled && setMapRead(null));
-    getJson<DataResponse>(`/api/data?${query}`)
-      .then((data) => !cancelled && setDataRead({ view: viewId, data }))
-      .catch(() => !cancelled && setDataRead(null));
+    if (rev === WORKING_REV) setDataRead(null);
+    else
+      getJson<DataResponse>(`/api/data?${query}`)
+        .then((data) => !cancelled && setDataRead({ view: viewId, data }))
+        .catch(() => !cancelled && setDataRead(null));
     return () => {
       cancelled = true;
     };
