@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import type { InboxRepo, InboxResult, RemoteBranch } from "@/lib/inbox";
 import { requestFetch } from "./fetchBranch";
@@ -109,8 +109,12 @@ export function Inbox({
 
   const key = useMemo(() => [...roots].sort().join("\0"), [roots]);
 
+  const latest = useRef(0);
   const load = useCallback(
     async (opts: { fresh?: boolean; quiet?: boolean } = {}) => {
+      // Keep only the newest load's answer, so a poll that resolves after a
+      // refresh, or after a root is removed, can't put back what it replaced.
+      const n = ++latest.current;
       if (roots.length === 0) {
         setData(null);
         return;
@@ -125,6 +129,7 @@ export function Inbox({
         });
         if (!response.ok) throw new Error("Couldn't scan your checkouts.");
         const result = (await response.json()) as InboxResult;
+        if (n !== latest.current) return;
         setData(result);
         setError(null);
 
@@ -140,7 +145,8 @@ export function Inbox({
           onForget(result.unresolved.map((entry) => entry.path));
         }
       } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
+        if (n === latest.current)
+          setError(err instanceof Error ? err.message : String(err));
       } finally {
         if (!opts.quiet) setLoading(false);
       }
