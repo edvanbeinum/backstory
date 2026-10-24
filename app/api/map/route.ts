@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { crossSite, errorResponse } from "@/lib/api";
 import { autoRead } from "@/lib/data/cache";
 import { resolveRepo } from "@/lib/git";
-import { buildMap } from "@/lib/map";
+import { WORKING_REV } from "@/lib/constants";
+import { buildMap, buildWorkingMap } from "@/lib/map";
 import { startMapRead, startMapTrunkRead } from "@/lib/models/cache";
 import type { ApiError } from "@/lib/types";
 import { viewRange } from "@/lib/view";
@@ -24,8 +25,19 @@ async function resolve(request: Request) {
     };
   }
   const repo = await resolveRepo(repoPath, searchParams.get("ref"));
-  const range = await viewRange(repo, rev);
-  return { root: repo.root, range, searchParams };
+  // Uncommitted work is drawn on HEAD's map, so its read is HEAD's own view's.
+  // A branch opened by ref has none: the checkout's uncommitted work belongs
+  // to another branch, and /api/session reports none.
+  const working = rev === WORKING_REV;
+  const range =
+    working && repo.ref ? null : await viewRange(repo, working ? "HEAD" : rev);
+  const map = () =>
+    !range
+      ? null
+      : working
+        ? buildWorkingMap(repo)
+        : buildMap(repo.root, range.base, range.head);
+  return { root: repo.root, range, map, searchParams };
 }
 
 /** The system map for a view: what the change touched in the C4 model. */
@@ -33,11 +45,9 @@ export async function GET(request: Request) {
   try {
     const r = await resolve(request);
     if (r.error) return r.error;
-    if (!r.range) return NextResponse.json({ status: "none" });
-    return NextResponse.json(
-      await buildMap(r.root, r.range.base, r.range.head),
-      { headers: { "Cache-Control": "no-store" } },
-    );
+    const map = await r.map();
+    if (!map) return NextResponse.json({ status: "none" });
+    return NextResponse.json(map, { headers: { "Cache-Control": "no-store" } });
   } catch (err) {
     return errorResponse(err);
   }
@@ -89,7 +99,7 @@ export async function POST(request: Request) {
         },
         { status: 409 },
       );
-    return NextResponse.json(await buildMap(r.root, base, head), {
+    return NextResponse.json(await r.map(), {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (err) {
