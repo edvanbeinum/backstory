@@ -28,7 +28,7 @@ function readOf(
       : null;
   const failed: Failed[] = [];
   if (job?.status === "failed") failed.push({ name, error: job.error, retry });
-  if (error) failed.push({ name, error, retry: null });
+  if (error) failed.push({ name, error, retry });
   const gap = job?.status === "unavailable" ? job.reason : null;
   return { running, failed, gap };
 }
@@ -77,7 +77,7 @@ export function ReadLine({
     failed.push({
       name: "Describing the change",
       error: description.error,
-      retry: null,
+      retry: () => description.start(),
     });
   if (said?.status === "unavailable") gaps.push(said.reason);
   if (said?.status === "done" && said.gap) gaps.push(said.gap);
