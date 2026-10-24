@@ -68,8 +68,10 @@ is left as it is, and Fetch says so.
 
 **The workspace** is one branch. Its header picks the change: the whole branch,
 your uncommitted work, or any one commit on it. It opens on your uncommitted
-work when there is some, and on the whole branch otherwise. Under the header are
-three tabs, as on a pull request, and every change opens on the first:
+work when there is some, and on the whole branch otherwise. Uncommitted work is
+drawn on the map from your last commit, so it shows which components the work
+touched, not which ones it added or removed. Under the header are three tabs,
+as on a pull request, and every change opens on the first:
 
 - **Story** walks you through the change one part at a time (see [Walking through a change](#walking-through-a-change)).
   **Show everything on one page** shows it all at once instead: a few sentences
@@ -107,6 +109,9 @@ Story opens on the change's overview, then takes you through it in order:
 4. **Not on the map**: the files no component has, such as tests.
 5. **Your notes**: says you've seen the whole change, or names the files you
    haven't seen yet, then lists your notes with **Send**.
+
+On uncommitted work, the overview is the map from your last commit, with no
+description, and the walk goes through each component the work changed.
 
 The bar at the top says where you are, as "3 of 6 · Sync Engine", with a dot
 for each part and how many of the change's files you've seen. `j` and `k`, or
