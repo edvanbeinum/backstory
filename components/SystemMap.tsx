@@ -703,7 +703,13 @@ function DraftOffer({ draft }: { draft: MapDraftApi }) {
 
 /** Draws a drafted head's base, with the repo turned off, so reading it isn't left to Draw the map again, which reads main in full. */
 function DrawBase({ map, draft }: { map: MapResponse; draft: MapDraftApi }) {
-  if (map.source !== "drafted" || map.baseModel || !offered(map)) return null;
+  if (
+    map.source !== "drafted" ||
+    map.baseModel ||
+    map.draft?.status !== "idle" ||
+    map.draft.auto
+  )
+    return null;
   return (
     <span className="part">
       <Button size="sm" variant="invisible" onClick={() => draft.start()}>
