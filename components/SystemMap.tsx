@@ -12,10 +12,9 @@ import {
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
 import { ownsCode } from "@/lib/mapGroups";
 import { viewKey, viewParams } from "@/lib/url";
-import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { Badge, Button, CopyButton, Spinner, Ticked } from "./ui";
+import { Button, CopyButton, Ticked } from "./ui";
 import { useView } from "./ViewContext";
 
 /**
@@ -549,7 +548,7 @@ export async function setAutoReading(repo: string, on: boolean) {
  * reads it again. Polls while a read runs rather than adding a watch event:
  * reads are rare.
  */
-function useMapDraft(
+export function useMapDraft(
   repo: string,
   rev: string,
   given: MapResponse | null,
@@ -678,129 +677,39 @@ function useMapDraft(
   };
 }
 
-type DraftApi = ReturnType<typeof useMapDraft>;
+export type MapDraftApi = ReturnType<typeof useMapDraft>;
 
-const formatSeconds = (ms: number) => {
-  const s = Math.max(0, Math.round(ms / 1000));
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m ${s % 60}s`;
-};
+/** Whether the repo is turned off and the read hasn't started, so the page offers the one click that starts it. */
+const offered = (map: MapResponse) =>
+  map.draft?.status === "idle" ? !map.draft.auto : map.draft?.status === "done";
 
-export function Elapsed({ since }: { since: number }) {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
-  }, []);
-  return <>{formatSeconds(now - since)}</>;
-}
-
-function DraftProgress({ draft }: { draft: DraftApi }) {
-  const job = draft.map?.draft;
-  if (draft.error)
-    return (
-      <span className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
-        <AlertIcon size={11} /> {draft.error}
-      </span>
-    );
-  if (job?.status === "running")
-    return (
-      <span className="flex items-center gap-1.5 text-[12px] text-[var(--fg-muted)]">
-        <Spinner className="!h-3 !w-3" />
-        {job.phase} · <Elapsed since={job.startedAt} />
-      </span>
-    );
-  if (job?.status === "failed")
-    return (
-      <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-[var(--attention)]">
-        <AlertIcon size={11} />
-        <span className="truncate" title={job.error}>
-          The read failed: {job.error}
-        </span>
-        <Button size="sm" onClick={draft.retry}>
-          Try again
-        </Button>
-      </span>
-    );
-  if (job?.status === "unavailable")
-    return (
-      <span className="text-[12px] text-[var(--attention)]">
-        <ClaudeCodeNotice reason={job.reason} needs="Drawing the map needs" />
-      </span>
-    );
-  return null;
-}
-
-/** What a view with no map of its own shows, where the map goes: the read's progress, or the offer to read it. */
-function DraftOffer({ draft }: { draft: DraftApi }) {
-  const job = draft.map?.draft;
-  const idle =
-    !job ||
-    job.status === "idle" ||
-    job.status === "unavailable" ||
-    job.status === "done";
-  const provider = job?.status === "idle" ? job.provider : null;
-  const offerAuto = job?.status === "idle" && !job.auto;
-  const file = draft.map?.handFile;
-  const mainMap = draft.map?.mainMap;
+/**
+ * Where the map goes before there is one: with the repo turned off, the one
+ * button that draws it; otherwise empty, since Story's progress line says
+ * what is happening.
+ */
+function DraftOffer({ draft }: { draft: MapDraftApi }) {
+  if (!draft.map || !offered(draft.map))
+    return <div className="story-card map-pending" />;
   return (
     <div className="story-card">
-      <h3>
-        {mainMap
-          ? "This change isn't on the map yet"
-          : "Backstory hasn't drawn this repo yet"}
-      </h3>
-      {mainMap ? (
-        <p>
-          Backstory has main&apos;s map. {provider ?? "The AI provider"} reads
-          only what the diff changes, read-only, and adds it. The map stays on
-          this machine.
-        </p>
-      ) : (
-        <p>
-          Backstory draws a map of your system from the code.{" "}
-          {provider ?? "The AI provider"} reads main once, read-only, then only
-          what each diff changes. The map stays on this machine.
-        </p>
-      )}
-      {idle && (
-        <span className="flex flex-wrap justify-center gap-2">
-          <Button variant="primary" onClick={() => draft.start()}>
-            Draw the map
-          </Button>
-          {offerAuto && (
-            <Button onClick={draft.turnOn}>Read automatically</Button>
-          )}
-        </span>
-      )}
-      <span className="mt-2 flex justify-center">
-        <DraftProgress draft={draft} />
-      </span>
-      {provider && (
-        <span className="est">
-          {provider} ·{" "}
-          {mainMap
-            ? "seconds for this change"
-            : "a few minutes for main, then seconds a change"}{" "}
-          · uses your {provider} login
-        </span>
-      )}
-      {file && (
-        <span className="est flex min-w-0 items-center justify-center gap-1.5">
-          <span className="shrink-0">Or write one by hand at</span>
-          <code className="mono min-w-0 truncate" title={file}>
-            {file}
-          </code>
-          <span className="shrink-0">
-            <CopyButton
-              value={file}
-              variant="invisible"
-              title="Copy the path a hand-written map goes at, to write one"
-              label="Copy path"
-            />
-          </span>
-        </span>
-      )}
+      <h3>The map hasn&apos;t been drawn yet</h3>
+      <Button variant="primary" onClick={() => draft.start()}>
+        Draw the map
+      </Button>
     </div>
+  );
+}
+
+/** Draws a drafted head's base, with the repo turned off, so reading it isn't left to Draw the map again, which reads main in full. */
+function DrawBase({ map, draft }: { map: MapResponse; draft: MapDraftApi }) {
+  if (map.source !== "drafted" || map.baseModel || !offered(map)) return null;
+  return (
+    <span className="part">
+      <Button size="sm" variant="invisible" onClick={() => draft.start()}>
+        Draw the map
+      </Button>
+    </span>
   );
 }
 
@@ -822,72 +731,6 @@ function LocalModel({ map }: { map: MapResponse }) {
   );
 }
 
-/** A drafted map's footnote: the Drawn by AI badge, whether reads start by themselves, Turn off or Read automatically, and Draw again. */
-function DraftFootnote({ map, draft }: { map: MapResponse; draft: DraftApi }) {
-  const running = map.draft?.status === "running";
-  const parts: React.ReactNode[] = [];
-  if (map.auto)
-    parts.push(
-      "Read automatically",
-      <button
-        type="button"
-        className="text-[var(--accent)] hover:underline"
-        onClick={draft.turnOff}
-      >
-        Turn off
-      </button>,
-    );
-  else
-    parts.push(
-      <button
-        type="button"
-        className="text-[var(--accent)] hover:underline"
-        onClick={draft.turnOn}
-      >
-        Read automatically
-      </button>,
-    );
-  return (
-    <span className="part inline-flex flex-wrap items-center gap-1.5">
-      <Badge tone="draft" className="!py-0 !leading-4">
-        Drawn by AI
-      </Badge>
-      <span className="text-[11px] text-[var(--fg-subtle)]">
-        {parts.map((part, i) => (
-          <span key={i}>
-            {i > 0 && " · "}
-            {part}
-          </span>
-        ))}
-      </span>
-      {/* Offers Draw the map when the head has a map but its base doesn't,
-          so reading the base isn't left to Draw again, which reads main in full. */}
-      {!map.baseModel && map.draft?.status === "idle" && !map.auto && (
-        <Button size="sm" variant="invisible" onClick={() => draft.start()}>
-          Draw the map
-        </Button>
-      )}
-      {!running && (
-        <Button
-          size="sm"
-          variant="invisible"
-          onClick={() => {
-            if (
-              window.confirm(
-                `Draw the map again? Main is read again in full and this view is worked out from it, which can take a few minutes on your account. Other views are worked out again as you open them. The current map is kept if it fails.`,
-              )
-            )
-              draft.start(true);
-          }}
-        >
-          Draw again
-        </Button>
-      )}
-      <DraftProgress draft={draft} />
-    </span>
-  );
-}
-
 /** The component with the most changed lines, as the line under the map names it. */
 function mostWork(map: MapResponse): React.ReactNode {
   const busiest = map.nodes
@@ -905,7 +748,7 @@ function mostWork(map: MapResponse): React.ReactNode {
 }
 
 export function SystemMap({
-  map: given,
+  draft,
   repo,
   rev,
   highlight = null,
@@ -913,10 +756,10 @@ export function SystemMap({
   onPickNode,
   onOrder,
   onOpenFile,
-  onModelChange,
   children,
 }: {
-  map: MapResponse | null;
+  /** The view's map and its read, from `useMapDraft` */
+  draft: MapDraftApi;
   repo: string;
   rev: string;
   /** A component to outline, asked for from Files changed */
@@ -929,14 +772,10 @@ export function SystemMap({
   onOrder?: (ids: string[]) => void;
   /** Show a file in Files changed */
   onOpenFile: (path: string) => void;
-  /** A drafted map was read: read the map again */
-  onModelChange: () => void;
   /** The rest of the line under the map: the data model's summary */
   children?: React.ReactNode;
 }) {
-  const draft = useMapDraft(repo, rev, given, onModelChange);
   const map = draft.map;
-  const drafted = map?.source === "drafted";
   // Keep a click's Show map or Hide map only for the view it was made on.
   const { ref } = useView();
   const view = viewKey({ repo, ref, rev });
@@ -998,7 +837,7 @@ export function SystemMap({
                 />
               </button>
             )}
-            {drafted && <DraftFootnote map={map} draft={draft} />}
+            <DrawBase map={map} draft={draft} />
           </div>
         )}
         {showWhole && map.whole && (
@@ -1104,7 +943,7 @@ export function SystemMap({
           </span>
         )}
         {children}
-        {drafted && <DraftFootnote map={map} draft={draft} />}
+        <DrawBase map={map} draft={draft} />
         {map.local && <LocalModel map={map} />}
       </div>
     </section>

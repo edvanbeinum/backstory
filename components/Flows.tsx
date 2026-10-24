@@ -117,9 +117,6 @@ export function Flows({
         <Button variant="primary" onClick={api.start}>
           Trace this change
         </Button>
-        <span className="est">
-          Claude Code · about a minute · the result is kept
-        </span>
       </div>
     );
   }

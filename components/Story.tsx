@@ -11,12 +11,14 @@ import type { DiffFile, DiffResponse } from "@/lib/types";
 import { resolveStop, viewKey } from "@/lib/url";
 import { buildStops } from "@/lib/walk";
 import { ChangeDescription, useDescription } from "./ChangeDescription";
-import { DataSummary } from "./DataSummary";
+import { DataSummary, useDataDraft } from "./DataSummary";
 import type { StoryTarget } from "./FlowCard";
 import { FlowCoverage } from "./FlowCoverage";
 import { Flows } from "./Flows";
 import type { ComponentInfo, DataField, StepBadge } from "./FlowSequence";
-import { SystemMap } from "./SystemMap";
+import { ReadFootnote } from "./ReadFootnote";
+import { ReadLine } from "./ReadLine";
+import { SystemMap, useMapDraft } from "./SystemMap";
 import { Button } from "./ui";
 import type { FlowsApi } from "./useFlows";
 import { useView } from "./ViewContext";
@@ -30,7 +32,9 @@ import { StopView, WalkBar } from "./Walk";
  * finish with your notes. Show
  * everything on one page reads it top to bottom instead: the description,
  * the map at the column's width with a line of what it says, then each flow
- * as a card. The code is a click away from any step.
+ * as a card. The code is a click away from any step. One line at the top
+ * says which reads are running, and one footnote at the bottom says what the
+ * AI drew and offers each drawing's Read again.
  */
 export function Story({
   repo,
@@ -118,6 +122,23 @@ export function Story({
   const description =
     read.status?.status === "done" ? read.status.description : null;
   const shownMap = rev !== WORKING_REV ? map : null;
+  // Story holds the drawings' reads, not the drawings, so its one progress
+  // line knows each read and the data model reads in the walk, whose
+  // overview shows no data phrase.
+  const mapDraft = useMapDraft(repo, rev, shownMap, onModelChange);
+  const dataDraft = useDataDraft(
+    repo,
+    rev,
+    rev !== WORKING_REV ? data : null,
+    onModelChange,
+  );
+  const describes = rev !== WORKING_REV ? read : null;
+  const readLine = (
+    <ReadLine map={mapDraft} data={dataDraft} description={describes} />
+  );
+  const footnote = (
+    <ReadFootnote map={mapDraft} data={dataDraft} description={describes} />
+  );
   const view = viewKey({ repo, ref, rev });
   const [drawn, setDrawn] = useState<{ view: string; ids: string[] } | null>(
     null,
@@ -224,14 +245,13 @@ export function Story({
       />
     ) : null;
 
-  const mapSection = (focused: boolean) => (
+  const mapSection = (focused: boolean, withData = true) => (
     <SystemMap
-      map={map}
+      draft={mapDraft}
       repo={repo}
       rev={rev}
       highlight={mapHighlight}
       onOpenFile={onOpenFile}
-      onModelChange={onModelChange}
       onOrder={onOrder}
       {...(focused && {
         focus:
@@ -244,14 +264,15 @@ export function Story({
         },
       })}
     >
-      <DataSummary
-        data={data}
-        notes={entityNotes}
-        repo={repo}
-        rev={rev}
-        onRead={onModelChange}
-        phraseOnly={focused}
-      />
+      {withData && (
+        <DataSummary
+          draft={dataDraft}
+          notes={entityNotes}
+          repo={repo}
+          rev={rev}
+          phraseOnly={focused}
+        />
+      )}
     </SystemMap>
   );
 
@@ -266,6 +287,7 @@ export function Story({
             onGo={go}
             onLeave={() => onWalk(false)}
           />
+          {readLine}
         </div>
         <div
           className="walk-stop"
@@ -279,7 +301,7 @@ export function Story({
             overview={
               <>
                 {overview}
-                {rev !== WORKING_REV && mapSection(true)}
+                {rev !== WORKING_REV && mapSection(true, false)}
               </>
             }
             map={rev !== WORKING_REV ? mapSection(true) : null}
@@ -290,13 +312,15 @@ export function Story({
             onStep={onStep}
             onGo={go}
           />
+          {footnote}
         </div>
       </div>
     );
 
   return (
     <div className="space-y-6 pt-1">
-      <div className="flex justify-end">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">{readLine}</div>
         <Button size="sm" variant="invisible" onClick={() => onWalk(true)}>
           Walk me through it
         </Button>
@@ -347,6 +371,7 @@ export function Story({
           onBadge={onBadge}
         />
       </section>
+      {footnote}
     </div>
   );
 }

@@ -11,10 +11,8 @@ import {
   type ChangeDescription as Description,
   type DescriptionResponse,
 } from "@/lib/description/types";
-import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
-import { AlertIcon } from "./icons";
-import { Elapsed, setAutoReading } from "./SystemMap";
-import { Badge, Button, Spinner, Ticked } from "./ui";
+import { setAutoReading } from "./SystemMap";
+import { Button, Ticked } from "./ui";
 import { useView } from "./ViewContext";
 
 /**
@@ -189,7 +187,8 @@ function Parts({
  * Why the change was made, what it does, and where to look first, at the top
  * of Story.
  * Read by the AI provider as the view opens when the repo reads
- * automatically, or on a click.
+ * automatically, or on a click. Its read's progress and errors are on
+ * Story's progress line.
  */
 export function ChangeDescription({
   read,
@@ -203,117 +202,21 @@ export function ChangeDescription({
   /** Outline a component on the map, or in Story's walk go to its stop */
   onShowOnMap: (name: string) => void;
 }) {
-  const { status, error, start, setAuto } = read;
-  if (!status || status.status === "none") {
-    return error ? (
-      <p className="flex items-center gap-1 text-[12px] text-[var(--attention)]">
-        <AlertIcon size={11} /> Couldn&apos;t describe this change: {error}
-      </p>
-    ) : null;
-  }
-
-  let body: React.ReactNode;
-  if (status.status === "done")
-    body = (
-      <>
-        <Parts
-          description={status.description}
-          map={map}
-          onShowOnMap={onShowOnMap}
-        />
-        <span className="mt-3 flex flex-wrap items-center gap-1.5">
-          <Badge tone="draft" className="!py-0 !leading-4">
-            Drawn by {status.provider}
-          </Badge>
-          <span className="text-[11px] text-[var(--fg-subtle)]">
-            {status.auto ? (
-              <>
-                Read automatically ·{" "}
-                <button
-                  type="button"
-                  className="text-[var(--accent)] hover:underline"
-                  onClick={() => setAuto(false)}
-                >
-                  Turn off
-                </button>
-              </>
-            ) : (
-              <button
-                type="button"
-                className="text-[var(--accent)] hover:underline"
-                onClick={() => setAuto(true)}
-              >
-                Read automatically
-              </button>
-            )}
-          </span>
-          <Button size="sm" variant="invisible" onClick={() => start(true)}>
-            Describe again
-          </Button>
-        </span>
-        {status.gap && (
-          <p className="mt-2 text-[12px] text-[var(--attention)]">
-            <ClaudeCodeNotice
-              reason={status.gap}
-              needs="Describing this change again needs"
-            />
-          </p>
-        )}
-        {status.error && (
-          <p className="mt-2 flex min-w-0 items-center gap-1 text-[12px] text-[var(--attention)]">
-            <AlertIcon size={11} />
-            <span className="min-w-0 truncate" title={status.error}>
-              Couldn&apos;t describe this change again: {status.error}
-            </span>
-          </p>
-        )}
-      </>
-    );
-  else if (status.status === "running")
-    body = (
-      <span className="flex items-center gap-1.5 text-[13px] text-[var(--fg-muted)]">
-        <Spinner className="!h-3 !w-3" />
-        Describing this change · <Elapsed since={status.startedAt} />
-      </span>
-    );
-  else if (status.status === "failed")
-    body = (
-      <span className="flex min-w-0 flex-wrap items-center gap-1.5 text-[13px] text-[var(--attention)]">
-        <AlertIcon size={11} />
-        <span className="min-w-0 truncate" title={status.error}>
-          Couldn&apos;t describe this change: {status.error}
-        </span>
-        <Button size="sm" onClick={() => start(true)}>
-          Describe again
-        </Button>
-      </span>
-    );
-  else if (status.status === "unavailable")
-    body = (
-      <span className="text-[13px] text-[var(--attention)]">
-        <ClaudeCodeNotice
-          reason={status.reason}
-          needs="Describing this change needs"
-        />
-      </span>
-    );
-  else
-    body = (
-      <span className="flex flex-wrap items-center gap-2 text-[13px] text-[var(--fg-muted)]">
+  const { status, start } = read;
+  if (status?.status === "idle" && !status.auto)
+    return (
+      <section>
         <Button onClick={() => start()}>Describe this change</Button>
-        {status.provider} reads the patch, its commits and its PR, read-only,
-        and says what it does.
-      </span>
+      </section>
     );
-
+  if (status?.status !== "done") return null;
   return (
     <section>
-      {body}
-      {error && (
-        <p className="mt-2 flex items-center gap-1 text-[12px] text-[var(--attention)]">
-          <AlertIcon size={11} /> {error}
-        </p>
-      )}
+      <Parts
+        description={status.description}
+        map={map}
+        onShowOnMap={onShowOnMap}
+      />
     </section>
   );
 }
