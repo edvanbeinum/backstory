@@ -554,6 +554,13 @@ test("an untracked file no component has is off the map, and an untracked test i
   assert.deepEqual(map.fileComponents, {});
 });
 
+test("uncommitted work maps in a repo with a file named HEAD", async () => {
+  const repo = workingRepo({ HEAD: "x\n", "src/a/one.ts": "1\n" });
+  write(repo.dir, "src/a/one.ts", "1\nmore\n");
+  const map = await repo.map();
+  assert.deepEqual(map.fileComponents, { "src/a/one.ts": "Alpha" });
+});
+
 test("a clean working tree touches nothing and has the whole system", async () => {
   const map = await workingRepo({ "src/a/one.ts": "1\n" }).map();
   assert.equal(map.status, "ok");

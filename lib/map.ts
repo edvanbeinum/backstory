@@ -120,8 +120,8 @@ interface FileStat {
 /** Each file's change between the two ends `git diff` is given. */
 async function fileStats(root: string, range: string[]): Promise<FileStat[]> {
   const [{ stdout: numstat }, { stdout: names }] = await Promise.all([
-    git(root, ["diff", "--numstat", "-M", "-z", ...range]),
-    git(root, ["diff", "--name-status", "-M", "-z", ...range]),
+    git(root, ["diff", "--numstat", "-M", "-z", ...range, "--"]),
+    git(root, ["diff", "--name-status", "-M", "-z", ...range, "--"]),
   ]);
   const statusOf = new Map<string, string>();
   const nameParts = names.split("\0");
@@ -160,13 +160,16 @@ async function fileStats(root: string, range: string[]): Promise<FileStat[]> {
 }
 
 /**
- * Uncommitted work's files: tracked changes against HEAD, staged or not, and
- * the untracked files the working patch shows, up to its cap. A file too big
- * for the patch counts no additions, as the patch shows it as a binary add.
+ * Uncommitted work's files: tracked changes against `head`, staged or not,
+ * and the untracked files the working patch shows, up to its cap. A file too
+ * big for the patch counts no additions, as the patch shows it as a binary add.
  */
-async function workingFileStats(repo: RepoInfo): Promise<FileStat[]> {
+async function workingFileStats(
+  repo: RepoInfo,
+  head: string,
+): Promise<FileStat[]> {
   const [tracked, { untrackedPaths }] = await Promise.all([
-    fileStats(repo.root, ["HEAD"]),
+    fileStats(repo.root, [head]),
     getWorkingTree(repo),
   ]);
   for (const rel of untrackedPaths.slice(0, MAX_UNTRACKED)) {
@@ -361,7 +364,7 @@ export async function buildWorkingMap(
     headRead.model,
     headRead,
     headRead.source === "local" ? null : headRead,
-    await workingFileStats(repo),
+    await workingFileStats(repo, range.head),
     reading,
   );
 }
