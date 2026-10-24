@@ -1,12 +1,17 @@
+import { promises as fs } from "node:fs";
+import path from "node:path";
+
 import { autoRead } from "./data/cache";
 import type { TrunkReadStatus } from "./data/types";
 import { git } from "./exec";
+import { getWorkingTree, MAX_UNTRACKED, MAX_UNTRACKED_BYTES } from "./git";
 import {
   isAppCode,
   localModelFile,
   readModelAt,
   type Model,
   type ModelElement,
+  type ModelRead,
   type ModelSource,
 } from "./model";
 import {
@@ -14,7 +19,10 @@ import {
   mapStatus,
   mapTrunkStatus,
   type MapDraftStatus,
+  type MapView,
 } from "./models/cache";
+import type { RepoInfo } from "./types";
+import { viewRange } from "./view";
 
 /**
  * The system map for a view: which C4 elements the change touched, which
@@ -109,14 +117,8 @@ interface FileStat {
   status: string;
 }
 
-async function fileStats(
-  root: string,
-  base: string | null,
-  head: string,
-): Promise<FileStat[]> {
-  const range = base
-    ? [base, head]
-    : ["4b825dc642cb6eb9a060e54bf8d69288fbee4904", head];
+/** Each file's change between the two ends `git diff` is given. */
+async function fileStats(root: string, range: string[]): Promise<FileStat[]> {
   const [{ stdout: numstat }, { stdout: names }] = await Promise.all([
     git(root, ["diff", "--numstat", "-M", "-z", ...range]),
     git(root, ["diff", "--name-status", "-M", "-z", ...range]),
@@ -155,6 +157,40 @@ async function fileStats(
     });
   }
   return out;
+}
+
+/**
+ * Uncommitted work's files: tracked changes against HEAD, staged or not, and
+ * the untracked files the working patch shows, up to its cap. A file too big
+ * for the patch counts no additions, as the patch shows it as a binary add.
+ */
+async function workingFileStats(repo: RepoInfo): Promise<FileStat[]> {
+  const [tracked, { untrackedPaths }] = await Promise.all([
+    fileStats(repo.root, ["HEAD"]),
+    getWorkingTree(repo),
+  ]);
+  for (const rel of untrackedPaths.slice(0, MAX_UNTRACKED)) {
+    const stat = await fs.stat(path.join(repo.root, rel)).catch(() => null);
+    if (!stat?.isFile()) continue;
+    let additions = 0;
+    if (stat.size <= MAX_UNTRACKED_BYTES) {
+      // --no-index exits 1 whenever it finds differences, which is always here.
+      const { stdout } = await git(
+        repo.root,
+        ["diff", "--numstat", "--no-index", "--", "/dev/null", rel],
+        { allowExitCodes: [1] },
+      );
+      additions = Number(stdout.split("\t")[0]) || 0;
+    }
+    tracked.push({
+      path: rel,
+      oldPath: rel,
+      additions,
+      deletions: 0,
+      status: "A",
+    });
+  }
+  return tracked;
 }
 
 const leafOf = (model: Model, file: string) => model.match(file);
@@ -228,54 +264,112 @@ function wholeMap(model: Model): { nodes: MapNode[]; edges: MapEdge[] } {
 /** The focused map stays a glance: changed elements plus a few neighbours. */
 const MAX_NODES = 7;
 
+const empty = (): MapResponse => ({
+  status: "none",
+  baseModel: false,
+  error: null,
+  baseError: null,
+  local: false,
+  modelFile: null,
+  nodes: [],
+  edges: [],
+  hidden: 0,
+  fileComponents: {},
+  unmapped: [],
+  ambiguous: [],
+  descriptions: {},
+});
+
+type Reading = Pick<
+  MapResponse,
+  "draft" | "auto" | "handFile" | "mainMap" | "mainRead"
+>;
+
+/**
+ * With no model of its own, the repo's map is drafted: how the read of
+ * `view` stands, the read whose result the map is drawn on.
+ */
+async function readingOf(
+  headRead: ModelRead | null,
+  view: MapView,
+): Promise<Reading> {
+  if (headRead && headRead.source !== "drafted") return {};
+  return {
+    draft: await mapStatus(view),
+    auto: await autoRead(view.root),
+    handFile: await localModelFile(view.root),
+    mainMap: await hasMainMap(view.root),
+    mainRead: await mapTrunkStatus(view.root),
+  };
+}
+
+/** The map when the head has no model to draw on. */
+function noModel(headRead: ModelRead | null, reading: Reading): MapResponse {
+  if (!headRead) return { ...empty(), ...reading };
+  return {
+    ...empty(),
+    source: headRead.source,
+    error: headRead.error,
+    local: headRead.source === "local",
+    modelFile: headRead.file,
+  };
+}
+
 export async function buildMap(
   root: string,
   base: string | null,
   head: string,
 ): Promise<MapResponse> {
   const headRead = await readModelAt(root, head);
-  const empty: MapResponse = {
-    status: "none",
-    baseModel: false,
-    error: null,
-    baseError: null,
-    local: false,
-    modelFile: null,
-    nodes: [],
-    edges: [],
-    hidden: 0,
-    fileComponents: {},
-    unmapped: [],
-    ambiguous: [],
-    descriptions: {},
-  };
-  // With no model of its own, the repo's map is drafted: say how its read
-  // for this view stands.
-  const drafting = !headRead || headRead.source === "drafted";
-  const reading = drafting
-    ? {
-        draft: await mapStatus({ root, base, head }),
-        auto: await autoRead(root),
-        handFile: await localModelFile(root),
-        mainMap: await hasMainMap(root),
-        mainRead: await mapTrunkStatus(root),
-      }
-    : {};
-  if (!headRead) return { ...empty, ...reading };
-  const local = headRead.source === "local";
-  if (!headRead.model)
-    return {
-      ...empty,
-      source: headRead.source,
-      error: headRead.error,
-      local,
-      modelFile: headRead.file,
-    };
-  const model = headRead.model;
+  const reading = await readingOf(headRead, { root, base, head });
+  if (!headRead?.model) return noModel(headRead, reading);
   // A local model is the same for every commit; comparing it with itself
-  // would claim "no structural change" when nothing was checked. A base
-  // whose model comes from elsewhere than the head's isn't compared either.
-  const baseRead = base && !local ? await readModelAt(root, base) : null;
+  // would claim "no structural change" when nothing was checked.
+  const baseRead =
+    base && headRead.source !== "local" ? await readModelAt(root, base) : null;
+  const range = base
+    ? [base, head]
+    : ["4b825dc642cb6eb9a060e54bf8d69288fbee4904", head];
+  return drawMap(
+    headRead.model,
+    headRead,
+    baseRead,
+    await fileStats(root, range),
+    reading,
+  );
+}
+
+/**
+ * The map for uncommitted work: the working tree's changes drawn on HEAD's
+ * model, which is the model at both ends, so nothing reads as added or
+ * removed. A drafted map's status is HEAD's own view's, since that read
+ * saves the map HEAD's tree is drawn on.
+ */
+export async function buildWorkingMap(repo: RepoInfo): Promise<MapResponse> {
+  const range = await viewRange(repo, "HEAD");
+  if (!range) return empty();
+  const view = { root: repo.root, ...range };
+  const headRead = await readModelAt(repo.root, range.head);
+  const reading = await readingOf(headRead, view);
+  if (!headRead?.model) return noModel(headRead, reading);
+  return drawMap(
+    headRead.model,
+    headRead,
+    headRead.source === "local" ? null : headRead,
+    await workingFileStats(repo),
+    reading,
+  );
+}
+
+function drawMap(
+  model: Model,
+  headRead: ModelRead,
+  baseRead: ModelRead | null,
+  stats: FileStat[],
+  reading: Reading,
+): MapResponse {
+  const local = headRead.source === "local";
+  // A base whose model comes from elsewhere than the head's isn't compared.
   const sameSource = baseRead?.source === headRead.source;
   const baseModel = sameSource ? (baseRead?.model ?? null) : null;
 
@@ -285,7 +379,7 @@ export async function buildMap(
   const fileComponents: Record<string, string> = {};
   const unmapped: string[] = [];
   const ambiguous: { file: string; ids: string[] }[] = [];
-  for (const f of await fileStats(root, base, head)) {
+  for (const f of stats) {
     const deleted = f.status === "D";
     const against = deleted && baseModel ? baseModel : model;
     if (!isAppCode(against, f.path)) continue;
