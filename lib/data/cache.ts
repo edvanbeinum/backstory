@@ -616,7 +616,9 @@ export async function startDataRead(
   registry.ended.delete(files.key);
   job.phase = PHASES.waiting;
   const main = trunkKey(files.dir);
-  if (registry.jobs.has(main)) job.behind = main;
+  // Count main's read as a step only once it's queued: before then it may
+  // find main saved and end without reading.
+  if (registry.jobs.get(main)?.of) job.behind = main;
   const c = chain(view.root, files.dir, view.files ?? null, job, {
     runner: opts.runner,
     fresh: opts.redraft,
@@ -630,10 +632,12 @@ export async function startDataRead(
       // base instead would cost as much and fail the same way.
       const mainEnded = job.behind ? registry.ended.get(job.behind) : null;
       if (mainEnded?.status === "failed") throw new Error(mainEnded.error);
-      // Count again: main's read, or another view's, may have saved a tree since.
-      job.at = behind;
+      // Count again: main's read, or another view's, may have saved a tree
+      // since, and main's read ends without reading when one already had.
+      const read = mainEnded ? 1 : 0;
+      job.at = read;
       job.of = await treesToRead(c, view, files).then(
-        (n) => behind + n,
+        (n) => read + n,
         () => job.of,
       );
       const trunk = await readView(c, view, files);
@@ -691,6 +695,7 @@ export async function startTrunkRead(
   }
   if (!ready) return false;
 
+  registry.ended.delete(key);
   job.phase = PHASES.waiting;
   job.of = 1;
   const { tip, files } = ready;
