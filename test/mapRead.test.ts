@@ -1072,7 +1072,8 @@ esac`,
     await body(calls);
   } finally {
     process.env.PATH = saved.path;
-    process.env.SHELL = saved.shell;
+    if (saved.shell === undefined) delete process.env.SHELL;
+    else process.env.SHELL = saved.shell;
   }
 }
 
