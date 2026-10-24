@@ -99,25 +99,19 @@ export function useDescription(
     void request("POST");
   }, [autoStart, view, request]);
 
+  // Lets a failed switch reach the caller rather than storing it as the
+  // description's error, since the switch is the repo's, not the description's.
   const setAuto = async (on: boolean) => {
-    try {
-      await setAutoReading(repo, on);
-      onAutoChange();
-      await request("GET");
-    } catch (err) {
-      setAnswer({
-        view,
-        status,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    await setAutoReading(repo, on);
+    onAutoChange();
+    await request("GET");
   };
 
   return {
     status,
     error: shown?.error ?? null,
     start: (redraft = false) => void request("POST", redraft),
-    setAuto: (on: boolean) => void setAuto(on),
+    setAuto,
   };
 }
 

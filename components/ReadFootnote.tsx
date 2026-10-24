@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import type { DescriptionApi } from "./ChangeDescription";
 import type { DataDraftApi } from "./DataSummary";
 import type { MapDraftApi } from "./SystemMap";
@@ -22,6 +23,7 @@ export function ReadFootnote({
   /** Null on uncommitted work, which has no description */
   description: DescriptionApi | null;
 }) {
+  const [switchError, setSwitchError] = useState<string | null>(null);
   const said = description?.status;
   const drawnMap = map.map?.source === "drafted" ? map.map : null;
   const drawnData = data.data?.drafted ? data.data : null;
@@ -31,13 +33,24 @@ export function ReadFootnote({
   const provider =
     described?.provider ?? drawnData?.drafted?.provider ?? "Claude Code";
   const auto = drawnMap?.auto ?? drawnData?.auto ?? described?.auto ?? true;
-  const setAuto = (on: boolean) => description?.setAuto(on);
+  const setAuto = (on: boolean) =>
+    description?.setAuto(on).then(
+      () => setSwitchError(null),
+      (err: unknown) =>
+        setSwitchError(err instanceof Error ? err.message : String(err)),
+    );
   const parts: React.ReactNode[] = [`Drawn by ${provider}`];
   if (description)
     parts.push(
       <button type="button" className={LINK} onClick={() => setAuto(!auto)}>
         {auto ? "Turn off" : "Read automatically"}
       </button>,
+    );
+  if (switchError)
+    parts.push(
+      <span className="text-[var(--attention)]" title={switchError}>
+        {auto ? "Couldn't turn off" : "Couldn't turn on"}: {switchError}
+      </span>,
     );
   if (drawnMap)
     parts.push(
