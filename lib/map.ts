@@ -343,10 +343,15 @@ export async function buildMap(
  * The map for uncommitted work: the working tree's changes drawn on HEAD's
  * model, which is the model at both ends, so nothing reads as added or
  * removed. A drafted map's status is HEAD's own view's, since that read
- * saves the map HEAD's tree is drawn on.
+ * saves the map HEAD's tree is drawn on. Pass `head`, HEAD's view range, when
+ * a read was just started for it, so the answer reports that read even if a
+ * commit lands in between.
  */
-export async function buildWorkingMap(repo: RepoInfo): Promise<MapResponse> {
-  const range = await viewRange(repo, "HEAD");
+export async function buildWorkingMap(
+  repo: RepoInfo,
+  head?: { base: string | null; head: string },
+): Promise<MapResponse> {
+  const range = head ?? (await viewRange(repo, "HEAD"));
   if (!range) return empty();
   const view = { root: repo.root, ...range };
   const headRead = await readModelAt(repo.root, range.head);

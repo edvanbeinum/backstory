@@ -35,7 +35,7 @@ async function resolve(request: Request) {
     !range
       ? null
       : working
-        ? buildWorkingMap(repo)
+        ? buildWorkingMap(repo, range)
         : buildMap(repo.root, range.base, range.head);
   return { root: repo.root, range, map, searchParams };
 }
