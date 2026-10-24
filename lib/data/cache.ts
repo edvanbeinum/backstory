@@ -632,7 +632,10 @@ export async function startDataRead(
       if (mainEnded?.status === "failed") throw new Error(mainEnded.error);
       // Count again: main's read, or another view's, may have saved a tree since.
       job.at = behind;
-      job.of = behind + (await treesToRead(c, view, files));
+      job.of = await treesToRead(c, view, files).then(
+        (n) => behind + n,
+        () => job.of,
+      );
       const trunk = await readView(c, view, files);
       if (c.fresh) await saveRedraft(c, trunk);
       registry.ended.set(files.key, {
