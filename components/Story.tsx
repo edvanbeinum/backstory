@@ -123,8 +123,8 @@ export function Story({
     read.status?.status === "done" ? read.status.description : null;
   const shownMap = rev !== WORKING_REV ? map : null;
   // Story holds the drawings' reads, not the drawings, so its one progress
-  // line knows each read and the data model reads in the walk, whose
-  // overview shows no data phrase.
+  // line knows each read and the data model reads in the walk, whose maps
+  // show no data phrase.
   const mapDraft = useMapDraft(repo, rev, shownMap, onModelChange);
   const dataDraft = useDataDraft(
     repo,
@@ -245,7 +245,7 @@ export function Story({
       />
     ) : null;
 
-  const mapSection = (focused: boolean, withData = true) => (
+  const mapSection = (focused: boolean) => (
     <SystemMap
       draft={mapDraft}
       onSetAuto={describes?.setAuto}
@@ -265,13 +265,12 @@ export function Story({
         },
       })}
     >
-      {withData && (
+      {!focused && (
         <DataSummary
           draft={dataDraft}
           notes={entityNotes}
           repo={repo}
           rev={rev}
-          phraseOnly={focused}
         />
       )}
     </SystemMap>
@@ -302,7 +301,7 @@ export function Story({
             overview={
               <>
                 {overview}
-                {rev !== WORKING_REV && mapSection(true, false)}
+                {rev !== WORKING_REV && mapSection(true)}
               </>
             }
             map={rev !== WORKING_REV ? mapSection(true) : null}

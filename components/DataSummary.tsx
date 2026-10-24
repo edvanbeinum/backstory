@@ -657,15 +657,12 @@ export function DataSummary({
   notes,
   repo,
   rev,
-  phraseOnly = false,
 }: {
   /** The view's data model and its read, from `useDataDraft` */
   draft: DataDraftApi;
   notes?: Map<string, string[]>;
   repo: string;
   rev: string;
-  /** Never opens the cards: Story's walk shows them on a stop of their own */
-  phraseOnly?: boolean;
 }) {
   const data = draft.data;
   const shown = useMemo(() => present(data?.entities ?? []), [data]);
@@ -675,8 +672,7 @@ export function DataSummary({
   const { ref } = useView();
   const view = viewKey({ repo, ref, rev });
   const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
-  const open =
-    !phraseOnly && (toggled?.view === view ? toggled.open : changed.length > 0);
+  const open = toggled?.view === view ? toggled.open : changed.length > 0;
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -732,17 +728,15 @@ export function DataSummary({
       <span className="part inline-flex min-w-0 flex-wrap items-center gap-1.5">
         <b>Data</b>
         <span>{whole ? noChange : summary(shown)}</span>
-        {!phraseOnly && (
-          <button
-            type="button"
-            className="story-disclose"
-            aria-expanded={open}
-            onClick={() => setToggled({ view, open: !open })}
-          >
-            {open ? "Hide data" : "Show data"}
-            <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
-          </button>
-        )}
+        <button
+          type="button"
+          className="story-disclose"
+          aria-expanded={open}
+          onClick={() => setToggled({ view, open: !open })}
+        >
+          {open ? "Hide data" : "Show data"}
+          <ChevronDownIcon size={12} className={open ? "rotate-180" : ""} />
+        </button>
       </span>
       {open && (
         <div ref={boxRef} className="basis-full pt-1">
