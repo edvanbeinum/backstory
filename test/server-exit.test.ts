@@ -10,12 +10,15 @@ const preload = path.join(root, "mac", "server-exit-with-parent.cjs");
 
 // Starts a stand-in for the Mac app, which starts a stand-in server with the
 // preload and prints its pid. The test only ever signals the stand-in app.
+// The app writes the pid as plain text, not with console.log: the test runner
+// sets FORCE_COLOR when it reports to a terminal, and console.log then wraps a
+// number in color codes, which the test reads as no pid at all.
 async function startApp(exitAfterStarting: boolean) {
   const script = `
     const { spawn } = require("node:child_process");
     const server = spawn(process.execPath, ["--require", ${JSON.stringify(preload)}, "-e", "setInterval(() => {}, 1000)"], { stdio: "ignore" });
     server.unref();
-    console.log(server.pid);
+    process.stdout.write(server.pid + "\\n");
     ${exitAfterStarting ? "process.exit(0);" : "setInterval(() => {}, 1000);"}
   `;
   const app = spawn(process.execPath, ["-e", script], {
