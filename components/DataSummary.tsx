@@ -703,8 +703,8 @@ export function DataSummary({
       </span>
     ) : null;
   }
-  // Said only with no base to compare with, since it explains why nothing
-  // shows as changed.
+  // Say there's no base to compare with only when there isn't one, since it
+  // explains why nothing shows as changed.
   const noBase = !data.baseModel && (
     <>
       <b>Data</b>

@@ -309,7 +309,8 @@ export function FilesChanged({
         notes={notes}
         noteRev={noteRev}
         marks={marks}
-        // Under a component's heading, the file's component chip repeats it.
+        // Drop each file's component chip when files are grouped, since the
+        // group's heading already names it.
         fileComponents={grouped ? null : (map?.fileComponents ?? null)}
         sections={sections}
         flows={flows}

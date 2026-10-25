@@ -135,7 +135,8 @@ export function NoteFor({
         + Note for the agent
       </Button>
     );
-  // Its own full row, beside other buttons on Story on one page.
+  // Give the composer its own full row, since on Story on one page it sits
+  // beside other buttons.
   return (
     <div className="basis-full">
       <NoteComposer
