@@ -72,7 +72,7 @@ order:
 
 The change picker's **A commit…** lists the commits after it. **All changes**
 names in its header what the whole branch is diffed against
-(`Everything vs origin/main`): the branch its pull request targets, else where
+(`Everything vs main`): the branch its pull request targets, else where
 it left the default branch.
 
 ## Diffs and highlighting

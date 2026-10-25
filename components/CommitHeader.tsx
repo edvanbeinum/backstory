@@ -20,7 +20,7 @@ export function CommitHeader({
   diff: DiffResponse | null;
   /** Below the push boundary — already on the remote */
   pushed?: boolean;
-  /** What All changes is diffed against, as "vs origin/main" */
+  /** What All changes is diffed against, as "vs main" */
   base?: string | null;
 }) {
   if (!commit || commit.sha === WORKING_REV) return null;
