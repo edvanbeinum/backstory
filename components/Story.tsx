@@ -18,7 +18,12 @@ import { Flows } from "./Flows";
 import type { ComponentInfo, DataField, StepBadge } from "./FlowSequence";
 import { ReadFootnote } from "./ReadFootnote";
 import { ReadLine } from "./ReadLine";
-import { setAutoReading, SystemMap, useMapDraft } from "./SystemMap";
+import {
+  mapDrawing,
+  setAutoReading,
+  SystemMap,
+  useMapDraft,
+} from "./SystemMap";
 import { Button } from "./ui";
 import type { FlowsApi } from "./useFlows";
 import { useView } from "./ViewContext";
@@ -309,6 +314,7 @@ export function Story({
                 {mapSection(true)}
               </>
             }
+            drawing={mapDrawing(mapDraft.map)}
             map={mapSection(true)}
             data={data}
             entityNotes={entityNotes}

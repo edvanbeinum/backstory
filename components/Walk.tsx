@@ -145,6 +145,7 @@ export function StopView({
   index,
   seen,
   overview,
+  drawing,
   map,
   data,
   entityNotes,
@@ -158,6 +159,8 @@ export function StopView({
   seen: Set<string>;
   /** The change description with the map under it, for the overview */
   overview: React.ReactNode;
+  /** While the map is drawing, which leaves out the stops it will add */
+  drawing: boolean;
   /** The map, outlining the component a stop is on */
   map: React.ReactNode;
   data: DataResponse | null;
@@ -177,7 +180,7 @@ export function StopView({
       return (
         <section className="space-y-4">
           {overview}
-          {ahead.length > 0 && (
+          {!drawing && ahead.length > 0 && (
             <p className="walk-ahead">
               Then{" "}
               {ahead.map((s, i) => (

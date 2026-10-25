@@ -666,6 +666,10 @@ export type MapDraftApi = ReturnType<typeof useMapDraft>;
 const offered = (map: MapResponse) =>
   map.draft?.status === "idle" ? !map.draft.auto : map.draft?.status === "done";
 
+/** Whether the map's space shows its read running, so nothing else on the page reads as the walk's final shape. */
+export const mapDrawing = (map: MapResponse | null) =>
+  map?.status === "none" && !map.error && !!map.draft && !offered(map);
+
 /** The map's read in the space the map will take, so a read that takes minutes doesn't look frozen. */
 function DraftPending({ map }: { map: MapResponse | null }) {
   const first = map?.mainRead?.status === "running" ? map.mainRead : null;
