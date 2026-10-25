@@ -44,6 +44,8 @@ terms:
     means: "One part of the walk: the overview, the data model when it changed, one per changed component in the map's order, the files no component has, and the finish with your notes. Every changed file is in exactly one stop. The UI never says stop: its bar reads 3 of 6."
     avoid:
       - step (that's a flow's step, as in `1·3`)
+  - name: notes box
+    means: "The box pinned to the bottom of every tab with the notes for your agent, Add a general note, Send to agent and Copy (`components/FeedbackBar.tsx`). It shows once there is a note, while an agent is waiting on `backstory review`, or when a note couldn't be saved or sent; before that, + Note for the agent on the walk's finish or beside Walk me through it writes the first general note."
   - name: gutter mark
     means: "A mark beside a line in Files changed: `⇄ 1·7` is flow 1, step 7, and opens it in the story; `💬 2` is review comment 2, and opens it in Comments."
     avoid:
