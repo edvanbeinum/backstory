@@ -35,7 +35,6 @@ import {
 import { AlertIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
-import { ConnectGitHubLink } from "@/components/SetupChecklist";
 import { PrTitle } from "@/components/PrTitle";
 import { useStaleReload } from "@/components/useStaleReload";
 import { ViewProvider, type OpenView } from "@/components/ViewContext";
@@ -1102,18 +1101,6 @@ export default function Page() {
                       >
                         Dismiss
                       </button>
-                    </p>
-                  )}
-
-                  {session.github.unavailable && !session.github.pr && (
-                    <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
-                      {session.github.unavailable}
-                      {session.github.connect && (
-                        <>
-                          {" "}
-                          <ConnectGitHubLink />
-                        </>
-                      )}
                     </p>
                   )}
 
