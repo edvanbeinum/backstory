@@ -1235,23 +1235,17 @@ export default function Page() {
                         Before the first note it shows only for a waiting agent
                         or an error; the first general note is written from
                         Story. */}
-                        {(notes.notes.length > 0 ||
-                          review.waiting ||
-                          review.error ||
-                          outbox.error ||
-                          notes.error) && (
-                          <div className="sticky bottom-4 z-20">
-                            <FeedbackBar
-                              notes={notes}
-                              noteRev={noteRev}
-                              diff={noteRev ? diff : null}
-                              session={session}
-                              review={review}
-                              outbox={outbox}
-                              onOpenNote={openNote}
-                            />
-                          </div>
-                        )}
+                        <div className="sticky bottom-4 z-20">
+                          <FeedbackBar
+                            notes={notes}
+                            noteRev={noteRev}
+                            diff={noteRev ? diff : null}
+                            session={session}
+                            review={review}
+                            outbox={outbox}
+                            onOpenNote={openNote}
+                          />
+                        </div>
                       </>
                     )}
                   </WithReview>
