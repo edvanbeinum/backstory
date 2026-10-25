@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en" class="h-full antialiased">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Backstory, running on a recording of one of its own pull requests: the map, the flows, the data model and a walk through the change."
+    />
+    <title>Try Backstory · PR #117</title>
+    <link
+      rel="icon"
+      href="../img/logo/backstory-icon.svg"
+      type="image/svg+xml"
+    />
+    <link rel="icon" href="../img/logo/backstory-icon-32.png" sizes="32x32" />
+    <link rel="stylesheet" href="app.css" />
+    <style>
+      .demo-bar {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 4px 16px;
+        padding: 8px 16px;
+        font-size: 13px;
+        color: var(--fg-muted);
+        background: var(--accent-subtle);
+        border-bottom: 1px solid var(--border-muted);
+      }
+      .demo-bar b {
+        color: var(--fg);
+        font-weight: 600;
+      }
+      .demo-bar a {
+        color: var(--accent);
+      }
+      /* The repo bar's top row (Inbox, the repo's path, Browse, Open) leads
+         nowhere in a recording. */
+      header.sticky > div:first-child {
+        display: none;
+      }
+      .demo-bar .end {
+        margin-left: auto;
+        display: flex;
+        gap: 16px;
+      }
+    </style>
+    <script type="module" src="app.js"></script>
+  </head>
+  <body class="min-h-full">
+    <div class="demo-bar">
+      <span
+        ><b>Try Backstory</b> on a recording of one of its own pull requests,
+        #117.</span
+      >
+      <span class="end">
+        <a href="https://github.com/edvanbeinum/backstory/pull/117/files"
+          >See this PR on GitHub</a
+        >
+        <a href="../">Back to Backstory</a>
+      </span>
+    </div>
+    <div id="root"></div>
+  </body>
+</html>

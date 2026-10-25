@@ -43,3 +43,8 @@ next-env.d.ts
 xcuserdata/
 /mac/build/
 *.profraw
+
+# the site's demo, built by demo/build.mjs
+/site/demo/app.js
+/site/demo/app.css
+/site/demo/recording.json
