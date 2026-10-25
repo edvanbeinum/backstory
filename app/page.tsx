@@ -1138,7 +1138,6 @@ export default function Page() {
                               onOpenFile={openFile}
                               flows={flows}
                               diff={diffIsCurrent ? diff : null}
-                              onShowFiles={() => setTab("files")}
                               onShowYourself={showYourself}
                               target={storyTarget}
                               onTargetDone={clearStoryTarget}

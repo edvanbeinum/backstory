@@ -53,7 +53,6 @@ export function Story({
   onOpenFile,
   flows,
   diff,
-  onShowFiles,
   onShowYourself,
   target,
   onTargetDone,
@@ -88,7 +87,6 @@ export function Story({
   flows: FlowsApi;
   /** This view's diff, once it has loaded */
   diff: DiffResponse | null;
-  onShowFiles: () => void;
   onShowYourself: () => void;
   target: StoryTarget | null;
   onTargetDone: (at: number) => void;
@@ -348,40 +346,41 @@ export function Story({
         {mapSection(false)}
       </section>
 
-      <section className="space-y-2">
-        <div className="story-h">
-          <h3>Flows</h3>
-          {set && <span className="counter">{set.flows.length}</span>}
-          {set && diff && (
-            <FlowCoverage
-              set={set}
-              files={diff.files}
-              tracing={status?.status === "ready" ? status.tracing : []}
-              onTrace={flows.trace}
-              repo={repo}
-              rev={rev}
-              onShowYourself={onShowYourself}
-            />
-          )}
-        </div>
-        <Flows
-          api={flows}
-          fileCount={diff ? diff.files.length : null}
-          onShowFiles={onShowFiles}
-          repo={repo}
-          rev={rev}
-          onShowInFiles={onShowInFiles}
-          filesInDiff={filesInDiff}
-          target={target}
-          onTargetDone={onTargetDone}
-          navRef={navRef}
-          components={components}
-          dataFields={dataFields}
-          flowNotes={flowNotes}
-          badges={badges}
-          onBadge={onBadge}
-        />
-      </section>
+      {rev !== WORKING_REV && (
+        <section className="space-y-2">
+          <div className="story-h">
+            <h3>Flows</h3>
+            {set && <span className="counter">{set.flows.length}</span>}
+            {set && diff && (
+              <FlowCoverage
+                set={set}
+                files={diff.files}
+                tracing={status?.status === "ready" ? status.tracing : []}
+                onTrace={flows.trace}
+                repo={repo}
+                rev={rev}
+                onShowYourself={onShowYourself}
+              />
+            )}
+          </div>
+          <Flows
+            api={flows}
+            fileCount={diff ? diff.files.length : null}
+            repo={repo}
+            rev={rev}
+            onShowInFiles={onShowInFiles}
+            filesInDiff={filesInDiff}
+            target={target}
+            onTargetDone={onTargetDone}
+            navRef={navRef}
+            components={components}
+            dataFields={dataFields}
+            flowNotes={flowNotes}
+            badges={badges}
+            onBadge={onBadge}
+          />
+        </section>
+      )}
       {footnote}
     </div>
   );

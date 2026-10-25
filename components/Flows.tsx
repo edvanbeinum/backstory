@@ -39,13 +39,11 @@ interface CardProps {
 export function Flows({
   api,
   fileCount,
-  onShowFiles,
   ...cards
 }: CardProps & {
   api: FlowsApi;
   /** The change's files, for the untraced and uncommitted cards */
   fileCount: number | null;
-  onShowFiles: () => void;
 }) {
   const { status, error } = api;
 
@@ -71,24 +69,8 @@ export function Flows({
     );
   }
   if (status.status === "unavailable") {
-    return status.reason === "uncommitted" ? (
-      <div className="story-card">
-        <p>
-          Uncommitted work isn&apos;t traced. Commit it, or pick a commit or All
-          changes, to see what it does as flows.
-        </p>
-        {fileCount !== null && (
-          <button
-            type="button"
-            className="mt-2 text-[13px] text-[var(--accent)] hover:underline"
-            onClick={onShowFiles}
-          >
-            See the {fileCount} changed {fileCount === 1 ? "file" : "files"} in
-            Files changed
-          </button>
-        )}
-      </div>
-    ) : (
+    // Story leaves out Flows on uncommitted work.
+    return status.reason === "uncommitted" ? null : (
       <Notice tone="attention">
         <ClaudeCodeNotice reason={status.reason} needs="Flows need">
           <button
