@@ -35,7 +35,6 @@ import {
 import { AlertIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
-import { ConnectGitHubLink } from "@/components/SetupChecklist";
 import { PrTitle } from "@/components/PrTitle";
 import { useStaleReload } from "@/components/useStaleReload";
 import { ViewProvider, type OpenView } from "@/components/ViewContext";
@@ -621,9 +620,10 @@ export default function Page() {
   }, [shown, rev, viewId, haveSession, workingDiffKey]);
 
   // The map follows the diff: a commit's never changes; the branch's moves
-  // with its tip.
+  // with its tip, and uncommitted work's with each save. The data model reads
+  // files at a commit, so uncommitted work has none.
   useEffect(() => {
-    if (!shown.repo || !haveSession || rev === WORKING_REV) {
+    if (!shown.repo || !haveSession) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the map where there is none, else fetches it
       setMapRead(null);
       setDataRead(null);
@@ -634,9 +634,11 @@ export default function Page() {
     getJson<MapResponse>(`/api/map?${query}`)
       .then((data) => !cancelled && setMapRead({ view: viewId, map: data }))
       .catch(() => !cancelled && setMapRead(null));
-    getJson<DataResponse>(`/api/data?${query}`)
-      .then((data) => !cancelled && setDataRead({ view: viewId, data }))
-      .catch(() => !cancelled && setDataRead(null));
+    if (rev === WORKING_REV) setDataRead(null);
+    else
+      getJson<DataResponse>(`/api/data?${query}`)
+        .then((data) => !cancelled && setDataRead({ view: viewId, data }))
+        .catch(() => !cancelled && setDataRead(null));
     return () => {
       cancelled = true;
     };
@@ -1102,18 +1104,6 @@ export default function Page() {
                     </p>
                   )}
 
-                  {session.github.unavailable && !session.github.pr && (
-                    <p className="rounded-md border border-[var(--border)] bg-[var(--canvas-subtle)] px-3 py-2 text-[12px] text-[var(--fg-muted)]">
-                      {session.github.unavailable}
-                      {session.github.connect && (
-                        <>
-                          {" "}
-                          <ConnectGitHubLink />
-                        </>
-                      )}
-                    </p>
-                  )}
-
                   <ChangeHeader
                     session={session}
                     rev={rev}
@@ -1148,7 +1138,6 @@ export default function Page() {
                               onOpenFile={openFile}
                               flows={flows}
                               diff={diffIsCurrent ? diff : null}
-                              onShowFiles={() => setTab("files")}
                               onShowYourself={showYourself}
                               target={storyTarget}
                               onTargetDone={clearStoryTarget}

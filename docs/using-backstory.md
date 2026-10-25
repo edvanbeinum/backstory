@@ -68,8 +68,10 @@ is left as it is, and Fetch says so.
 
 **The workspace** is one branch. Its header picks the change: the whole branch,
 your uncommitted work, or any one commit on it. It opens on your uncommitted
-work when there is some, and on the whole branch otherwise. Under the header are
-three tabs, as on a pull request, and every change opens on the first:
+work when there is some, and on the whole branch otherwise. Uncommitted work is
+drawn on the map from your last commit, so it shows which components the work
+touched, not which ones it added or removed. Under the header are three tabs,
+as on a pull request, and every change opens on the first:
 
 - **Story** walks you through the change one part at a time (see [Walking through a change](#walking-through-a-change)).
   **Show everything on one page** shows it all at once instead: a few sentences
@@ -108,6 +110,9 @@ Story opens on the change's overview, then takes you through it in order:
 5. **Your notes**: says you've seen the whole change, or names the files you
    haven't seen yet, then lists your notes with **Send**.
 
+On uncommitted work, the overview is the map from your last commit, with no
+description, and the walk goes through each component the work changed.
+
 The bar at the top says where you are, as "3 of 6 · Sync Engine", with a dot
 for each part and how many of the change's files you've seen. `j` and `k`, or
 **‹** and **›**, move between the parts, and clicking a changed component on
@@ -132,12 +137,13 @@ pull request say why. Click a place to look first that is on the map to outline
 it there. Opening a commit or the whole branch describes it, unless you turned
 the repo off; then **Describe this change** reads it.
 
-While Claude Code reads, one line at the top of Story says which reads are
-running and how far each has got, such as "Drawing the map: Reading the base ·
-2 of 3 · Describing the change". A read that fails shows its error on that line
-with **Try again**. On a repo of 5,000 tracked files or more, a second line says
-the first read takes a while and you can leave the window open. The inbox shows
-main's read in the repo's header until it ends.
+While Claude Code draws the map, the space the map will take says so. The
+first time, it also says that future reads will be much quicker. One line
+at the top of Story says which other reads are running, such as "Describing the
+change". A read that fails shows its error on that line with **Try again**. On
+a repo of 5,000 tracked files or more, a second line says the first read takes a
+while and you can leave the window open. The inbox shows main's read in the
+repo's header until it ends.
 
 Once Claude Code has drawn anything on the page, one footnote at the bottom of
 Story says so and has:

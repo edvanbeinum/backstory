@@ -5,7 +5,8 @@ import os from "node:os";
 import path from "node:path";
 import { after, test } from "node:test";
 
-import { buildMap, type MapResponse } from "../lib/map";
+import { resolveRepo } from "../lib/git";
+import { buildMap, buildWorkingMap, type MapResponse } from "../lib/map";
 import { groupByComponent } from "../lib/mapGroups";
 import { localModelFile } from "../lib/model";
 
@@ -38,7 +39,7 @@ function gitRepo() {
     sh("commit", "-qm", message);
     return sh("rev-parse", "HEAD");
   };
-  return { dir, commit };
+  return { dir, sh, commit };
 }
 
 interface Comp {
@@ -472,4 +473,105 @@ test("groupByComponent groups in the map's order and keeps every file", () => {
   const out = groups.flatMap((g) => g.files.map((f) => f.path));
   assert.equal(out.length, files.length);
   assert.equal(new Set(out).size, files.length);
+});
+
+/** A repo at HEAD's model, with the files given committed beside it. */
+function workingRepo(files: Record<string, string>) {
+  const repo = gitRepo();
+  repo.commit({ ...files, ...asDsl(HEAD) }, "head");
+  return {
+    ...repo,
+    map: async () => buildWorkingMap(await resolveRepo(repo.dir)),
+  };
+}
+
+test("uncommitted work puts every changed app file, staged, unstaged or untracked, on HEAD's model, with nothing added or removed", async () => {
+  const repo = workingRepo({ "src/a/one.ts": "1\n", "src/b/two.ts": "2\n" });
+  write(repo.dir, "src/a/one.ts", "1\nmore\n");
+  write(repo.dir, "src/b/two.ts", "2\nstaged\n");
+  repo.sh("add", "src/b/two.ts");
+  write(repo.dir, "src/c/three.ts", "3\nnew\n");
+
+  const map = await repo.map();
+  assert.equal(map.status, "ok");
+  assert.equal(map.baseModel, true);
+  assert.equal(map.source, "committed");
+  const byName = new Map(map.nodes.map((n) => [n.name, n]));
+  assert.deepEqual(
+    Object.fromEntries(map.nodes.map((n) => [n.name, n.state])),
+    {
+      Alpha: "touched",
+      Beta: "touched",
+      Gamma: "touched",
+      Web: "neighbour",
+      App: "neighbour",
+    },
+  );
+  assert.deepEqual(byName.get("Alpha")?.fileStats, [
+    { path: "src/a/one.ts", additions: 1, deletions: 0, status: "M" },
+  ]);
+  assert.deepEqual(byName.get("Beta")?.files, ["src/b/two.ts"]);
+  assert.deepEqual(byName.get("Gamma")?.fileStats, [
+    { path: "src/c/three.ts", additions: 2, deletions: 0, status: "A" },
+  ]);
+  assert.equal(byName.get("Gamma")?.newFiles, 1);
+  assert.deepEqual(map.fileComponents, {
+    "src/a/one.ts": "Alpha",
+    "src/b/two.ts": "Beta",
+    "src/c/three.ts": "Gamma",
+  });
+  assert.deepEqual(map.unmapped, []);
+  assert.ok(map.edges.length > 0);
+  assert.ok(map.edges.every((e) => e.state === "same"));
+});
+
+test("a file deleted in the working tree maps by HEAD's model", async () => {
+  const repo = workingRepo({ "src/a/one.ts": "1\n", "src/a/gone.ts": "x\n" });
+  rmSync(path.join(repo.dir, "src/a/gone.ts"));
+  const alpha = (await repo.map()).nodes.find((n) => n.name === "Alpha");
+  assert.deepEqual(alpha?.fileStats, [
+    { path: "src/a/gone.ts", additions: 0, deletions: 1, status: "D" },
+  ]);
+});
+
+test("a staged rename on uncommitted work names both paths' component", async () => {
+  const repo = workingRepo({ "src/a/one.ts": "the same text\n" });
+  mkdirSync(path.join(repo.dir, "src/b"), { recursive: true });
+  repo.sh("mv", "src/a/one.ts", "src/b/moved.ts");
+  const map = await repo.map();
+  assert.deepEqual(map.fileComponents, {
+    "src/b/moved.ts": "Beta",
+    "src/a/one.ts": "Beta",
+  });
+});
+
+test("an untracked file no component has is off the map, and an untracked test is in neither", async () => {
+  const repo = workingRepo({ "src/a/one.ts": "1\n" });
+  write(repo.dir, "src/loose.ts", "nobody's\n");
+  write(repo.dir, "test/new.test.ts", "t\n");
+  const map = await repo.map();
+  assert.deepEqual(map.unmapped, ["src/loose.ts"]);
+  assert.deepEqual(map.fileComponents, {});
+});
+
+test("uncommitted work maps in a repo with a file named HEAD", async () => {
+  const repo = workingRepo({ HEAD: "x\n", "src/a/one.ts": "1\n" });
+  write(repo.dir, "src/a/one.ts", "1\nmore\n");
+  const map = await repo.map();
+  assert.deepEqual(map.fileComponents, { "src/a/one.ts": "Alpha" });
+});
+
+test("a clean working tree touches nothing and has the whole system", async () => {
+  const map = await workingRepo({ "src/a/one.ts": "1\n" }).map();
+  assert.equal(map.status, "ok");
+  assert.deepEqual(map.nodes, []);
+  assert.ok(map.whole && map.whole.nodes.length > 0);
+});
+
+test("uncommitted work in a repo with no commit yet has no map and nothing to draft", async () => {
+  const repo = gitRepo();
+  write(repo.dir, "src/a/one.ts", "1\n");
+  const map = await buildWorkingMap(await resolveRepo(repo.dir));
+  assert.equal(map.status, "none");
+  assert.equal(map.draft, undefined);
 });

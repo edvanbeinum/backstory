@@ -211,7 +211,7 @@ const DRAFTED_PROPERTY = "backstory.drafted";
 
 export type ModelSource = "committed" | "local" | "drafted";
 
-interface ModelRead {
+export interface ModelRead {
   /** Null when the file is there but couldn't be read: see `error` */
   model: Model | null;
   source: ModelSource;

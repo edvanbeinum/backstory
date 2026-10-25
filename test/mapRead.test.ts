@@ -39,6 +39,7 @@ import {
 import { serializeModel } from "../lib/models/dsl";
 import type { DraftOutput } from "../lib/models/prompts";
 import { homeDir } from "../lib/store";
+import { quietLoginShell, standIns } from "./standins";
 
 const previousHome = process.env.BACKSTORY_HOME;
 const home = mkdtempSync(path.join(os.tmpdir(), "backstory-maps-home-"));
@@ -1034,4 +1035,100 @@ test("reading main's map reads no branch's view, so a view nobody opens is never
   assert.deepEqual(ai.calls, ["full"]);
   for (const view of views)
     assert.equal((await mapStatus(view)).status, "idle");
+});
+
+/**
+ * Puts a stand-in `claude` first on PATH for `body`: signed in, answering a
+ * read in full with SHOP and a forward read with an empty difference, and
+ * logging "full" or "delta" to the `calls` it returns.
+ */
+async function withClaudeStandIn(
+  body: (calls: () => string[]) => Promise<void>,
+) {
+  const dir = standIns({
+    claude: `dir="\${0%/*}"
+case "$1" in
+  --version) exit 0 ;;
+  auth) echo '{"loggedIn": true}'; exit 0 ;;
+esac
+case "$(cat)" in
+  *"The patch:"*) echo delta >> "$dir/calls"; cat "$dir/delta.json" ;;
+  *) echo full >> "$dir/calls"; cat "$dir/full.json" ;;
+esac`,
+  });
+  dirs.push(dir);
+  const answer = (output: unknown) =>
+    JSON.stringify({ structured_output: output, total_cost_usd: 0.1 });
+  writeFileSync(path.join(dir, "full.json"), answer(SHOP));
+  writeFileSync(path.join(dir, "delta.json"), answer(delta()));
+  const saved = { path: process.env.PATH, shell: process.env.SHELL };
+  quietLoginShell();
+  process.env.PATH = `${dir}${path.delimiter}${saved.path}`;
+  const calls = () =>
+    existsSync(path.join(dir, "calls"))
+      ? readFileSync(path.join(dir, "calls"), "utf8").trim().split("\n")
+      : [];
+  try {
+    await body(calls);
+  } finally {
+    process.env.PATH = saved.path;
+    if (saved.shell === undefined) delete process.env.SHELL;
+    else process.env.SHELL = saved.shell;
+  }
+}
+
+test("uncommitted work reads HEAD's own view, and its map is HEAD's drafted map with the working files on it", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  const head = repo.commit({ "src/app/basket.ts": "1\n" }, "Basket");
+  writeFileSync(
+    path.join(repo.root, "src/app/main.ts"),
+    "export const main = 2;\n",
+  );
+  writeFileSync(
+    path.join(repo.root, "src/sync/queue.ts"),
+    "export const queue = 1;\n",
+  );
+  const query = `repo=${encodeURIComponent(repo.root)}&rev=working`;
+  const get = async () =>
+    (await mapRoute
+      .GET(new Request(`http://localhost/api/map?${query}`))
+      .then((r) => r.json())) as Awaited<ReturnType<typeof buildMap>>;
+  const headView = { root: repo.root, base: repo.main, head };
+
+  const before = await get();
+  assert.equal(before.status, "none");
+  assert.equal(before.draft?.status, "idle");
+
+  await withClaudeStandIn(async (calls) => {
+    assert.equal((await post(query)).status, 200);
+    await mapReadSettled(headView);
+    assert.deepEqual(calls(), ["delta"]);
+
+    const map = await get();
+    assert.equal(map.status, "ok");
+    assert.equal(map.source, "drafted");
+    assert.equal(map.baseModel, true);
+    assert.equal(map.draft?.status, "done");
+    const shown = states(map);
+    assert.equal(shown["shop.web.app"], "touched");
+    assert.equal(shown["shop.web.sync"], "touched");
+    assert.deepEqual(map.fileComponents, {
+      "src/app/main.ts": "app",
+      "src/sync/queue.ts": "sync",
+    });
+    // Only commits' trees are saved: the working tree is never a key.
+    assert.deepEqual(
+      readdirSync(await mapsFolder(repo.root)).sort(),
+      [
+        `${repo.tree(head)}.json`,
+        `${repo.tree(repo.main)}.json`,
+        "trunk.json",
+      ].sort(),
+    );
+
+    assert.equal((await post(`${query}&redraft=1`)).status, 200);
+    await mapReadSettled(headView);
+    assert.deepEqual(calls(), ["delta", "full", "delta"]);
+  });
 });

@@ -8,7 +8,8 @@ import type { RepoInfo } from "./types";
  * The two commits a view compares, the same ones /api/diff diffs: a commit
  * and its first parent, or for "All changes" the branch's fork point and
  * `repo.tip`: the branch the repo was opened to review, or HEAD. Null for
- * uncommitted work, which has no commit to key anything on.
+ * uncommitted work, which has no commit of its own to key anything on: its
+ * map keys on HEAD's view instead.
  */
 export async function viewRange(
   repo: RepoInfo,

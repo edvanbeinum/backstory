@@ -18,7 +18,12 @@ import { Flows } from "./Flows";
 import type { ComponentInfo, DataField, StepBadge } from "./FlowSequence";
 import { ReadFootnote } from "./ReadFootnote";
 import { ReadLine } from "./ReadLine";
-import { SystemMap, useMapDraft } from "./SystemMap";
+import {
+  mapDrawing,
+  setAutoReading,
+  SystemMap,
+  useMapDraft,
+} from "./SystemMap";
 import { Button } from "./ui";
 import type { FlowsApi } from "./useFlows";
 import { useView } from "./ViewContext";
@@ -48,7 +53,6 @@ export function Story({
   onOpenFile,
   flows,
   diff,
-  onShowFiles,
   onShowYourself,
   target,
   onTargetDone,
@@ -83,7 +87,6 @@ export function Story({
   flows: FlowsApi;
   /** This view's diff, once it has loaded */
   diff: DiffResponse | null;
-  onShowFiles: () => void;
   onShowYourself: () => void;
   target: StoryTarget | null;
   onTargetDone: (at: number) => void;
@@ -121,11 +124,11 @@ export function Story({
   const read = useDescription(repo, rev, onModelChange);
   const description =
     read.status?.status === "done" ? read.status.description : null;
-  const shownMap = rev !== WORKING_REV ? map : null;
   // Story holds the drawings' reads, not the drawings, so its one progress
   // line knows each read and the data model reads in the walk, whose maps
   // show no data phrase.
-  const mapDraft = useMapDraft(repo, rev, shownMap, onModelChange);
+  const mapDraft = useMapDraft(repo, rev, map, onModelChange);
+  const drawing = mapDrawing(mapDraft.map);
   const dataDraft = useDataDraft(
     repo,
     rev,
@@ -133,6 +136,12 @@ export function Story({
     onModelChange,
   );
   const describes = rev !== WORKING_REV ? read : null;
+  // Gives the map card the repo's switch on uncommitted work too, where there
+  // is no description to own it.
+  const setAuto = async (on: boolean) => {
+    await setAutoReading(repo, on);
+    onModelChange();
+  };
   const readLine = (
     <ReadLine map={mapDraft} data={dataDraft} description={describes} />
   );
@@ -158,13 +167,13 @@ export function Story({
     () =>
       buildStops({
         description,
-        map: shownMap,
+        map,
         order,
         data,
         flows: set,
         files: diff?.files ?? [],
       }),
-    [description, shownMap, order, data, set, diff],
+    [description, map, order, data, set, diff],
   );
   // Keep the stop picked on screen when a late map, data model or diff adds
   // stops before it, rather than the stop now at its number. A stop number
@@ -248,7 +257,7 @@ export function Story({
   const mapSection = (focused: boolean) => (
     <SystemMap
       draft={mapDraft}
-      onSetAuto={describes?.setAuto}
+      onSetAuto={describes?.setAuto ?? setAuto}
       repo={repo}
       rev={rev}
       highlight={mapHighlight}
@@ -284,6 +293,7 @@ export function Story({
             stops={stops}
             index={index}
             seen={seen.keys}
+            drawing={drawing}
             onGo={go}
             onLeave={() => onWalk(false)}
           />
@@ -301,10 +311,11 @@ export function Story({
             overview={
               <>
                 {overview}
-                {rev !== WORKING_REV && mapSection(true)}
+                {mapSection(true)}
               </>
             }
-            map={rev !== WORKING_REV ? mapSection(true) : null}
+            drawing={drawing}
+            map={mapSection(true)}
             data={data}
             entityNotes={entityNotes}
             renderFiles={renderFiles}
@@ -328,49 +339,48 @@ export function Story({
 
       {overview}
 
+      <section className="space-y-2">
+        <div className="story-h">
+          <h3>Map</h3>
+        </div>
+        {mapSection(false)}
+      </section>
+
       {rev !== WORKING_REV && (
         <section className="space-y-2">
           <div className="story-h">
-            <h3>Map</h3>
+            <h3>Flows</h3>
+            {set && <span className="counter">{set.flows.length}</span>}
+            {set && diff && (
+              <FlowCoverage
+                set={set}
+                files={diff.files}
+                tracing={status?.status === "ready" ? status.tracing : []}
+                onTrace={flows.trace}
+                repo={repo}
+                rev={rev}
+                onShowYourself={onShowYourself}
+              />
+            )}
           </div>
-          {mapSection(false)}
+          <Flows
+            api={flows}
+            fileCount={diff ? diff.files.length : null}
+            repo={repo}
+            rev={rev}
+            onShowInFiles={onShowInFiles}
+            filesInDiff={filesInDiff}
+            target={target}
+            onTargetDone={onTargetDone}
+            navRef={navRef}
+            components={components}
+            dataFields={dataFields}
+            flowNotes={flowNotes}
+            badges={badges}
+            onBadge={onBadge}
+          />
         </section>
       )}
-
-      <section className="space-y-2">
-        <div className="story-h">
-          <h3>Flows</h3>
-          {set && <span className="counter">{set.flows.length}</span>}
-          {set && diff && (
-            <FlowCoverage
-              set={set}
-              files={diff.files}
-              tracing={status?.status === "ready" ? status.tracing : []}
-              onTrace={flows.trace}
-              repo={repo}
-              rev={rev}
-              onShowYourself={onShowYourself}
-            />
-          )}
-        </div>
-        <Flows
-          api={flows}
-          fileCount={diff ? diff.files.length : null}
-          onShowFiles={onShowFiles}
-          repo={repo}
-          rev={rev}
-          onShowInFiles={onShowInFiles}
-          filesInDiff={filesInDiff}
-          target={target}
-          onTargetDone={onTargetDone}
-          navRef={navRef}
-          components={components}
-          dataFields={dataFields}
-          flowNotes={flowNotes}
-          badges={badges}
-          onBadge={onBadge}
-        />
-      </section>
       {footnote}
     </div>
   );

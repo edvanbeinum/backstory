@@ -258,6 +258,27 @@ test("with no map, the walk is the overview, every file, and the finish", () => 
   }
 });
 
+test("uncommitted work's map, with nothing added or removed, gives a stop per changed component and the rest only for files no component has", () => {
+  assert.ok(MAP.nodes.every((n) => ["touched", "neighbour"].includes(n.state)));
+  assert.ok(MAP.edges.every((e) => e.state === "same"));
+  const stops = all({ description: null, data: null });
+  assert.deepEqual(
+    stops.map((s) => s.key),
+    [
+      "overview",
+      "component:screen",
+      "component:api",
+      "component:store",
+      "yourself",
+      "finish",
+    ],
+  );
+  assert.deepEqual(
+    stops.find((s) => s.kind === "yourself")?.files.map((f) => f.path),
+    ["test/routes.test.ts", "README.md", "src/other/loose.ts", "src/both.ts"],
+  );
+});
+
 test("a component's stop says the description's sentence on it, or else the map's", () => {
   const description: ChangeDescription = {
     what: "Saves orders.",

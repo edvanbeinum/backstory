@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readdirSync,
   readFileSync,
@@ -205,6 +206,10 @@ test("a cross-site request to a route that writes is refused and writes nothing"
       map.POST(send(at("map", `repo=${repo}&rev=HEAD`), "POST", EVIL)),
     ],
     [
+      "map read of uncommitted work",
+      map.POST(send(at("map", `repo=${repo}&rev=working`), "POST", EVIL)),
+    ],
+    [
       "description read",
       description.POST(
         send(at("description", `repo=${repo}&rev=HEAD`), "POST", EVIL),
@@ -294,6 +299,56 @@ test("GET /api/description wants both a repo and a rev", async () => {
     description.GET(send(at("description", query), "GET", {}));
   assert.equal((await get(`repo=${encodeURIComponent(REPO)}`)).status, 400);
   assert.equal((await get("rev=HEAD")).status, 400);
+});
+
+test("GET /api/map draws uncommitted work on HEAD's map, and a branch opened by ref has none", async () => {
+  const dir = tempRepo();
+  const git = (...args: string[]) =>
+    execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" });
+  mkdirSync(path.join(dir, "architecture"));
+  writeFileSync(
+    path.join(dir, "architecture/workspace.dsl"),
+    `workspace {
+    model {
+        app = softwareSystem "App" {
+            web = container "Web" {
+                site = component "Site" {
+                    properties {
+                        "code.globs" "src/**"
+                    }
+                }
+            }
+        }
+    }
+}
+`,
+  );
+  git("add", ".");
+  git(
+    "-c",
+    "user.email=t@example.com",
+    "-c",
+    "user.name=T",
+    "commit",
+    "-qm",
+    "Model",
+  );
+  git("branch", "other");
+  mkdirSync(path.join(dir, "src"));
+  writeFileSync(path.join(dir, "src/wip.ts"), "export const wip = 1;\n");
+  const get = async (query: string) =>
+    (await map.GET(send(at("map", query), "GET", {}))).json() as Promise<{
+      status: string;
+      fileComponents?: Record<string, string>;
+    }>;
+
+  const working = await get(`repo=${encodeURIComponent(dir)}&rev=working`);
+  assert.equal(working.status, "ok");
+  assert.deepEqual(working.fileComponents, { "src/wip.ts": "Site" });
+  assert.deepEqual(
+    await get(`repo=${encodeURIComponent(dir)}&ref=other&rev=working`),
+    { status: "none" },
+  );
 });
 
 test("POST /api/looked stores the tip the page showed, else the branch's tip, and wants both a repo and a branch", async () => {

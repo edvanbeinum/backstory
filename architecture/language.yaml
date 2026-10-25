@@ -19,7 +19,7 @@ terms:
     avoid:
       - lane, for the data
   - name: view
-    means: 'The two commits being compared: one commit and its first parent, or "All changes" from the fork point to the reviewed branch''s tip, HEAD unless the URL has `ref` (`lib/view.ts`).'
+    means: 'The two commits being compared: one commit and its first parent, or "All changes" from the fork point to the reviewed branch''s tip, HEAD unless the URL has `ref` (`lib/view.ts`). Uncommitted work is the working tree against HEAD, drawn on HEAD''s map.'
     avoid:
       - view, for the Diff / Before / After switch
   - name: flow mode
@@ -33,11 +33,11 @@ terms:
       - panel
       - column
   - name: story
-    means: "The Story tab, where every view lands: the walk through the change, or with Show everything on one page the change description, then the map at full width with one line of what it says, then each flow as a card (`components/Story.tsx`). Story holds the map's, the data model's and the description's reads: one progress line at the top says which run, with each one's phase and step, a failed read's error and Try again, and a line for a big repo (`components/ReadLine.tsx`); one footnote at the bottom, once the AI drew anything, says who drew it and has Turn off and each drawing's Read again (`components/ReadFootnote.tsx`)."
+    means: "The Story tab, where every view lands: the walk through the change, or with Show everything on one page the change description, then the map at full width with a line under it only when its structure changed, then each flow as a card (`components/Story.tsx`). Story holds the map's, the data model's and the description's reads: one progress line at the top says which run, a failed read's error and Try again, and a line for a big repo (`components/ReadLine.tsx`), except the map's running read, which the space the map will take shows instead, with a large spinner, on the first read a line that later reads are much quicker, and the big-repo line; one footnote at the bottom, once the AI drew anything, says who drew it and has Turn off and each drawing's Read again (`components/ReadFootnote.tsx`)."
     avoid:
       - strip, for the map or the data model's summary
   - name: walk
-    means: "Story as it opens: the change one stop at a time under a pinned bar, with the map on each component stop outlining it, and no data phrase under it, since the data model has its own stop (`lib/walk.ts`, `components/Walk.tsx`). `stop=` in the URL names the stop, and `walk=0` opens Story on one page. The UI never says walk: it offers Walk me through it and Show everything on one page."
+    means: "Story as it opens: the change one stop at a time under a pinned bar, with the map on each component stop outlining it, and no data phrase under it, since the data model has its own stop (`lib/walk.ts`, `components/Walk.tsx`). On uncommitted work, which has no description, the overview is the map. `stop=` in the URL names the stop, and `walk=0` opens Story on one page. The UI never says walk: it offers Walk me through it and Show everything on one page."
     avoid:
       - tour (reads as an app's onboarding tour)
   - name: stop
@@ -83,7 +83,7 @@ terms:
     avoid:
       - draft alone, for the model
   - name: drafted map
-    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Read as repos and views open, unless the repo is turned off (Turn off in Story's footnote), or on a click (Draw the map). With the repo turned off, the map card also has Read automatically, since the footnote only shows once something was drawn. Draw the map again, in Story's footnote, reads main in full again."
+    means: "The AI provider's C4 model of one tree, for a repo with no committed or local model: main's map is read in full once (`lib/models/draft.ts`); every other tree's is derived forward from the nearest map already read, by one read of the patch that returns only what it changed (`lib/models/delta.ts`). Base and head are compared like a committed model's, so the map marks what a branch added or removed. Uncommitted work is drawn on HEAD's map, so opening it reads HEAD's own view. Read as repos and views open, unless the repo is turned off (Turn off in Story's footnote), or on a click (Draw the map). With the repo turned off, the map card also has Read automatically, since the footnote only shows once something was drawn. Draw the map again, in Story's footnote, reads main in full again."
     avoid:
       - local model, for a drafted map
   - name: main's map

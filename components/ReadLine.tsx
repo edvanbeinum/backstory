@@ -22,10 +22,7 @@ function readOf(
   error: string | null,
   retry: () => void,
 ) {
-  const running =
-    job?.status === "running"
-      ? `${name}: ${job.phase}${job.step ? ` · ${job.step.at} of ${job.step.of}` : ""}`
-      : null;
+  const running = job?.status === "running" ? name : null;
   const failed: Failed[] = [];
   if (job?.status === "failed") failed.push({ name, error: job.error, retry });
   if (error) failed.push({ name, error, retry });
@@ -37,10 +34,11 @@ const bigRead = (read: TrunkReadStatus | null | undefined) =>
   read?.status === "running" && read.big;
 
 /**
- * Story's one line about its reads, at the top: each running read's phase
- * and step, a failed read's error with Try again, and on a big repo a second
+ * Story's one line about its reads, at the top: which reads run, a failed
+ * read's error with Try again, and on a big repo a second
  * line saying the first read takes a while. Hidden when nothing runs or
- * failed.
+ * failed. Leaves the map's running read to the box the map will fill, which
+ * says it larger.
  */
 export function ReadLine({
   map,
@@ -53,11 +51,20 @@ export function ReadLine({
   description: DescriptionApi | null;
 }) {
   const said = description?.status;
-  const reads = [
-    readOf("Drawing the map", map.map?.draft, map.error, map.retry),
-    readOf("Reading the data model", data.data?.draft, data.error, data.retry),
-  ];
-  const running = reads.flatMap((r) => (r.running ? [r.running] : []));
+  const mapRead = readOf(
+    "Drawing the map",
+    map.map?.draft,
+    map.error,
+    map.retry,
+  );
+  const dataRead = readOf(
+    "Reading the data model",
+    data.data?.draft,
+    data.error,
+    data.retry,
+  );
+  const reads = [mapRead, dataRead];
+  const running = dataRead.running ? [dataRead.running] : [];
   const failed = reads.flatMap((r) => r.failed);
   const gaps: ProviderGap[] = reads.flatMap((r) => (r.gap ? [r.gap] : []));
   if (said?.status === "running") running.push("Describing the change");
@@ -81,9 +88,7 @@ export function ReadLine({
     });
   if (said?.status === "unavailable") gaps.push(said.reason);
   if (said?.status === "done" && said.gap) gaps.push(said.gap);
-  const big =
-    running.length > 0 &&
-    (bigRead(map.map?.mainRead) || bigRead(data.data?.mainRead));
+  const big = running.length > 0 && bigRead(data.data?.mainRead);
 
   if (running.length === 0 && failed.length === 0 && gaps.length === 0)
     return null;

@@ -36,12 +36,15 @@ export function WalkBar({
   stops,
   index,
   seen,
+  drawing,
   onGo,
   onLeave,
 }: {
   stops: Stop[];
   index: number;
   seen: Set<string>;
+  /** While the map is drawing, which leaves out the stops it will add */
+  drawing: boolean;
   onGo: (index: number) => void;
   /** Show everything on one page */
   onLeave: () => void;
@@ -50,24 +53,31 @@ export function WalkBar({
   return (
     <div className="walk-bar">
       <span className="walk-where">
-        <b>
-          {index + 1} of {stops.length}
-        </b>{" "}
-        · {stopName(stops[index])}
+        {!drawing && (
+          <>
+            <b>
+              {index + 1} of {stops.length}
+            </b>{" "}
+            ·{" "}
+          </>
+        )}
+        {stopName(stops[index])}
       </span>
-      <span className="walk-dots">
-        {stops.map((s, i) => (
-          <button
-            key={s.key}
-            type="button"
-            aria-label={`${i + 1}: ${stopName(s)}`}
-            aria-current={i === index ? "step" : undefined}
-            title={stopName(s)}
-            className={`walk-dot ${seen.has(s.key) ? "seen" : ""}`}
-            onClick={() => onGo(i)}
-          />
-        ))}
-      </span>
+      {!drawing && (
+        <span className="walk-dots">
+          {stops.map((s, i) => (
+            <button
+              key={s.key}
+              type="button"
+              aria-label={`${i + 1}: ${stopName(s)}`}
+              aria-current={i === index ? "step" : undefined}
+              title={stopName(s)}
+              className={`walk-dot ${seen.has(s.key) ? "seen" : ""}`}
+              onClick={() => onGo(i)}
+            />
+          ))}
+        </span>
+      )}
       {total > 0 && (
         <span className="walk-seen">
           {filesSeen(stops, seen)} of {fileWord(total)} seen
@@ -145,6 +155,7 @@ export function StopView({
   index,
   seen,
   overview,
+  drawing,
   map,
   data,
   entityNotes,
@@ -158,6 +169,8 @@ export function StopView({
   seen: Set<string>;
   /** The change description with the map under it, for the overview */
   overview: React.ReactNode;
+  /** While the map is drawing, which leaves out the stops it will add */
+  drawing: boolean;
   /** The map, outlining the component a stop is on */
   map: React.ReactNode;
   data: DataResponse | null;
@@ -177,7 +190,7 @@ export function StopView({
       return (
         <section className="space-y-4">
           {overview}
-          {ahead.length > 0 && (
+          {!drawing && ahead.length > 0 && (
             <p className="walk-ahead">
               Then{" "}
               {ahead.map((s, i) => (

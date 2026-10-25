@@ -813,8 +813,8 @@ export async function getCommitPatch(
   }
 }
 
-const MAX_UNTRACKED = 100;
-const MAX_UNTRACKED_BYTES = 2 * 1024 * 1024;
+export const MAX_UNTRACKED = 100;
+export const MAX_UNTRACKED_BYTES = 2 * 1024 * 1024;
 
 /**
  * The patch for uncommitted work: tracked changes against HEAD, plus a

@@ -10,11 +10,10 @@ import {
 } from "react";
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
-import { ownsCode } from "@/lib/mapGroups";
 import { viewKey, viewParams } from "@/lib/url";
 import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { Button, CopyButton, Ticked } from "./ui";
+import { Button, CopyButton, Spinner, Ticked } from "./ui";
 import { useView } from "./ViewContext";
 
 /**
@@ -444,12 +443,8 @@ const names = (list: MapNode[]) => {
     : `${n.slice(0, 3).join(", ")} +${n.length - 3}`;
 };
 
+/** What the map's colours say changed in its structure, or why it can't say: nothing when every box and arrow is the same. */
 function summary(map: MapResponse) {
-  // A new or removed box is named as such, but a box around a changed
-  // component isn't a changed component itself.
-  const changed = map.nodes
-    .filter(ownsCode)
-    .filter((n) => n.state !== "neighbour");
   const added = map.nodes.filter((n) => n.state === "added");
   const removed = map.nodes.filter((n) => n.state === "removed");
   const arrows = {
@@ -457,40 +452,14 @@ function summary(map: MapResponse) {
     removed: map.edges.filter((e) => e.state === "removed").length,
     changed: map.edges.filter((e) => e.state === "changed").length,
   };
-  const structural =
-    added.length +
-      removed.length +
-      arrows.added +
-      arrows.removed +
-      arrows.changed >
-    0;
   const parts: React.ReactNode[] = [];
-  if (!structural) {
+  if (map.baseError)
     parts.push(
-      <>
-        <b>{changed.length}</b> touched
-      </>,
-      names(changed),
-      map.local ? (
-        "hand-written map on this machine, so nothing shows as new or removed"
-      ) : map.baseModel ? (
-        "no structural change"
-      ) : map.baseError ? (
-        <span className="text-[var(--attention)]" title={map.baseError}>
-          couldn&apos;t read the base&apos;s map, so nothing shows as new or
-          removed
-        </span>
-      ) : (
-        "no map at the base to compare with"
-      ),
+      <span className="text-[var(--attention)]" title={map.baseError}>
+        couldn&apos;t read the base&apos;s map, so nothing shows as new or
+        removed
+      </span>,
     );
-    return parts;
-  }
-  parts.push(
-    <>
-      <b>{changed.length}</b> changed
-    </>,
-  );
   if (added.length)
     parts.push(
       <span className="text-[var(--success)]">
@@ -634,8 +603,8 @@ export function useMapDraft(
   // With reading turned on, a view with no map yet, or with a drafted head
   // but no base to compare it with, starts its read on open. It starts once
   // until the view's read status changes: a read that fails or can't run
-  // stays that way, while the branch view, whose rev stays "branch" as HEAD
-  // moves, reads again once its new head needs it.
+  // stays that way, while the branch view and uncommitted work, whose revs
+  // stay the same as HEAD moves, read again once their new head needs it.
   const autoStart =
     !map?.error &&
     (map?.status === "none" || (map?.source === "drafted" && !map.baseModel)) &&
@@ -666,11 +635,32 @@ export type MapDraftApi = ReturnType<typeof useMapDraft>;
 const offered = (map: MapResponse) =>
   map.draft?.status === "idle" ? !map.draft.auto : map.draft?.status === "done";
 
+/** Whether the map's space shows its read running, so nothing else on the page reads as the walk's final shape. */
+export const mapDrawing = (map: MapResponse | null) =>
+  map?.status === "none" && !map.error && !!map.draft && !offered(map);
+
+/** The map's read in the space the map will take, so a read that takes minutes doesn't look frozen. */
+function DraftPending({ map }: { map: MapResponse | null }) {
+  const first = map?.mainRead?.status === "running" ? map.mainRead : null;
+  return (
+    <div className="story-card map-pending" role="status">
+      <Spinner className="!h-6 !w-6" />
+      <p className="font-semibold text-[var(--fg)]">Drawing the map</p>
+      {first && <p>Once this is drawn, future reads will be much quicker.</p>}
+      {first?.big && (
+        <p className="text-[var(--fg-subtle)]">
+          This is a big repo, so it takes a while. You can leave this open.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Where the map goes before there is one: with the repo turned off, the
  * button that draws it and the repo's switch, since the footnote that also
- * has the switch only shows once something was drawn; otherwise empty, since
- * Story's progress line says what is happening.
+ * has the switch only shows once something was drawn; otherwise the read
+ * that is drawing it.
  */
 function DraftOffer({
   draft,
@@ -681,7 +671,7 @@ function DraftOffer({
 }) {
   const [switchError, setSwitchError] = useState<string | null>(null);
   if (!draft.map || !offered(draft.map))
-    return <div className="story-card map-pending" />;
+    return <DraftPending map={draft.map} />;
   return (
     <div className="story-card">
       <h3>The map hasn&apos;t been drawn yet</h3>
@@ -748,22 +738,6 @@ function LocalModel({ map }: { map: MapResponse }) {
         label="Copy path"
       />
     </div>
-  );
-}
-
-/** The component with the most changed lines, as the line under the map names it. */
-function mostWork(map: MapResponse): React.ReactNode {
-  const busiest = map.nodes
-    .filter((n) => n.files.length > 0)
-    .sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions))[0];
-  if (!busiest) return null;
-  const files = busiest.files.length;
-  return (
-    <>
-      <b>{busiest.name}</b> does most of the work: {files}{" "}
-      {files === 1 ? "file" : "files"}
-      {busiest.newFiles > 0 && `, ${busiest.newFiles} new`}
-    </>
   );
 }
 
@@ -888,8 +862,7 @@ export function SystemMap({
     );
   }
 
-  const work = mostWork(map);
-  const parts = [...(work ? [work] : []), ...summary(map)];
+  const parts = summary(map);
   return (
     <section ref={boxRef} className="story-map">
       <div className="map-card">
