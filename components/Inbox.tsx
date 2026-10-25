@@ -283,11 +283,7 @@ export function Inbox({
                       role="status"
                     >
                       <Spinner className="!h-3 !w-3 shrink-0" />
-                      <span className="truncate">
-                        {repo.reading.phase}
-                        {repo.reading.step &&
-                          ` · ${repo.reading.step.at} of ${repo.reading.step.of}`}
-                      </span>
+                      <span className="truncate">{repo.reading.name}</span>
                     </span>
                   )}
                   <span className="h-px flex-1 bg-[var(--border)]" />

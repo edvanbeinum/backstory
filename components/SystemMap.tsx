@@ -668,21 +668,15 @@ const offered = (map: MapResponse) =>
 
 /** The map's read in the space the map will take, so a read that takes minutes doesn't look frozen. */
 function DraftPending({ map }: { map: MapResponse | null }) {
-  const job = map?.draft?.status === "running" ? map.draft : null;
+  const first = map?.mainRead?.status === "running" ? map.mainRead : null;
   return (
     <div className="story-card map-pending" role="status">
       <Spinner className="!h-6 !w-6" />
       <p className="font-semibold text-[var(--fg)]">Drawing the map</p>
-      {job && (
-        <p>
-          {job.phase}
-          {job.step && ` · ${job.step.at} of ${job.step.of}`}
-        </p>
-      )}
-      {job && map?.mainRead?.status === "running" && map.mainRead.big && (
+      {first && <p>Once this is drawn, future reads will be much quicker.</p>}
+      {first?.big && (
         <p className="text-[var(--fg-subtle)]">
-          This is a big repo, the first read takes a while. You can leave this
-          open.
+          This is a big repo, so it takes a while. You can leave this open.
         </p>
       )}
     </div>

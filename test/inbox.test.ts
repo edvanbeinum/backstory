@@ -9,11 +9,7 @@ import type { Runner } from "../lib/ai/provider";
 import { pickPullRequest } from "../lib/github";
 import { buildInbox } from "../lib/inbox";
 import { markLooked } from "../lib/looked";
-import {
-  mapTrunkReadSettled,
-  PHASES,
-  startMapTrunkRead,
-} from "../lib/models/cache";
+import { mapTrunkReadSettled, startMapTrunkRead } from "../lib/models/cache";
 import {
   githubApiStandIn,
   quietLoginShell,
@@ -305,11 +301,7 @@ test("a repo whose main is being read says so on the inbox until the read ends",
   const running = await reading();
   release();
   await mapTrunkReadSettled(repo.root);
-  assert.deepEqual(running, {
-    phase: `Drawing the map: ${PHASES.firstMain}`,
-    step: { at: 1, of: 1 },
-    big: false,
-  });
+  assert.deepEqual(running, { name: "Drawing the map", big: false });
   assert.equal(await reading(), null);
 });
 

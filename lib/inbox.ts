@@ -113,11 +113,7 @@ export interface InboxRepo {
    */
   onGitHub: RemoteBranch[];
   /** Main's map or data model read while it runs, in the words Story's progress line uses */
-  reading: {
-    phase: string;
-    step: { at: number; of: number } | null;
-    big: boolean;
-  } | null;
+  reading: { name: string; big: boolean } | null;
 }
 
 export interface InboxResult {
@@ -133,12 +129,7 @@ async function mainRead(root: string): Promise<InboxRepo["reading"]> {
     ["Reading the data model", await dataTrunkStatus(root)],
   ] as const;
   for (const [name, read] of reads)
-    if (read?.status === "running")
-      return {
-        phase: `${name}: ${read.phase}`,
-        step: read.step,
-        big: read.big,
-      };
+    if (read?.status === "running") return { name, big: read.big };
   return null;
 }
 

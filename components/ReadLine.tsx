@@ -22,10 +22,7 @@ function readOf(
   error: string | null,
   retry: () => void,
 ) {
-  const running =
-    job?.status === "running"
-      ? `${name}: ${job.phase}${job.step ? ` · ${job.step.at} of ${job.step.of}` : ""}`
-      : null;
+  const running = job?.status === "running" ? name : null;
   const failed: Failed[] = [];
   if (job?.status === "failed") failed.push({ name, error: job.error, retry });
   if (error) failed.push({ name, error, retry });
@@ -37,8 +34,8 @@ const bigRead = (read: TrunkReadStatus | null | undefined) =>
   read?.status === "running" && read.big;
 
 /**
- * Story's one line about its reads, at the top: each running read's phase
- * and step, a failed read's error with Try again, and on a big repo a second
+ * Story's one line about its reads, at the top: which reads run, a failed
+ * read's error with Try again, and on a big repo a second
  * line saying the first read takes a while. Hidden when nothing runs or
  * failed. Leaves the map's running read to the box the map will fill, which
  * says it larger.
