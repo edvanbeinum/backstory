@@ -159,8 +159,8 @@ Story says so and has:
   does the same for the data model.
 - **Describe again**, which reads the description once more, and keeps the
   earlier description if that read fails.
-- **Trace again**, once the change is traced, which traces its flows once more,
-  and keeps the earlier flows if that trace fails.
+- **Trace again**, on one page once the change is traced, which traces its
+  flows once more, and keeps the earlier flows if that trace fails.
 
 Backstory draws what a change did to the system, so you can see its effect
 before reading its lines:

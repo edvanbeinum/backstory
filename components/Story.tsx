@@ -145,12 +145,14 @@ export function Story({
   const readLine = (
     <ReadLine map={mapDraft} data={dataDraft} description={describes} />
   );
+  // Keep the flows out of the walk's footnote, since only the Flows section on
+  // one page shows a trace running or failing.
   const footnote = (
     <ReadFootnote
       map={mapDraft}
       data={dataDraft}
       description={describes}
-      flows={rev !== WORKING_REV ? flows : null}
+      flows={rev !== WORKING_REV && !walk ? flows : null}
     />
   );
   const view = viewKey({ repo, ref, rev });
