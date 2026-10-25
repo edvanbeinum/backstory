@@ -130,6 +130,7 @@ export function Story({
   // line knows each read and the data model reads in the walk, whose maps
   // show no data phrase.
   const mapDraft = useMapDraft(repo, rev, map, onModelChange);
+  const drawing = mapDrawing(mapDraft.map);
   const dataDraft = useDataDraft(
     repo,
     rev,
@@ -294,6 +295,7 @@ export function Story({
             stops={stops}
             index={index}
             seen={seen.keys}
+            drawing={drawing}
             onGo={go}
             onLeave={() => onWalk(false)}
           />
@@ -314,7 +316,7 @@ export function Story({
                 {mapSection(true)}
               </>
             }
-            drawing={mapDrawing(mapDraft.map)}
+            drawing={drawing}
             map={mapSection(true)}
             data={data}
             entityNotes={entityNotes}
