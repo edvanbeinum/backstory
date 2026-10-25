@@ -311,7 +311,7 @@ export function Story({
           style={{ "--walk-top": `${topHeight}px` } as React.CSSProperties}
         >
           <StopView
-            key={current.key}
+            key={`${view} ${current.key}`}
             stops={stops}
             index={index}
             seen={seen.keys}
@@ -342,7 +342,8 @@ export function Story({
         <Button size="sm" variant="invisible" onClick={() => onWalk(true)}>
           Walk me through it
         </Button>
-        {onNote && <NoteFor onNote={onNote} />}
+        {/* Keyed by view so a half-written note never goes to the next change. */}
+        {onNote && <NoteFor key={view} onNote={onNote} />}
       </div>
 
       {overview}
