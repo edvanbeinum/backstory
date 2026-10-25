@@ -109,7 +109,8 @@ Story opens on the change's overview, then takes you through it in order:
    a whole, which starts "On" and its name.
 4. **Not on the map**: the files no component has, such as tests.
 5. **Your notes**: says you've seen the whole change, or names the files you
-   haven't seen yet, then lists your notes with **Send**.
+   haven't seen yet, with **+ Note for the agent** for a note on the change as a
+   whole.
 
 On uncommitted work, the overview is the map from your last commit, with no
 description, and the walk goes through each component the work changed.
@@ -311,10 +312,13 @@ opens it in Backstory. If you move the app, choose it again to fix the link.
 When an agent is making the change, you review what it made — uncommitted work,
 or the commits it made on its own if you let it run. Notes go on any change:
 in Files changed, hover a line of **Uncommitted**, **All changes**, or any one
-commit, and press
-**+**; **Add a general note** covers the work as a whole. When you review a
-stack of commits one at a time, the notes on each commit are kept to send
-together, and the bar lists the ones on other changes.
+commit, and press **+**. **+ Note for the agent**, on the walk's last part or
+beside **Walk me through it** on one page, covers the work as a whole.
+
+The notes box appears at the bottom of the window with your first note, or as
+soon as an agent is waiting, and has **Add a general note** for more. When you
+review a stack of commits one at a time, the notes on each commit are kept to
+send together, and the box lists the ones on other changes.
 
 A note on a commit is sent naming the commit, and whether it's been pushed.
 Notes remember the text of their line, so they follow it when the agent's next

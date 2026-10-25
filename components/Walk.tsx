@@ -116,12 +116,16 @@ function StopHeading({
   );
 }
 
-/** A note on the change as a whole, starting with the component it's about. */
-function NoteFor({
+/**
+ * A note on the change as a whole, starting with the component it's about
+ * when there is one. The notes box shows only once there is a note, so this
+ * is where the first general note is written.
+ */
+export function NoteFor({
   name,
   onNote,
 }: {
-  name: string;
+  name?: string;
   onNote: (body: string) => void;
 }) {
   const [writing, setWriting] = useState(false);
@@ -131,16 +135,23 @@ function NoteFor({
         + Note for the agent
       </Button>
     );
+  // Its own full row, beside other buttons on Story on one page.
   return (
-    <NoteComposer
-      initial={`On ${name}: `}
-      placeholder={`Anything about ${name}?`}
-      onCancel={() => setWriting(false)}
-      onSave={(body) => {
-        onNote(body);
-        setWriting(false);
-      }}
-    />
+    <div className="basis-full">
+      <NoteComposer
+        initial={name ? `On ${name}: ` : undefined}
+        placeholder={
+          name
+            ? `Anything about ${name}?`
+            : "Anything about the change as a whole?"
+        }
+        onCancel={() => setWriting(false)}
+        onSave={(body) => {
+          onNote(body);
+          setWriting(false);
+        }}
+      />
+    </div>
   );
 }
 
@@ -282,6 +293,7 @@ export function StopView({
               </ul>
             </div>
           )}
+          {onNote && <NoteFor onNote={onNote} />}
         </section>
       );
     }

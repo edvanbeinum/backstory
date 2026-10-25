@@ -199,11 +199,6 @@ export function FeedbackBar({
             ? "Notes for your agent"
             : `${count} ${count === 1 ? "note" : "notes"} for your agent`}
         </span>
-        {count === 0 && noteRev && (
-          <span className="text-[12px] text-[var(--fg-muted)]">
-            — hover a line and press + to leave one
-          </span>
-        )}
 
         <div className="ml-auto flex items-center gap-1.5">
           {!writing && (

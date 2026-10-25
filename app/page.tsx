@@ -1231,11 +1231,15 @@ export default function Page() {
 
                         {/* Pinned to the bottom of the window on every tab: an
                         agent waiting on review must never be invisible, and
-                        notes written in Files changed are sent from anywhere. */}
-                        {(noteRev ||
-                          notes.notes.length > 0 ||
+                        notes written in Files changed are sent from anywhere.
+                        Before the first note it shows only for a waiting agent
+                        or an error; the first general note is written from
+                        Story. */}
+                        {(notes.notes.length > 0 ||
                           review.waiting ||
-                          review.error) && (
+                          review.error ||
+                          outbox.error ||
+                          notes.error) && (
                           <div className="sticky bottom-4 z-20">
                             <FeedbackBar
                               notes={notes}

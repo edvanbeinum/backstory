@@ -27,7 +27,7 @@ import {
 import { Button } from "./ui";
 import type { FlowsApi } from "./useFlows";
 import { useView } from "./ViewContext";
-import { StopView, WalkBar } from "./Walk";
+import { NoteFor, StopView, WalkBar } from "./Walk";
 
 /**
  * The tab every view lands on. It opens as a walk through the change, one
@@ -335,11 +335,12 @@ export function Story({
 
   return (
     <div className="space-y-6 pt-1">
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">{readLine}</div>
         <Button size="sm" variant="invisible" onClick={() => onWalk(true)}>
           Walk me through it
         </Button>
+        {onNote && <NoteFor onNote={onNote} />}
       </div>
 
       {overview}
