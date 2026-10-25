@@ -96,7 +96,6 @@ export function ChangeHeader({
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-1.5">
-        <span className="text-[11px] text-[var(--fg-muted)]">Showing</span>
         {options.map((option) => (
           <button
             key={option.rev}
@@ -133,7 +132,12 @@ export function ChangeHeader({
         )}
       </div>
 
-      <CommitHeader commit={commit} diff={diff} pushed={pushed} />
+      <CommitHeader
+        commit={commit}
+        diff={diff}
+        pushed={pushed}
+        base={session.branchDiff?.label ?? null}
+      />
     </div>
   );
 }

@@ -17,7 +17,7 @@ import {
 import { requestFetch } from "./fetchBranch";
 import { RepoBrowser } from "./RepoBrowser";
 import { ConnectGitHubLink } from "./SetupChecklist";
-import { Badge, Button, CopyButton, Spinner } from "./ui";
+import { Button, CopyButton, Spinner } from "./ui";
 import type { FetchResult } from "@/lib/fetch";
 import type { RecentRepo } from "@/lib/recents";
 import type { SessionResponse } from "@/lib/types";
@@ -28,7 +28,6 @@ export function RepoBar({
   session,
   loading,
   onRefresh,
-  live = false,
   recents = [],
   onRemoveRecent,
   onBackToInbox,
@@ -38,8 +37,6 @@ export function RepoBar({
   session: SessionResponse | null;
   loading: boolean;
   onRefresh: () => void;
-  /** The watch stream is connected — changes appear without reloading */
-  live?: boolean;
   /** Previously-opened repos, newest first, for the dropdown */
   recents?: RecentRepo[];
   onRemoveRecent?: (path: string) => void;
@@ -215,18 +212,6 @@ export function RepoBar({
         </form>
 
         <div className="flex items-center gap-2">
-          {session && (
-            <span
-              title={
-                live
-                  ? "Live — changes in the repo appear automatically"
-                  : "Not watching — refresh manually"
-              }
-              className={`text-[9px] ${live ? "text-[var(--success)]" : "text-[var(--fg-subtle)]"}`}
-            >
-              ●
-            </span>
-          )}
           {loading && <Spinner />}
           {session && (
             <CopyButton
@@ -260,26 +245,6 @@ export function RepoBar({
               base={pr?.baseRefName ?? null}
               onFetched={onRefresh}
             />
-          )}
-
-          <span className="text-[var(--fg-subtle)]">
-            {session.commits.length}{" "}
-            {session.commits.length === 1 ? "commit" : "commits"}{" "}
-            {session.base.label}
-          </span>
-
-          {session.working.hasChanges && (
-            <Badge tone="attention">
-              {[
-                session.working.staged && `${session.working.staged} staged`,
-                session.working.unstaged &&
-                  `${session.working.unstaged} unstaged`,
-                session.working.untracked &&
-                  `${session.working.untracked} untracked`,
-              ]
-                .filter(Boolean)
-                .join(" · ")}
-            </Badge>
           )}
 
           <span className="flex-1" />

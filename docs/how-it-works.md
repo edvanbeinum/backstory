@@ -48,8 +48,7 @@ needs.
 The window follows the repo without reloading: the server watches the filesystem
 (the working tree, plus the git dir — resolved separately, so linked worktrees
 work) and pushes a debounced event over SSE whenever something changes. A commit
-made in a terminal appears in the change picker straight away. The green dot in
-the header shows the watch stream is connected.
+made in a terminal appears in the change picker straight away.
 
 Local events (saves, commits, branch switches) refresh from git only; the GitHub
 API is consulted at most every 30s unless a push lands (refs/remotes moved) or
@@ -71,7 +70,10 @@ order:
 3. else `merge-base` with the default branch from `origin/HEAD`
 4. else the local default branch
 
-The header names the one it used (`3 commits ahead of origin/main`).
+The change picker's **A commit…** lists the commits after it. **All changes**
+names in its header what the whole branch is diffed against
+(`Everything vs origin/main`): the branch its pull request targets, else where
+it left the default branch.
 
 ## Diffs and highlighting
 

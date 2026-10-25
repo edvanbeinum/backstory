@@ -67,9 +67,10 @@ is left as it is, and Fetch says so.
 
 **The workspace** is one branch. Its header picks the change: the whole branch,
 your uncommitted work, or any one commit on it. It opens on your uncommitted
-work when there is some, and on the whole branch otherwise. Uncommitted work is
-drawn on the map from your last commit, so it shows which components the work
-touched, not which ones it added or removed. Under the header are three tabs,
+work when there is some, and on the whole branch otherwise. The whole branch's
+header names what it is diffed against, as "Everything vs origin/main".
+Uncommitted work is drawn on the map from your last commit, so it shows which
+components the work touched, not which ones it added or removed. Under the header are three tabs,
 as on a pull request, and every change opens on the first:
 
 - **Story** walks you through the change one part at a time (see [Walking through a change](#walking-through-a-change)).
