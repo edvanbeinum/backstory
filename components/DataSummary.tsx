@@ -36,7 +36,7 @@ const COL_GAP = 22;
 /** Level 1, the phrase: which entities changed, in a phrase each. */
 function summary(shown: Presented[]) {
   const changed = shown.filter((p) => p.state !== "same");
-  if (changed.length === 0) return <>no data model change</>;
+  if (changed.length === 0) return null;
   const added = changed.filter((p) => p.state === "added");
   const removed = changed.filter((p) => p.state === "removed");
   const edited = changed.filter((p) => p.state === "changed");
