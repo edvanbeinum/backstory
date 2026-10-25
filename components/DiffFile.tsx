@@ -57,7 +57,6 @@ const STATUS_TONE: Record<string, string> = {
   deleted: "text-[var(--danger)]",
   renamed: "text-[var(--done)]",
   copied: "text-[var(--done)]",
-  modified: "text-[var(--fg-muted)]",
 };
 
 export function DiffFile({
@@ -319,9 +318,11 @@ export function DiffFile({
 
         {component && <span className="file-owner">{component}</span>}
 
-        <span className={`text-[11px] ${STATUS_TONE[file.status] ?? ""}`}>
-          {file.status}
-        </span>
+        {file.status !== "modified" && (
+          <span className={`text-[11px] ${STATUS_TONE[file.status] ?? ""}`}>
+            {file.status}
+          </span>
+        )}
 
         <span className="mono shrink-0 text-[11px]">
           <span className="text-[var(--success)]">+{file.additions}</span>{" "}

@@ -87,10 +87,11 @@ The tab is in the address bar, so a link opens on the tab it was copied from.
 
 In **Files changed**, files are grouped by the map's components, each group
 with an **On the map** link that outlines its component on Story; **By path**
-lists them by path instead. Once the change is traced, each file says which
-flows it is on, or **read yourself** when it is app code no flow explains. The
-filters above the files show only the hunks to read yourself, or the files on
-one flow; **read these yourself** beside the flows on Story opens the first.
+lists them by path instead, each file naming its component. Once the change is
+traced, each file says which flows it is on, or **read yourself** when it is app
+code no flow explains, and filters above the files show only the hunks to read
+yourself, or the files on one flow; **read these yourself** beside the flows on
+Story opens the first.
 Marks in the gutter beside a line open what is there: `⇄ 1·7` opens flow 1, step
 7 in the story, and `💬 2` opens review comment 2 in Comments.
 

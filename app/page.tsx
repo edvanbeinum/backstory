@@ -1155,7 +1155,6 @@ export default function Page() {
                                   notes={noteRev ? notes : null}
                                   noteRev={noteRev}
                                   marks={diffIsCurrent ? marks : null}
-                                  fileComponents={map?.fileComponents ?? null}
                                   sections={[{ key: "stop", files }]}
                                   commentNumbers={commentNumbers}
                                   onStep={openStep}
