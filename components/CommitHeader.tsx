@@ -2,13 +2,13 @@
 
 import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
 import type { CommitSummary, DiffResponse } from "@/lib/types";
-import { FileDiffIcon, GitCommitIcon, PencilIcon } from "./icons";
+import { FileDiffIcon, GitCommitIcon } from "./icons";
 import { Badge, RelativeTime } from "./ui";
 
 /**
  * The commit message, shown the way GitHub shows it above a commit's diff:
- * subject in bold, body as preformatted text below. For uncommitted work
- * there's no message yet, and the header says so rather than faking one.
+ * subject in bold, body as preformatted text below. Nothing for uncommitted
+ * work, which has no message and which the view's picker already names.
  */
 export function CommitHeader({
   commit,
@@ -20,9 +20,8 @@ export function CommitHeader({
   /** Below the push boundary — already on the remote */
   pushed?: boolean;
 }) {
-  if (!commit) return null;
+  if (!commit || commit.sha === WORKING_REV) return null;
 
-  const isWorking = commit.sha === WORKING_REV;
   const isBranch = commit.sha === BRANCH_REV;
   const fileCount = diff?.files.length ?? 0;
 
@@ -30,9 +29,7 @@ export function CommitHeader({
     <section className="overflow-hidden rounded-md border border-[var(--border)] bg-[var(--canvas)]">
       <div className="border-b border-[var(--border-muted)] px-4 py-3">
         <div className="mb-1 flex items-start gap-2">
-          {isWorking ? (
-            <PencilIcon size={16} className="mt-1 text-[var(--attention)]" />
-          ) : isBranch ? (
+          {isBranch ? (
             <FileDiffIcon size={16} className="mt-1 text-[var(--accent)]" />
           ) : (
             <GitCommitIcon size={16} className="mt-1 text-[var(--fg-muted)]" />
@@ -50,9 +47,7 @@ export function CommitHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-[var(--canvas-subtle)] px-4 py-2 text-[12px] text-[var(--fg-muted)]">
-        {isWorking ? (
-          <span>Not committed yet.</span>
-        ) : isBranch ? (
+        {isBranch ? (
           <span>
             Everything the pull request will contain after you push —
             uncommitted work not included.
