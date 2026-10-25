@@ -119,14 +119,13 @@ const registry: Registry = (g.__backstoryMaps ??= {
   queue: Promise.resolve(),
 });
 
-/** Each read's phase, worded to follow "Drawing the map", which Story and the inbox put before it. */
 export const PHASES = {
   waiting: "Waiting for another read",
-  main: "Main's map first",
-  firstMain: "Main's map first, so each change after this is quick",
-  base: "What the base changed since main",
-  baseInFull: "The base",
-  head: "This change",
+  main: "Reading main's map first",
+  firstMain: "Reading main's map first, so each change after this is quick",
+  base: "Reading what the base changed since main",
+  baseInFull: "Reading the base",
+  head: "Reading this change",
 };
 
 interface Files {
@@ -441,21 +440,21 @@ async function mapAt(
 
 /**
  * How many trees `readView` reads: main's on a Redraft, then the base and the
- * head unless saved, each tree once, and none that main's read will save.
+ * head unless saved, each tree once.
  */
 async function treesToRead(
   c: Chain,
   view: MapView,
   files: Files,
-  { behindMain = false } = {},
 ): Promise<number> {
-  const main = c.fresh || behindMain ? await mainTip(c.root) : null;
-  const mainTree = main && (await tree(c.root, main));
-  // Leave out main's tree while main's read, which saves it, runs first.
-  const skip = !c.fresh && behindMain ? mainTree : null;
+  const main = c.fresh ? await mainTip(c.root) : null;
   const unread = new Set<string>();
-  for (const t of [c.fresh && mainTree, view.base && files.base, files.head]) {
-    if (!t || t === skip || unread.has(t)) continue;
+  for (const t of [
+    main && (await tree(c.root, main)),
+    view.base && files.base,
+    files.head,
+  ]) {
+    if (!t || unread.has(t)) continue;
     if (c.fresh || !(await savedMap(c.dir, t))) unread.add(t);
   }
   return unread.size;
@@ -585,11 +584,7 @@ export async function startMapRead(
     fresh: opts.redraft,
   });
   const behind = job.behind ? 1 : 0;
-  job.of =
-    behind +
-    (await treesToRead(c, view, files, { behindMain: !!job.behind }).catch(
-      () => 0,
-    ));
+  job.of = behind + (await treesToRead(c, view, files).catch(() => 0));
   void enqueue(async () => {
     const started = Date.now();
     try {

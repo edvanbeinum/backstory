@@ -24,7 +24,7 @@ function readOf(
 ) {
   const running =
     job?.status === "running"
-      ? `${name}: ${job.phase}${job.step ? ` · step ${job.step.at} of ${job.step.of}` : ""}`
+      ? `${name}: ${job.phase}${job.step ? ` · ${job.step.at} of ${job.step.of}` : ""}`
       : null;
   const failed: Failed[] = [];
   if (job?.status === "failed") failed.push({ name, error: job.error, retry });

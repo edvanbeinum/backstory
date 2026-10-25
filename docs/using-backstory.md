@@ -137,13 +137,12 @@ pull request say why. Click a place to look first that is on the map to outline
 it there. Opening a commit or the whole branch describes it, unless you turned
 the repo off; then **Describe this change** reads it.
 
-While Claude Code draws the map, the space the map will take shows a spinner
-and how far the read has got, such as "Main's map first · step 1 of 3": main's
-map, then the change's base, then the change. On a repo of 5,000 tracked files
-or more, it also says the first read takes a while and you can leave the window
-open. One line at the top of Story says which other reads are running, such as
-"Describing the change". A read that fails shows its error on that line with
-**Try again**. The inbox shows main's read in the repo's header until it ends.
+While Claude Code reads, one line at the top of Story says which reads are
+running and how far each has got, such as "Drawing the map: Reading the base ·
+2 of 3 · Describing the change". A read that fails shows its error on that line
+with **Try again**. On a repo of 5,000 tracked files or more, a second line says
+the first read takes a while and you can leave the window open. The inbox shows
+main's read in the repo's header until it ends.
 
 Once Claude Code has drawn anything on the page, one footnote at the bottom of
 Story says so and has:

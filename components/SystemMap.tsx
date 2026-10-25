@@ -676,7 +676,7 @@ function DraftPending({ map }: { map: MapResponse | null }) {
       {job && (
         <p>
           {job.phase}
-          {job.step && ` · step ${job.step.at} of ${job.step.of}`}
+          {job.step && ` · ${job.step.at} of ${job.step.of}`}
         </p>
       )}
       {job && map?.mainRead?.status === "running" && map.mainRead.big && (

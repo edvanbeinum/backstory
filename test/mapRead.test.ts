@@ -887,54 +887,6 @@ test("a view's read says which of its trees it is on, with main's read first whi
   assert.deepEqual(seen, [{ at: 1, of: 1 }]);
 });
 
-test("a view whose head is main's tip doesn't count the head while main's read will save it", async () => {
-  const repo = tempRepo();
-  const base = repo.commit(START, "Start the shop");
-  const head = repo.commit({ "src/app/total.ts": "1\n" }, "Total");
-  repo.git("branch", "-M", "main");
-  const view = { root: repo.root, base, head };
-
-  let open = () => {};
-  const gate = new Promise<void>((resolve) => (open = resolve));
-  let entered = () => {};
-  const reading = new Promise<void>((resolve) => (entered = resolve));
-  const main = recorder();
-  const gated: Runner = async <T>(
-    prompt: string,
-    schema: object,
-    cwd: string,
-  ) => {
-    entered();
-    await gate;
-    return main.runner<T>(prompt, schema, cwd);
-  };
-  const steps: unknown[] = [];
-  const ai = recorder();
-  const stepping: Runner = async <T>(
-    prompt: string,
-    schema: object,
-    cwd: string,
-  ) => {
-    const status = await mapStatus(view);
-    steps.push(status.status === "running" && status.step);
-    return ai.runner<T>(prompt, schema, cwd);
-  };
-
-  await startMapTrunkRead(repo.root, { runner: gated, status: ready });
-  await startMapRead(view, { runner: stepping, status: ready });
-  await reading;
-  const waiting = await mapStatus(view);
-  open();
-  assert.deepEqual(waiting.status === "running" && waiting.step, {
-    at: 1,
-    of: 2,
-  });
-
-  await mapTrunkReadSettled(repo.root);
-  await mapReadSettled(view);
-  assert.deepEqual(steps, [{ at: 2, of: 2 }]);
-});
-
 test("main's read says a repo of BIG_REPO_FILES tracked files or more is big, and a repo with a model has no main read", async () => {
   const repo = tempRepo();
   repo.commit(

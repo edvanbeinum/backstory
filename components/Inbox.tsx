@@ -286,7 +286,7 @@ export function Inbox({
                       <span className="truncate">
                         {repo.reading.phase}
                         {repo.reading.step &&
-                          ` · step ${repo.reading.step.at} of ${repo.reading.step.of}`}
+                          ` · ${repo.reading.step.at} of ${repo.reading.step.of}`}
                       </span>
                     </span>
                   )}
