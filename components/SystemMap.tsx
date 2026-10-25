@@ -10,7 +10,6 @@ import {
 } from "react";
 
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
-import { ownsCode } from "@/lib/mapGroups";
 import { viewKey, viewParams } from "@/lib/url";
 import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
@@ -444,12 +443,8 @@ const names = (list: MapNode[]) => {
     : `${n.slice(0, 3).join(", ")} +${n.length - 3}`;
 };
 
+/** What the map's colours say changed in its structure, or why it can't say: nothing when every box and arrow is the same. */
 function summary(map: MapResponse) {
-  // A new or removed box is named as such, but a box around a changed
-  // component isn't a changed component itself.
-  const changed = map.nodes
-    .filter(ownsCode)
-    .filter((n) => n.state !== "neighbour");
   const added = map.nodes.filter((n) => n.state === "added");
   const removed = map.nodes.filter((n) => n.state === "removed");
   const arrows = {
@@ -457,40 +452,14 @@ function summary(map: MapResponse) {
     removed: map.edges.filter((e) => e.state === "removed").length,
     changed: map.edges.filter((e) => e.state === "changed").length,
   };
-  const structural =
-    added.length +
-      removed.length +
-      arrows.added +
-      arrows.removed +
-      arrows.changed >
-    0;
   const parts: React.ReactNode[] = [];
-  if (!structural) {
+  if (map.baseError)
     parts.push(
-      <>
-        <b>{changed.length}</b> touched
-      </>,
-      names(changed),
-      map.local ? (
-        "hand-written map on this machine, so nothing shows as new or removed"
-      ) : map.baseModel ? (
-        "no structural change"
-      ) : map.baseError ? (
-        <span className="text-[var(--attention)]" title={map.baseError}>
-          couldn&apos;t read the base&apos;s map, so nothing shows as new or
-          removed
-        </span>
-      ) : (
-        "no map at the base to compare with"
-      ),
+      <span className="text-[var(--attention)]" title={map.baseError}>
+        couldn&apos;t read the base&apos;s map, so nothing shows as new or
+        removed
+      </span>,
     );
-    return parts;
-  }
-  parts.push(
-    <>
-      <b>{changed.length}</b> changed
-    </>,
-  );
   if (added.length)
     parts.push(
       <span className="text-[var(--success)]">
@@ -772,22 +741,6 @@ function LocalModel({ map }: { map: MapResponse }) {
   );
 }
 
-/** The component with the most changed lines, as the line under the map names it. */
-function mostWork(map: MapResponse): React.ReactNode {
-  const busiest = map.nodes
-    .filter((n) => n.files.length > 0)
-    .sort((a, b) => b.additions + b.deletions - (a.additions + a.deletions))[0];
-  if (!busiest) return null;
-  const files = busiest.files.length;
-  return (
-    <>
-      <b>{busiest.name}</b> does most of the work: {files}{" "}
-      {files === 1 ? "file" : "files"}
-      {busiest.newFiles > 0 && `, ${busiest.newFiles} new`}
-    </>
-  );
-}
-
 export function SystemMap({
   draft,
   repo,
@@ -909,8 +862,7 @@ export function SystemMap({
     );
   }
 
-  const work = mostWork(map);
-  const parts = [...(work ? [work] : []), ...summary(map)];
+  const parts = summary(map);
   return (
     <section ref={boxRef} className="story-map">
       <div className="map-card">
