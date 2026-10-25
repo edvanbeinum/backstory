@@ -1810,10 +1810,19 @@ tr.step-code-target td.diff-num {
 .story-card p:last-child {
   margin-bottom: 0;
 }
-/* Where the map goes while its read runs: the space it will take, empty. */
 .story-card.map-pending {
   min-height: 180px;
   border-style: dashed;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  text-align: center;
+  color: var(--fg-muted);
+}
+.story-card.map-pending p {
+  margin: 0;
 }
 
 /* Story's one line about its reads, and its one footnote about what the AI drew. */

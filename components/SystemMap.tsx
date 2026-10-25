@@ -14,7 +14,7 @@ import { ownsCode } from "@/lib/mapGroups";
 import { viewKey, viewParams } from "@/lib/url";
 import { edgePath, nestedLayout } from "./graph";
 import { AlertIcon, ChevronDownIcon } from "./icons";
-import { Button, CopyButton, Ticked } from "./ui";
+import { Button, CopyButton, Spinner, Ticked } from "./ui";
 import { useView } from "./ViewContext";
 
 /**
@@ -666,11 +666,34 @@ export type MapDraftApi = ReturnType<typeof useMapDraft>;
 const offered = (map: MapResponse) =>
   map.draft?.status === "idle" ? !map.draft.auto : map.draft?.status === "done";
 
+/** The map's read in the space the map will take, so a read that takes minutes doesn't look frozen. */
+function DraftPending({ map }: { map: MapResponse | null }) {
+  const job = map?.draft?.status === "running" ? map.draft : null;
+  return (
+    <div className="story-card map-pending" role="status">
+      <Spinner className="!h-6 !w-6" />
+      <p className="font-semibold text-[var(--fg)]">Drawing the map</p>
+      {job && (
+        <p>
+          {job.phase}
+          {job.step && ` · ${job.step.at} of ${job.step.of}`}
+        </p>
+      )}
+      {job && map?.mainRead?.status === "running" && map.mainRead.big && (
+        <p className="text-[var(--fg-subtle)]">
+          This is a big repo, the first read takes a while. You can leave this
+          open.
+        </p>
+      )}
+    </div>
+  );
+}
+
 /**
  * Where the map goes before there is one: with the repo turned off, the
  * button that draws it and the repo's switch, since the footnote that also
- * has the switch only shows once something was drawn; otherwise empty, since
- * Story's progress line says what is happening.
+ * has the switch only shows once something was drawn; otherwise the read
+ * that is drawing it.
  */
 function DraftOffer({
   draft,
@@ -681,7 +704,7 @@ function DraftOffer({
 }) {
   const [switchError, setSwitchError] = useState<string | null>(null);
   if (!draft.map || !offered(draft.map))
-    return <div className="story-card map-pending" />;
+    return <DraftPending map={draft.map} />;
   return (
     <div className="story-card">
       <h3>The map hasn&apos;t been drawn yet</h3>
