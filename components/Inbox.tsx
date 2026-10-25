@@ -191,10 +191,6 @@ export function Inbox({
   }, [data]);
 
   const changed = (data?.rows ?? []).filter((row) => row.changed).length;
-  // A row is a branch now, not always a worktree — a stacked PR is reviewable
-  // without one, so the two counts have to be said separately.
-  const checkedOut = (data?.rows ?? []).filter((row) => row.worktree).length;
-  const branchesOnly = (data?.rows ?? []).length - checkedOut;
 
   return (
     <div className="min-h-screen">
@@ -251,11 +247,6 @@ export function Inbox({
                   ? "Nothing new since you last looked"
                   : `${changed} ${changed === 1 ? "branch" : "branches"} changed since you last looked`}
             </h1>
-            <p className="mt-0.5 text-[13px] text-[var(--fg-muted)]">
-              {checkedOut} {checkedOut === 1 ? "worktree" : "worktrees"} checked
-              out
-              {branchesOnly > 0 && `, ${branchesOnly} more branches with a PR`}
-            </p>
 
             {forgot > 0 && (
               <p className="mt-2 text-[12px] text-[var(--fg-subtle)]">
@@ -355,44 +346,39 @@ export function Inbox({
               </section>
             ))}
 
-            <form
-              className="mt-8 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-3"
-              onSubmit={(event) => {
-                event.preventDefault();
-                void addRepo(adding);
-              }}
-            >
-              <span className="text-[12px] text-[var(--fg-muted)]">
-                Add a repo
-              </span>
-              <input
-                value={adding}
-                onChange={(event) => setAdding(event.target.value)}
-                placeholder="/Users/you/code/another-repo"
-                spellCheck={false}
-                aria-label="Path to a repository"
-                className="mono min-w-0 flex-1 rounded-md border border-[var(--border)] bg-[var(--canvas)] px-2.5 py-1 text-[12px] outline-none focus:border-[var(--accent)]"
-              />
-              <button
-                type="submit"
-                disabled={checking || adding.trim() === ""}
-                className="rounded-md border border-[var(--border)] bg-[var(--canvas)] px-2.5 py-1 text-[12px] font-medium text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
+            <details className="mt-8 border-t border-[var(--border)] pt-3 text-[12px]">
+              <summary className="cursor-pointer text-[var(--fg-muted)] hover:text-[var(--fg)]">
+                Type a path
+              </summary>
+              <form
+                className="mt-2 flex flex-wrap items-center gap-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void addRepo(adding);
+                }}
               >
-                {checking ? "Checking…" : "Add"}
-              </button>
-              <button
-                type="button"
-                onClick={onBrowse}
-                className="text-[12px] text-[var(--accent)] hover:underline"
-              >
-                or browse…
-              </button>
-              {addError && (
-                <span className="w-full text-[12px] text-[var(--attention)]">
-                  {addError}
-                </span>
-              )}
-            </form>
+                <input
+                  value={adding}
+                  onChange={(event) => setAdding(event.target.value)}
+                  placeholder="/Users/you/code/another-repo"
+                  spellCheck={false}
+                  aria-label="Path to a repository"
+                  className="mono min-w-0 flex-1 rounded-md border border-[var(--border)] bg-[var(--canvas)] px-2.5 py-1 text-[12px] outline-none focus:border-[var(--accent)]"
+                />
+                <button
+                  type="submit"
+                  disabled={checking || adding.trim() === ""}
+                  className="rounded-md border border-[var(--border)] bg-[var(--canvas)] px-2.5 py-1 text-[12px] font-medium text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-subtle)] disabled:cursor-not-allowed disabled:opacity-40"
+                >
+                  {checking ? "Checking…" : "Add"}
+                </button>
+                {addError && (
+                  <span className="w-full text-[12px] text-[var(--attention)]">
+                    {addError}
+                  </span>
+                )}
+              </form>
+            </details>
           </>
         )}
       </div>

@@ -45,7 +45,6 @@ Opening a branch takes it out of that count until it gets another commit.
 
 ```text
 2 branches changed since you last looked
-21 worktrees checked out
 
 ACME-APP ──────────────────────────────────────────────────────────
  ●  feature/offline-sync-1203       #40 open                 +212 −38
