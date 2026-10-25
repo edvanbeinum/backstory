@@ -459,6 +459,8 @@ export async function loadGitHubDataCached(
  * Everything GitHub-side, in one call. Every failure path degrades to
  * `unavailable` with a readable reason rather than throwing — the commits and
  * diffs are still worth showing when GitHub is unreachable or `gh` is missing.
+ * No GitHub remote, a detached HEAD or no pull request is nothing to find,
+ * not a failure, so it answers `unavailable: null`.
  */
 export async function loadGitHubData(repo: RepoInfo): Promise<GitHubData> {
   const empty: GitHubData = {
@@ -469,18 +471,7 @@ export async function loadGitHubData(repo: RepoInfo): Promise<GitHubData> {
     connect: false,
   };
 
-  if (!repo.owner || !repo.name) {
-    return {
-      ...empty,
-      unavailable: "No GitHub remote — showing local commits only.",
-    };
-  }
-  if (!repo.branch) {
-    return {
-      ...empty,
-      unavailable: "HEAD is detached, so there's no branch to match a PR to.",
-    };
-  }
+  if (!repo.owner || !repo.name || !repo.branch) return empty;
 
   let pr: PullRequestInfo | null;
   try {
@@ -490,12 +481,7 @@ export async function loadGitHubData(repo: RepoInfo): Promise<GitHubData> {
     return { ...empty, unavailable: message, connect };
   }
 
-  if (!pr) {
-    return {
-      ...empty,
-      unavailable: `No pull request found for ${repo.branch}.`,
-    };
-  }
+  if (!pr) return empty;
 
   try {
     const { threads, reviews } = await loadThreads(repo, pr.number);

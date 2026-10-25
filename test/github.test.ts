@@ -250,6 +250,42 @@ test("no gh and no token asks to Connect GitHub too", async () => {
   assert.equal(data.connect, true);
 });
 
+test("a branch with no pull request is nothing to find, not a failure, so there is no notice", async () => {
+  const on = machine({ token: true });
+  const { data } = await load(on, () => ({
+    json: { data: { repository: { pullRequests: { nodes: [] } } } },
+  }));
+
+  assert.equal(data.pr, null);
+  assert.equal(data.unavailable, null);
+  assert.equal(data.connect, false);
+});
+
+test("a repo with no GitHub remote, or a detached HEAD, asks nothing and has no notice", async () => {
+  for (const info of [
+    repo({ remoteUrl: null, host: null, owner: null, name: null }),
+    repo({ branch: null, detached: true }),
+  ]) {
+    const { data, calls } = await load(machine({ token: true }), github, info);
+    assert.equal(data.unavailable, null);
+    assert.equal(data.connect, false);
+    assert.equal(calls.length, 0);
+  }
+});
+
+test("a pull request whose threads fail to load keeps the pull request and says why", async () => {
+  const on = machine({ token: true });
+  const { data } = await load(on, (call) =>
+    call.query.includes("pullRequests(headRefName")
+      ? { json: PRS_JSON }
+      : { json: { errors: [{ message: "Something went wrong" }] } },
+  );
+
+  assert.equal(data.pr?.number, 7);
+  assert.match(data.unavailable ?? "", /Something went wrong/);
+  assert.equal(data.connect, false);
+});
+
 test("an Enterprise remote never gets the github.com token, and uses gh", async () => {
   const on = machine({ gh: true, token: true });
   const { data, calls } = await load(

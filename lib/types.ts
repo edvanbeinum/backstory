@@ -182,7 +182,10 @@ export interface GitHubData {
   pr: PullRequestInfo | null;
   threads: ReviewThread[];
   reviews: ReviewSummary[];
-  /** Set when GitHub data could not be loaded; the app still shows diffs */
+  /**
+   * Set when GitHub couldn't be asked; the app still shows diffs. Null when
+   * there is nothing to find: no GitHub remote, no branch, no pull request.
+   */
   unavailable: string | null;
   /** The fix is Connect GitHub, so the page links to the setup checklist */
   connect: boolean;

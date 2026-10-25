@@ -101,7 +101,11 @@ export interface InboxRepo {
   owner: string | null;
   name: string | null;
   label: string;
-  /** gh missing, unauthenticated, no remote… Rows are still returned. */
+  /**
+   * Set when GitHub couldn't be asked: gh missing, unauthenticated,
+   * unreachable. Rows are still returned. Null for a repo with no GitHub
+   * remote, whose rows already show what there is.
+   */
   unavailable: string | null;
   /** The fix is Connect GitHub, so the inbox links to the setup checklist */
   connect: boolean;
@@ -514,9 +518,7 @@ async function buildRepo(
   ];
 
   let prs = new Map<string, GqlInboxPr[]>();
-  if (!owner || !name) {
-    repo.unavailable = "No GitHub remote — showing local branches only.";
-  } else {
+  if (owner && name) {
     const key = `${owner}/${name} ${[...branches].sort().join(",")}`;
     const hit = cache.get(key);
     if (!opts.fresh && hit && Date.now() - hit.at < TTL_MS) {
