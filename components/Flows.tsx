@@ -7,7 +7,7 @@ import type { FlowSet } from "@/lib/flows/types";
 import { ClaudeCodeNotice } from "./ClaudeCodeNotice";
 import { FlowCard, type StoryTarget } from "./FlowCard";
 import type { ComponentInfo, DataField, StepBadge } from "./FlowSequence";
-import { AlertIcon, SyncIcon } from "./icons";
+import { AlertIcon } from "./icons";
 import { Button, Spinner } from "./ui";
 import type { FlowsApi } from "./useFlows";
 
@@ -122,18 +122,12 @@ export function Flows({
   }
 
   return (
-    <ReadyFlows
-      set={status.flows}
-      onRegenerate={api.regenerate}
-      runError={status.runError}
-      {...cards}
-    />
+    <ReadyFlows set={status.flows} runError={status.runError} {...cards} />
   );
 }
 
 function ReadyFlows({
   set,
-  onRegenerate,
   runError,
   target,
   navRef,
@@ -142,7 +136,6 @@ function ReadyFlows({
   ...card
 }: CardProps & {
   set: FlowSet;
-  onRegenerate: () => void;
   runError?: string;
 }) {
   const summaries = useMemo(
@@ -172,14 +165,11 @@ function ReadyFlows({
 
   if (set.flows.length === 0) {
     return (
-      <div className="space-y-3">
-        <Notice>
-          {set.hunks.length === 0
-            ? "This change touches no app code, so there are no flows to trace."
-            : "None of this change's app code is on a flow — it changes no behaviour a trigger reaches."}
-        </Notice>
-        <Regenerate set={set} onRegenerate={onRegenerate} />
-      </div>
+      <Notice>
+        {set.hunks.length === 0
+          ? "This change touches no app code, so there are no flows to trace."
+          : "None of this change's app code is on a flow — it changes no behaviour a trigger reaches."}
+      </Notice>
     );
   }
 
@@ -211,42 +201,7 @@ function ReadyFlows({
           The last run failed, so these are the flows from before it: {runError}
         </Notice>
       )}
-      <Regenerate set={set} onRegenerate={onRegenerate} />
     </div>
-  );
-}
-
-/** "claude-sonnet-5-5" → "Sonnet 5.5". */
-function modelName(id: string) {
-  const m = id.match(/^claude-([a-z]+)-(\d+)-(\d+)/);
-  return m
-    ? `${m[1].charAt(0).toUpperCase()}${m[1].slice(1)} ${m[2]}.${m[3]}`
-    : id;
-}
-
-function Regenerate({
-  set,
-  onRegenerate,
-}: {
-  set: FlowSet;
-  onRegenerate: () => void;
-}) {
-  return (
-    <p className="flex items-center gap-2 px-0.5 text-[11px] text-[var(--fg-subtle)]">
-      <span>
-        Traced by Claude Code{set.model ? ` (${modelName(set.model)})` : ""} in{" "}
-        {Math.round(set.durationMs / 1000)} s
-      </span>
-      <span className="flex-1" />
-      <button
-        type="button"
-        onClick={onRegenerate}
-        className="inline-flex items-center gap-1 text-[var(--fg-muted)] hover:text-[var(--accent)]"
-        title="Trace this change's flows again"
-      >
-        <SyncIcon size={11} /> Regenerate
-      </button>
-    </p>
   );
 }
 

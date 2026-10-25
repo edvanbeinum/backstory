@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { DescriptionApi } from "./ChangeDescription";
 import type { DataDraftApi } from "./DataSummary";
 import type { MapDraftApi } from "./SystemMap";
+import type { FlowsApi } from "./useFlows";
 
 const LINK = "text-[var(--accent)] hover:underline disabled:opacity-50";
 
@@ -17,18 +18,22 @@ export function ReadFootnote({
   map,
   data,
   description,
+  flows,
 }: {
   map: MapDraftApi;
   data: DataDraftApi;
   /** Null on uncommitted work, which has no description */
   description: DescriptionApi | null;
+  /** Null on uncommitted work, which has no flows */
+  flows: FlowsApi | null;
 }) {
   const [switchError, setSwitchError] = useState<string | null>(null);
   const said = description?.status;
   const drawnMap = map.map?.source === "drafted" ? map.map : null;
   const drawnData = data.data?.drafted ? data.data : null;
   const described = said?.status === "done" ? said : null;
-  if (!drawnMap && !drawnData && !described) return null;
+  const traced = flows?.status?.status === "ready" ? flows.status : null;
+  if (!drawnMap && !drawnData && !described && !traced) return null;
 
   const provider =
     described?.provider ??
@@ -99,6 +104,17 @@ export function ReadFootnote({
         onClick={() => description?.start(true)}
       >
         Describe again
+      </button>,
+    );
+  if (traced)
+    parts.push(
+      <button
+        type="button"
+        className={LINK}
+        disabled={traced.tracing.length > 0}
+        onClick={() => flows?.regenerate()}
+      >
+        Trace again
       </button>,
     );
 

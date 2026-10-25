@@ -723,6 +723,42 @@ function DrawBase({ map, draft }: { map: MapResponse; draft: MapDraftApi }) {
   );
 }
 
+const NODE_KEY = [
+  ["touched", "Touched"],
+  ["added", "New"],
+  ["removed", "Removed"],
+  ["neighbour", "Unchanged"],
+] as const;
+
+const EDGE_KEY = [
+  ["added", "text-[var(--success)]", "—", "new arrow"],
+  ["changed", "text-[var(--attention)]", "—", "relabelled"],
+  ["removed", "text-[var(--danger)]", "- -", "removed arrow"],
+] as const;
+
+/** Names only the states this map draws. */
+function MapKey({ map }: { map: MapResponse }) {
+  const nodes = new Set<string>(map.nodes.map((n) => n.state));
+  const edges = new Set<string>(map.edges.map((e) => e.state));
+  return (
+    <div className="map-key">
+      {NODE_KEY.filter(([state]) => nodes.has(state)).map(([state, word]) => (
+        <span key={`node ${state}`}>
+          <i className={`box ${state}`} />
+          {word}
+        </span>
+      ))}
+      {EDGE_KEY.filter(([state]) => edges.has(state)).map(
+        ([state, tone, mark, word]) => (
+          <span key={`edge ${state}`}>
+            <span className={tone}>{mark}</span> {word}
+          </span>
+        ),
+      )}
+    </div>
+  );
+}
+
 /** A hand-written map's path, to correct it. */
 function LocalModel({ map }: { map: MapResponse }) {
   if (!map.modelFile) return null;
@@ -878,66 +914,39 @@ export function SystemMap({
             onOrder={onOrder}
           />
         )}
-        <div className="map-foot">
-          {map.hidden > 0 && (
+        {map.hidden > 0 && (
+          <div className="map-foot">
             <span className="map-chip">
               <b>+{map.hidden}</b> unchanged{" "}
               {map.hidden === 1 ? "component" : "components"}
             </span>
-          )}
-          <span className="flex-1" />
-          <span>Unchanged arrows label on hover</span>
-        </div>
+          </div>
+        )}
       </div>
-      <div className="map-key">
-        <span>
-          <i className="box touched" />
-          Touched
-        </span>
-        <span>
-          <i className="box added" />
-          New
-        </span>
-        <span>
-          <i className="box removed" />
-          Removed
-        </span>
-        <span>
-          <i className="box neighbour" />
-          Unchanged
-        </span>
-        <span>
-          <span className="text-[var(--success)]">—</span> new arrow
-        </span>
-        <span>
-          <span className="text-[var(--attention)]">—</span> relabelled
-        </span>
-        <span>
-          <span className="text-[var(--danger)]">- -</span> removed arrow
-        </span>
-      </div>
+      <MapKey map={map} />
       <div className="story-line">
         {parts.map((p, i) => (
           <span key={i} className="part">
             {p}
           </span>
         ))}
-        {(map.unmapped.length > 0 || map.ambiguous.length > 0) && (
-          <span
-            className="part"
-            title={[
-              ...map.unmapped,
-              ...map.ambiguous.map((a) => `${a.file} ← ${a.ids.join(", ")}`),
-            ].join("\n")}
-          >
-            {map.unmapped.length > 0 &&
-              (map.local
-                ? `${map.unmapped.length} ${map.unmapped.length === 1 ? "file" : "files"} the hand-written map has no place for`
-                : `${map.unmapped.length} unmapped`)}
-            {map.unmapped.length > 0 && map.ambiguous.length > 0 && " · "}
-            {map.ambiguous.length > 0 && `${map.ambiguous.length} ambiguous`}
-          </span>
-        )}
+        {map.source !== "drafted" &&
+          (map.unmapped.length > 0 || map.ambiguous.length > 0) && (
+            <span
+              className="part"
+              title={[
+                ...map.unmapped,
+                ...map.ambiguous.map((a) => `${a.file} ← ${a.ids.join(", ")}`),
+              ].join("\n")}
+            >
+              {map.unmapped.length > 0 &&
+                (map.local
+                  ? `${map.unmapped.length} ${map.unmapped.length === 1 ? "file" : "files"} the hand-written map has no place for`
+                  : `${map.unmapped.length} unmapped`)}
+              {map.unmapped.length > 0 && map.ambiguous.length > 0 && " · "}
+              {map.ambiguous.length > 0 && `${map.ambiguous.length} ambiguous`}
+            </span>
+          )}
         {children}
         <DrawBase map={map} draft={draft} />
         {map.local && <LocalModel map={map} />}

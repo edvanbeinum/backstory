@@ -146,7 +146,12 @@ export function Story({
     <ReadLine map={mapDraft} data={dataDraft} description={describes} />
   );
   const footnote = (
-    <ReadFootnote map={mapDraft} data={dataDraft} description={describes} />
+    <ReadFootnote
+      map={mapDraft}
+      data={dataDraft}
+      description={describes}
+      flows={rev !== WORKING_REV ? flows : null}
+    />
   );
   const view = viewKey({ repo, ref, rev });
   const [drawn, setDrawn] = useState<{ view: string; ids: string[] } | null>(
