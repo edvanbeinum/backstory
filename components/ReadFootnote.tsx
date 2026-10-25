@@ -40,7 +40,13 @@ export function ReadFootnote({
     drawnData?.drafted?.provider ??
     (drawnMap?.draft?.status === "idle" ? drawnMap.draft.provider : null) ??
     "Claude Code";
-  const auto = drawnMap?.auto ?? drawnData?.auto ?? described?.auto ?? true;
+  // Reads the switch from an unread description too, since traced flows alone
+  // don't report it; with no report at all the switch isn't shown.
+  const auto =
+    drawnMap?.auto ??
+    drawnData?.auto ??
+    described?.auto ??
+    (said?.status === "idle" ? said.auto : null);
   const setAuto = (on: boolean) =>
     description?.setAuto(on).then(
       () => setSwitchError(null),
@@ -48,7 +54,7 @@ export function ReadFootnote({
         setSwitchError(err instanceof Error ? err.message : String(err)),
     );
   const parts: React.ReactNode[] = [`Drawn by ${provider}`];
-  if (description)
+  if (description && auto !== null)
     parts.push(
       <button type="button" className={LINK} onClick={() => setAuto(!auto)}>
         {auto ? "Turn off" : "Read automatically"}
