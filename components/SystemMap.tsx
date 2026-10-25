@@ -738,7 +738,13 @@ const EDGE_KEY = [
 
 /** Names only the states this map draws. */
 function MapKey({ map }: { map: MapResponse }) {
-  const nodes = new Set<string>(map.nodes.map((n) => n.state));
+  // Skip unchanged groups, whose boundary is drawn plain rather than as an
+  // Unchanged box.
+  const nodes = new Set<string>(
+    map.nodes
+      .filter((n) => !n.group || n.state !== "neighbour")
+      .map((n) => n.state),
+  );
   const edges = new Set<string>(map.edges.map((e) => e.state));
   return (
     <div className="map-key">
