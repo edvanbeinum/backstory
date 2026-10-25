@@ -1728,10 +1728,6 @@ tr.step-code-target td.diff-num {
   background: var(--accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
 }
-.walk-seen {
-  font-size: 12px;
-  color: var(--fg-muted);
-}
 .walk-stop {
   padding-top: 12px;
 }

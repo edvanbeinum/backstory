@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { DataResponse } from "@/lib/data/types";
 import type { StepMark } from "@/lib/flows/rows";
 import type { DiffFile } from "@/lib/types";
-import { filesNotSeen, filesSeen, type Stop } from "@/lib/walk";
+import { filesNotSeen, type Stop } from "@/lib/walk";
 import { DataCards } from "./DataSummary";
 import { NoteComposer } from "./NoteCard";
 import { Button, Ticked } from "./ui";
@@ -49,7 +49,6 @@ export function WalkBar({
   /** Show everything on one page */
   onLeave: () => void;
 }) {
-  const total = stops.reduce((n, s) => n + s.files.length, 0);
   return (
     <div className="walk-bar">
       <span className="walk-where">
@@ -76,11 +75,6 @@ export function WalkBar({
               onClick={() => onGo(i)}
             />
           ))}
-        </span>
-      )}
-      {total > 0 && (
-        <span className="walk-seen">
-          {filesSeen(stops, seen)} of {fileWord(total)} seen
         </span>
       )}
       <span className="flex-1" />

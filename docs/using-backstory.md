@@ -114,9 +114,8 @@ On uncommitted work, the overview is the map from your last commit, with no
 description, and the walk goes through each component the work changed.
 
 The bar at the top says where you are, as "3 of 6 · Sync Engine", with a dot
-for each part and how many of the change's files you've seen. `j` and `k`, or
-**‹** and **›**, move between the parts, and clicking a changed component on
-the map goes to its part. On each component, the map outlines it and its
+for each part. `j` and `k`, or **‹** and **›**, move between the parts, and
+clicking a changed component on the map goes to its part. On each component, the map outlines it and its
 arrows. A flow step's chip, or a link from Files changed or Comments to a step,
 opens it on **Show everything on one page**.
 
