@@ -119,13 +119,14 @@ const registry: Registry = (g.__backstoryMaps ??= {
   queue: Promise.resolve(),
 });
 
+/** Each read's phase, worded to follow "Drawing the map", which Story and the inbox put before it. */
 export const PHASES = {
   waiting: "Waiting for another read",
-  main: "Reading main's map first",
-  firstMain: "Reading main's map first, so each change after this is quick",
-  base: "Reading what the base changed since main",
-  baseInFull: "Reading the base",
-  head: "Reading this change",
+  main: "Main's map first",
+  firstMain: "Main's map first, so each change after this is quick",
+  base: "What the base changed since main",
+  baseInFull: "The base",
+  head: "This change",
 };
 
 interface Files {
