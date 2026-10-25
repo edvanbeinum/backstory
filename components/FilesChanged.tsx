@@ -166,8 +166,8 @@ export function FilesChanged({
           })(),
   );
 
-  const grouped =
-    !byPath && map?.status === "ok" && map.nodes.length > 0 ? map : null;
+  const grouping = map?.status === "ok" && map.nodes.length > 0;
+  const grouped = !byPath && grouping ? map : null;
   // Group files only by boxes that own them: a container drawn around a
   // changed component has nothing of its own to outline.
   const leaves = grouped?.nodes.filter(ownsCode) ?? [];
@@ -202,7 +202,6 @@ export function FilesChanged({
 
   const filters =
     flowSet !== null && (yoursCount > 0 || flowSet.flows.length > 0);
-  const grouping = map?.status === "ok" && map.nodes.length > 0;
   const chip = (value: Filter, children: React.ReactNode, warn = false) => (
     <button
       type="button"
