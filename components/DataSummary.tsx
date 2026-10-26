@@ -252,8 +252,9 @@ interface DataEdge {
 /**
  * The relationships to draw: each belongs-to from the entity holding the
  * link to the one it points at (a polymorphic one to each entity that fills
- * it), and many-to-many. A has-many is the other end of a belongs-to, so
- * drawing both would be one link twice.
+ * it), each contains from the record to the value it holds, and
+ * many-to-many. A has-many is the other end of a belongs-to, so drawing both
+ * would be one link twice.
  */
 function dataEdges(
   entities: EntityDiff[],
@@ -265,7 +266,12 @@ function dataEdges(
   for (const e of entities) {
     for (const d of e.relationships) {
       const r = d.item;
-      if (r.kind !== "belongs to" && r.kind !== "many to many") continue;
+      if (
+        r.kind !== "belongs to" &&
+        r.kind !== "many to many" &&
+        r.kind !== "contains"
+      )
+        continue;
       const targets = r.polymorphic
         ? (r.candidates ?? [])
         : r.target
@@ -632,6 +638,11 @@ export function DataCards({
   return (
     <div ref={boxRef}>
       <p className="mb-2 text-[13px]">{summary(shown)}</p>
+      {data.storage && (
+        <p className="mb-2 text-[12px] text-[var(--fg-muted)]">
+          {data.storage}
+        </p>
+      )}
       <div className="map-card">
         {width > 0 && (
           <DataGraph shown={shown} width={width - 2} notes={notes} />
@@ -749,6 +760,11 @@ export function DataSummary({
               <DataGraph shown={shown} width={width - 2} notes={notes} />
             )}
           </div>
+          {data.storage && (
+            <p className="mt-2 px-1 text-[12px] text-[var(--fg-muted)]">
+              {data.storage}
+            </p>
+          )}
         </div>
       )}
     </>

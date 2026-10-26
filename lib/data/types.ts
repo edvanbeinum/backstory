@@ -16,7 +16,12 @@ export interface Field {
 }
 
 export type RelationshipKind =
-  "belongs to" | "has many" | "has one" | "many to many";
+  | "belongs to"
+  | "has many"
+  | "has one"
+  | "many to many"
+  /** A value stored whole inside the record, not a reference to another record */
+  | "contains";
 
 export interface Relationship {
   name: string;
@@ -96,6 +101,8 @@ export interface DataResponse {
    * drafted view the change touched none of, every entity, unchanged
    */
   entities: EntityDiff[];
+  /** On a drafted view: where the data is stored, what one stored unit is and when it is written */
+  storage?: string;
   /** Who drafted the model, when no reader found one and the AI provider read it */
   drafted: { provider: string; model: string | null } | null;
   /** On a drafted view: whether data models are read as repos and views open */

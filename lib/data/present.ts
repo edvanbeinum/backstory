@@ -27,7 +27,7 @@ const TIMESTAMPS = new Set([
 ]);
 
 const isArrow = (r: Relationship) =>
-  r.kind === "belongs to" || r.kind === "many to many";
+  r.kind === "belongs to" || r.kind === "many to many" || r.kind === "contains";
 
 export interface Presented {
   entity: EntityDiff;
