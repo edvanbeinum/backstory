@@ -261,7 +261,12 @@ async function verifySteps(dir: string, steps: RawStep[]): Promise<FlowStep[]> {
 function cleanData(data: StepData[] | undefined): StepData[] {
   return (data ?? [])
     .map((d) => ({ entity: d.entity.trim(), does: d.does.trim() }))
-    .filter((d) => d.entity && d.does)
+    .filter(
+      (d, i, all) =>
+        d.entity &&
+        d.does &&
+        all.findIndex((o) => o.entity === d.entity && o.does === d.does) === i,
+    )
     .slice(0, MAX_DATA);
 }
 

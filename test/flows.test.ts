@@ -277,6 +277,7 @@ test("a step says which record it writes and how, and keeps it through the cache
       : [
           { entity: " Basket ", does: " sets the shopper's items " },
           { entity: "", does: "reads nothing" },
+          basket,
           { entity: "Order", does: "reads the total" },
           { entity: "Shopper", does: "reads the id" },
           { entity: "Stock", does: "takes one" },
