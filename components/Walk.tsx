@@ -189,7 +189,7 @@ export function StopView({
   /** Open a flow step in Story on one page */
   onStep: (mark: StepMark) => void;
   onGo: (index: number) => void;
-  /** An entity's component was clicked: go to its stop, or outline it on the map */
+  /** An entity's component was clicked: go to its stop, or outline it on the overview's map */
   onShowOnMap: (name: string) => void;
 }) {
   const stop = stops[index];

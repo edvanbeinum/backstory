@@ -248,8 +248,11 @@ export function Story({
     const i = stops.findIndex(
       (s) => s.kind === "component" && s.node.name === name,
     );
-    if (i === -1) onShowOnMap(name);
-    else go(i);
+    if (i !== -1) return go(i);
+    // Go to the overview to outline a component with no stop, since the data
+    // stop, where its chip was clicked, draws no map.
+    go(0);
+    onShowOnMap(name);
   };
 
   const overview =

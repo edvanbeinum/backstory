@@ -102,7 +102,8 @@ Story opens on the change's overview, then takes you through it in order:
 1. **Overview**: the change's description, with the map under it. Its places to
    look first go to their part of the walk.
 2. **Data model**, when the change touches it: the changed entities as cards.
-   Click an entity's component to go to that component's part of the walk.
+   Click an entity's component to go to that component's part of the walk, or
+   to the overview's map, outlining it, when the change doesn't touch it.
 3. **Each changed component**, in the map's order, top to bottom and left to
    right: what the change does in it, the records its flow steps use beside
    its file count, the flow steps its files are on as `⇄ 1·3` chips, the map
