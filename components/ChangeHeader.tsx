@@ -132,12 +132,7 @@ export function ChangeHeader({
         )}
       </div>
 
-      <CommitHeader
-        commit={commit}
-        diff={diff}
-        pushed={pushed}
-        base={session.branchDiff?.label ?? null}
-      />
+      <CommitHeader commit={commit} diff={diff} pushed={pushed} />
     </div>
   );
 }

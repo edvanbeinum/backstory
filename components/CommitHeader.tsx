@@ -14,14 +14,11 @@ export function CommitHeader({
   commit,
   diff,
   pushed = false,
-  base = null,
 }: {
   commit: CommitSummary | null;
   diff: DiffResponse | null;
   /** Below the push boundary — already on the remote */
   pushed?: boolean;
-  /** What All changes is diffed against, as "vs main" */
-  base?: string | null;
 }) {
   if (!commit || commit.sha === WORKING_REV) return null;
 
@@ -50,12 +47,7 @@ export function CommitHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-[var(--canvas-subtle)] px-4 py-2 text-[12px] text-[var(--fg-muted)]">
-        {isBranch ? (
-          <span>
-            Everything{base && ` ${base}`}: what the pull request will contain
-            after you push. Uncommitted work not included.
-          </span>
-        ) : (
+        {!isBranch && (
           <>
             <span>
               <span className="font-medium text-[var(--fg)]">

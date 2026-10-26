@@ -70,10 +70,7 @@ order:
 3. else `merge-base` with the default branch from `origin/HEAD`
 4. else the local default branch
 
-The change picker's **A commit…** lists the commits after it. **All changes**
-names in its header what the whole branch is diffed against
-(`Everything vs main`): the branch its pull request targets, else where
-it left the default branch.
+The change picker's **A commit…** lists the commits after it.
 
 ## Diffs and highlighting
 
