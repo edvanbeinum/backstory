@@ -169,6 +169,7 @@ export function StopView({
   onNote,
   onStep,
   onGo,
+  onShowOnMap,
 }: {
   stops: Stop[];
   index: number;
@@ -188,6 +189,8 @@ export function StopView({
   /** Open a flow step in Story on one page */
   onStep: (mark: StepMark) => void;
   onGo: (index: number) => void;
+  /** An entity's component was clicked: go to its stop, or outline it on the map */
+  onShowOnMap: (name: string) => void;
 }) {
   const stop = stops[index];
   switch (stop.kind) {
@@ -216,7 +219,13 @@ export function StopView({
       return (
         <section className="space-y-3">
           <StopHeading title="Data model" />
-          {data && <DataCards data={data} notes={entityNotes} />}
+          {data && (
+            <DataCards
+              data={data}
+              notes={entityNotes}
+              onShowOnMap={onShowOnMap}
+            />
+          )}
         </section>
       );
     case "component":
@@ -228,6 +237,9 @@ export function StopView({
               <>
                 {stop.container && <>In {stop.container} · </>}
                 {fileWord(stop.files.length)}
+                {stop.writes.length > 0 && (
+                  <> · writes {stop.writes.join(", ")}</>
+                )}
               </>
             }
           />

@@ -287,6 +287,7 @@ export function Story({
           notes={entityNotes}
           repo={repo}
           rev={rev}
+          onShowOnMap={onShowOnMap}
         />
       )}
     </SystemMap>
@@ -329,6 +330,7 @@ export function Story({
             onNote={onNote}
             onStep={onStep}
             onGo={go}
+            onShowOnMap={toStop}
           />
           {footnote}
         </div>

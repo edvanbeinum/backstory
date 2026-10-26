@@ -45,7 +45,7 @@ terms:
     avoid:
       - tour (reads as an app's onboarding tour)
   - name: stop
-    means: "One part of the walk: the overview, the data model when it changed, one per changed component in the map's order, the files no component has, and the finish with your notes. Every changed file is in exactly one stop. The UI never says stop: its bar reads 3 of 6."
+    means: "One part of the walk: the overview, the data model when it changed, one per changed component in the map's order (naming the records its steps' data tags write), the files no component has, and the finish with your notes. Every changed file is in exactly one stop. The UI never says stop: its bar reads 3 of 6."
     avoid:
       - step (that's a flow's step, as in `1·3`)
   - name: notes box

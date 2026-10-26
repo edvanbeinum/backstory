@@ -326,6 +326,41 @@ test("a component's stop lists the flow steps its files are on, and none untrace
   assert.deepEqual(chips(null), { Screen: [], Api: [], Store: [] });
 });
 
+test("a component's stop lists the entities its steps write, each once, in flow and step order", () => {
+  const tagged = (s: FlowStep, ...entities: string[]): FlowStep => ({
+    ...s,
+    data: entities.map((entity) => ({ entity, does: "sets it" })),
+  });
+  const flows: FlowSet = {
+    ...FLOWS,
+    flows: [
+      {
+        ...FLOWS.flows[0],
+        after: [
+          tagged(step("s1", "src/api/routes.ts", 3), "Basket"),
+          step("s2", "src/store/db.ts", 9),
+          tagged(step("s3", "src/api/routes.ts", 7), "Basket"),
+        ],
+      },
+      {
+        ...FLOWS.flows[0],
+        id: "pay",
+        after: [tagged(step("p1", "src/api/routes.ts", 12), "Order", "Basket")],
+      },
+    ],
+  };
+  const writes = Object.fromEntries(
+    all({ flows }).flatMap((s) =>
+      s.kind === "component" ? [[s.node.name, s.writes]] : [],
+    ),
+  );
+  assert.deepEqual(writes, {
+    Screen: [],
+    Api: ["Basket", "Order"],
+    Store: [],
+  });
+});
+
 test("files not seen empties only once every stop with files is seen", () => {
   const stops = all();
   const seen = new Set<string>();

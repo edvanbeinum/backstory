@@ -123,15 +123,36 @@ function Row({
  * level 4: rules, the columns links live in, timestamps. Unchanged fields
  * aren't shown at all: they're the code's business, not the change's.
  */
+function ComponentChip({
+  name,
+  onShowOnMap,
+}: {
+  name: string;
+  onShowOnMap: (name: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      className="file-owner hover:underline"
+      title={`Outline ${name} on the map`}
+      onClick={() => onShowOnMap(name)}
+    >
+      {name}
+    </button>
+  );
+}
+
 function EntityCard({
   p,
   open,
   onToggle,
+  onShowOnMap,
   notes = [],
 }: {
   p: Presented;
   open: boolean;
   onToggle: () => void;
+  onShowOnMap: (name: string) => void;
   /** "Worth a look" notes pinned on this entity */
   notes?: string[];
 }) {
@@ -141,7 +162,9 @@ function EntityCard({
     return (
       <div className="data-card same compact" title={e.file ?? undefined}>
         <span className="name">{e.name}</span>
-        {e.component && <span className="file-owner">{e.component}</span>}
+        {e.component && (
+          <ComponentChip name={e.component} onShowOnMap={onShowOnMap} />
+        )}
       </div>
     );
   }
@@ -153,20 +176,23 @@ function EntityCard({
       className={`data-card ${p.state} ${open ? "open" : ""}`}
       title={e.file ?? undefined}
     >
-      <button
-        type="button"
-        className="data-card-head"
-        onClick={onToggle}
-        aria-expanded={open}
-      >
-        <span className="name">{e.name}</span>
-        {p.state === "added" && <span className="map-tag new">New</span>}
-        {p.state === "removed" && (
-          <span className="map-tag removed">Removed</span>
+      <div className="data-card-head">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-1.5 self-stretch text-left"
+          onClick={onToggle}
+          aria-expanded={open}
+        >
+          <span className="name">{e.name}</span>
+          {p.state === "added" && <span className="map-tag new">New</span>}
+          {p.state === "removed" && (
+            <span className="map-tag removed">Removed</span>
+          )}
+        </button>
+        {e.component && (
+          <ComponentChip name={e.component} onShowOnMap={onShowOnMap} />
         )}
-        <span className="flex-1" />
-        {e.component && <span className="file-owner">{e.component}</span>}
-      </button>
+      </div>
       <button type="button" className="data-card-line" onClick={onToggle}>
         <span>
           {p.state === "added"
@@ -305,10 +331,12 @@ function DataGraph({
   shown,
   width,
   notes,
+  onShowOnMap,
 }: {
   shown: Presented[];
   width: number;
   notes?: Map<string, string[]>;
+  onShowOnMap: (name: string) => void;
 }) {
   const changedNames = useMemo(
     () =>
@@ -491,6 +519,7 @@ function DataGraph({
             p={n}
             open={open.has(n.id)}
             notes={notes?.get(n.id)}
+            onShowOnMap={onShowOnMap}
             onToggle={() =>
               setOpen((cur) => {
                 const next = new Set(cur);
@@ -619,9 +648,12 @@ export type DataDraftApi = ReturnType<typeof useDataDraft>;
 export function DataCards({
   data,
   notes,
+  onShowOnMap,
 }: {
   data: DataResponse;
   notes?: Map<string, string[]>;
+  /** An entity's component was clicked: go to its stop, or outline it on the map */
+  onShowOnMap: (name: string) => void;
 }) {
   const shown = useMemo(() => present(data.entities), [data]);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -645,7 +677,12 @@ export function DataCards({
       )}
       <div className="map-card">
         {width > 0 && (
-          <DataGraph shown={shown} width={width - 2} notes={notes} />
+          <DataGraph
+            shown={shown}
+            width={width - 2}
+            notes={notes}
+            onShowOnMap={onShowOnMap}
+          />
         )}
       </div>
     </div>
@@ -662,12 +699,15 @@ export function DataSummary({
   notes,
   repo,
   rev,
+  onShowOnMap,
 }: {
   /** The view's data model and its read, from `useDataDraft` */
   draft: DataDraftApi;
   notes?: Map<string, string[]>;
   repo: string;
   rev: string;
+  /** An entity's component was clicked: outline it on the map */
+  onShowOnMap: (name: string) => void;
 }) {
   const data = draft.data;
   const shown = useMemo(() => present(data?.entities ?? []), [data]);
@@ -757,7 +797,12 @@ export function DataSummary({
         <div ref={boxRef} className="basis-full pt-1">
           <div className="map-card">
             {width > 0 && (
-              <DataGraph shown={shown} width={width - 2} notes={notes} />
+              <DataGraph
+                shown={shown}
+                width={width - 2}
+                notes={notes}
+                onShowOnMap={onShowOnMap}
+              />
             )}
           </div>
           {data.storage && (

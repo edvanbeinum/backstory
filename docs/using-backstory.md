@@ -102,9 +102,11 @@ Story opens on the change's overview, then takes you through it in order:
 1. **Overview**: the change's description, with the map under it. Its places to
    look first go to their part of the walk.
 2. **Data model**, when the change touches it: the changed entities as cards.
+   Click an entity's component to go to that component's part of the walk.
 3. **Each changed component**, in the map's order, top to bottom and left to
-   right: what the change does in it, the flow steps its files are on as
-   `⇄ 1·3` chips, the map outlining it, and its files with their diffs. Leave line notes on them as
+   right: what the change does in it, the records its flow steps write beside
+   its file count, the flow steps its files are on as `⇄ 1·3` chips, the map
+   outlining it, and its files with their diffs. Leave line notes on them as
    in Files changed, or **+ Note for the agent** for a note on the component as
    a whole, which starts "On" and its name.
 4. **Not on the map**: the files no component has, such as tests.
@@ -231,7 +233,8 @@ before reading its lines:
   - On a view Claude Code read, **Show data** opens the whole model when the
     change touches none of it.
   - The Data line's graph opens by itself when the change touches the data
-    model; **Hide data** closes it.
+    model; **Hide data** closes it. Click an entity's component to outline it
+    on the map.
   - Main's data model moves forward when a view's base is on main and past it:
     the read that view's base needed is main's change since, and the base
     becomes main's model. Main is read in full again only when the patch from
