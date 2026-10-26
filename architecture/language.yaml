@@ -101,7 +101,7 @@ terms:
     avoid:
       - store
   - name: change description
-    means: "A few plain sentences at the top of Story: why the change was made (only when its commit messages or PR say), what it does, and at most two places to look first, each outlining its component on the map when the name is one. The AI provider reads it from the view's patch, commit messages, PR and the names of the components and entities it touches (`lib/description/`), once per view, cached by base and head trees in `~/.backstory/descriptions/`. Read as views open unless the repo is turned off (Turn off in Story's footnote), or on a click (Describe this change). Describe again, in Story's footnote, reads it once more, and the earlier one stays if that read fails."
+    means: "A few plain sentences at the top of Story: why the change was made (only when its commit messages or PR say), what it does, with one sentence naming the slots or states when it gives stored data a lifecycle, and at most two places to look first, each outlining its component on the map when the name is one. The AI provider reads it from the view's patch, commit messages, PR and the names of the components and entities it touches (`lib/description/`), once per view, cached by base and head trees in `~/.backstory/descriptions/`. Read as views open unless the repo is turned off (Turn off in Story's footnote), or on a click (Describe this change). Describe again, in Story's footnote, reads it once more, and the earlier one stays if that read fails."
     avoid:
       - summary, for the description (that's the line under the map)
   - name: repo key

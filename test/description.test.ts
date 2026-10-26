@@ -272,7 +272,7 @@ test("the prompt states every writing rule, with two good and two bad examples",
   const ai = recorder();
   await read(repo.view, { runner: ai.runner });
 
-  assert.equal(WRITING_RULES.length, 9);
+  assert.equal(WRITING_RULES.length, 10);
   assert.equal(GOOD_EXAMPLES.length, 2);
   assert.equal(BAD_EXAMPLES.length, 2);
   for (const line of [...WRITING_RULES, ...GOOD_EXAMPLES, ...BAD_EXAMPLES])
@@ -284,6 +284,7 @@ test("the prompt states every writing rule, with two good and two bad examples",
     /"seamless", "robust", "leverage", "enhance", "streamline", "carries", "holds"/,
     /No openers like "This change…" or "This PR…"/,
     /A sentence that could describe any change is cut/,
+    /gives stored data a lifecycle[\s\S]*naming the slots or states/,
     /why comes only from the commit messages and the pull request/,
     /copied exactly\. At most 2/,
     /components names come only from the list of components given/,

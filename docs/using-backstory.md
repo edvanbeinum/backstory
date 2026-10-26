@@ -136,7 +136,9 @@ footer says so.
 At the top of Story, Claude Code describes the change in three parts: **Why**,
 **What it does**, and **Where to look first**. It reads the patch, the commit
 messages and the pull request, and writes **Why** only when the commits or the
-pull request say why. Click a place to look first that is on the map to outline
+pull request say why. When the change moves stored data through stages, such
+as a value moved from one field to another or a status that changes, **What it
+does** says so in one sentence that names them. Click a place to look first that is on the map to outline
 it there. Opening a commit or the whole branch describes it, unless you turned
 the repo off; then **Describe this change** reads it.
 

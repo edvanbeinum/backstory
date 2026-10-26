@@ -57,6 +57,7 @@ export const WRITING_RULES = [
   'Plain, literal words. None of "seamless", "robust", "leverage", "enhance", "streamline", "carries", "holds". No metaphors or colloquialisms.',
   'No openers like "This change…" or "This PR…", and no closing summary.',
   "Each sentence says one thing. A sentence that could describe any change is cut.",
+  "When the change gives stored data a lifecycle, such as a value moved from one slot to another or a status that moves through states, what says so in one sentence, naming the slots or states.",
   "why comes only from the commit messages and the pull request. When they don't say why, it is null. Never guess it from the code.",
   `lookFirst names come only from the lists of components and entities given, copied exactly. At most ${LOOK_FIRST_MAX}, chosen for where a reviewer is most likely to find a mistake.`,
   "components names come only from the list of components given, copied exactly, each once.",
