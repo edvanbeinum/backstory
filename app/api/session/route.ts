@@ -58,16 +58,7 @@ export async function GET(request: Request) {
       rawBase,
       repo.tip,
     );
-    const base: typeof rawBase = {
-      ...rawBase,
-      boundarySha,
-      // When the boundary has moved off the merge base, "ahead of
-      // <upstream>" would overstate the count — say what the list now means.
-      label:
-        boundarySha && rawBase.sha && boundarySha !== rawBase.sha
-          ? "not yet on any remote"
-          : rawBase.label,
-    };
+    const base: typeof rawBase = { ...rawBase, boundarySha };
 
     // GitHub is the slow part and the only one that can fail softly, so let
     // it run alongside the remaining local git work.
