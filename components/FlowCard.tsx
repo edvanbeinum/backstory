@@ -303,14 +303,14 @@ export function FlowCard({
           )}
           footer={
             <>
-              <span className="flow-here">
-                <i />
-                <span className="truncate">
-                  {steps.size > 0
-                    ? `${steps.size} ${steps.size === 1 ? "step's" : "steps'"} code open`
-                    : "The code stays out of the way until you ask for it"}
+              {steps.size > 0 && (
+                <span className="flow-here">
+                  <i />
+                  <span className="truncate">
+                    {`${steps.size} ${steps.size === 1 ? "step's" : "steps'"} code open`}
+                  </span>
                 </span>
-              </span>
+              )}
               <span className="flex-1" />
               <span className="shrink-0">
                 Click a step to open its code under it · Esc closes
