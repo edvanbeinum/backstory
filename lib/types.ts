@@ -111,9 +111,6 @@ export interface RepoInfo {
 
 export interface WorkingTreeInfo {
   hasChanges: boolean;
-  staged: number;
-  unstaged: number;
-  untracked: number;
   /** Paths of untracked files, needed to synthesise their diffs */
   untrackedPaths: string[];
   /**

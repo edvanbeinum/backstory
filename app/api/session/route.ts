@@ -18,9 +18,6 @@ import type { ApiError, ReviewThread, SessionResponse } from "@/lib/types";
 /** A branch you're only reading has no working tree of its own. */
 const EMPTY_WORKING_TREE = {
   hasChanges: false,
-  staged: 0,
-  unstaged: 0,
-  untracked: 0,
   untrackedPaths: [],
   changedPaths: [],
 };
