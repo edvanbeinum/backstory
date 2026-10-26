@@ -81,6 +81,9 @@ export function repoKeyOf(common: string): string {
 // Common flags for every patch we parse. --no-ext-diff and --no-textconv keep
 // a user's difftool config from replacing the patch body; -M finds renames so
 // a moved file reads as a rename rather than a delete plus an add.
+/** git's empty tree, the base of a repository's first commit. */
+export const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
+
 const PATCH_FLAGS = [
   "--no-color",
   "--no-ext-diff",

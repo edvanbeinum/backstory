@@ -4,7 +4,12 @@ import path from "node:path";
 import { autoRead } from "./data/cache";
 import type { TrunkReadStatus } from "./data/types";
 import { git } from "./exec";
-import { getWorkingTree, MAX_UNTRACKED, MAX_UNTRACKED_BYTES } from "./git";
+import {
+  EMPTY_TREE,
+  getWorkingTree,
+  MAX_UNTRACKED,
+  MAX_UNTRACKED_BYTES,
+} from "./git";
 import {
   isAppCode,
   localModelFile,
@@ -330,9 +335,7 @@ export async function buildMap(
   // would claim "no structural change" when nothing was checked.
   const baseRead =
     base && headRead.source !== "local" ? await readModelAt(root, base) : null;
-  const range = base
-    ? [base, head]
-    : ["4b825dc642cb6eb9a060e54bf8d69288fbee4904", head];
+  const range = base ? [base, head] : [EMPTY_TREE, head];
   return drawMap(
     headRead.model,
     headRead,

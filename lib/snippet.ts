@@ -1,6 +1,7 @@
 import { parseUnifiedDiff } from "./diff";
 import { git } from "./exec";
 import { FULL_CONTEXT, getRangePatch } from "./git";
+import { EMPTY_TREE } from "./git";
 import { highlightFiles } from "./highlight";
 import { langForPath } from "./lang";
 import { showFile } from "./model";
@@ -11,8 +12,6 @@ import type { DiffFile, DiffLine } from "./types";
  * coloured as the diff colours them when the change touched the file, and
  * plain when it didn't (most steps sit in code the change never touched).
  */
-
-const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 export interface Snippet {
   path: string;
