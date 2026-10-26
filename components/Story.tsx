@@ -339,7 +339,7 @@ export function Story({
     <div className="space-y-6 pt-1">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">{readLine}</div>
-        <Button size="sm" variant="invisible" onClick={() => onWalk(true)}>
+        <Button size="sm" onClick={() => onWalk(true)}>
           Walk me through it
         </Button>
         {/* Keyed by view so a half-written note never goes to the next change. */}
