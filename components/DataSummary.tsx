@@ -117,12 +117,6 @@ function Row({
   );
 }
 
-/**
- * One entity. Level 2: its name and one line. Click for level 3, the field
- * changes and any relationship the arrows don't already say. "Details" is
- * level 4: rules, the columns links live in, timestamps. Unchanged fields
- * aren't shown at all: they're the code's business, not the change's.
- */
 function ComponentChip({
   name,
   onShowOnMap,
@@ -142,6 +136,12 @@ function ComponentChip({
   );
 }
 
+/**
+ * One entity. Level 2: its name and one line. Click for level 3, the field
+ * changes and any relationship the arrows don't already say. "Details" is
+ * level 4: rules, the columns links live in, timestamps. Unchanged fields
+ * aren't shown at all: they're the code's business, not the change's.
+ */
 function EntityCard({
   p,
   open,
