@@ -87,7 +87,8 @@ The tab is in the address bar, so a link opens on the tab it was copied from.
 
 In **Files changed**, files are grouped by the map's components, each group
 with an **On the map** link that outlines its component on Story; **By path**
-lists them by path instead, each file naming its component. Once the change is
+lists them by path instead, each file naming its component. On uncommitted
+work, the row above the files gives its size in files and lines. Once the change is
 traced, each file says which flows it is on, or **read yourself** when it is app
 code no flow explains, and filters above the files show only the hunks to read
 yourself, or the files on one flow; **read these yourself** beside the flows on

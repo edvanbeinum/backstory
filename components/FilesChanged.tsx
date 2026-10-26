@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { WORKING_REV } from "@/lib/constants";
 import { coverage } from "@/lib/flows/coverage";
 import { fileFlows, type StepMark, type StepMarks } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
@@ -202,6 +203,8 @@ export function FilesChanged({
 
   const filters =
     flowSet !== null && (yoursCount > 0 || flowSet.flows.length > 0);
+  // Give uncommitted work its size here, since it has no header to say it.
+  const size = commit?.sha === WORKING_REV;
   const chip = (value: Filter, children: React.ReactNode, warn = false) => (
     <button
       type="button"
@@ -259,7 +262,7 @@ export function FilesChanged({
 
   return (
     <div ref={rootRef} className="space-y-3 pt-1">
-      {diff && files.length > 0 && (filters || grouping) && (
+      {diff && files.length > 0 && (filters || grouping || size) && (
         <div className="files-filters">
           {filters && (
             <>
@@ -278,6 +281,13 @@ export function FilesChanged({
             </>
           )}
           <span className="flex-1" />
+          {size && (
+            <span className="mono">
+              {files.length} {files.length === 1 ? "file" : "files"}{" "}
+              <span className="text-[var(--success)]">+{diff.additions}</span>{" "}
+              <span className="text-[var(--danger)]">−{diff.deletions}</span>
+            </span>
+          )}
           {grouping && (
             <span className="seg" role="group" aria-label="Group files">
               <button
