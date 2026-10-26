@@ -237,9 +237,7 @@ export function StopView({
               <>
                 {stop.container && <>In {stop.container} · </>}
                 {fileWord(stop.files.length)}
-                {stop.writes.length > 0 && (
-                  <> · writes {stop.writes.join(", ")}</>
-                )}
+                {stop.uses.length > 0 && <> · uses {stop.uses.join(", ")}</>}
               </>
             }
           />

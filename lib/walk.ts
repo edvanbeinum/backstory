@@ -34,7 +34,7 @@ export type Stop<F extends WalkFile = DiffFile> = {
       /** Its arrows on the map, by key */
       edges: string[];
       /** The records its steps read or write, by their data tags, in flow and step order */
-      writes: string[];
+      uses: string[];
     }
   | { kind: "yourself" }
   | { kind: "finish" }
@@ -67,7 +67,7 @@ function stepsOn(
 }
 
 /** The entities the after side's steps on any of these files tag, each once. */
-function writesOn(flows: FlowSet | null, files: WalkFile[]): string[] {
+function usesOn(flows: FlowSet | null, files: WalkFile[]): string[] {
   const paths = new Set(files.flatMap((f) => [f.newPath, f.oldPath]));
   const names = new Set<string>();
   for (const flow of flows?.flows ?? [])
@@ -137,7 +137,7 @@ export function buildStops<F extends WalkFile>({
         edges: map.edges
           .filter((e) => e.source === node.id || e.destination === node.id)
           .map((e) => e.key),
-        writes: writesOn(flows, own),
+        uses: usesOn(flows, own),
       });
     }
   }

@@ -326,7 +326,7 @@ test("a component's stop lists the flow steps its files are on, and none untrace
   assert.deepEqual(chips(null), { Screen: [], Api: [], Store: [] });
 });
 
-test("a component's stop lists the entities its steps write, each once, in flow and step order", () => {
+test("a component's stop lists the entities its steps use, each once, in flow and step order", () => {
   const tagged = (s: FlowStep, ...entities: string[]): FlowStep => ({
     ...s,
     data: entities.map((entity) => ({ entity, does: "sets it" })),
@@ -349,12 +349,12 @@ test("a component's stop lists the entities its steps write, each once, in flow 
       },
     ],
   };
-  const writes = Object.fromEntries(
+  const uses = Object.fromEntries(
     all({ flows }).flatMap((s) =>
-      s.kind === "component" ? [[s.node.name, s.writes]] : [],
+      s.kind === "component" ? [[s.node.name, s.uses]] : [],
     ),
   );
-  assert.deepEqual(writes, {
+  assert.deepEqual(uses, {
     Screen: [],
     Api: ["Basket", "Order"],
     Store: [],

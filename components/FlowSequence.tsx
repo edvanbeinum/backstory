@@ -388,7 +388,7 @@ export function FlowSequence({
                           <span
                             key={`${d.entity}:${d.does}`}
                             className="flow-badge"
-                            title={`This step writes ${d.entity}: ${d.does}`}
+                            title={`This step uses ${d.entity}: ${d.does}`}
                           >
                             {d.entity} · {d.does}
                           </span>
