@@ -156,8 +156,6 @@ export default function Page() {
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
   /** Set when a URL asked for a rev that isn't in the unpushed list. */
   const [revNotice, setRevNotice] = useState<string | null>(null);
-  /** True while the watch stream is connected — shown as the live dot. */
-  const [live, setLive] = useState(false);
   const [browsing, setBrowsing] = useState(false);
   /** `?setup=1`: the inbox shows the setup checklist whatever else it holds */
   const [setup, setSetup] = useState(false);
@@ -527,7 +525,6 @@ export default function Page() {
     );
 
     source.onopen = () => {
-      setLive(true);
       void checkBuild();
       // Reconnects (server restarted, laptop woke) mean missed events —
       // catch up once, bypassing the GitHub cache since time has passed.
@@ -564,13 +561,7 @@ export default function Page() {
       });
     };
 
-    // EventSource reconnects on its own; just reflect the state.
-    source.onerror = () => setLive(false);
-
-    return () => {
-      source.close();
-      setLive(false);
-    };
+    return () => source.close();
   }, [ready, repoPath, loadSession, checkBuild]);
 
   const haveSession = session !== null;
@@ -1040,7 +1031,6 @@ export default function Page() {
             session={session}
             loading={sessionLoading || diffLoading}
             onRefresh={() => void loadSession(repoPath, { fresh: true })}
-            live={live}
             recents={recents}
             onRemoveRecent={removeRecent}
             onBackToInbox={backToInbox}
@@ -1165,7 +1155,6 @@ export default function Page() {
                                   notes={noteRev ? notes : null}
                                   noteRev={noteRev}
                                   marks={diffIsCurrent ? marks : null}
-                                  fileComponents={map?.fileComponents ?? null}
                                   sections={[{ key: "stop", files }]}
                                   commentNumbers={commentNumbers}
                                   onStep={openStep}
@@ -1243,22 +1232,17 @@ export default function Page() {
                         {/* Pinned to the bottom of the window on every tab: an
                         agent waiting on review must never be invisible, and
                         notes written in Files changed are sent from anywhere. */}
-                        {(noteRev ||
-                          notes.notes.length > 0 ||
-                          review.waiting ||
-                          review.error) && (
-                          <div className="sticky bottom-4 z-20">
-                            <FeedbackBar
-                              notes={notes}
-                              noteRev={noteRev}
-                              diff={noteRev ? diff : null}
-                              session={session}
-                              review={review}
-                              outbox={outbox}
-                              onOpenNote={openNote}
-                            />
-                          </div>
-                        )}
+                        <div className="sticky bottom-4 z-20">
+                          <FeedbackBar
+                            notes={notes}
+                            noteRev={noteRev}
+                            diff={noteRev ? diff : null}
+                            session={session}
+                            review={review}
+                            outbox={outbox}
+                            onOpenNote={openNote}
+                          />
+                        </div>
                       </>
                     )}
                   </WithReview>

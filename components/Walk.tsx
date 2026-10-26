@@ -5,7 +5,7 @@ import { useState } from "react";
 import type { DataResponse } from "@/lib/data/types";
 import type { StepMark } from "@/lib/flows/rows";
 import type { DiffFile } from "@/lib/types";
-import { filesNotSeen, filesSeen, type Stop } from "@/lib/walk";
+import { filesNotSeen, type Stop } from "@/lib/walk";
 import { DataCards } from "./DataSummary";
 import { NoteComposer } from "./NoteCard";
 import { Button, Ticked } from "./ui";
@@ -49,7 +49,6 @@ export function WalkBar({
   /** Show everything on one page */
   onLeave: () => void;
 }) {
-  const total = stops.reduce((n, s) => n + s.files.length, 0);
   return (
     <div className="walk-bar">
       <span className="walk-where">
@@ -76,11 +75,6 @@ export function WalkBar({
               onClick={() => onGo(i)}
             />
           ))}
-        </span>
-      )}
-      {total > 0 && (
-        <span className="walk-seen">
-          {filesSeen(stops, seen)} of {fileWord(total)} seen
         </span>
       )}
       <span className="flex-1" />
@@ -122,12 +116,16 @@ function StopHeading({
   );
 }
 
-/** A note on the change as a whole, starting with the component it's about. */
-function NoteFor({
+/**
+ * A note on the change as a whole, starting with the component it's about
+ * when there is one. The notes box shows only once there is a note, so this
+ * is where the first general note is written.
+ */
+export function NoteFor({
   name,
   onNote,
 }: {
-  name: string;
+  name?: string;
   onNote: (body: string) => void;
 }) {
   const [writing, setWriting] = useState(false);
@@ -137,16 +135,24 @@ function NoteFor({
         + Note for the agent
       </Button>
     );
+  // Give the composer its own full row, since on Story on one page it sits
+  // beside other buttons.
   return (
-    <NoteComposer
-      initial={`On ${name}: `}
-      placeholder={`Anything about ${name}?`}
-      onCancel={() => setWriting(false)}
-      onSave={(body) => {
-        onNote(body);
-        setWriting(false);
-      }}
-    />
+    <div className="basis-full">
+      <NoteComposer
+        initial={name ? `On ${name}: ` : undefined}
+        placeholder={
+          name
+            ? `Anything about ${name}?`
+            : "Anything about the change as a whole?"
+        }
+        onCancel={() => setWriting(false)}
+        onSave={(body) => {
+          onNote(body);
+          setWriting(false);
+        }}
+      />
+    </div>
   );
 }
 
@@ -288,6 +294,7 @@ export function StopView({
               </ul>
             </div>
           )}
+          {onNote && <NoteFor onNote={onNote} />}
         </section>
       );
     }

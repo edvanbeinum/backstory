@@ -36,7 +36,7 @@ const COL_GAP = 22;
 /** Level 1, the phrase: which entities changed, in a phrase each. */
 function summary(shown: Presented[]) {
   const changed = shown.filter((p) => p.state !== "same");
-  if (changed.length === 0) return <>no data model change</>;
+  if (changed.length === 0) return null;
   const added = changed.filter((p) => p.state === "added");
   const removed = changed.filter((p) => p.state === "removed");
   const edited = changed.filter((p) => p.state === "changed");
@@ -637,12 +637,6 @@ export function DataCards({
           <DataGraph shown={shown} width={width - 2} notes={notes} />
         )}
       </div>
-      <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
-        {data.drafted
-          ? `Read by ${data.drafted.provider} from the code. It may be wrong.`
-          : `From ${data.label}, at the base and the head.`}{" "}
-        Click an entity for its fields.
-      </p>
     </div>
   );
 }
@@ -709,25 +703,35 @@ export function DataSummary({
       </span>
     ) : null;
   }
-  const noChange = data.baseModel
-    ? "no data model change"
-    : "no data model at base to compare with";
+  // Say there's no base to compare with only when there isn't one, since it
+  // explains why nothing shows as changed.
+  const noBase = !data.baseModel && (
+    <>
+      <b>Data</b>
+      <span>no data model at base to compare with</span>
+    </>
+  );
   // A drafted view with no change still has its whole model to look at.
   if (changed.length === 0 && !(data.drafted && shown.length > 0)) {
-    return (
+    return noBase ? (
       <span className="part inline-flex flex-wrap items-center gap-1.5">
-        <b>Data</b>
-        {noChange}
+        {noBase}
       </span>
-    );
+    ) : null;
   }
 
   const whole = changed.length === 0;
   return (
     <>
       <span className="part inline-flex min-w-0 flex-wrap items-center gap-1.5">
-        <b>Data</b>
-        <span>{whole ? noChange : summary(shown)}</span>
+        {whole ? (
+          noBase
+        ) : (
+          <>
+            <b>Data</b>
+            <span>{summary(shown)}</span>
+          </>
+        )}
         <button
           type="button"
           className="story-disclose"
@@ -745,14 +749,6 @@ export function DataSummary({
               <DataGraph shown={shown} width={width - 2} notes={notes} />
             )}
           </div>
-          <p className="mt-2 px-1 text-[11px] text-[var(--fg-subtle)]">
-            {data.drafted
-              ? `Read by ${data.drafted.provider} from the code: main once in full, then updated from what each diff changes. It may be wrong.`
-              : `From ${data.label}, at the base and the head.`}{" "}
-            {whole
-              ? `Every entity at the head; ${data.baseModel ? "this change touches none of them" : "there is no data model at the base to compare with"}. Arrows point from the entity that has a link to the one it links to.`
-              : "Click an entity for its fields. Arrows point from the entity that has a link to the one it links to; grey boxes are unchanged entities a changed one links to."}
-          </p>
         </div>
       )}
     </>

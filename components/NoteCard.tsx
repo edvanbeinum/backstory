@@ -79,9 +79,6 @@ export function NoteComposer({
         className="w-full resize-y rounded-t-md bg-transparent px-3 py-2 font-sans text-[13px] leading-5 outline-none"
       />
       <div className="flex items-center justify-end gap-2 border-t border-[var(--border-muted)] px-2 py-1.5">
-        <span className="mr-auto text-[11px] text-[var(--fg-subtle)]">
-          ⌘↵ to save · esc to cancel
-        </span>
         <Button size="sm" variant="invisible" onClick={onCancel}>
           Cancel
         </Button>

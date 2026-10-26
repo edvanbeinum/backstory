@@ -47,12 +47,7 @@ export function CommitHeader({
       </div>
 
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 bg-[var(--canvas-subtle)] px-4 py-2 text-[12px] text-[var(--fg-muted)]">
-        {isBranch ? (
-          <span>
-            Everything the pull request will contain after you push —
-            uncommitted work not included.
-          </span>
-        ) : (
+        {!isBranch && (
           <>
             <span>
               <span className="font-medium text-[var(--fg)]">

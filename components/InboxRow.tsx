@@ -61,7 +61,7 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
           )}
         </span>
 
-        {row.pr ? (
+        {row.pr && (
           <>
             <span className="mt-0.5 block truncate text-[13px] text-[var(--fg)]">
               {row.pr.title}
@@ -76,15 +76,6 @@ export function InboxRow({ row, onOpen }: { row: Row; onOpen: () => void }) {
               </span>
             )}
           </>
-        ) : (
-          <span className="mt-0.5 block text-[12px] text-[var(--fg-subtle)]">
-            {row.ahead === null
-              ? "no upstream yet"
-              : row.ahead > 0
-                ? `${row.ahead} ${row.ahead === 1 ? "commit" : "commits"} ahead of upstream`
-                : "up to date with upstream"}{" "}
-            · no pull request yet
-          </span>
         )}
 
         {folderDiffers && (

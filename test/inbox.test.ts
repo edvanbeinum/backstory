@@ -276,6 +276,16 @@ test("a branch reads as changed until you look at it, and again after a new comm
   assert.deepEqual(await changed(), { main: false, one: true, two: true });
 });
 
+test("a repo with no GitHub remote has no GitHub notice, and still lists its rows", async () => {
+  const repo = repoOnMain(null);
+  repo.worktree("one");
+  const inbox = await buildInbox([repo.root]);
+
+  assert.equal(inbox.repos[0].unavailable, null);
+  assert.equal(inbox.repos[0].connect, false);
+  assert.deepEqual(inbox.rows.map((r) => r.branch).sort(), ["main", "one"]);
+});
+
 test("a repo whose main is being read says so on the inbox until the read ends", async () => {
   const repo = repoOnMain(null);
   const reading = async () => (await buildInbox([repo.root])).repos[0].reading;

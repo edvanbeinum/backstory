@@ -665,9 +665,6 @@ export async function getWorkingTree(repo: RepoInfo): Promise<WorkingTreeInfo> {
 
   const info: WorkingTreeInfo = {
     hasChanges: false,
-    staged: 0,
-    unstaged: 0,
-    untracked: 0,
     untrackedPaths: [],
     changedPaths: [],
   };
@@ -683,7 +680,6 @@ export async function getWorkingTree(repo: RepoInfo): Promise<WorkingTreeInfo> {
     const filePath = entry.slice(3);
 
     if (x === "?" && y === "?") {
-      info.untracked++;
       info.untrackedPaths.push(filePath);
       info.changedPaths.push(filePath);
       continue;
@@ -698,12 +694,9 @@ export async function getWorkingTree(repo: RepoInfo): Promise<WorkingTreeInfo> {
       const source = entries[++i];
       if (source) info.changedPaths.push(source);
     }
-
-    if (x !== " " && x !== "?") info.staged++;
-    if (y !== " " && y !== "?") info.unstaged++;
   }
 
-  info.hasChanges = info.staged > 0 || info.unstaged > 0 || info.untracked > 0;
+  info.hasChanges = info.changedPaths.length > 0;
   return info;
 }
 

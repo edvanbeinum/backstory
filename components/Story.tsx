@@ -27,7 +27,7 @@ import {
 import { Button } from "./ui";
 import type { FlowsApi } from "./useFlows";
 import { useView } from "./ViewContext";
-import { StopView, WalkBar } from "./Walk";
+import { NoteFor, StopView, WalkBar } from "./Walk";
 
 /**
  * The tab every view lands on. It opens as a walk through the change, one
@@ -145,8 +145,15 @@ export function Story({
   const readLine = (
     <ReadLine map={mapDraft} data={dataDraft} description={describes} />
   );
+  // Keep the flows out of the walk's footnote, since only the Flows section on
+  // one page shows a trace running or failing.
   const footnote = (
-    <ReadFootnote map={mapDraft} data={dataDraft} description={describes} />
+    <ReadFootnote
+      map={mapDraft}
+      data={dataDraft}
+      description={describes}
+      flows={rev !== WORKING_REV && !walk ? flows : null}
+    />
   );
   const view = viewKey({ repo, ref, rev });
   const [drawn, setDrawn] = useState<{ view: string; ids: string[] } | null>(
@@ -304,7 +311,7 @@ export function Story({
           style={{ "--walk-top": `${topHeight}px` } as React.CSSProperties}
         >
           <StopView
-            key={current.key}
+            key={`${view} ${current.key}`}
             stops={stops}
             index={index}
             seen={seen.keys}
@@ -330,11 +337,13 @@ export function Story({
 
   return (
     <div className="space-y-6 pt-1">
-      <div className="flex items-start gap-3">
+      <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">{readLine}</div>
-        <Button size="sm" variant="invisible" onClick={() => onWalk(true)}>
+        <Button size="sm" onClick={() => onWalk(true)}>
           Walk me through it
         </Button>
+        {/* Keyed by view so a half-written note never goes to the next change. */}
+        {onNote && <NoteFor key={view} onNote={onNote} />}
       </div>
 
       {overview}

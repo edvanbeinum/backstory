@@ -177,6 +177,18 @@ export function FeedbackBar({
     return () => clearTimeout(timer);
   }, [confirmingClear]);
 
+  // Stays open while a general note is being written, so deleting the last
+  // line note doesn't throw that draft away.
+  if (
+    !writing &&
+    notes.notes.length === 0 &&
+    !review.waiting &&
+    !review.error &&
+    !outbox.error &&
+    !notes.error
+  )
+    return null;
+
   return (
     <div
       className={`space-y-2 rounded-md border px-3 py-2 shadow-lg ${
@@ -199,11 +211,6 @@ export function FeedbackBar({
             ? "Notes for your agent"
             : `${count} ${count === 1 ? "note" : "notes"} for your agent`}
         </span>
-        {count === 0 && noteRev && (
-          <span className="text-[12px] text-[var(--fg-muted)]">
-            — hover a line and press + to leave one
-          </span>
-        )}
 
         <div className="ml-auto flex items-center gap-1.5">
           {!writing && (

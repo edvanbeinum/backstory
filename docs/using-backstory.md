@@ -45,7 +45,6 @@ Opening a branch takes it out of that count until it gets another commit.
 
 ```text
 2 branches changed since you last looked
-21 worktrees checked out
 
 ACME-APP ──────────────────────────────────────────────────────────
  ●  feature/offline-sync-1203       #40 open                 +212 −38
@@ -68,9 +67,9 @@ is left as it is, and Fetch says so.
 
 **The workspace** is one branch. Its header picks the change: the whole branch,
 your uncommitted work, or any one commit on it. It opens on your uncommitted
-work when there is some, and on the whole branch otherwise. Uncommitted work is
-drawn on the map from your last commit, so it shows which components the work
-touched, not which ones it added or removed. Under the header are three tabs,
+work when there is some, and on the whole branch otherwise.
+Uncommitted work is drawn on the map from your last commit, so it shows which
+components the work touched, not which ones it added or removed. Under the header are three tabs,
 as on a pull request, and every change opens on the first:
 
 - **Story** walks you through the change one part at a time (see [Walking through a change](#walking-through-a-change)).
@@ -87,10 +86,12 @@ The tab is in the address bar, so a link opens on the tab it was copied from.
 
 In **Files changed**, files are grouped by the map's components, each group
 with an **On the map** link that outlines its component on Story; **By path**
-lists them by path instead. Once the change is traced, each file says which
-flows it is on, or **read yourself** when it is app code no flow explains. The
-filters above the files show only the hunks to read yourself, or the files on
-one flow; **read these yourself** beside the flows on Story opens the first.
+lists them by path instead, each file naming its component. On uncommitted
+work, the row above the files gives its size in files and lines. Once the change is
+traced, each file says which flows it is on, or **read yourself** when it is app
+code no flow explains, and filters above the files show only the hunks to read
+yourself, or the files on one flow; **read these yourself** beside the flows on
+Story opens the first.
 Marks in the gutter beside a line open what is there: `⇄ 1·7` opens flow 1, step
 7 in the story, and `💬 2` opens review comment 2 in Comments.
 
@@ -108,15 +109,15 @@ Story opens on the change's overview, then takes you through it in order:
    a whole, which starts "On" and its name.
 4. **Not on the map**: the files no component has, such as tests.
 5. **Your notes**: says you've seen the whole change, or names the files you
-   haven't seen yet, then lists your notes with **Send**.
+   haven't seen yet, with **+ Note for the agent** for a note on the change as a
+   whole.
 
 On uncommitted work, the overview is the map from your last commit, with no
 description, and the walk goes through each component the work changed.
 
 The bar at the top says where you are, as "3 of 6 · Sync Engine", with a dot
-for each part and how many of the change's files you've seen. `j` and `k`, or
-**‹** and **›**, move between the parts, and clicking a changed component on
-the map goes to its part. On each component, the map outlines it and its
+for each part. `j` and `k`, or **‹** and **›**, move between the parts, and
+clicking a changed component on the map goes to its part. On each component, the map outlines it and its
 arrows. A flow step's chip, or a link from Files changed or Comments to a step,
 opens it on **Show everything on one page**.
 
@@ -158,6 +159,8 @@ Story says so and has:
   does the same for the data model.
 - **Describe again**, which reads the description once more, and keeps the
   earlier description if that read fails.
+- **Trace again**, on one page once the change is traced, which traces its
+  flows once more, and keeps the earlier flows if that trace fails.
 
 Backstory draws what a change did to the system, so you can see its effect
 before reading its lines:
@@ -309,10 +312,14 @@ opens it in Backstory. If you move the app, choose it again to fix the link.
 When an agent is making the change, you review what it made — uncommitted work,
 or the commits it made on its own if you let it run. Notes go on any change:
 in Files changed, hover a line of **Uncommitted**, **All changes**, or any one
-commit, and press
-**+**; **Add a general note** covers the work as a whole. When you review a
-stack of commits one at a time, the notes on each commit are kept to send
-together, and the bar lists the ones on other changes.
+commit, and press **+**. **+ Note for the agent**, on the walk's last part or
+beside **Walk me through it** on one page, covers the work as a whole. In a
+note, `⌘↵` saves it and `Esc` cancels.
+
+The notes box appears at the bottom of the window with your first note, or as
+soon as an agent is waiting, and has **Add a general note** for more. When you
+review a stack of commits one at a time, the notes on each commit are kept to
+send together, and the box lists the ones on other changes.
 
 A note on a commit is sent naming the commit, and whether it's been pushed.
 Notes remember the text of their line, so they follow it when the agent's next

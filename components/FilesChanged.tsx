@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { WORKING_REV } from "@/lib/constants";
 import { coverage } from "@/lib/flows/coverage";
 import { fileFlows, type StepMark, type StepMarks } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
@@ -166,8 +167,8 @@ export function FilesChanged({
           })(),
   );
 
-  const grouped =
-    !byPath && map?.status === "ok" && map.nodes.length > 0 ? map : null;
+  const grouping = map?.status === "ok" && map.nodes.length > 0;
+  const grouped = !byPath && grouping ? map : null;
   // Group files only by boxes that own them: a container drawn around a
   // changed component has nothing of its own to outline.
   const leaves = grouped?.nodes.filter(ownsCode) ?? [];
@@ -200,8 +201,10 @@ export function FilesChanged({
       }))
     : [{ key: "all", files: shownFiles }];
 
-  const additions = files.reduce((n, f) => n + f.additions, 0);
-  const deletions = files.reduce((n, f) => n + f.deletions, 0);
+  const filters =
+    flowSet !== null && (yoursCount > 0 || flowSet.flows.length > 0);
+  // Give uncommitted work its size here, since it has no header to say it.
+  const size = commit?.sha === WORKING_REV;
   const chip = (value: Filter, children: React.ReactNode, warn = false) => (
     <button
       type="button"
@@ -259,30 +262,33 @@ export function FilesChanged({
 
   return (
     <div ref={rootRef} className="space-y-3 pt-1">
-      {diff && files.length > 0 && (
+      {diff && files.length > 0 && (filters || grouping || size) && (
         <div className="files-filters">
-          <span>Show</span>
-          {chip("all", `All files · ${files.length}`)}
-          {flowSet && yoursCount > 0 && (
+          {filters && (
             <>
-              {chip(
-                "yourself",
-                `Read these yourself · ${yoursCount} ${yoursCount === 1 ? "hunk" : "hunks"}`,
-                true,
-              )}
+              {chip("all", `All files · ${files.length}`)}
+              {yoursCount > 0 &&
+                chip(
+                  "yourself",
+                  `Read these yourself · ${yoursCount} ${yoursCount === 1 ? "hunk" : "hunks"}`,
+                  true,
+                )}
+              {flowSet?.flows.map((f, i) => (
+                <span key={f.id} title={f.trigger}>
+                  {chip(i + 1, `On flow ${i + 1}`)}
+                </span>
+              ))}
             </>
           )}
-          {flowSet?.flows.map((f, i) => (
-            <span key={f.id} title={f.trigger}>
-              {chip(i + 1, `On flow ${i + 1}`)}
-            </span>
-          ))}
           <span className="flex-1" />
-          <span className="mono">
-            <span className="text-[var(--success)]">+{additions}</span>{" "}
-            <span className="text-[var(--danger)]">−{deletions}</span>
-          </span>
-          {map?.status === "ok" && map.nodes.length > 0 && (
+          {size && (
+            <span className="mono">
+              {files.length} {files.length === 1 ? "file" : "files"}{" "}
+              <span className="text-[var(--success)]">+{diff.additions}</span>{" "}
+              <span className="text-[var(--danger)]">−{diff.deletions}</span>
+            </span>
+          )}
+          {grouping && (
             <span className="seg" role="group" aria-label="Group files">
               <button
                 type="button"
@@ -313,7 +319,9 @@ export function FilesChanged({
         notes={notes}
         noteRev={noteRev}
         marks={marks}
-        fileComponents={map?.fileComponents ?? null}
+        // Drop each file's component chip when files are grouped, since the
+        // group's heading already names it.
+        fileComponents={grouped ? null : (map?.fileComponents ?? null)}
         sections={sections}
         flows={flows}
         onlyHunks={active === "yourself" ? yours : null}
