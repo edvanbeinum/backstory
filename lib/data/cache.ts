@@ -445,7 +445,7 @@ async function modelAt(
       c.files,
     );
     model = {
-      storage: start.model.storage,
+      storage: read.output.storage?.trim() || start.model.storage,
       entities: mergeDelta(start.model.entities, read.output),
       files: c.files,
       from: start.tree,

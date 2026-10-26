@@ -1141,6 +1141,24 @@ test("a view whose head is cached reads only its base", async () => {
   assert.deepEqual(ai.calls, ["delta"]);
 });
 
+test("a derived model says where its data is stored: the delta's sentence when the patch moves it, the start's otherwise", async () => {
+  for (const storage of [undefined, "One value per server, in the Keychain"]) {
+    const repo = notesRepo();
+    repo.write("README.md", "notes\n");
+    const tip = repo.commit("Say what notes are");
+    await read(
+      { root: repo.root, base: repo.head, head: tip },
+      {
+        runner: recorder({
+          delta: { changed: [], absent: [], ...(storage ? { storage } : {}) },
+        }).runner,
+      },
+    );
+    const data = await buildData(repo.root, repo.head, tip);
+    assert.equal(data.storage, storage ?? noteHead.storage);
+  }
+});
+
 test("a failed run isn't retried, fails with the provider's message and caches nothing", async () => {
   const repo = notesRepo();
   const failing = recorder({ failures: Infinity });

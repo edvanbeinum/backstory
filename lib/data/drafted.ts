@@ -27,6 +27,8 @@ export interface DraftedDelta {
   changed: Entity[];
   /** Entities of the model the delta starts from that this commit doesn't have */
   absent: string[];
+  /** This commit's storage sentence, only when the patch changes where or how records are stored */
+  storage?: string;
 }
 
 const fieldSchema = {
@@ -102,6 +104,11 @@ const deltaSchema = () => ({
   properties: {
     changed: entitiesSchema,
     absent: { type: "array", items: { type: "string" } },
+    storage: {
+      type: "string",
+      description:
+        "Only when the patch changes where or how records are stored: this commit's storage sentence, in the same form as the model below",
+    },
   },
 });
 
@@ -140,6 +147,7 @@ Below is the data model of another commit of this repository, and the patch from
 
 - changed: for every entity the patch changed or added, its full version as it is in THIS commit. Write each one in the same style as the model below, keeping everything the patch does not touch word for word.
 - absent: the names of entities in the model below that the patch removed, so they don't exist here.
+- storage: only when the patch changes where records are kept, what one stored unit is or when it is written, this commit's storage sentence in the same form. Otherwise leave it out.
 
 An entity the patch does not touch goes in neither list. If the patch changes no stored records, both lists are empty. Check the code here when the patch is unclear.
 ${steering(files)}
