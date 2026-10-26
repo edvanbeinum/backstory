@@ -313,7 +313,8 @@ When an agent is making the change, you review what it made — uncommitted work
 or the commits it made on its own if you let it run. Notes go on any change:
 in Files changed, hover a line of **Uncommitted**, **All changes**, or any one
 commit, and press **+**. **+ Note for the agent**, on the walk's last part or
-beside **Walk me through it** on one page, covers the work as a whole.
+beside **Walk me through it** on one page, covers the work as a whole. In a
+note, `⌘↵` saves it and `Esc` cancels.
 
 The notes box appears at the bottom of the window with your first note, or as
 soon as an agent is waiting, and has **Add a general note** for more. When you

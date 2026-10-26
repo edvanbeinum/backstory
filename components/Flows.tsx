@@ -94,7 +94,6 @@ export function Flows({
             ? `${fileCount} changed ${fileCount === 1 ? "file" : "files"}`
             : "changed files"}{" "}
           and draws what each user action does, as flows across the map above.
-          The code stays a click away.
         </p>
         <Button variant="primary" onClick={api.start}>
           Trace this change
