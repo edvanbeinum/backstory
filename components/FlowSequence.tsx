@@ -46,8 +46,9 @@ export interface DataField {
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** The changed fields a step's call names. */
+/** The changed fields a step's call names, on a step with no data tags. */
 function fieldsIn(step: FlowRow["step"], fields: DataField[]) {
+  if (step.data?.length) return [];
   const text = `${step.label} ${step.symbol}`;
   return fields
     .filter((f) => new RegExp(`\\b${escapeRe(f.field)}\\b`).test(text))
@@ -382,6 +383,15 @@ export function FlowSequence({
                         {row.again && (
                           <span className="flow-badge">{row.again}</span>
                         )}
+                        {row.step.data?.map((d) => (
+                          <span
+                            key={`${d.entity}:${d.does}`}
+                            className="flow-badge"
+                            title={`This step writes ${d.entity}: ${d.does}`}
+                          >
+                            {d.entity} · {d.does}
+                          </span>
+                        ))}
                         {fieldsIn(row.step, dataFields).map((f) => (
                           <span
                             key={f.field}

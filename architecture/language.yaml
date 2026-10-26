@@ -8,11 +8,15 @@ terms:
     avoid:
       - mockup
   - name: flow
-    means: "What the code does for one user action a change touches: the data, a card in the story and the feature."
+    means: "What the code does for one user action a change touches: the data, a card in the story and the feature. A step that reads or writes stored data says which records and what it does to them, in its data tags."
     drawing: sequence
     avoid:
       - sequence, for the data
       - trace as a noun (trace stays the verb, as in "Trace this change")
+  - name: data tag
+    means: "One stored record a flow step reads or writes, by the data model's name for it, and what the step does to it in a few words (`StepData` in `lib/flows/types.ts`, the `backstory.data` step property in the flow cache). At most three on a step, drawn as badges after its label, in place of the changed-field chips."
+    avoid:
+      - chip, for the tag
   - name: participant
     means: One actor in a flow, a type the calls go between (`FlowParticipant`, SARIF `logicalLocations`).
     drawing: lane

@@ -1,4 +1,10 @@
-import type { Flow, FlowParticipant, FlowSet, FlowStep } from "./types";
+import type {
+  Flow,
+  FlowParticipant,
+  FlowSet,
+  FlowStep,
+  StepData,
+} from "./types";
 
 /**
  * The cache is SARIF 2.1.0: one informational result per flow, its steps as
@@ -81,11 +87,27 @@ const toLocation = (s: FlowStep, i: number): SarifLocation => ({
         returns: s.returns,
         repeat: s.repeat,
         sameAs: s.sameAs,
+        data: s.data,
         verified: s.verified,
       }).filter(([, v]) => v !== undefined && v !== ""),
     ),
   ),
 });
+
+/** A step's data tags, or undefined when the property is missing or not tags, as in a file cached before steps had them. */
+function dataOf(value: unknown): StepData[] | undefined {
+  if (!Array.isArray(value) || value.length === 0) return undefined;
+  const tags = value.filter(
+    (d: unknown): d is StepData =>
+      typeof d === "object" &&
+      d !== null &&
+      typeof (d as Record<string, unknown>).entity === "string" &&
+      typeof (d as Record<string, unknown>).does === "string",
+  );
+  return tags.length === value.length
+    ? tags.map(({ entity, does }) => ({ entity, does }))
+    : undefined;
+}
 
 const fromLocation = (l: SarifLocation): FlowStep => {
   const p = l.properties;
@@ -98,8 +120,10 @@ const fromLocation = (l: SarifLocation): FlowStep => {
       .map((k) => [k, str(k)])
       .filter(([, v]) => v !== undefined),
   );
+  const data = dataOf(prop(p, "data"));
   return {
     ...optional,
+    ...(data ? { data } : {}),
     id: str("stepId") ?? `step-${l.executionOrder}`,
     from: str("from") ?? "",
     to: str("to") ?? "",

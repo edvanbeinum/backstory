@@ -3,6 +3,8 @@ import os from "node:os";
 import path from "node:path";
 
 import { aiProvider, type Runner } from "../ai/provider";
+import { readDrafted } from "../data/cache";
+import { dataSteer, readDataModel, steerError } from "../data/readers";
 import { git, gitLine, run } from "../exec";
 import { EMPTY_TREE } from "../git";
 import { isAppCode, readModelAt, type Model } from "../model";
@@ -12,6 +14,7 @@ import {
   baseSchema,
   headPrompt,
   headSchema,
+  MAX_DATA,
   MAX_FLOWS,
   MAX_STEPS,
   tracePrompt,
@@ -20,7 +23,13 @@ import {
   type RawFlow,
   type RawStep,
 } from "./prompts";
-import type { Flow, FlowParticipant, FlowSet, FlowStep } from "./types";
+import type {
+  Flow,
+  FlowParticipant,
+  FlowSet,
+  FlowStep,
+  StepData,
+} from "./types";
 
 /**
  * Flows for one view: a base and a head (a commit and its parent, or a
@@ -91,6 +100,25 @@ async function prepare(
     .map((h, i) => ({ ...h, id: `H${i + 1}` }));
   const appFiles = [...new Set(hunks.map((h) => h.file))];
   return { root, base, head, subject, model, hunks, renames, appFiles };
+}
+
+/**
+ * The names of the records the repo stores at the head, so steps tag them as
+ * the data view names them: from a data reader, or the drafted model already
+ * saved. Never waits for a drafted read; null when there is none yet.
+ */
+async function storedEntities(ctx: Context): Promise<string[] | null> {
+  const steer = dataSteer(ctx.model?.properties);
+  if (steerError(steer)) return null;
+  const read = await readDataModel(ctx.root, ctx.head, steer);
+  if (read) return [...read.model.entities.keys()];
+  const drafted = await readDrafted({
+    root: ctx.root,
+    base: ctx.base,
+    head: ctx.head,
+    files: steer.files,
+  }).catch(() => null);
+  return drafted ? [...drafted.head.entities.keys()] : null;
 }
 
 /** The commit's files in a temp dir. Nothing in the repo is touched. */
@@ -215,9 +243,24 @@ async function verifySteps(dir: string, steps: RawStep[]): Promise<FlowStep[]> {
   for (const s of steps) {
     const file = normalisePath(s.file);
     const found = await locate(read, file, s.line, s.symbol);
-    out.push({ ...s, file, line: found ?? s.line, verified: found !== null });
+    const { data: raw, ...rest } = s;
+    const data = cleanData(raw);
+    out.push({
+      ...rest,
+      ...(data.length > 0 ? { data } : {}),
+      file,
+      line: found ?? s.line,
+      verified: found !== null,
+    });
   }
   return out;
+}
+
+function cleanData(data: StepData[] | undefined): StepData[] {
+  return (data ?? [])
+    .map((d) => ({ entity: d.entity.trim(), does: d.does.trim() }))
+    .filter((d) => d.entity && d.does)
+    .slice(0, MAX_DATA);
 }
 
 const normalisePath = (file: string) =>
@@ -351,6 +394,7 @@ export async function generateFlows(opts: GenerateOptions): Promise<FlowSet> {
     return { ...empty, durationMs: Date.now() - started };
 
   phase("Tracing flows at the head");
+  const entities = await storedEntities(ctx);
   const head = await withSnapshot(ctx.root, ctx.head, async (dir) => {
     const { output, costUsd, model } = await runner<HeadOutput>(
       headPrompt({
@@ -358,6 +402,7 @@ export async function generateFlows(opts: GenerateOptions): Promise<FlowSet> {
         subject: ctx.subject,
         hunks: hunkText(ctx.hunks),
         hasBase: ctx.base !== null,
+        entities,
       }),
       headSchema(),
       dir,

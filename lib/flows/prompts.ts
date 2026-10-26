@@ -6,8 +6,14 @@
  * Claude returns compact steps; Backstory verifies them and wraps them in SARIF.
  */
 
+import type { StepData } from "./types";
+
 export const MAX_FLOWS = 5;
 export const MAX_STEPS = 15;
+/** Data tags on one step */
+export const MAX_DATA = 3;
+/** Entity names the head trace is given */
+export const MAX_ENTITIES = 60;
 
 const STEP_SCHEMA = {
   type: "object",
@@ -23,6 +29,18 @@ const STEP_SCHEMA = {
     returns: { type: "string" },
     repeat: { type: "string" },
     sameAs: { type: "string" },
+    data: {
+      type: "array",
+      maxItems: MAX_DATA,
+      items: {
+        type: "object",
+        properties: {
+          entity: { type: "string" },
+          does: { type: "string" },
+        },
+        required: ["entity", "does"],
+      },
+    },
     nesting: { type: "integer" },
   },
   required: [
@@ -105,6 +123,7 @@ export interface RawStep {
   returns?: string;
   repeat?: string;
   sameAs?: string;
+  data?: StepData[];
   nesting: number;
 }
 
@@ -135,6 +154,7 @@ const STEP_RULES = `For each step give:
 - returns: what comes back, in a few words, only if it matters to the flow.
 - repeat: if the call runs more than once per trigger, how often, e.g. "for each of 2 contexts".
 - sameAs: if this step re-runs an earlier step's whole subtree, that step's id, instead of listing its steps again.
+- data: only if the call reads or writes stored data (a database row, a file, a keychain item, a stored setting), the records it touches, at most ${MAX_DATA}. entity is the record's name in PascalCase; does is what the call does to it, in a few words in code terms, e.g. "sets candidate", "moves candidate to active, clears challenge", "reads the token". Leave it out for a call that touches no stored data.
 - nesting: call depth from the trigger; 0 for the entry call.
 - id: "<flow id>.<short-kebab-name>", descriptive.
 
@@ -145,7 +165,13 @@ export function headPrompt(opts: {
   subject: string;
   hunks: string;
   hasBase: boolean;
+  /** The records the repo stores at this commit, when Backstory knows them */
+  entities: string[] | null;
 }): string {
+  const records =
+    opts.entities && opts.entities.length > 0
+      ? `Records this program stores, by the names to use: ${opts.entities.slice(0, MAX_ENTITIES).join(", ")}.`
+      : "Name each stored record after the type it is stored as.";
   return `You are tracing flows through a code change, for a reviewer. A flow is what the code does when one trigger happens: a user action (open a screen, tap a button, submit a form, call an endpoint) or a system event (app launch, background job, sync). Each flow is a sequence of calls between types.
 
 The repository at commit ${opts.sha} ("${opts.subject}") is in the current directory. Read files with Read, Grep and Glob. Don't modify anything.
@@ -159,7 +185,9 @@ ${opts.hunks}
 3. isNew: true if the trigger didn't exist before this change (a new feature); false if it existed and the change altered what happens.
 4. For each hunk, list the ids of the flows whose steps sit in it.
 
-${STEP_RULES}`;
+${STEP_RULES}
+
+${records}`;
 }
 
 export function basePrompt(opts: {
@@ -177,7 +205,7 @@ The change, from base (old) to head (new):
 ${opts.hunks}
 
 The flows at the head, with each step marked:
-- "carried": the change didn't touch its line; it has already been moved to its line at the base and checked there. Keep its id, file, line and symbol. But the code around it may have done something different at the base (a different query, a different loop): re-read it, and update its label, returns and repeat if they weren't true then.
+- "carried": the change didn't touch its line; it has already been moved to its line at the base and checked there. Keep its id, file, line and symbol. But the code around it may have done something different at the base (a different query, a different loop): re-read it, and update its label, returns, repeat and data if they weren't true then.
 - "affected": the change added or edited its line. If the same call existed at the base, keep the step's id with its base file, line and symbol. If it didn't exist, leave it out.
 
 ${opts.flows}

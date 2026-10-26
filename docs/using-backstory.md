@@ -235,7 +235,10 @@ before reading its lines:
     again and removes every model worked out from the old one, since a mistake
     in main's model is copied into each of them.
 - **Flows** are sequence diagrams of what the code does for each user action the
-  change touches, before and after, beside the code they come from.
+  change touches, before and after, beside the code they come from. A step that
+  reads or writes stored data names each record after it, with what the step
+  does to it, such as "Basket · sets the shopper's items". A step that names no
+  records shows the changed fields its call uses.
 
 In a hand-written map, Backstory reads the part of the DSL that describes
 elements and arrows:

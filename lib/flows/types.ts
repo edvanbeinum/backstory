@@ -34,8 +34,18 @@ export interface FlowStep {
   repeat?: string;
   /** This step re-runs an earlier step's subtree */
   sameAs?: string;
+  /** The stored records the call reads or writes, at most three */
+  data?: StepData[];
   nesting: number;
   verified: boolean;
+}
+
+/** A data tag: one stored record a step reads or writes, and what it does to it. */
+export interface StepData {
+  /** The record's name, as the data model names it */
+  entity: string;
+  /** In a few words, in code terms, e.g. "moves candidate to active" */
+  does: string;
 }
 
 export interface Flow {
