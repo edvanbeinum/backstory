@@ -110,7 +110,9 @@ async function prepare(
 async function storedEntities(ctx: Context): Promise<string[] | null> {
   const steer = dataSteer(ctx.model?.properties);
   if (steerError(steer)) return null;
-  const read = await readDataModel(ctx.root, ctx.head, steer);
+  const read = await readDataModel(ctx.root, ctx.head, steer).catch(
+    () => null,
+  );
   if (read) return [...read.model.entities.keys()];
   // Ask for the head alone: with a base, the read finds nothing unless the
   // base's model is saved too.
