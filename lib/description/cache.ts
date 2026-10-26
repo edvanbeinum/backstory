@@ -18,7 +18,7 @@ import { buildData } from "../data/build";
 import { MAX_PATCH_BYTES } from "../data/drafted";
 import { git, gitLine } from "../exec";
 import { withSnapshot } from "../flows/generate";
-import { getRangePatch, repoKey } from "../git";
+import { EMPTY_TREE, getRangePatch, repoKey } from "../git";
 import { buildMap } from "../map";
 import { readModelAt } from "../model";
 import { mapReadSettled, startMapRead } from "../models/cache";
@@ -85,8 +85,6 @@ const registry: Registry = (g.__backstoryDescriptions ??= {
   ended: new Map(),
   queue: Promise.resolve(),
 });
-
-const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 const tree = async (root: string, rev: string) => {
   const t = await gitLine(root, ["rev-parse", "--verify", `${rev}^{tree}`]);
