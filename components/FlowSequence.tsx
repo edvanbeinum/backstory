@@ -71,7 +71,6 @@ export function FlowSequence({
   mode,
   activeKeys,
   onRowClick,
-  footer,
   open = NONE_OPEN,
   renderCode,
   components,
@@ -86,7 +85,6 @@ export function FlowSequence({
   mode: FlowMode;
   activeKeys: Set<string>;
   onRowClick: (row: FlowRow) => void;
-  footer: React.ReactNode;
   /** Rows whose code is open beneath them */
   open?: Set<string>;
   renderCode?: (row: FlowRow) => React.ReactNode;
@@ -438,7 +436,6 @@ export function FlowSequence({
           </div>
         </div>
       </div>
-      <div className="flow-foot">{footer}</div>
     </div>
   );
 }
