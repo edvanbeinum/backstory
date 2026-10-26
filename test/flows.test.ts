@@ -312,7 +312,7 @@ test("a step says which record it writes and how, and keeps it through the cache
   assert.deepEqual(roundTrip.flows, set.flows);
 });
 
-test("the head trace is told the records the repo stores, by name", async () => {
+test("a trace is told the records the repo stores, by name", async () => {
   const dir = mkdtempSync(path.join(os.tmpdir(), "backstory-flows-data-"));
   try {
     const git = (...args: string[]) =>
@@ -365,10 +365,33 @@ test("the head trace is told the records the repo stores, by name", async () => 
     );
     assert.deepEqual(listed?.[1].split(", "), names);
 
+    const set = await generateFlows({
+      root: dir,
+      base: bare,
+      head: stored,
+      runner,
+    });
+    prompts.length = 0;
+    await traceHunk({
+      root: dir,
+      base: bare,
+      head: stored,
+      runner,
+      set,
+      hunkId: set.hunks[0].id,
+    });
+    assert.deepEqual(
+      prompts[0]
+        .match(/Records this program stores, by the names to use: (.*)\./)?.[1]
+        .split(", "),
+      names,
+    );
+    prompts.length = 0;
+
     await generateFlows({ root: dir, base, head: bare, runner });
-    assert.doesNotMatch(prompts[1], /Records this program stores/);
+    assert.doesNotMatch(prompts[0], /Records this program stores/);
     assert.match(
-      prompts[1],
+      prompts[0],
       /Name each stored record after the type it is stored as/,
     );
   } finally {

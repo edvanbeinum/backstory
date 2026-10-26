@@ -160,6 +160,11 @@ const STEP_RULES = `For each step give:
 
 Describe only what the code does. Don't judge it, and don't add a step you can't point to on a line.`;
 
+const records = (entities: string[] | null) =>
+  entities && entities.length > 0
+    ? `Records this program stores, by the names to use: ${entities.slice(0, MAX_ENTITIES).join(", ")}.`
+    : "Name each stored record after the type it is stored as.";
+
 export function headPrompt(opts: {
   sha: string;
   subject: string;
@@ -168,10 +173,6 @@ export function headPrompt(opts: {
   /** The records the repo stores at this commit, when Backstory knows them */
   entities: string[] | null;
 }): string {
-  const records =
-    opts.entities && opts.entities.length > 0
-      ? `Records this program stores, by the names to use: ${opts.entities.slice(0, MAX_ENTITIES).join(", ")}.`
-      : "Name each stored record after the type it is stored as.";
   return `You are tracing flows through a code change, for a reviewer. A flow is what the code does when one trigger happens: a user action (open a screen, tap a button, submit a form, call an endpoint) or a system event (app launch, background job, sync). Each flow is a sequence of calls between types.
 
 The repository at commit ${opts.sha} ("${opts.subject}") is in the current directory. Read files with Read, Grep and Glob. Don't modify anything.
@@ -187,7 +188,7 @@ ${opts.hunks}
 
 ${STEP_RULES}
 
-${records}`;
+${records(opts.entities)}`;
 }
 
 export function basePrompt(opts: {
@@ -224,6 +225,8 @@ export function tracePrompt(opts: {
   subject: string;
   hunk: string;
   known: string;
+  /** The records the repo stores at this commit, when Backstory knows them */
+  entities: string[] | null;
 }): string {
   return `You are tracing one flow through a code change, for a reviewer. A flow is what the code does when one trigger happens: a user action or a system event. It is a sequence of calls between types.
 
@@ -237,5 +240,7 @@ Flows already traced for this change (don't repeat them): ${opts.known || "none"
 
 Return exactly one flow: name the trigger that reaches this hunk, and list the steps from the trigger's entry point through the changed code, at most ${MAX_STEPS}. isNew: true if the trigger didn't exist before this change. List the hunk with the flow's id.
 
-${STEP_RULES}`;
+${STEP_RULES}
+
+${records(opts.entities)}`;
 }

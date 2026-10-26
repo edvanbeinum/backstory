@@ -110,9 +110,7 @@ async function prepare(
 async function storedEntities(ctx: Context): Promise<string[] | null> {
   const steer = dataSteer(ctx.model?.properties);
   if (steerError(steer)) return null;
-  const read = await readDataModel(ctx.root, ctx.head, steer).catch(
-    () => null,
-  );
+  const read = await readDataModel(ctx.root, ctx.head, steer).catch(() => null);
   if (read) return [...read.model.entities.keys()];
   // Ask for the head alone: with a base, the read finds nothing unless the
   // base's model is saved too.
@@ -503,6 +501,7 @@ export async function traceHunk(
     );
   if (!hunk) throw new Error(`No hunk ${opts.hunkId} in this change.`);
 
+  const entities = await storedEntities(ctx);
   const head = await withSnapshot(ctx.root, ctx.head, async (dir) => {
     const { output, costUsd } = await runner<HeadOutput>(
       tracePrompt({
@@ -510,6 +509,7 @@ export async function traceHunk(
         subject: ctx.subject,
         hunk: hunkText([hunk]),
         known: opts.set.flows.map((f) => `"${f.name}"`).join(", "),
+        entities,
       }),
       headSchema(1),
       dir,
