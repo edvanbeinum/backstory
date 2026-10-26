@@ -112,9 +112,11 @@ async function storedEntities(ctx: Context): Promise<string[] | null> {
   if (steerError(steer)) return null;
   const read = await readDataModel(ctx.root, ctx.head, steer);
   if (read) return [...read.model.entities.keys()];
+  // Ask for the head alone: with a base, the read finds nothing unless the
+  // base's model is saved too.
   const drafted = await readDrafted({
     root: ctx.root,
-    base: ctx.base,
+    base: null,
     head: ctx.head,
     files: steer.files,
   }).catch(() => null);
