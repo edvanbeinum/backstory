@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { aiProvider, type Runner } from "../ai/provider";
 import { git, gitLine, run } from "../exec";
+import { EMPTY_TREE } from "../git";
 import { isAppCode, readModelAt, type Model } from "../model";
 import { hunkText, mapNewToOld, parseZeroContext, type Hunk } from "./hunks";
 import {
@@ -35,9 +36,6 @@ import type { Flow, FlowParticipant, FlowSet, FlowStep } from "./types";
  * At most two Claude runs; a new feature needs one. No view reads another
  * view's flows.
  */
-
-/** git's empty tree, the base of a repository's first commit. */
-const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf8d69288fbee4904";
 
 interface GenerateOptions {
   root: string;
