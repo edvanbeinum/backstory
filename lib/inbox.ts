@@ -56,8 +56,6 @@ export interface InboxRow {
   repo: string;
   /** The repo's own checkout rather than a sibling worktree. */
   isMain: boolean;
-  /** Commits ahead of upstream, null when the branch has no upstream. */
-  ahead: number | null;
   lastCommitAt: string | null;
   pr: InboxPr | null;
   /** How deep in a stack of PRs, from the base each one targets. */
@@ -171,31 +169,27 @@ async function identify(
 }
 
 interface BranchFacts {
-  ahead: number | null;
   lastCommitAt: string | null;
   tip: string;
 }
 
 /**
- * Ahead-count, last-commit date and tip for every branch in the repo, in one
- * call. Per-worktree this would be a `rev-list` each; here it's free.
+ * Last-commit date and tip for every branch in the repo, in one call rather
+ * than one per worktree.
  */
 async function branchFacts(root: string): Promise<Map<string, BranchFacts>> {
   const out = await git(root, [
     "for-each-ref",
-    "--format=%(refname:short)%09%(upstream:track)%09%(committerdate:iso8601-strict)%09%(objectname)",
+    "--format=%(refname:short)%09%(committerdate:iso8601-strict)%09%(objectname)",
     "refs/heads/",
   ]);
   const facts = new Map<string, BranchFacts>();
   if (!out) return facts;
 
   for (const line of out.split("\n")) {
-    const [name, track, date, tip] = line.split("\t");
+    const [name, date, tip] = line.split("\t");
     if (!name || !tip) continue;
-    // "[ahead 3]", "[ahead 3, behind 1]", "[gone]", or empty.
-    const ahead = track?.match(/ahead (\d+)/);
     facts.set(name, {
-      ahead: ahead ? Number(ahead[1]) : track === "" ? 0 : null,
       lastCommitAt: date || null,
       tip,
     });
@@ -591,7 +585,6 @@ async function buildRepo(
       head: worktree?.head ?? null,
       repo: commonDir,
       isMain: worktree ? worktree.path === root : false,
-      ahead: fact?.ahead ?? null,
       lastCommitAt: fact?.lastCommitAt ?? null,
       pr,
       depth: 0,
