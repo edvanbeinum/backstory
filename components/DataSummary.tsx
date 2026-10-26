@@ -665,11 +665,6 @@ export function DataCards({
   return (
     <div ref={boxRef}>
       <p className="mb-2 text-[13px]">{summary(shown)}</p>
-      {data.storage && (
-        <p className="mb-2 text-[12px] text-[var(--fg-muted)]">
-          {data.storage}
-        </p>
-      )}
       <div className="map-card">
         {width > 0 && (
           <DataGraph
@@ -680,6 +675,11 @@ export function DataCards({
           />
         )}
       </div>
+      {data.storage && (
+        <p className="mt-2 px-1 text-[12px] text-[var(--fg-muted)]">
+          {data.storage}
+        </p>
+      )}
     </div>
   );
 }
