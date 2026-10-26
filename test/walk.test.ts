@@ -6,7 +6,7 @@ import type { ChangeDescription } from "../lib/description/types";
 import type { FlowSet, FlowStep } from "../lib/flows/types";
 import type { MapNode, MapResponse } from "../lib/map";
 import type { DiffFile } from "../lib/types";
-import { buildStops, filesNotSeen, filesSeen } from "../lib/walk";
+import { buildStops, filesNotSeen } from "../lib/walk";
 
 const file = (path: string, oldPath: string | null = path): DiffFile => ({
   oldPath,
@@ -326,19 +326,20 @@ test("a component's stop lists the flow steps its files are on, and none untrace
   assert.deepEqual(chips(null), { Screen: [], Api: [], Store: [] });
 });
 
-test("files seen reaches the total only once every stop with files is seen", () => {
+test("files not seen empties only once every stop with files is seen", () => {
   const stops = all();
-  const total = FILES.length;
   const seen = new Set<string>();
-  assert.equal(filesSeen(stops, seen), 0);
-  assert.equal(filesNotSeen(stops, seen).length, total);
+  assert.equal(filesNotSeen(stops, seen).length, FILES.length);
 
   const withFiles = stops.filter((s) => s.files.length > 0);
   for (const [i, stop] of stops.entries()) {
     seen.add(stop.key);
     const done = withFiles.every((s) => seen.has(s.key));
-    assert.equal(filesSeen(stops, seen) === total, done, `after stop ${i + 1}`);
+    assert.equal(
+      filesNotSeen(stops, seen).length === 0,
+      done,
+      `after stop ${i + 1}`,
+    );
   }
-  assert.equal(filesSeen(stops, seen), total);
   assert.deepEqual(filesNotSeen(stops, seen), []);
 });

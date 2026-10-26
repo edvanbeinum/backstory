@@ -136,13 +136,6 @@ export function buildStops<F extends WalkFile>({
   return stops;
 }
 
-/** How many of the walk's files are in the stops seen so far, by key. */
-export function filesSeen(stops: Stop<WalkFile>[], seen: Set<string>) {
-  return stops
-    .filter((s) => seen.has(s.key))
-    .reduce((n, s) => n + s.files.length, 0);
-}
-
 /** Every file in a stop not seen yet, in the walk's order. */
 export function filesNotSeen<F extends WalkFile>(
   stops: Stop<F>[],
