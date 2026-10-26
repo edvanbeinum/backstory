@@ -278,7 +278,7 @@ interface DataEdge {
 /**
  * The relationships to draw: each belongs-to from the entity holding the
  * link to the one it points at (a polymorphic one to each entity that fills
- * it), each contains from the record to the value it holds, and
+ * it), each contains from the record to the value stored inside it, and
  * many-to-many. A has-many is the other end of a belongs-to, so drawing both
  * would be one link twice.
  */

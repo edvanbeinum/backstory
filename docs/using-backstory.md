@@ -226,7 +226,7 @@ before reading its lines:
   - On a model Claude Code read, one sentence under the graph says where the
     data is stored, what one stored unit is and when it is written. A value
     stored whole inside a record, such as a nested struct, is an arrow from
-    the record to the value's entity, named after the field that holds it, so
+    the record to the value's entity, named after the field it is stored in, so
     two fields of the same type are two arrows.
   - Reads start as a repo and a view open: opening a repo starts the reads of
     main's data model and map, and opening a view on Story starts the view's
