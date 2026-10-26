@@ -1,5 +1,6 @@
 import { parseUnifiedDiff } from "./diff";
 import { git } from "./exec";
+import { FULL_CONTEXT, getRangePatch } from "./git";
 import { highlightFiles } from "./highlight";
 import { langForPath } from "./lang";
 import { showFile } from "./model";
@@ -38,24 +39,12 @@ export async function snippet(opts: {
   // A renamed file needs both its names in the pathspec, or git reads it
   // as one file deleted and another added, every line changed.
   const names = [path, ...(await renamePartner(root, from, head, path))];
-  const { stdout } = await git(
-    root,
-    [
-      "diff",
-      "-U1000000",
-      "-M",
-      "--no-color",
-      "--no-ext-diff",
-      "--no-textconv",
-      from,
-      head,
-      "--",
-      ...names,
-    ],
-    { maxBuffer: 64 * 1024 * 1024 },
-  );
+  const patch = await getRangePatch(root, from, head, {
+    context: FULL_CONTEXT,
+    pathspec: names,
+  });
   let lines: DiffLine[] | null =
-    parseUnifiedDiff(stdout)[0]?.hunks[0]?.lines ?? null;
+    parseUnifiedDiff(patch)[0]?.hunks[0]?.lines ?? null;
   const changed = lines !== null;
   if (!lines) {
     const text = await showFile(
