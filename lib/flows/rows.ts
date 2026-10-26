@@ -65,7 +65,8 @@ function againNote(steps: FlowStep[], step: FlowStep): string | null {
 const sameWords = (a: FlowStep, b: FlowStep) =>
   a.label === b.label &&
   (a.returns ?? "") === (b.returns ?? "") &&
-  (a.repeat ?? "") === (b.repeat ?? "");
+  (a.repeat ?? "") === (b.repeat ?? "") &&
+  JSON.stringify(a.data ?? []) === JSON.stringify(b.data ?? []);
 
 export function flowRows(
   flow: Flow,

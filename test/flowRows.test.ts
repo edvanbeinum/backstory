@@ -87,6 +87,22 @@ test("the same call with new words is a removal and an addition", () => {
   assert.deepEqual(shape(f), ["del 1 - load", "add - 1 load"]);
 });
 
+test("the same call doing something new to the data is a removal and an addition", () => {
+  const f = flow(
+    [
+      step("save", 1, {
+        data: [{ entity: "Session", does: "sets candidate" }],
+      }),
+    ],
+    [
+      step("save", 1, {
+        data: [{ entity: "Session", does: "moves candidate to active" }],
+      }),
+    ],
+  );
+  assert.deepEqual(shape(f), ["del 1 - save", "add - 1 save"]);
+});
+
 test("a step newly on the flow, on unchanged code, is not a +", () => {
   const f = flow([step("init", 1)], [step("init", 1), step("helper", 9)]);
   assert.deepEqual(shape(f), ["ctx 1 1 init", "ctx - 2 helper"]);
