@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 
-import { present, type Presented } from "@/lib/data/present";
+import { isArrow, present, type Presented } from "@/lib/data/present";
 import type {
   Constraint,
   DataResponse,
@@ -292,12 +292,7 @@ function dataEdges(
   for (const e of entities) {
     for (const d of e.relationships) {
       const r = d.item;
-      if (
-        r.kind !== "belongs to" &&
-        r.kind !== "many to many" &&
-        r.kind !== "contains"
-      )
-        continue;
+      if (!isArrow(r)) continue;
       const targets = r.polymorphic
         ? (r.candidates ?? [])
         : r.target

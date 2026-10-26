@@ -26,7 +26,7 @@ const TIMESTAMPS = new Set([
   "updatedAt",
 ]);
 
-const isArrow = (r: Relationship) =>
+export const isArrow = (r: Relationship) =>
   r.kind === "belongs to" || r.kind === "many to many" || r.kind === "contains";
 
 export interface Presented {
