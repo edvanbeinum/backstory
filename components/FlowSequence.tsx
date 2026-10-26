@@ -345,6 +345,7 @@ export function FlowSequence({
               const text = [
                 row.step.label,
                 row.step.returns ? `→ ${row.step.returns}` : "",
+                ...(row.step.data ?? []).map((d) => `${d.entity} · ${d.does}`),
               ].join(" ");
               const fits = start + text.length * 7.3 + 8 <= area;
               const place = fits
