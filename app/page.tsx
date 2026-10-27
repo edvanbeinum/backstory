@@ -756,6 +756,13 @@ export default function Page() {
     setTab("story");
   }, []);
 
+  // Clear the outline on every move through the walk, since each stop mounts
+  // its own map, which would otherwise scroll to the outline and keep it.
+  const goToStop = useCallback((to: number) => {
+    setStop(to);
+    setMapHighlight(null);
+  }, []);
+
   const showYourself = useCallback(() => {
     setFilesFilter({ filter: "yourself", at: Date.now() });
     setTab("files");
@@ -1140,7 +1147,7 @@ export default function Page() {
                               onBadge={selectComment}
                               walk={walk}
                               stop={stop}
-                              onStop={setStop}
+                              onStop={goToStop}
                               onWalk={setWalk}
                               walkNavRef={walkNavRef}
                               renderFiles={(files) => (
