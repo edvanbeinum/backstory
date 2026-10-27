@@ -148,6 +148,7 @@ function ComponentChip({
 function EntityCard({
   p,
   open,
+  highlight,
   onToggle,
   onMap,
   onShowOnMap,
@@ -155,6 +156,8 @@ function EntityCard({
 }: {
   p: Presented;
   open: boolean;
+  /** Outlined, for a record the map points at */
+  highlight: boolean;
   onToggle: () => void;
   onMap: (name: string) => boolean;
   onShowOnMap: (name: string) => void;
@@ -163,9 +166,13 @@ function EntityCard({
 }) {
   const [details, setDetails] = useState(false);
   const e = p.entity;
+  const lit = highlight ? "highlight" : "";
   if (p.state === "same") {
     return (
-      <div className="data-card same compact" title={e.file ?? undefined}>
+      <div
+        className={`data-card same compact ${lit}`}
+        title={e.file ?? undefined}
+      >
         <span className="name">{e.name}</span>
         {e.component && (
           <ComponentChip
@@ -182,7 +189,7 @@ function EntityCard({
     d.rules.length + d.linkFields.length + d.timestamps.length > 0;
   return (
     <div
-      className={`data-card ${p.state} ${open ? "open" : ""}`}
+      className={`data-card ${p.state} ${open ? "open" : ""} ${lit}`}
       title={e.file ?? undefined}
     >
       <div className="data-card-head">
@@ -335,16 +342,32 @@ function dataEdges(
   return out;
 }
 
+/**
+ * An entity to open the graph on, asked for from the map. Each ask is a new
+ * object, compared by identity, so asking for the same entity twice opens and
+ * scrolls to it again.
+ */
+export interface OpenEntity {
+  name: string;
+}
+
+const NO_NAMES = new Set<string>();
+
 function DataGraph({
   shown,
   width,
   notes,
+  highlight,
+  focus,
   onMap,
   onShowOnMap,
 }: {
   shown: Presented[];
   width: number;
   notes?: Map<string, string[]>;
+  highlight: Set<string>;
+  /** The entity to open and scroll to */
+  focus: OpenEntity | null;
   onMap: (name: string) => boolean;
   onShowOnMap: (name: string) => void;
 }) {
@@ -365,17 +388,37 @@ function DataGraph({
       ),
     [shown, changedNames, whole],
   );
-  // Changed entities, and only the neighbours a changed one links to.
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [focused, setFocused] = useState<OpenEntity | null>(null);
+  if (focus !== focused) {
+    setFocused(focus);
+    if (focus) setOpen((cur) => new Set(cur).add(focus.name));
+  }
+  // Draw changed entities, the neighbours a changed one links to, and the
+  // entity the map asked for, which may be an unchanged one a component
+  // declares.
+  const focusName = focused?.name ?? null;
   const nodes = useMemo(() => {
     const linked = new Set(edges.flatMap((e) => [e.source, e.destination]));
     return shown
-      .filter((p) => whole || p.state !== "same" || linked.has(p.entity.name))
+      .filter(
+        (p) =>
+          whole ||
+          p.state !== "same" ||
+          linked.has(p.entity.name) ||
+          p.entity.name === focusName,
+      )
       .map((p) => ({ ...p, id: p.entity.name }));
-  }, [shown, edges, whole]);
-  const [open, setOpen] = useState<Set<string>>(new Set());
+  }, [shown, edges, whole, focusName]);
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const [hover, setHover] = useState<string | null>(null);
   const cards = useRef(new Map<string, HTMLDivElement>());
+  useEffect(() => {
+    if (focused)
+      cards.current
+        .get(focused.name)
+        ?.scrollIntoView({ block: "center", behavior: "smooth" });
+  }, [focused]);
   const { placed, height } = useMemo(
     () =>
       layeredLayout(
@@ -528,6 +571,7 @@ function DataGraph({
           <EntityCard
             p={n}
             open={open.has(n.id)}
+            highlight={highlight.has(n.id) || focused?.name === n.id}
             notes={notes?.get(n.id)}
             onMap={onMap}
             onShowOnMap={onShowOnMap}
@@ -655,6 +699,17 @@ export function useDataDraft(
 
 export type DataDraftApi = ReturnType<typeof useDataDraft>;
 
+const drawsGraph = (data: DataResponse, shown: Presented[]) =>
+  shown.some((p) => p.state !== "same") ||
+  (data.drafted !== null && shown.length > 0);
+
+/** The entities the data graph can open on: none when it draws no graph */
+export function graphEntities(data: DataResponse | null): Set<string> {
+  if (data?.status !== "ok" || !drawsGraph(data, present(data.entities)))
+    return NO_NAMES;
+  return new Set(data.entities.map((e) => e.name));
+}
+
 /**
  * The data model's part of the line under the map. Its parts sit in the
  * line's wrapping row; the graph opens on a row of its own beneath it,
@@ -665,6 +720,8 @@ export function DataSummary({
   notes,
   repo,
   rev,
+  highlight = NO_NAMES,
+  open: openOn = null,
   onMap,
   onShowOnMap,
 }: {
@@ -673,6 +730,10 @@ export function DataSummary({
   notes?: Map<string, string[]>;
   repo: string;
   rev: string;
+  /** Entities to outline, for the records of the box the pointer is on */
+  highlight?: Set<string>;
+  /** An entity to open the graph on and scroll to, from a record clicked on the map */
+  open?: OpenEntity | null;
   /** Whether the map draws a component, so its chip can outline it */
   onMap: (name: string) => boolean;
   /** An entity's component was clicked: outline it on the map */
@@ -687,6 +748,11 @@ export function DataSummary({
   const view = viewKey({ repo, ref, rev });
   const [toggled, setToggled] = useState<{ view: string; open: boolean }>();
   const open = toggled?.view === view ? toggled.open : changed.length > 0;
+  const [asked, setAsked] = useState<OpenEntity | null>(null);
+  if (openOn && openOn !== asked) {
+    setAsked(openOn);
+    if (!open) setToggled({ view, open: true });
+  }
   const boxRef = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(0);
 
@@ -732,7 +798,7 @@ export function DataSummary({
     </>
   );
   // A drafted view with no change still has its whole model to look at.
-  if (changed.length === 0 && !(data.drafted && shown.length > 0)) {
+  if (!drawsGraph(data, shown)) {
     return noBase ? (
       <span className="part inline-flex flex-wrap items-center gap-1.5">
         {noBase}
@@ -770,6 +836,8 @@ export function DataSummary({
                 shown={shown}
                 width={width - 2}
                 notes={notes}
+                highlight={highlight}
+                focus={openOn}
                 onMap={onMap}
                 onShowOnMap={onShowOnMap}
               />

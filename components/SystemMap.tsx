@@ -9,6 +9,7 @@ import {
   useState,
 } from "react";
 
+import type { RecordUse } from "@/lib/flows/rows";
 import type { MapEdge, MapNode, MapResponse } from "@/lib/map";
 import { viewKey, viewParams } from "@/lib/url";
 import { edgePath, nestedLayout } from "./graph";
@@ -26,6 +27,8 @@ const MIN_NODE_W = 190;
 const MAX_NODE_W = 280;
 /** Files named in a box before the rest fold into "+N more". */
 const MAX_FILES = 4;
+/** Records named in a box before the rest fold into "+N more". */
+const MAX_RECORDS = 4;
 const COL_GAP = 18;
 const PAD = 14;
 /** A container's or system's box: the header above its children, and the space around them. */
@@ -38,10 +41,11 @@ const GROUP_TYPE: Record<string, string> = {
 };
 
 /**
- * A box's height before it's measured: name, the description wrapped, and
- * one line per file named. The real height replaces it after the first paint.
+ * A box's height before it's measured: name, the description wrapped, one
+ * line per file named, and a line of records. The real height replaces it
+ * after the first paint.
  */
-function estimateHeight(n: MapNode, w: number) {
+function estimateHeight(n: MapNode, w: number, records: boolean) {
   const inner = w - 24;
   const descLines = n.description
     ? Math.ceil((n.description.length * 6.4) / inner)
@@ -52,20 +56,29 @@ function estimateHeight(n: MapNode, w: number) {
       inner,
   );
   const files = Math.min(n.files.length, MAX_FILES + 1);
-  return 16 + nameLines * 18 + descLines * 16 + (files ? 8 + files * 18 : 0);
+  return (
+    16 +
+    nameLines * 18 +
+    descLines * 16 +
+    (files ? 8 + files * 18 : 0) +
+    (records ? 26 : 0)
+  );
 }
 
 function layout(
   nodes: MapNode[],
   edges: MapEdge[],
   width: number,
-  heights: Map<string, number> = new Map(),
+  heights: Map<string, number>,
+  records: Map<string, RecordUse[]>,
 ) {
   return nestedLayout(
     nodes,
     edges,
     width,
-    (n, w) => heights.get(n.id) ?? estimateHeight(n, w),
+    (n, w) =>
+      heights.get(n.id) ??
+      estimateHeight(n, w, (records.get(n.name)?.length ?? 0) > 0),
     {
       minW: MIN_NODE_W,
       maxW: MAX_NODE_W,
@@ -92,25 +105,56 @@ export function jumpToFile(path: string, root: ParentNode = document): boolean {
 
 const fileName = (path: string) => path.split("/").pop() ?? path;
 
+/**
+ * Splits a box's list into the items it names and the ones folded into
+ * "+N more". Names one past `max` too, since "+1 more" takes a line anyway.
+ */
+function fold<T>(list: T[], max: number): [T[], T[]] {
+  const at = list.length === max + 1 ? max + 1 : max;
+  return [list.slice(0, at), list.slice(at)];
+}
+
+function recordTitle(r: RecordUse) {
+  const parts = r.declared ? ["Declared here"] : [];
+  if (r.does.length > 0) parts.push(r.does.join(", "));
+  return `${r.entity}\n${parts.join(" · ")}`;
+}
+
 function MapCanvas({
   nodes,
   edges,
   width,
   highlight,
+  records,
+  openable,
   onJump,
+  onShowRecord,
+  onHoverNode,
 }: {
   nodes: MapNode[];
   edges: MapEdge[];
   width: number;
   /** A component's name, outlined as hovering it would */
   highlight: string | null;
+  /** The records each component uses, by its name */
+  records: Map<string, RecordUse[]>;
+  /** The records the data model can open on when clicked */
+  openable: Set<string>;
   onJump: (path: string) => void;
+  /** A record was clicked, to show it in the data model */
+  onShowRecord: (entity: string) => void;
+  /** The pointer moved onto a box, by its component's name, or off it */
+  onHoverNode: (name: string | null) => void;
 }) {
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const { placed, height } = useMemo(
-    () => layout(nodes, edges, width, heights),
-    [nodes, edges, width, heights],
+    () => layout(nodes, edges, width, heights, records),
+    [nodes, edges, width, heights, records],
   );
+  const [hoverRecord, setHoverRecord] = useState<string | null>(null);
+  const usesHovered = (name: string) =>
+    hoverRecord !== null &&
+    (records.get(name) ?? []).some((r) => r.entity === hoverRecord);
   const boxes = useRef(new Map<string, HTMLDivElement>());
 
   // Boxes size to what they say; lay out again once their real heights are
@@ -292,12 +336,12 @@ function MapCanvas({
 
       {[...placed.values()].map((n) => {
         if (n.group) return null;
-        // "+1 more" takes a line anyway: name the file instead.
-        const shown = n.fileStats.slice(
-          0,
-          n.fileStats.length === MAX_FILES + 1 ? MAX_FILES + 1 : MAX_FILES,
+        const [shown, folded] = fold(n.fileStats, MAX_FILES);
+        const more = folded.length;
+        const [usesShown, usesMore] = fold(
+          records.get(n.name) ?? [],
+          MAX_RECORDS,
         );
-        const more = n.fileStats.length - shown.length;
         return (
           <div
             key={n.id}
@@ -305,8 +349,10 @@ function MapCanvas({
               if (el) boxes.current.set(n.id, el);
               else boxes.current.delete(n.id);
             }}
-            className={`map-node ${n.state} ${n.files.length ? "jumps" : ""} ${highlight === n.name ? "highlight" : ""}`}
+            className={`map-node ${n.state} ${n.files.length ? "jumps" : ""} ${highlight === n.name ? "highlight" : ""} ${usesHovered(n.name) ? "uses" : ""}`}
             style={{ left: n.x, top: n.y, width: n.w }}
+            onMouseEnter={() => onHoverNode(n.name)}
+            onMouseLeave={() => onHoverNode(null)}
             onClick={() => {
               if (n.files[0]) onJump(n.files[0]);
             }}
@@ -362,6 +408,48 @@ function MapCanvas({
                     >
                       +{more} more {more === 1 ? "file" : "files"}
                     </button>
+                  </li>
+                )}
+              </ul>
+            )}
+            {usesShown.length > 0 && (
+              <ul className="map-records">
+                {usesShown.map((r) => {
+                  const chip = {
+                    className: `map-record mono ${hoverRecord === r.entity ? "uses" : ""}`,
+                    onMouseEnter: () => setHoverRecord(r.entity),
+                    onMouseLeave: () => setHoverRecord(null),
+                  };
+                  return (
+                    <li key={r.entity}>
+                      {openable.has(r.entity) ? (
+                        <button
+                          type="button"
+                          {...chip}
+                          title={`${recordTitle(r)}\nShow it in the data model`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onShowRecord(r.entity);
+                          }}
+                        >
+                          {r.entity}
+                        </button>
+                      ) : (
+                        <span {...chip} title={recordTitle(r)}>
+                          {r.entity}
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
+                {usesMore.length > 0 && (
+                  <li>
+                    <span
+                      className="map-record more"
+                      title={usesMore.map(recordTitle).join("\n\n")}
+                    >
+                      +{usesMore.length} more
+                    </span>
                   </li>
                 )}
               </ul>
@@ -644,8 +732,8 @@ const EDGE_KEY = [
   ["removed", "text-[var(--danger)]", "- -", "removed arrow"],
 ] as const;
 
-/** Names only the states this map draws. */
-function MapKey({ map }: { map: MapResponse }) {
+/** Names only the states this map draws, and records when a box lists any. */
+function MapKey({ map, records }: { map: MapResponse; records: boolean }) {
   // Skip unchanged groups, whose boundary is drawn plain rather than as an
   // Unchanged box.
   const nodes = new Set<string>(
@@ -668,6 +756,12 @@ function MapKey({ map }: { map: MapResponse }) {
             <span className={tone}>{mark}</span> {word}
           </span>
         ),
+      )}
+      {records && (
+        <span>
+          <i className="record" />
+          record it uses
+        </span>
       )}
     </div>
   );
@@ -696,7 +790,11 @@ export function SystemMap({
   repo,
   rev,
   highlight = null,
+  records,
+  openable,
   onOpenFile,
+  onShowRecord,
+  onHoverNode,
   onSetAuto,
   children,
 }: {
@@ -708,6 +806,14 @@ export function SystemMap({
   rev: string;
   /** A component to outline, asked for from Files changed */
   highlight?: { name: string; at: number } | null;
+  /** The records each component uses, by its name, from `recordsOnComponents` */
+  records: Map<string, RecordUse[]>;
+  /** The records the data model can open on when clicked */
+  openable: Set<string>;
+  /** A record was clicked, to show it in the data model */
+  onShowRecord: (entity: string) => void;
+  /** The pointer moved onto a box, by its component's name, or off it */
+  onHoverNode: (name: string | null) => void;
   /** Show a file in Files changed */
   onOpenFile: (path: string) => void;
   /** The rest of the line under the map: the data model's summary */
@@ -787,7 +893,11 @@ export function SystemMap({
                   edges={map.whole.edges}
                   width={width - 2}
                   highlight={highlight?.name ?? null}
+                  records={records}
+                  openable={openable}
                   onJump={onOpenFile}
+                  onShowRecord={onShowRecord}
+                  onHoverNode={onHoverNode}
                 />
               )}
             </div>
@@ -813,11 +923,20 @@ export function SystemMap({
             edges={map.edges}
             width={width - 2}
             highlight={highlight?.name ?? null}
+            records={records}
+            openable={openable}
             onJump={onOpenFile}
+            onShowRecord={onShowRecord}
+            onHoverNode={onHoverNode}
           />
         )}
       </div>
-      <MapKey map={map} />
+      <MapKey
+        map={map}
+        records={map.nodes.some(
+          (n) => !n.group && (records.get(n.name)?.length ?? 0) > 0,
+        )}
+      />
       <div className="story-line">
         {parts.map((p, i) => (
           <span key={i} className="part">

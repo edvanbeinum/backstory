@@ -6,10 +6,12 @@ import {
   fileFlows,
   flowRows,
   groupParticipants,
+  recordsOnComponents,
   shortLabels,
   stepsAt,
   summarise,
 } from "../lib/flows/rows";
+import type { EntityDiff } from "../lib/data/types";
 import type { Flow, FlowHunk, FlowSet, FlowStep } from "../lib/flows/types";
 
 const step = (
@@ -390,4 +392,150 @@ test("fileFlows names each file's flows, or says to read it yourself", () => {
   assert.deepEqual(out.get("a.ts"), [2]);
   assert.equal(out.get("b.ts"), "yourself");
   assert.equal(out.has("t.test.ts"), false, "a test is neither");
+});
+
+const tags = (...pairs: [string, string][]) =>
+  pairs.map(([entity, does]) => ({ entity, does }));
+
+const entity = (
+  name: string,
+  component: string | null,
+  state: EntityDiff["state"] = "same",
+): EntityDiff => ({
+  name,
+  state,
+  file: null,
+  component,
+  fields: [],
+  relationships: [],
+  constraints: [],
+});
+
+/** Lanes in two components: the screen calls the client, and both touch the stored record. */
+const signIn = (after: FlowStep[]): Flow => ({
+  ...flow(null, after),
+  participants: [
+    {
+      name: "SignInView",
+      label: "SignInView",
+      external: false,
+      component: "Sign-in screen",
+    },
+    {
+      name: "APIClient",
+      label: "APIClient",
+      external: false,
+      component: "API client",
+    },
+    { name: "URLSession", label: "URLSession", external: true },
+  ],
+});
+
+test("records on components: a step's record goes to its caller's component, a record two components use is on both, and what the code does is listed in order", () => {
+  const set = flowSet([
+    flow(null, [step("other", 1)]),
+    signIn([
+      step("read", 1, {
+        from: "SignInView",
+        to: "APIClient",
+        data: tags(["NativeStoredAuthentication", "reads candidate"]),
+      }),
+      step("set", 2, {
+        from: "APIClient",
+        to: "URLSession",
+        data: tags(
+          ["NativeStoredAuthentication", "sets candidate"],
+          ["Credential", "saves it"],
+        ),
+      }),
+      step("move", 3, {
+        from: "APIClient",
+        to: "APIClient",
+        data: tags(["NativeStoredAuthentication", "moves candidate to active"]),
+      }),
+      step("again", 4, {
+        from: "APIClient",
+        to: "APIClient",
+        data: tags(["NativeStoredAuthentication", "sets candidate"]),
+      }),
+    ]),
+  ]);
+  const out = recordsOnComponents(set, {}, null);
+  assert.deepEqual(out.get("Sign-in screen"), [
+    {
+      entity: "NativeStoredAuthentication",
+      declared: false,
+      does: ["reads candidate"],
+    },
+  ]);
+  assert.deepEqual(out.get("API client"), [
+    {
+      entity: "NativeStoredAuthentication",
+      declared: false,
+      does: ["sets candidate", "moves candidate to active"],
+    },
+    {
+      entity: "Credential",
+      declared: false,
+      does: ["saves it"],
+    },
+  ]);
+});
+
+test("a step whose participant has no component falls back to its file's component, and one with neither is on no component", () => {
+  const set = flowSet([
+    flow(null, [
+      step("placed", 1, {
+        file: "store.swift",
+        data: tags(["Credential", "saves it"]),
+      }),
+      step("loose", 2, {
+        file: "elsewhere.swift",
+        data: tags(["Challenge", "clears it"]),
+      }),
+    ]),
+  ]);
+  const out = recordsOnComponents(set, { "store.swift": "Store" }, null);
+  assert.deepEqual([...out.keys()], ["Store"]);
+  assert.deepEqual(
+    out.get("Store")?.map((r) => r.entity),
+    ["Credential"],
+  );
+});
+
+test("an entity the data model declares in a component is listed there as declared, with or without steps", () => {
+  const set = flowSet([
+    signIn([
+      step("save", 1, {
+        from: "APIClient",
+        to: "URLSession",
+        data: tags(["Session", "saves it"], ["Credential", "saves it"]),
+      }),
+    ]),
+  ]);
+  const out = recordsOnComponents(set, {}, [
+    entity("Credential", "API client"),
+    entity("Token", "API client"),
+    entity("Gone", "API client", "removed"),
+    entity("Loose", null),
+  ]);
+  assert.deepEqual(out.get("API client"), [
+    {
+      entity: "Credential",
+      declared: true,
+      does: ["saves it"],
+    },
+    { entity: "Token", declared: true, does: [] },
+    { entity: "Session", declared: false, does: ["saves it"] },
+  ]);
+});
+
+test("flows traced before data tags existed, no flows, or no data model give no records", () => {
+  const untagged = flowSet([signIn([step("save", 1, { from: "APIClient" })])]);
+  assert.equal(
+    recordsOnComponents(untagged, { "a.ts": "Store" }, null).size,
+    0,
+  );
+  assert.equal(recordsOnComponents(null, { "a.ts": "Store" }, null).size, 0);
+  assert.equal(recordsOnComponents(untagged, {}, []).size, 0);
 });

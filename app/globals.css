@@ -950,6 +950,37 @@ tr.line-del .diff-gutter {
 .map-files .more {
   color: var(--fg-muted);
 }
+/* The records a component uses, under its files. */
+.map-records {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 6px 0 0;
+  padding: 5px 0 0;
+  border-top: 1px solid var(--border-muted);
+}
+.map-record {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--canvas-subtle);
+  font-size: 10.5px;
+  line-height: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--fg-muted);
+}
+button.map-record:hover,
+.map-record.uses {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.map-record.more {
+  border-style: dashed;
+}
 .map-node.touched {
   border: 1.5px solid var(--fg-muted);
   padding: 7.5px 10.5px 6.5px;
@@ -1080,6 +1111,13 @@ tr.line-del .diff-gutter {
 }
 .map-key .box.neighbour {
   border-color: var(--border);
+  background: var(--canvas-subtle);
+}
+.map-key .record {
+  width: 18px;
+  height: 10px;
+  border: 1px solid var(--border);
+  border-radius: 3px;
   background: var(--canvas-subtle);
 }
 
@@ -1486,10 +1524,23 @@ tr.step-code-target td.diff-num {
 .story-map .map-key {
   margin-top: 8px;
 }
+/* A box that uses the record the pointer is on. It comes before highlight so
+   a box that is both keeps the stronger ring. */
+.map-node.uses {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+}
 .map-node.highlight,
-.map-group.highlight {
+.map-group.highlight,
+.data-card.highlight {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+/* Keep an added card's green bar under the outline. */
+.data-card.added.highlight {
+  box-shadow:
+    inset 3px 0 0 var(--success),
+    0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 /* The line under the map: its parts, a dot between each, wrapping; the data
