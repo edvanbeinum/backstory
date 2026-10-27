@@ -337,16 +337,20 @@ export function FlowSequence({
                   : row.kind === "del"
                     ? "removed"
                     : "";
+              const tags = [
+                kindWord,
+                row.step.repeat ? `× ${row.step.repeat}` : "",
+                row.again ?? "",
+                ...(row.step.data ?? []).map((d) => `${d.entity} · ${d.does}`),
+              ].filter(Boolean);
               const text = [
                 row.step.label,
-                kindWord,
                 row.step.returns ? `→ ${row.step.returns}` : "",
-                ...(row.step.data ?? []).map((d) => `${d.entity} · ${d.does}`),
+                ...tags,
               ].join(" ");
               // Count each badge's 12px of padding and the row's 8px gap too,
               // so three badges don't run off the card.
-              const tagWidth =
-                ((row.step.data?.length ?? 0) + (kindWord ? 1 : 0)) * 20;
+              const tagWidth = tags.length * 20;
               const fits = start + text.length * 7.3 + tagWidth + 8 <= area;
               const place = fits
                 ? { left: start, maxWidth: `calc(100% - ${start + 8}px)` }
