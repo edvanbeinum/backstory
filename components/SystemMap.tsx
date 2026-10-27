@@ -129,6 +129,7 @@ function MapCanvas({
   width,
   highlight,
   records,
+  openable,
   onJump,
   onShowRecord,
   onHoverNode,
@@ -140,6 +141,8 @@ function MapCanvas({
   highlight: string | null;
   /** The records each component uses, by its name */
   records: Map<string, RecordUse[]>;
+  /** The records the data model can open on when clicked */
+  openable: Set<string>;
   onJump: (path: string) => void;
   /** A record was clicked, to show it in the data model */
   onShowRecord: (entity: string) => void;
@@ -415,21 +418,30 @@ function MapCanvas({
             {usesShown.length > 0 && (
               <ul className="map-records">
                 {usesShown.map((r) => {
+                  const chip = {
+                    className: `map-record mono ${hoverRecord === r.entity ? "uses" : ""}`,
+                    onMouseEnter: () => setHoverRecord(r.entity),
+                    onMouseLeave: () => setHoverRecord(null),
+                  };
                   return (
                     <li key={r.entity}>
-                      <button
-                        type="button"
-                        className={`map-record mono ${hoverRecord === r.entity ? "uses" : ""}`}
-                        title={`${recordTitle(r)}\nShow it in the data model`}
-                        onMouseEnter={() => setHoverRecord(r.entity)}
-                        onMouseLeave={() => setHoverRecord(null)}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onShowRecord(r.entity);
-                        }}
-                      >
-                        {r.entity}
-                      </button>
+                      {openable.has(r.entity) ? (
+                        <button
+                          type="button"
+                          {...chip}
+                          title={`${recordTitle(r)}\nShow it in the data model`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onShowRecord(r.entity);
+                          }}
+                        >
+                          {r.entity}
+                        </button>
+                      ) : (
+                        <span {...chip} title={recordTitle(r)}>
+                          {r.entity}
+                        </span>
+                      )}
                     </li>
                   );
                 })}
@@ -782,6 +794,7 @@ export function SystemMap({
   rev,
   highlight = null,
   records,
+  openable,
   onOpenFile,
   onShowRecord,
   onHoverNode,
@@ -798,6 +811,8 @@ export function SystemMap({
   highlight?: { name: string; at: number } | null;
   /** The records each component uses, by its name, from `recordsOnComponents` */
   records: Map<string, RecordUse[]>;
+  /** The records the data model can open on when clicked */
+  openable: Set<string>;
   /** A record was clicked, to show it in the data model */
   onShowRecord: (entity: string) => void;
   /** The pointer moved onto a box, by its component's name, or off it */
@@ -882,6 +897,7 @@ export function SystemMap({
                   width={width - 2}
                   highlight={highlight?.name ?? null}
                   records={records}
+                  openable={openable}
                   onJump={onOpenFile}
                   onShowRecord={onShowRecord}
                   onHoverNode={onHoverNode}
@@ -911,6 +927,7 @@ export function SystemMap({
             width={width - 2}
             highlight={highlight?.name ?? null}
             records={records}
+            openable={openable}
             onJump={onOpenFile}
             onShowRecord={onShowRecord}
             onHoverNode={onHoverNode}

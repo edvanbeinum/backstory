@@ -699,6 +699,17 @@ export function useDataDraft(
 
 export type DataDraftApi = ReturnType<typeof useDataDraft>;
 
+const drawsGraph = (data: DataResponse, shown: Presented[]) =>
+  shown.some((p) => p.state !== "same") ||
+  (data.drafted !== null && shown.length > 0);
+
+/** The entities the data graph can open on: none when it draws no graph */
+export function graphEntities(data: DataResponse | null): Set<string> {
+  if (data?.status !== "ok" || !drawsGraph(data, present(data.entities)))
+    return NO_NAMES;
+  return new Set(data.entities.map((e) => e.name));
+}
+
 /**
  * The data model's part of the line under the map. Its parts sit in the
  * line's wrapping row; the graph opens on a row of its own beneath it,
@@ -787,7 +798,7 @@ export function DataSummary({
     </>
   );
   // A drafted view with no change still has its whole model to look at.
-  if (changed.length === 0 && !(data.drafted && shown.length > 0)) {
+  if (!drawsGraph(data, shown)) {
     return noBase ? (
       <span className="part inline-flex flex-wrap items-center gap-1.5">
         {noBase}

@@ -11,7 +11,12 @@ import type { MapResponse } from "@/lib/map";
 import type { DiffResponse } from "@/lib/types";
 import { viewKey } from "@/lib/url";
 import { ChangeDescription, useDescription } from "./ChangeDescription";
-import { DataSummary, useDataDraft, type OpenEntity } from "./DataSummary";
+import {
+  DataSummary,
+  graphEntities,
+  useDataDraft,
+  type OpenEntity,
+} from "./DataSummary";
 import type { StoryTarget } from "./FlowCard";
 import { FlowCoverage } from "./FlowCoverage";
 import { Flows } from "./Flows";
@@ -164,6 +169,10 @@ export function Story({
       ),
     [records, hoverName],
   );
+  const openable = useMemo(
+    () => graphEntities(dataDraft.data),
+    [dataDraft.data],
+  );
   const showRecord = useCallback(
     (name: string) => setRecordOpen({ view, entity: { name } }),
     [view],
@@ -194,6 +203,7 @@ export function Story({
           rev={rev}
           highlight={mapHighlight}
           records={records}
+          openable={openable}
           onOpenFile={onOpenFile}
           onShowRecord={showRecord}
           onHoverNode={(name) => setHoverBox(name ? { view, name } : null)}
