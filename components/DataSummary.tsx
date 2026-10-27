@@ -305,7 +305,7 @@ function dataEdges(
   for (const e of entities) {
     for (const d of e.relationships) {
       const r = d.item;
-      if (!isArrow(r)) continue;
+      if (!isArrow(r, e.name, shown)) continue;
       const targets = r.polymorphic
         ? (r.candidates ?? [])
         : r.target

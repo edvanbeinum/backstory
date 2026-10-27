@@ -1069,6 +1069,29 @@ test("a contained value is said by its arrow, not listed again", async () => {
   assert.equal(server.summary, "+2 relationships");
   assert.deepEqual(server.relationships, []);
 
+  const unshown: DataModel = {
+    source: "drafted",
+    entities: new Map([
+      [
+        "Server",
+        {
+          ...entity("Server", ["url"]),
+          relationships: [
+            credential("active"),
+            { ...credential("mirror"), target: "Server" },
+          ],
+        },
+      ],
+    ]),
+  };
+  const listed = present(
+    diffModels({ source: "drafted", entities: new Map() }, unshown),
+  ).find((p) => p.entity.name === "Server")!;
+  assert.deepEqual(
+    listed.relationships.map((d) => d.item.name),
+    ["active", "mirror"],
+  );
+
   const schema = headSchema() as unknown as {
     properties: {
       entities: {
