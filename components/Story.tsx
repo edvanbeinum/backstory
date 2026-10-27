@@ -1,17 +1,17 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { filePaths } from "@/lib/anchor";
 import { WORKING_REV } from "@/lib/constants";
 import type { DataResponse } from "@/lib/data/types";
 import { isOnMap } from "@/lib/description/types";
-import type { FlowRow } from "@/lib/flows/rows";
+import { recordsOnComponents, type FlowRow } from "@/lib/flows/rows";
 import type { MapResponse } from "@/lib/map";
 import type { DiffResponse } from "@/lib/types";
 import { viewKey } from "@/lib/url";
 import { ChangeDescription, useDescription } from "./ChangeDescription";
-import { DataSummary, useDataDraft } from "./DataSummary";
+import { DataSummary, useDataDraft, type OpenEntity } from "./DataSummary";
 import type { StoryTarget } from "./FlowCard";
 import { FlowCoverage } from "./FlowCoverage";
 import { Flows } from "./Flows";
@@ -138,6 +138,37 @@ export function Story({
   };
   const view = viewKey({ repo, ref, rev });
 
+  const records = useMemo(
+    () =>
+      recordsOnComponents(
+        set,
+        map?.status === "ok" ? map.fileComponents : {},
+        data?.status === "ok" ? data.entities : null,
+      ),
+    [set, map, data],
+  );
+  const [recordOpen, setRecordOpen] = useState<{
+    view: string;
+    entity: OpenEntity;
+  } | null>(null);
+  const openRecord = recordOpen?.view === view ? recordOpen.entity : null;
+  const [hoverBox, setHoverBox] = useState<{
+    view: string;
+    name: string;
+  } | null>(null);
+  const hoverName = hoverBox?.view === view ? hoverBox.name : null;
+  const hoverRecords = useMemo(
+    () =>
+      new Set(
+        (hoverName ? (records.get(hoverName) ?? []) : []).map((r) => r.entity),
+      ),
+    [records, hoverName],
+  );
+  const showRecord = useCallback(
+    (name: string) => setRecordOpen({ view, entity: { name, at: Date.now() } }),
+    [view],
+  );
+
   return (
     <div className="space-y-6 pt-1">
       <div className="flex flex-wrap items-start gap-3">
@@ -162,13 +193,18 @@ export function Story({
           repo={repo}
           rev={rev}
           highlight={mapHighlight}
+          records={records}
           onOpenFile={onOpenFile}
+          onShowRecord={showRecord}
+          onHoverNode={(name) => setHoverBox(name ? { view, name } : null)}
         >
           <DataSummary
             draft={dataDraft}
             notes={entityNotes}
             repo={repo}
             rev={rev}
+            highlight={hoverRecords}
+            open={openRecord}
             onMap={(name) => isOnMap(name, map)}
             onShowOnMap={onShowOnMap}
           />

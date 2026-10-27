@@ -14,7 +14,7 @@ terms:
       - sequence, for the data
       - trace as a noun (trace stays the verb, as in "Trace this change")
   - name: data tag
-    means: "One stored record a flow step reads or writes, by the data model's name for it, and what the step does to it in a few words (`StepData` in `lib/flows/types.ts`, the `backstory.data` step property in the flow cache). At most three on a step, drawn as badges after its label, in place of the changed-field chips."
+    means: "One stored record a flow step reads or writes, by the data model's name for it, and what the step does to it in a few words (`StepData` in `lib/flows/types.ts`, the `backstory.data` step property in the flow cache). At most three on a step, drawn as badges after its label, in place of the changed-field chips. The map gathers them by component: each box lists the records its after-side steps tag and the ones the data model declares in it (`recordsOnComponents` in `lib/flows/rows.ts`)."
     avoid:
       - chip, for the tag
   - name: participant
