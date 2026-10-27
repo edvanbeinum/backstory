@@ -338,7 +338,7 @@ end
   assert.deepEqual(by("Zoom::Recording").details.rules, []);
   assert.deepEqual(by("Zoom::Recording").relationships, []);
   // Item: one relationship; its two columns and its rule are details.
-  assert.equal(by("Item").summary, "+1 relationship");
+  assert.equal(by("Item").summary, "1 relationship added");
   assert.deepEqual(by("Item").fields, []);
   assert.equal(by("Item").details.linkFields.length, 2);
   // Space only gained the far end of Zoom::Recording's link.
@@ -520,7 +520,30 @@ end
     (p) => p.entity.name === "Item",
   )!;
   assert.equal(constrained.state, "changed");
-  assert.equal(constrained.summary, "+1 rule");
+  assert.equal(constrained.summary, "1 rule added");
+});
+
+test("present: an entity's line says its changes in words", async () => {
+  const { present } = await import("../lib/data/present");
+  const schema = (columns: string) => `
+ActiveRecord::Schema[8.1].define(version: 1) do
+  create_table "items", force: :cascade do |t|
+    ${columns}
+  end
+end
+`;
+  const models = new Map([
+    ["app/models/item.rb", `class Item < ApplicationRecord\nend\n`],
+  ]);
+  const before = readRails({ schema: schema(`t.string "title"`), models });
+  const after = readRails({
+    schema: schema(`t.text "title"\n    t.string "body"`),
+    models,
+  });
+  const item = present(diffModels(before, after)).find(
+    (p) => p.entity.name === "Item",
+  )!;
+  assert.equal(item.summary, "1 field added, 1 changed");
 });
 
 test("a unique rule's column order is no change; a foreign key's still is", () => {
@@ -1066,7 +1089,7 @@ test("a contained value is said by its arrow, not listed again", async () => {
   const server = present(diffModels(before, after)).find(
     (p) => p.entity.name === "Server",
   )!;
-  assert.equal(server.summary, "+2 relationships");
+  assert.equal(server.summary, "2 relationships added");
   assert.deepEqual(server.relationships, []);
 
   const unshown: DataModel = {

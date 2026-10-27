@@ -57,13 +57,15 @@ export function ReadFootnote({
   if (description && auto !== null)
     parts.push(
       <button type="button" className={LINK} onClick={() => setAuto(!auto)}>
-        {auto ? "Turn off" : "Read automatically"}
+        {auto
+          ? "Stop reading this repo automatically"
+          : "Read this repo automatically"}
       </button>,
     );
   if (switchError)
     parts.push(
       <span className="text-[var(--attention)]" title={switchError}>
-        {auto ? "Couldn't turn off" : "Couldn't turn on"}: {switchError}
+        Couldn&apos;t change it: {switchError}
       </span>,
     );
   if (drawnMap)

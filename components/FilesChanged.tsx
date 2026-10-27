@@ -91,7 +91,7 @@ export function FilesChanged({
   flowSet: FlowSet | null;
   jump: FilesJump | null;
   onJumped: () => void;
-  /** A filter to open with, from the story's "read these yourself" */
+  /** A filter to open with, from the story's "3 changes no flow reaches" */
   filterAsk?: { filter: "yourself"; at: number } | null;
   /** Outline a component on the story's map */
   onShowOnMap: (component: string) => void;

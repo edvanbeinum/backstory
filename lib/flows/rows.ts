@@ -152,22 +152,36 @@ export function flowRows(
 export interface FlowSummary {
   added: number;
   removed: number;
-  beforeSteps: number | null;
-  afterSteps: number;
   /** The change altered this flow (or it's new) */
   changed: boolean;
+  /** "New flow", "1 step added, 2 removed" or "Same steps" */
+  text: string;
 }
 
 export function summarise(flow: Flow, hunks: FlowHunk[]): FlowSummary {
   const rows = flowRows(flow, "diff", hunks);
   const added = rows.filter((r) => r.kind === "add").length;
   const removed = rows.filter((r) => r.kind === "del").length;
+  // The noun goes with the first count: "1 step added, 2 removed".
+  const parts = (
+    [
+      [added, "added"],
+      [removed, "removed"],
+    ] as const
+  )
+    .filter(([n]) => n > 0)
+    .map(([n, word], i) =>
+      i === 0 ? `${n} ${n === 1 ? "step" : "steps"} ${word}` : `${n} ${word}`,
+    );
   return {
     added,
     removed,
-    beforeSteps: flow.before?.length ?? null,
-    afterSteps: flow.after.length,
     changed: flow.isNew || added > 0 || removed > 0,
+    text: flow.isNew
+      ? "New flow"
+      : parts.length > 0
+        ? parts.join(", ")
+        : "Same steps",
   };
 }
 

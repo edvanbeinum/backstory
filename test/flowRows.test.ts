@@ -69,13 +69,34 @@ test("a changed flow reads like a line diff", () => {
     "add - 2 fetchOnce",
     "ctx 4 3 render",
   ]);
-  assert.deepEqual(summarise(f, hunks), {
+});
+
+test("a flow's summary says its steps in words, with no arithmetic", () => {
+  const changed = flow(
+    [step("init", 1), step("fetch1", 3), step("fetch2", 4), step("render", 5)],
+    [step("init", 1), step("fetchOnce", 3), step("render", 4)],
+  );
+  assert.deepEqual(summarise(changed, hunks), {
     added: 1,
     removed: 2,
-    beforeSteps: 4,
-    afterSteps: 3,
     changed: true,
+    text: "1 step added, 2 removed",
   });
+  assert.equal(
+    summarise(flow(null, [step("init", 1)]), hunks).text,
+    "New flow",
+  );
+  assert.equal(
+    summarise(flow([step("init", 1)], [step("init", 1)]), hunks).text,
+    "Same steps",
+  );
+  assert.equal(
+    summarise(
+      flow([step("init", 1)], [step("init", 1), step("fresh", 3)]),
+      hunks,
+    ).text,
+    "1 step added",
+  );
 });
 
 test("the same call with new words is a removal and an addition", () => {

@@ -183,10 +183,6 @@ export function Story({
               <FlowCoverage
                 set={set}
                 files={diff.files}
-                tracing={status?.status === "ready" ? status.tracing : []}
-                onTrace={flows.trace}
-                repo={repo}
-                rev={rev}
                 onShowYourself={onShowYourself}
               />
             )}

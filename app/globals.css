@@ -1577,10 +1577,6 @@ tr.step-code-target td.diff-num {
   font-size: 12px;
   color: var(--fg-muted);
 }
-.flow-cover b {
-  font-weight: 600;
-  color: var(--fg);
-}
 
 /* The card in place of the flows, before tracing or for uncommitted work. */
 .story-card {

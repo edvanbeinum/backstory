@@ -685,7 +685,7 @@ export default function Page() {
     name: string;
     at: number;
   } | null>(null);
-  /** The filter Files changed opens with, from "read these yourself". */
+  /** The filter Files changed opens with, from "3 changes no flow reaches". */
   const [filesFilter, setFilesFilter] = useState<{
     filter: "yourself";
     at: number;

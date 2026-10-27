@@ -599,13 +599,13 @@ function DraftOffer({
               )
             }
           >
-            Read automatically
+            Read this repo automatically
           </Button>
         )}
       </div>
       {switchError && (
         <p className="mt-2 flex items-center gap-1 text-[12px] text-[var(--attention)]">
-          <AlertIcon size={11} /> Couldn&apos;t turn on:{" "}
+          <AlertIcon size={11} /> Couldn&apos;t change it:{" "}
           <Ticked text={switchError} />
         </p>
       )}

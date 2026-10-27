@@ -44,8 +44,6 @@ function scrollToReadingLine(el: HTMLElement) {
   });
 }
 
-const stepWord = (n: number) => `${n} ${n === 1 ? "step" : "steps"}`;
-
 /**
  * One flow in the story: its trigger, what the change did to it and the
  * components it crosses; opened, the sequence, where a step opens its code
@@ -206,29 +204,7 @@ export function FlowCard({
               {flow.trigger}
             </span>
             <span className="block text-[12px] leading-4 text-[var(--fg-muted)]">
-              {flow.isNew ? (
-                <span className="text-[var(--success)]">
-                  New flow · {stepWord(summary.afterSteps)}
-                </span>
-              ) : summary.changed ? (
-                <>
-                  {summary.removed > 0 && (
-                    <span className="text-[var(--danger)]">
-                      {stepWord(summary.removed)} removed
-                    </span>
-                  )}
-                  {summary.removed > 0 && summary.added > 0 && ", "}
-                  {summary.added > 0 && (
-                    <span className="text-[var(--success)]">
-                      {summary.added} added
-                    </span>
-                  )}
-                  {" · "}
-                  {stepWord(summary.beforeSteps ?? 0)} → {summary.afterSteps}
-                </>
-              ) : (
-                <>Same steps · {stepWord(summary.afterSteps)}</>
-              )}
+              {summary.text}
             </span>
             {path.length > 0 && (
               <span

@@ -43,7 +43,7 @@ export interface Presented {
   entity: EntityDiff;
   /** "same" when nothing but echoes of other entities' changes moved */
   state: EntityDiff["state"];
-  /** One line for the card and the strip: "New · 3 fields", "+1 relationship" */
+  /** One line for the card and the strip: "New · 3 fields", "1 relationship added" */
   summary: string;
   /** Level 3: the field changes worth reading */
   fields: Diffed<Field>[];
@@ -64,18 +64,20 @@ function plural(n: number, word: string) {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
 }
 
+/** "2 fields added, 1 removed, 1 changed": the noun goes with the first count. */
 function tally(list: Diffed<unknown>[], word: string) {
-  const added = list.filter((d) => d.state === "added").length;
-  const removed = list.filter((d) => d.state === "removed").length;
-  const moved = list.filter((d) => d.state === "changed").length;
-  const total = added + removed + moved;
-  if (!total) return null;
-  const bits = [
-    added && `+${added}`,
-    removed && `−${removed}`,
-    moved && `~${moved}`,
-  ].filter(Boolean);
-  return `${bits.join(" ")} ${word}${total === 1 ? "" : "s"}`;
+  const counts = (["added", "removed", "changed"] as const)
+    .map((state) => ({
+      state,
+      n: list.filter((d) => d.state === state).length,
+    }))
+    .filter((c) => c.n > 0);
+  if (counts.length === 0) return null;
+  return counts
+    .map(({ state, n }, i) =>
+      i === 0 ? `${plural(n, word)} ${state}` : `${n} ${state}`,
+    )
+    .join(", ");
 }
 
 export function present(entities: EntityDiff[]): Presented[] {
@@ -157,7 +159,7 @@ export function present(entities: EntityDiff[]): Presented[] {
       ].filter(Boolean) as string[];
       // A rule is detail, unless it's all that changed.
       summary = parts.length
-        ? parts.join(", ")
+        ? parts.join(" · ")
         : (tally(rules, "rule") ?? tally(timestamps, "field") ?? "");
     }
 
