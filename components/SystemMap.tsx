@@ -116,10 +116,7 @@ function fold<T>(list: T[], max: number): [T[], T[]] {
 
 function recordTitle(r: RecordUse) {
   const parts = r.declared ? ["Declared here"] : [];
-  if (r.steps.length > 0)
-    parts.push(
-      `${r.steps.length === 1 ? "Step" : "Steps"} ${r.steps.join(", ")}: ${r.does.join(", ")}`,
-    );
+  if (r.does.length > 0) parts.push(r.does.join(", "));
   return `${r.entity}\n${parts.join(" · ")}`;
 }
 

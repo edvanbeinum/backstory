@@ -431,7 +431,7 @@ const signIn = (after: FlowStep[]): Flow => ({
   ],
 });
 
-test("records on components: a step's record goes to its caller's component, a record two components use is on both, and what the steps do is listed in order", () => {
+test("records on components: a step's record goes to its caller's component, a record two components use is on both, and what the code does is listed in order", () => {
   const set = flowSet([
     flow(null, [step("other", 1)]),
     signIn([
@@ -466,7 +466,6 @@ test("records on components: a step's record goes to its caller's component, a r
       entity: "NativeStoredAuthentication",
       declared: false,
       does: ["reads candidate"],
-      steps: ["2·1"],
     },
   ]);
   assert.deepEqual(out.get("API client"), [
@@ -474,13 +473,11 @@ test("records on components: a step's record goes to its caller's component, a r
       entity: "NativeStoredAuthentication",
       declared: false,
       does: ["sets candidate", "moves candidate to active"],
-      steps: ["2·2", "2·3", "2·4"],
     },
     {
       entity: "Credential",
       declared: false,
       does: ["saves it"],
-      steps: ["2·2"],
     },
   ]);
 });
@@ -527,10 +524,9 @@ test("an entity the data model declares in a component is listed there as declar
       entity: "Credential",
       declared: true,
       does: ["saves it"],
-      steps: ["1·1"],
     },
-    { entity: "Token", declared: true, does: [], steps: [] },
-    { entity: "Session", declared: false, does: ["saves it"], steps: ["1·1"] },
+    { entity: "Token", declared: true, does: [] },
+    { entity: "Session", declared: false, does: ["saves it"] },
   ]);
 });
 

@@ -381,10 +381,8 @@ export interface RecordUse {
   entity: string;
   /** The data model declares it in this component */
   declared: boolean;
-  /** What the steps here do to it, each once, in flow and step order */
+  /** What the code here does to it, each once, in the order the flows do it */
   does: string[];
-  /** The steps' chips, "1·3", for the title */
-  steps: string[];
 }
 
 /**
@@ -405,7 +403,7 @@ export function recordsOnComponents(
     out.set(component, list);
     let found = list.find((r) => r.entity === entity);
     if (!found) {
-      found = { entity, declared: false, does: [], steps: [] };
+      found = { entity, declared: false, does: [] };
       list.push(found);
     }
     return found;
@@ -413,9 +411,9 @@ export function recordsOnComponents(
   for (const e of entities ?? [])
     if (e.component && e.state !== "removed")
       recordOn(e.component, e.name).declared = true;
-  set?.flows.forEach((flow, i) => {
+  set?.flows.forEach((flow) => {
     const byName = new Map(flow.participants.map((p) => [p.name, p]));
-    flow.after.forEach((step, j) => {
+    flow.after.forEach((step) => {
       if (!step.data?.length) return;
       const from = byName.get(step.from);
       const component =
@@ -426,8 +424,6 @@ export function recordsOnComponents(
       for (const d of step.data) {
         const record = recordOn(component, d.entity);
         if (!record.does.includes(d.does)) record.does.push(d.does);
-        const chip = `${i + 1}·${j + 1}`;
-        if (!record.steps.includes(chip)) record.steps.push(chip);
       }
     });
   });

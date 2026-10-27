@@ -183,11 +183,11 @@ before reading its lines:
     person and external system, with the arrows between them. A component's
     arrow is drawn from or to its container. **Hide map** closes it.
   - Under a component's files, its box lists the records it uses: the ones
-    the data model declares in it, and the ones its flow steps read or write.
-    A record's title says which steps use it and what they do to it. Point at
-    a record to outline every box that uses it. Click a record the data model
-    shows to open the data model on it. Point at a box to outline its records
-    in the data model.
+    the data model declares in it, and the ones it reads or writes in the flows.
+    A record's title says what the component does to it. Point at a record to
+    outline every box that uses it. Click a record the data model shows to
+    open the data model on it. Point at a box to outline its records in the
+    data model.
 - **The data model** shows the entities the change touched: new fields,
   relationships and rules. It reads `db/schema.rb` and the models (Rails), the
   `.xcdatamodeld` (Core Data), or SQL schema files: the `CREATE TABLE`
