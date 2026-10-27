@@ -41,7 +41,7 @@ terms:
     avoid:
       - strip, for the map or the data model's summary
   - name: notes box
-    means: "The box pinned to the bottom of every tab with the notes for your agent, Add a general note, Send to agent and Copy (`components/FeedbackBar.tsx`). It shows once there is a note, while an agent is waiting on `backstory review`, or when a note couldn't be saved or sent; before that, + Note for the agent at the top of Story writes the first general note."
+    means: "The box pinned to the bottom of every tab with the notes for your agent, Send to agent and Copy (`components/FeedbackBar.tsx`). It shows once there is a note, while an agent is waiting on `backstory review`, or when a note couldn't be saved or sent; before that, + Note for the agent at the top of Story writes the first general note."
   - name: gutter mark
     means: "A review comment's mark beside a line in Files changed: `💬 2` is review comment 2, and opens it in Comments."
     avoid:

@@ -198,10 +198,7 @@ export function FlowCard({
           onClick={onToggle}
           title={flow.name}
         >
-          <span
-            className={`flow-pick ${summary.changed ? "changed" : ""}`}
-            aria-hidden="true"
-          >
+          <span className="flow-pick" aria-hidden="true">
             {index + 1}
           </span>
           <span className="min-w-0 flex-1">

@@ -300,8 +300,7 @@ commit, and press **+**. **+ Note for the agent**, at the top of Story, covers
 the work as a whole. In a note, `⌘↵` saves it and `Esc` cancels.
 
 The notes box appears at the bottom of the window with your first note, or as
-soon as an agent is waiting, and has **Add a general note** for more. When you
-review a stack of commits one at a time, the notes on each commit are kept to
+soon as an agent is waiting. When you review a stack of commits one at a time, the notes on each commit are kept to
 send together, and the box lists the ones on other changes.
 
 A note on a commit is sent naming the commit, and whether it's been pushed.

@@ -3,12 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { BRANCH_REV, DIFF_API, WORKING_REV } from "@/lib/constants";
-import {
-  draftNote,
-  fileForNote,
-  formatFeedback,
-  type NoteCommit,
-} from "@/lib/feedback";
+import { fileForNote, formatFeedback, type NoteCommit } from "@/lib/feedback";
 import type {
   DiffFile,
   DiffResponse,
@@ -18,7 +13,7 @@ import type {
 import { pushedState } from "@/lib/pushed";
 import { viewParams } from "@/lib/url";
 import { CheckIcon, CommentIcon, CopyIcon, XIcon } from "./icons";
-import { NoteCard, NoteComposer, NoteTick } from "./NoteCard";
+import { NoteCard, NoteTick } from "./NoteCard";
 import { sinceLabel } from "./Tick";
 import { Button, copyToClipboard } from "./ui";
 import type { NotesApi } from "./useNotes";
@@ -64,7 +59,6 @@ export function FeedbackBar({
   onOpenNote: (note: Note) => void;
 }) {
   const { ref } = useView();
-  const [writing, setWriting] = useState(false);
   const [confirmingClear, setConfirmingClear] = useState(false);
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -177,10 +171,7 @@ export function FeedbackBar({
     return () => clearTimeout(timer);
   }, [confirmingClear]);
 
-  // Stays open while a general note is being written, so deleting the last
-  // line note doesn't throw that draft away.
   if (
-    !writing &&
     notes.notes.length === 0 &&
     !review.waiting &&
     !review.error &&
@@ -213,15 +204,6 @@ export function FeedbackBar({
         </span>
 
         <div className="ml-auto flex items-center gap-1.5">
-          {!writing && (
-            <Button
-              size="sm"
-              variant="invisible"
-              onClick={() => setWriting(true)}
-            >
-              Add a general note
-            </Button>
-          )}
           {count > 0 &&
             (confirmingClear ? (
               <Button
@@ -367,26 +349,6 @@ export function FeedbackBar({
             onTick={notes.tick}
           />
         ))}
-
-        {writing && (
-          <NoteComposer
-            placeholder="Anything about the change as a whole?"
-            onCancel={() => setWriting(false)}
-            onSave={(body) => {
-              notes.save(
-                draftNote({
-                  rev: noteRev ?? WORKING_REV,
-                  path: null,
-                  side: "new",
-                  line: null,
-                  quote: null,
-                  body,
-                }),
-              );
-              setWriting(false);
-            }}
-          />
-        )}
 
         {rounds.length > 0 && (
           <div className="space-y-2 border-t border-[var(--border-muted)] pt-2">

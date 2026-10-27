@@ -179,7 +179,6 @@ export function Story({
         <section className="space-y-2">
           <div className="story-h">
             <h3>Flows</h3>
-            {set && <span className="counter">{set.flows.length}</span>}
             {set && diff && (
               <FlowCoverage
                 set={set}

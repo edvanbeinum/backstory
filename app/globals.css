@@ -560,17 +560,6 @@ tr.note-row td {
   color: var(--accent);
   background: var(--accent-subtle);
 }
-.flow-pick.changed::after {
-  content: "";
-  position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--attention);
-  box-shadow: 0 0 0 2px var(--canvas);
-}
 
 .seg {
   display: inline-flex;
