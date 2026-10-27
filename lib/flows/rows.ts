@@ -303,10 +303,6 @@ export function componentPath(flow: Flow, rows: FlowRow[]): string[] {
   return path;
 }
 
-/** The number a row shows: a removed step by its old one. */
-const stepNumber = (row: FlowRow) =>
-  row.kind === "del" ? row.was : (row.now ?? row.was);
-
 /**
  * Cache each set's diff-mode rows, so every comment's step lookup shares one
  * LCS per flow rather than one per thread.
@@ -321,11 +317,10 @@ function diffRows(set: FlowSet): FlowRow[][] {
   return rows;
 }
 
-/** A flow's step: flow 1, step 5, `load()`. */
+/** A flow's step: flow 1, at `load()`. */
 export interface StepAt {
   /** 1-based, as the story numbers flows */
   flow: number;
-  step: number;
   /** The step's label, as its row in the open flow shows it */
   label: string;
   /** The step's row in the flow's diff mode */
@@ -346,12 +341,7 @@ export function stepsAt(
   for (const [i, rows] of diffRows(set).entries()) {
     for (const row of rows) {
       if (row.side === side && row.step.file === path && row.step.line === line)
-        return {
-          flow: i + 1,
-          step: stepNumber(row) ?? 0,
-          label: row.step.label,
-          row,
-        };
+        return { flow: i + 1, label: row.step.label, row };
     }
   }
   return null;

@@ -358,7 +358,6 @@ test("stepsAt finds a comment's step, and names only one", () => {
   ]);
   const at = stepsAt(set, draft, 78);
   assert.equal(at?.flow, 1, "the first flow, not the second");
-  assert.equal(at?.step, 5);
   assert.equal(at?.label, "s5");
   assert.equal(stepsAt(set, draft, 79), null);
 });
