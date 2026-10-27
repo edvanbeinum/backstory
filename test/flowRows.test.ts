@@ -7,7 +7,6 @@ import {
   flowRows,
   groupParticipants,
   shortLabels,
-  stepMarks,
   stepsAt,
   summarise,
 } from "../lib/flows/rows";
@@ -322,29 +321,6 @@ const flowSet = (flows: Flow[], extra: Partial<FlowSet> = {}): FlowSet => ({
   costUsd: 0,
   durationMs: 0,
   ...extra,
-});
-
-test("stepMarks marks every flow's steps on their lines", () => {
-  const marks = stepMarks(
-    flowSet([
-      flow(null, [step("open", 3)]),
-      flow(
-        [step("gone", 9, { file: "b.ts" })],
-        [step("kept", 5, { file: "b.ts" })],
-      ),
-      flow(null, []),
-    ]),
-  );
-  const chips = (file: string, side: "old" | "new", line: number) =>
-    marks
-      .get(file)
-      ?.[side].get(line)
-      ?.map((m) => `${m.chip}${m.was ? " was" : ""}`);
-
-  assert.deepEqual(chips("a.ts", "new", 3), ["1·1"]);
-  assert.deepEqual(chips("b.ts", "new", 5), ["2·1"]);
-  assert.deepEqual(chips("b.ts", "old", 9), ["2·1 was"]);
-  assert.deepEqual([...marks.keys()].sort(), ["a.ts", "b.ts"]);
 });
 
 test("stepsAt finds a comment's step, and names only one", () => {

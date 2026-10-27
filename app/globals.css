@@ -794,14 +794,14 @@ tr.note-row td {
   color: var(--attention);
 }
 
-/* Gutter marks: a flow's step (`⇄ 1·7`) or a review comment (`💬 2`) on a
-   diff line, each opening where it belongs. */
+/* Gutter marks: a review comment (`💬 2`) on a diff line, opening it in
+   Comments. */
 .diff-gutter {
   width: 1%;
   padding: 0 6px 0 2px;
   white-space: nowrap;
   vertical-align: top;
-  /* Copying code shouldn't copy "⇄ 1·3" with it. */
+  /* Copying code shouldn't copy "💬 2" with it. */
   user-select: none;
 }
 tr.line-add .diff-gutter {
@@ -828,10 +828,6 @@ tr.line-del .diff-gutter {
 }
 .mark:hover {
   background: var(--accent-subtle);
-}
-.mark.was {
-  border-color: var(--danger);
-  color: var(--danger);
 }
 .mark.c {
   border-color: var(--attention);

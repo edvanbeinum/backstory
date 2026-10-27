@@ -298,31 +298,13 @@ export function componentPath(flow: Flow, rows: FlowRow[]): string[] {
   return path;
 }
 
-/** A flow step on a diff line: `1·7` is flow 1, step 7. */
-export interface StepMark {
-  /** Unique across flows */
-  key: string;
-  /** The flow's index in the set */
-  flow: number;
-  /** The step's row key in the flow's diff mode */
-  row: string;
-  chip: string;
-  /** A removed step, on the line as it was */
-  was: boolean;
-}
-
-export interface StepMarks {
-  old: Map<number, StepMark[]>;
-  new: Map<number, StepMark[]>;
-}
-
 /** The number a row shows: a removed step by its old one. */
 const stepNumber = (row: FlowRow) =>
   row.kind === "del" ? row.was : (row.now ?? row.was);
 
 /**
- * Cache each set's diff-mode rows, so the gutter marks and every comment's
- * step lookup share one LCS per flow rather than one per thread.
+ * Cache each set's diff-mode rows, so every comment's step lookup shares one
+ * LCS per flow rather than one per thread.
  */
 const diffRowsCache = new WeakMap<FlowSet, FlowRow[][]>();
 function diffRows(set: FlowSet): FlowRow[][] {
@@ -388,31 +370,5 @@ export function fileFlows(
     ].sort((a, b) => a - b);
     out.set(path, flows.length > 0 ? flows : "yourself");
   }
-  return out;
-}
-
-/** Every flow's steps, by file and by the line each sits on. */
-export function stepMarks(set: FlowSet): Map<string, StepMarks> {
-  const out = new Map<string, StepMarks>();
-  diffRows(set).forEach((rows, i) => {
-    for (const row of rows) {
-      const entry = out.get(row.step.file) ?? {
-        old: new Map(),
-        new: new Map(),
-      };
-      const side = entry[row.side];
-      side.set(row.step.line, [
-        ...(side.get(row.step.line) ?? []),
-        {
-          key: `${i}/${row.key}`,
-          flow: i,
-          row: row.key,
-          chip: `${i + 1}·${stepNumber(row)}`,
-          was: row.kind === "del",
-        },
-      ]);
-      out.set(row.step.file, entry);
-    }
-  });
   return out;
 }
