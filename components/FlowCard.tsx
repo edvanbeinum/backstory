@@ -22,6 +22,7 @@ import { ChevronDownIcon, ChevronRightIcon } from "./icons";
 
 /** A flow and step for the story to open: a row key in the flow's diff mode. */
 export interface StoryTarget {
+  /** 0-based, unlike `StepAt.flow` */
   flow: number;
   row: string;
   /** When it was asked for, so asking twice opens it twice */
@@ -43,8 +44,6 @@ function scrollToReadingLine(el: HTMLElement) {
     behavior: smooth ? "smooth" : "auto",
   });
 }
-
-const stepWord = (n: number) => `${n} ${n === 1 ? "step" : "steps"}`;
 
 /**
  * One flow in the story: its trigger, what the change did to it and the
@@ -198,10 +197,7 @@ export function FlowCard({
           onClick={onToggle}
           title={flow.name}
         >
-          <span
-            className={`flow-pick ${summary.changed ? "changed" : ""}`}
-            aria-hidden="true"
-          >
+          <span className="flow-pick" aria-hidden="true">
             {index + 1}
           </span>
           <span className="min-w-0 flex-1">
@@ -209,29 +205,7 @@ export function FlowCard({
               {flow.trigger}
             </span>
             <span className="block text-[12px] leading-4 text-[var(--fg-muted)]">
-              {flow.isNew ? (
-                <span className="text-[var(--success)]">
-                  New flow · {stepWord(summary.afterSteps)}
-                </span>
-              ) : summary.changed ? (
-                <>
-                  {summary.removed > 0 && (
-                    <span className="text-[var(--danger)]">
-                      {stepWord(summary.removed)} removed
-                    </span>
-                  )}
-                  {summary.removed > 0 && summary.added > 0 && ", "}
-                  {summary.added > 0 && (
-                    <span className="text-[var(--success)]">
-                      {summary.added} added
-                    </span>
-                  )}
-                  {" · "}
-                  {stepWord(summary.beforeSteps ?? 0)} → {summary.afterSteps}
-                </>
-              ) : (
-                <>Same steps · {stepWord(summary.afterSteps)}</>
-              )}
+              {summary.text}
             </span>
             {path.length > 0 && (
               <span
@@ -280,7 +254,6 @@ export function FlowCard({
           rows={rows}
           participants={participants}
           groups={groups}
-          mode={shownMode}
           activeKeys={steps}
           onRowClick={toggleStep}
           open={steps}

@@ -10,7 +10,6 @@ import {
 } from "react";
 
 import { anchorThreads } from "@/lib/anchor";
-import type { StepMark, StepMarks } from "@/lib/flows/rows";
 import { anchorNotes, draftNote } from "@/lib/feedback";
 import type {
   ApiError,
@@ -32,8 +31,6 @@ import { NoteCard, NoteComposer } from "./NoteCard";
 import { copyToClipboard, CopyButton, Spinner } from "./ui";
 import type { NotesApi } from "./useNotes";
 import { useView } from "./ViewContext";
-
-const NO_MARKS: StepMark[] = [];
 
 /** A hunk by its first changed line, as `coverage` names it. */
 export const hunkKey = (side: "old" | "new", line: number) => `${side}:${line}`;
@@ -68,12 +65,10 @@ export function DiffFile({
   notes = null,
   noteRev = null,
   fileNotes = [],
-  marks = null,
   component = null,
   flows = null,
   onlyHunks = null,
   commentNumbers = null,
-  onStep,
   onComment,
 }: {
   file: DiffFileType;
@@ -87,8 +82,6 @@ export function DiffFile({
   noteRev?: string | null;
   /** This file's notes, on this change */
   fileNotes?: Note[];
-  /** Flow steps anchored in this file */
-  marks?: StepMarks | null;
   /** The C4 component this file belongs to */
   component?: string | null;
   /** The flows this file is on, or "yourself" when it is app code on none */
@@ -97,16 +90,12 @@ export function DiffFile({
   onlyHunks?: Set<string> | null;
   /** Each thread's number, for its gutter mark */
   commentNumbers?: Map<string, number> | null;
-  /** A step's gutter mark was clicked */
-  onStep?: (mark: StepMark) => void;
   /** A comment's gutter mark was clicked */
   onComment?: (threadId: string) => void;
 }) {
   // The gutter is drawn only where there is something to mark, so a file
-  // with no flow steps and no comments keeps the full width for its code.
-  const gutter =
-    Boolean(marks && (marks.old.size > 0 || marks.new.size > 0)) ||
-    threads.some((t) => commentNumbers?.has(t.id));
+  // with no comments keeps the full width for its code.
+  const gutter = threads.some((t) => commentNumbers?.has(t.id));
   const { ref } = useView();
   const [collapsed, setCollapsed] = useState(false);
   const [whole, setWhole] = useState<FileViewResponse | null>(null);
@@ -395,10 +384,8 @@ export function DiffFile({
                         drafting={drafting}
                         onDraft={setDrafting}
                         onSaveNew={saveNew}
-                        marks={marks}
                         gutter={gutter}
                         commentNumbers={commentNumbers}
-                        onStep={onStep}
                         onComment={onComment}
                       />
                     ))}
@@ -482,10 +469,8 @@ function HunkRows({
   drafting,
   onDraft,
   onSaveNew,
-  marks,
   gutter,
   commentNumbers,
-  onStep,
   onComment,
 }: {
   hunk: DiffFileType["hunks"][number];
@@ -503,11 +488,9 @@ function HunkRows({
   drafting: NoteTarget | null;
   onDraft: (target: NoteTarget | null) => void;
   onSaveNew: (target: NoteTarget, body: string) => void;
-  marks: StepMarks | null | undefined;
   /** Draw the gutter mark column */
   gutter: boolean;
   commentNumbers: Map<string, number> | null;
-  onStep?: (mark: StepMark) => void;
   onComment?: (threadId: string) => void;
 }) {
   // Clicking a line number copies the editor-style "path:line" reference —
@@ -565,19 +548,6 @@ function HunkRows({
           drafting?.side === target.side &&
           drafting.line === target.line;
 
-        // A removed step sits on its old line; every other step on its new
-        // one. An unchanged line has both, so look on both sides.
-        const lineMarks = marks
-          ? [
-              ...(line.type !== "add" && line.oldNo != null
-                ? (marks.old.get(line.oldNo) ?? NO_MARKS)
-                : NO_MARKS),
-              ...(line.type !== "del" && line.newNo != null
-                ? (marks.new.get(line.newNo) ?? NO_MARKS)
-                : NO_MARKS),
-            ]
-          : NO_MARKS;
-
         return (
           <Fragment key={index}>
             <tr
@@ -615,17 +585,6 @@ function HunkRows({
               </td>
               {gutter && (
                 <td className="diff-gutter">
-                  {lineMarks.map((m) => (
-                    <button
-                      key={m.key}
-                      type="button"
-                      className={`mark ${m.was ? "was" : ""}`}
-                      title={`Flow ${m.chip.replace("·", ", step ")}${m.was ? ", as it was" : ""}: open it in the story`}
-                      onClick={() => onStep?.(m)}
-                    >
-                      ⇄ {m.chip}
-                    </button>
-                  ))}
                   {threads.map((t) =>
                     commentNumbers?.has(t.id) ? (
                       <button

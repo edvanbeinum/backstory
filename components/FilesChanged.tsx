@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { WORKING_REV } from "@/lib/constants";
 import { coverage } from "@/lib/flows/coverage";
-import { fileFlows, type StepMark, type StepMarks } from "@/lib/flows/rows";
+import { fileFlows } from "@/lib/flows/rows";
 import type { FlowSet } from "@/lib/flows/types";
 import type { MapResponse } from "@/lib/map";
 import { groupByComponent, ownsCode } from "@/lib/mapGroups";
@@ -69,13 +69,11 @@ export function FilesChanged({
   noteRev,
   map,
   flowSet,
-  marks,
   jump,
   onJumped,
   filterAsk = null,
   onShowOnMap,
   commentNumbers,
-  onStep,
   onComment,
 }: {
   /** The repo and change on screen */
@@ -91,18 +89,14 @@ export function FilesChanged({
   noteRev: string | null;
   map: MapResponse | null;
   flowSet: FlowSet | null;
-  /** Every flow's steps, by file */
-  marks: Map<string, StepMarks> | null;
   jump: FilesJump | null;
   onJumped: () => void;
-  /** A filter to open with, from the story's "read these yourself" */
+  /** A filter to open with, from the story's "3 changes no flow reaches" */
   filterAsk?: { filter: "yourself"; at: number } | null;
   /** Outline a component on the story's map */
   onShowOnMap: (component: string) => void;
   /** Each thread's number, oldest first, for its gutter mark */
   commentNumbers: Map<string, number>;
-  /** Open a step's gutter mark in the story */
-  onStep: (mark: StepMark) => void;
   /** Open a comment's gutter mark in Comments */
   onComment: (threadId: string) => void;
 }) {
@@ -312,7 +306,6 @@ export function FilesChanged({
         focusedThreadId={focusedThreadId}
         notes={notes}
         noteRev={noteRev}
-        marks={marks}
         // Drop each file's component chip when files are grouped, since the
         // group's heading already names it.
         fileComponents={grouped ? null : (map?.fileComponents ?? null)}
@@ -320,7 +313,6 @@ export function FilesChanged({
         flows={flows}
         onlyHunks={active === "yourself" ? yours : null}
         commentNumbers={commentNumbers}
-        onStep={onStep}
         onComment={onComment}
       />
     </div>

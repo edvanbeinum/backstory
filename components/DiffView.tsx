@@ -11,7 +11,6 @@ import type {
   RepoInfo,
   ReviewThread,
 } from "@/lib/types";
-import type { StepMark, StepMarks } from "@/lib/flows/rows";
 import { DiffFile } from "./DiffFile";
 import { AlertIcon } from "./icons";
 import { Spinner } from "./ui";
@@ -39,27 +38,6 @@ function partitionThreads(diff: DiffResponse | null, threads: ReviewThread[]) {
   return { perFile };
 }
 
-/**
- * A renamed file's removed steps sit under its old path and the rest under
- * its new one; the file needs both.
- */
-function marksFor(
-  marks: Map<string, StepMarks> | null,
-  file: DiffFileType,
-): StepMarks | null {
-  if (!marks) return null;
-  const a = file.newPath ? marks.get(file.newPath) : undefined;
-  const b =
-    file.oldPath && file.oldPath !== file.newPath
-      ? marks.get(file.oldPath)
-      : undefined;
-  if (!a || !b) return a ?? b ?? null;
-  return {
-    old: new Map([...a.old, ...b.old]),
-    new: new Map([...a.new, ...b.new]),
-  };
-}
-
 /** Files shown together under one heading. */
 export interface DiffSection {
   key: string;
@@ -80,13 +58,11 @@ export function DiffView({
   focusedThreadId,
   notes = null,
   noteRev = null,
-  marks = null,
   fileComponents = null,
   sections = null,
   flows = null,
   onlyHunks = null,
   commentNumbers = null,
-  onStep,
   onComment,
 }: {
   diff: DiffResponse | null;
@@ -100,8 +76,6 @@ export function DiffView({
   notes?: NotesApi | null;
   /** The change on screen, as notes record it: a full sha, or a pseudo-rev */
   noteRev?: string | null;
-  /** Every flow's steps, by file */
-  marks?: Map<string, StepMarks> | null;
   fileComponents?: Record<string, string> | null;
   /** The files to show, under headings; all of them, in order, when null */
   sections?: DiffSection[] | null;
@@ -111,7 +85,6 @@ export function DiffView({
   onlyHunks?: Map<string, Set<string>> | null;
   /** Each thread's number, oldest first, for its gutter mark */
   commentNumbers?: Map<string, number> | null;
-  onStep?: (mark: StepMark) => void;
   onComment?: (threadId: string) => void;
 }) {
   const { perFile } = useMemo(
@@ -184,12 +157,10 @@ export function DiffView({
                 notes={notes}
                 noteRev={noteRev}
                 fileNotes={notesPerFile.get(file) ?? NO_NOTES}
-                marks={marksFor(marks, file)}
                 component={fileComponents?.[file.path] ?? null}
                 flows={flows?.get(file.path) ?? null}
                 onlyHunks={onlyHunks?.get(file.path) ?? null}
                 commentNumbers={commentNumbers}
-                onStep={onStep}
                 onComment={onComment}
               />
             ))}

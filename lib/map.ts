@@ -62,9 +62,6 @@ export interface MapNode {
     deletions: number;
     status: string;
   }[];
-  additions: number;
-  deletions: number;
-  newFiles: number;
 }
 
 export interface MapEdge {
@@ -104,12 +101,8 @@ export interface MapResponse {
   edges: MapEdge[];
   /** Every element and arrow, unchanged, when the change touches no component */
   whole?: { nodes: MapNode[]; edges: MapEdge[] };
-  /** Components in the model that the focused map leaves out */
-  hidden: number;
   /** Each changed file's component, by name, for the diff's file headers */
   fileComponents: Record<string, string>;
-  unmapped: string[];
-  ambiguous: { file: string; ids: string[] }[];
   /** Every element's description, by name, for the flow's component boxes */
   descriptions: Record<string, string>;
 }
@@ -221,15 +214,9 @@ const contains = (
   inner: string,
 ) => ancestors(elementOf, inner).includes(outer);
 
-const unchanged = (): Pick<
-  MapNode,
-  "files" | "fileStats" | "additions" | "deletions" | "newFiles"
-> => ({
+const unchanged = (): Pick<MapNode, "files" | "fileStats"> => ({
   files: [],
   fileStats: [],
-  additions: 0,
-  deletions: 0,
-  newFiles: 0,
 });
 
 /**
@@ -281,10 +268,7 @@ const empty = (): MapResponse => ({
   modelFile: null,
   nodes: [],
   edges: [],
-  hidden: 0,
   fileComponents: {},
-  unmapped: [],
-  ambiguous: [],
   descriptions: {},
 });
 
@@ -388,21 +372,12 @@ function drawMap(
   // model, where its element may still exist.
   const touched = new Map<string, ReturnType<typeof unchanged>>();
   const fileComponents: Record<string, string> = {};
-  const unmapped: string[] = [];
-  const ambiguous: { file: string; ids: string[] }[] = [];
   for (const f of stats) {
     const deleted = f.status === "D";
     const against = deleted && baseModel ? baseModel : model;
     if (!isAppCode(against, f.path)) continue;
     const ids = leafOf(against, f.path);
-    if (ids.length === 0) {
-      unmapped.push(f.path);
-      continue;
-    }
-    if (ids.length > 1) {
-      ambiguous.push({ file: f.path, ids });
-      continue;
-    }
+    if (ids.length !== 1) continue;
     const entry = touched.get(ids[0]) ?? unchanged();
     entry.files.push(f.path);
     entry.fileStats.push({
@@ -411,9 +386,6 @@ function drawMap(
       deletions: f.deletions,
       status: f.status,
     });
-    entry.additions += f.additions;
-    entry.deletions += f.deletions;
-    if (f.status === "A") entry.newFiles++;
     touched.set(ids[0], entry);
     const name = against.elements.get(ids[0])?.name ?? ids[0];
     fileComponents[f.path] = name;
@@ -515,17 +487,8 @@ function drawMap(
       group,
       files: t?.files ?? [],
       fileStats: t?.fileStats ?? [],
-      additions: t?.additions ?? 0,
-      deletions: t?.deletions ?? 0,
-      newFiles: t?.newFiles ?? 0,
     };
   });
-
-  const leaves = new Set(
-    [...model.elements.values()]
-      .filter((e) => e.type === "component" || e.globs.length > 0)
-      .map((e) => e.id),
-  );
 
   return {
     status: "ok",
@@ -545,10 +508,7 @@ function drawMap(
         !contains(elementOf, e.destination, e.source),
     ),
     ...(nodes.length === 0 ? { whole: wholeMap(model) } : {}),
-    hidden: leaves.size - nodes.filter((n) => leaves.has(n.id)).length,
     fileComponents,
-    unmapped,
-    ambiguous,
     descriptions: Object.fromEntries(
       [...model.elements.values()].map((e) => [e.name, e.description]),
     ),

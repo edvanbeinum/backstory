@@ -7,7 +7,6 @@ import {
   flowRows,
   groupParticipants,
   shortLabels,
-  stepMarks,
   stepsAt,
   summarise,
 } from "../lib/flows/rows";
@@ -70,13 +69,34 @@ test("a changed flow reads like a line diff", () => {
     "add - 2 fetchOnce",
     "ctx 4 3 render",
   ]);
-  assert.deepEqual(summarise(f, hunks), {
+});
+
+test("a flow's summary says its steps in words, with no arithmetic", () => {
+  const changed = flow(
+    [step("init", 1), step("fetch1", 3), step("fetch2", 4), step("render", 5)],
+    [step("init", 1), step("fetchOnce", 3), step("render", 4)],
+  );
+  assert.deepEqual(summarise(changed, hunks), {
     added: 1,
     removed: 2,
-    beforeSteps: 4,
-    afterSteps: 3,
     changed: true,
+    text: "1 step added, 2 removed",
   });
+  assert.equal(
+    summarise(flow(null, [step("init", 1)]), hunks).text,
+    "New flow",
+  );
+  assert.equal(
+    summarise(flow([step("init", 1)], [step("init", 1)]), hunks).text,
+    "Same steps",
+  );
+  assert.equal(
+    summarise(
+      flow([step("init", 1)], [step("init", 1), step("fresh", 3)]),
+      hunks,
+    ).text,
+    "1 step added",
+  );
 });
 
 test("the same call with new words is a removal and an addition", () => {
@@ -114,7 +134,7 @@ test("a new flow marks only steps on added lines", () => {
   assert.deepEqual(shape(f), ["ctx - 1 init", "add - 2 fresh"]);
 });
 
-test("sameAs reads as the range of steps it re-runs", () => {
+test("sameAs reads as the step it runs again", () => {
   const steps = [
     step("open", 1),
     step("load", 2, { nesting: 1 }),
@@ -124,7 +144,7 @@ test("sameAs reads as the range of steps it re-runs", () => {
     step("reload", 6, { nesting: 1, sameAs: "load" }),
   ];
   const rows = flowRows(flow(null, steps), "after", hunks);
-  assert.equal(rows[5].again, "runs 2–4 again");
+  assert.equal(rows[5].again, "runs load again");
 });
 
 test("lanes drop a shared prefix unless that makes two lanes one name", () => {
@@ -324,29 +344,6 @@ const flowSet = (flows: Flow[], extra: Partial<FlowSet> = {}): FlowSet => ({
   ...extra,
 });
 
-test("stepMarks marks every flow's steps on their lines", () => {
-  const marks = stepMarks(
-    flowSet([
-      flow(null, [step("open", 3)]),
-      flow(
-        [step("gone", 9, { file: "b.ts" })],
-        [step("kept", 5, { file: "b.ts" })],
-      ),
-      flow(null, []),
-    ]),
-  );
-  const chips = (file: string, side: "old" | "new", line: number) =>
-    marks
-      .get(file)
-      ?.[side].get(line)
-      ?.map((m) => `${m.chip}${m.was ? " was" : ""}`);
-
-  assert.deepEqual(chips("a.ts", "new", 3), ["1·1"]);
-  assert.deepEqual(chips("b.ts", "new", 5), ["2·1"]);
-  assert.deepEqual(chips("b.ts", "old", 9), ["2·1 was"]);
-  assert.deepEqual([...marks.keys()].sort(), ["a.ts", "b.ts"]);
-});
-
 test("stepsAt finds a comment's step, and names only one", () => {
   const draft = "lib/models/draft.ts";
   const set = flowSet([
@@ -361,7 +358,7 @@ test("stepsAt finds a comment's step, and names only one", () => {
   ]);
   const at = stepsAt(set, draft, 78);
   assert.equal(at?.flow, 1, "the first flow, not the second");
-  assert.equal(at?.step, 5);
+  assert.equal(at?.label, "s5");
   assert.equal(stepsAt(set, draft, 79), null);
 });
 

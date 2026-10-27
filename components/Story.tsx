@@ -25,8 +25,8 @@ import type { FlowsApi } from "./useFlows";
 import { useView } from "./ViewContext";
 
 /**
- * A note on the change as a whole. The notes box shows only once there is a
- * note, so this is where the first general note is written.
+ * A note on the change as a whole. The notes box has no note button of its
+ * own, so this is where every general note is written.
  */
 function NoteForAgent({ onNote }: { onNote: (body: string) => void }) {
   const [writing, setWriting] = useState(false);
@@ -179,15 +179,10 @@ export function Story({
         <section className="space-y-2">
           <div className="story-h">
             <h3>Flows</h3>
-            {set && <span className="counter">{set.flows.length}</span>}
             {set && diff && (
               <FlowCoverage
                 set={set}
                 files={diff.files}
-                tracing={status?.status === "ready" ? status.tracing : []}
-                onTrace={flows.trace}
-                repo={repo}
-                rev={rev}
                 onShowYourself={onShowYourself}
               />
             )}

@@ -4,7 +4,6 @@ import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
 
 import {
   shortLabels,
-  type FlowMode,
   type FlowRow,
   type ParticipantGroup,
 } from "@/lib/flows/rows";
@@ -14,7 +13,6 @@ import { STEP_CODE_H } from "./StepCode";
 /** Row height, and where in the row the arrow runs. Matches the mockup. */
 const ROW = 40;
 const ARROW_Y = 30;
-const GUTTER = 76;
 const MIN_LANE = 84;
 /** Below this, lane names alternate between two rows so they can be wider. */
 const STAGGER_BELOW = 150;
@@ -69,7 +67,6 @@ export function FlowSequence({
   rows,
   participants,
   groups,
-  mode,
   activeKeys,
   onRowClick,
   open = NONE_OPEN,
@@ -83,7 +80,6 @@ export function FlowSequence({
   participants: FlowParticipant[];
   /** Participants by component, in lane order */
   groups: ParticipantGroup[];
-  mode: FlowMode;
   activeKeys: Set<string>;
   onRowClick: (row: FlowRow) => void;
   /** Rows whose code is open beneath them */
@@ -118,10 +114,7 @@ export function FlowSequence({
 
   // Lanes share the width; a component group gets at least the room its
   // name needs, so the name is never cut. Wider than the column scrolls.
-  const laneW = Math.max(
-    MIN_LANE,
-    (width - GUTTER) / Math.max(participants.length, 1),
-  );
+  const laneW = Math.max(MIN_LANE, width / Math.max(participants.length, 1));
   const spans: { g: ParticipantGroup; left: number; width: number }[] = [];
   const centre = new Map<string, number>();
   const laneWidth = new Map<string, number>();
@@ -167,7 +160,6 @@ export function FlowSequence({
   });
   const BAND_H =
     BOX_NAME_H + Math.max(0, ...boxes.map((b) => b.lines)) * 16 + 6;
-  const inner = GUTTER + area;
   const narrowest = Math.min(...[...laneWidth.values(), laneW]);
   const stagger = participants.length > 1 && narrowest < STAGGER_BELOW;
   const headH = (stagger ? 58 : 36) + BAND_H + BOX_PAD;
@@ -198,11 +190,8 @@ export function FlowSequence({
   return (
     <div className="flow-seq">
       <div ref={measure} className="thin-scroll overflow-x-auto">
-        <div style={{ minWidth: inner }}>
+        <div style={{ minWidth: area }}>
           <div className="flow-grid flow-head">
-            <span className="oh">{mode === "after" ? "now" : "was"}</span>
-            <span className="oh">{mode === "diff" ? "now" : ""}</span>
-            <span />
             <div className="flow-lanes" style={{ height: headH }}>
               {/* Each component drawn as the map draws it: a box holding its
                   lanes, named and described, marked by what the change did. */}
@@ -342,20 +331,30 @@ export function FlowSequence({
               // A label that won't fit to the right of its arrow ends at the
               // card's edge instead, reading back over the lanes to its left.
               const start = from === to ? from + 28 : Math.min(from, to) + 8;
+              const kindWord =
+                row.kind === "add"
+                  ? "added"
+                  : row.kind === "del"
+                    ? "removed"
+                    : "";
+              const tags = [
+                kindWord,
+                row.step.repeat ? `× ${row.step.repeat}` : "",
+                row.again ?? "",
+                ...(row.step.data ?? []).map((d) => `${d.entity} · ${d.does}`),
+              ].filter(Boolean);
               const text = [
                 row.step.label,
                 row.step.returns ? `→ ${row.step.returns}` : "",
-                ...(row.step.data ?? []).map((d) => `${d.entity} · ${d.does}`),
+                ...tags,
               ].join(" ");
-              // Count each data badge's 12px of padding and the row's 8px gap
-              // too, so three badges don't run off the card.
-              const tagWidth = (row.step.data?.length ?? 0) * 20;
+              // Count each badge's 12px of padding and the row's 8px gap too,
+              // so three badges don't run off the card.
+              const tagWidth = tags.length * 20;
               const fits = start + text.length * 7.3 + tagWidth + 8 <= area;
               const place = fits
                 ? { left: start, maxWidth: `calc(100% - ${start + 8}px)` }
                 : { right: 8, maxWidth: area - 16 };
-              const first = mode === "after" ? row.now : row.was;
-              const second = mode === "diff" ? row.now : null;
               return (
                 <Fragment key={row.key}>
                   <div
@@ -366,14 +365,14 @@ export function FlowSequence({
                     onClick={() => onRowClick(row)}
                     title={`${row.step.caller} · ${row.step.file}:${row.step.line}`}
                   >
-                    <span className="n">{first ?? ""}</span>
-                    <span className="n">{second ?? ""}</span>
-                    <span className="m" />
                     <span className="l">
                       <span className="lab" style={place}>
                         <span className="call min-w-0 truncate">
                           {row.step.label}
                         </span>
+                        {kindWord && (
+                          <span className="flow-badge">{kindWord}</span>
+                        )}
                         {row.step.returns && (
                           <span className="ret min-w-0 shrink-[2] truncate">
                             → {row.step.returns}

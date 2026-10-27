@@ -24,13 +24,7 @@ import { useFlows } from "@/components/useFlows";
 import { useNotes, type NotesApi } from "@/components/useNotes";
 import { useOutbox, type OutboxApi } from "@/components/useOutbox";
 import { useReview, type ReviewApi } from "@/components/useReview";
-import {
-  stepMarks,
-  stepsAt,
-  type FlowRow,
-  type StepAt,
-  type StepMark,
-} from "@/lib/flows/rows";
+import { stepsAt, type FlowRow, type StepAt } from "@/lib/flows/rows";
 import { AlertIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
@@ -691,7 +685,7 @@ export default function Page() {
     name: string;
     at: number;
   } | null>(null);
-  /** The filter Files changed opens with, from "read these yourself". */
+  /** The filter Files changed opens with, from "3 changes no flow reaches". */
   const [filesFilter, setFilesFilter] = useState<{
     filter: "yourself";
     at: number;
@@ -732,8 +726,8 @@ export default function Page() {
     setTab("files");
   }, []);
 
-  const openStep = useCallback((mark: Pick<StepMark, "flow" | "row">) => {
-    setStoryTarget({ flow: mark.flow, row: mark.row, at: Date.now() });
+  const openStep = useCallback((step: Omit<StoryTarget, "at">) => {
+    setStoryTarget({ flow: step.flow, row: step.row, at: Date.now() });
     setTab("story");
   }, []);
 
@@ -749,11 +743,8 @@ export default function Page() {
   }, []);
 
   // The last view's diff stays on screen while this one's loads; this view's
-  // flows must wait for it, or their marks sit on the old diff's lines.
+  // flows must wait for it, or they're matched against the old diff's files.
   const diffIsCurrent = diff !== null && diffView === viewId;
-
-  /** Every flow's steps, by the diff line each sits on, for the gutter marks. */
-  const marks = useMemo(() => (flowSet ? stepMarks(flowSet) : null), [flowSet]);
 
   /** Notes on the change's shape, pinned on the data cards and under flow titles. */
   const questions = useMemo(
@@ -1148,13 +1139,11 @@ export default function Page() {
                               noteRev={noteRev}
                               map={map}
                               flowSet={diffIsCurrent ? flowSet : null}
-                              marks={diffIsCurrent ? marks : null}
                               jump={filesJump}
                               onJumped={clearFilesJump}
                               filterAsk={filesFilter}
                               onShowOnMap={showOnMap}
                               commentNumbers={commentNumbers}
-                              onStep={openStep}
                               onComment={selectComment}
                             />
                           </div>

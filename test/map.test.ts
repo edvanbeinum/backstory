@@ -150,7 +150,7 @@ function assertTheChange(map: MapResponse) {
   // Dotfiles and brace globs map; tests and the model itself stay off.
   assert.equal(map.fileComponents["src/b/.hidden"], "Beta");
   assert.equal(map.fileComponents["src/x.ts"], "Beta");
-  assert.deepEqual(map.unmapped, ["src/loose.ts"]);
+  assert.equal(map.fileComponents["src/loose.ts"], undefined);
 }
 
 const changeRepo = change();
@@ -358,24 +358,6 @@ test("a container whose own files changed keeps them when drawn as the box aroun
   assert.equal(node("app.api.auth")?.parent, "app.api");
 });
 
-test("hidden counts the components the focused map leaves out, never the boxes around them or the people", async () => {
-  const repo = shop(`            jobs = container "Jobs" {
-                one = component "One"
-                two = component "Two"
-                three = component "Three"
-            }`);
-  const touched = repo.commit({ "src/a/one.ts": "2\n" }, "touch");
-  const map = await buildMap(repo.dir, repo.docs, touched);
-  const leaves = map.nodes
-    .filter((n) => !n.group)
-    .map((n) => n.id)
-    .sort();
-  assert.deepEqual(leaves, ["app.web.a", "app.web.b", "shopper"]);
-  // One, Two and Three are left out. Shopper isn't a component, and Web and
-  // App are drawn as boxes, so none of them count.
-  assert.equal(map.hidden, 3);
-});
-
 test("a base with no model adds nothing", async () => {
   const map = await buildMap(changeRepo.dir, null, changeRepo.base);
   assert.equal(map.baseModel, false);
@@ -514,13 +496,11 @@ test("uncommitted work puts every changed app file, staged, unstaged or untracke
   assert.deepEqual(byName.get("Gamma")?.fileStats, [
     { path: "src/c/three.ts", additions: 2, deletions: 0, status: "A" },
   ]);
-  assert.equal(byName.get("Gamma")?.newFiles, 1);
   assert.deepEqual(map.fileComponents, {
     "src/a/one.ts": "Alpha",
     "src/b/two.ts": "Beta",
     "src/c/three.ts": "Gamma",
   });
-  assert.deepEqual(map.unmapped, []);
   assert.ok(map.edges.length > 0);
   assert.ok(map.edges.every((e) => e.state === "same"));
 });
@@ -550,7 +530,6 @@ test("an untracked file no component has is off the map, and an untracked test i
   write(repo.dir, "src/loose.ts", "nobody's\n");
   write(repo.dir, "test/new.test.ts", "t\n");
   const map = await repo.map();
-  assert.deepEqual(map.unmapped, ["src/loose.ts"]);
   assert.deepEqual(map.fileComponents, {});
 });
 

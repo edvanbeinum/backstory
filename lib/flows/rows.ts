@@ -17,7 +17,7 @@ export interface FlowRow {
   step: FlowStep;
   /** Which side of the diff the step's line is on */
   side: "old" | "new";
-  /** "runs 2–7 again", from `sameAs` */
+  /** "runs load() again", from `sameAs` */
   again: string | null;
 }
 
@@ -46,20 +46,11 @@ function commonIds(a: string[], b: string[]): Set<string> {
   return out;
 }
 
-/** The note a `sameAs` step carries: the range of steps it re-runs. */
+/** The note a `sameAs` step carries: the step whose calls it runs again. */
 function againNote(steps: FlowStep[], step: FlowStep): string | null {
   if (!step.sameAs) return null;
-  const start = steps.findIndex((s) => s.id === step.sameAs);
-  if (start === -1) return null;
-  let end = start;
-  while (
-    end + 1 < steps.length &&
-    steps[end + 1].nesting > steps[start].nesting
-  )
-    end++;
-  return end > start
-    ? `runs ${start + 1}–${end + 1} again`
-    : `runs ${start + 1} again`;
+  const same = steps.find((s) => s.id === step.sameAs);
+  return same ? `runs ${same.label} again` : null;
 }
 
 const sameWords = (a: FlowStep, b: FlowStep) =>
@@ -126,8 +117,8 @@ export function flowRows(
       rows.push(row("del", b, "old", i + 1, null, before));
       i++;
     } else if (a && !shared.has(a.id)) {
-      // Newly on the flow but on unchanged code: a step without a "was"
-      // number, not a "+".
+      // Mark a step new to the flow as added only when its line is, since
+      // the flow reaching unchanged code doesn't change that code.
       const kind = isAddedLine(hunks, a.file, a.line) ? "add" : "ctx";
       rows.push(row(kind, a, "new", null, j + 1, after));
       j++;
@@ -152,22 +143,36 @@ export function flowRows(
 export interface FlowSummary {
   added: number;
   removed: number;
-  beforeSteps: number | null;
-  afterSteps: number;
   /** The change altered this flow (or it's new) */
   changed: boolean;
+  /** "New flow", "1 step added, 2 removed" or "Same steps" */
+  text: string;
 }
 
 export function summarise(flow: Flow, hunks: FlowHunk[]): FlowSummary {
   const rows = flowRows(flow, "diff", hunks);
   const added = rows.filter((r) => r.kind === "add").length;
   const removed = rows.filter((r) => r.kind === "del").length;
+  // The noun goes with the first count: "1 step added, 2 removed".
+  const parts = (
+    [
+      [added, "added"],
+      [removed, "removed"],
+    ] as const
+  )
+    .filter(([n]) => n > 0)
+    .map(([n, word], i) =>
+      i === 0 ? `${n} ${n === 1 ? "step" : "steps"} ${word}` : `${n} ${word}`,
+    );
   return {
     added,
     removed,
-    beforeSteps: flow.before?.length ?? null,
-    afterSteps: flow.after.length,
     changed: flow.isNew || added > 0 || removed > 0,
+    text: flow.isNew
+      ? "New flow"
+      : parts.length > 0
+        ? parts.join(", ")
+        : "Same steps",
   };
 }
 
@@ -298,31 +303,9 @@ export function componentPath(flow: Flow, rows: FlowRow[]): string[] {
   return path;
 }
 
-/** A flow step on a diff line: `1·7` is flow 1, step 7. */
-export interface StepMark {
-  /** Unique across flows */
-  key: string;
-  /** The flow's index in the set */
-  flow: number;
-  /** The step's row key in the flow's diff mode */
-  row: string;
-  chip: string;
-  /** A removed step, on the line as it was */
-  was: boolean;
-}
-
-export interface StepMarks {
-  old: Map<number, StepMark[]>;
-  new: Map<number, StepMark[]>;
-}
-
-/** The number a row shows: a removed step by its old one. */
-const stepNumber = (row: FlowRow) =>
-  row.kind === "del" ? row.was : (row.now ?? row.was);
-
 /**
- * Cache each set's diff-mode rows, so the gutter marks and every comment's
- * step lookup share one LCS per flow rather than one per thread.
+ * Cache each set's diff-mode rows, so every comment's step lookup shares one
+ * LCS per flow rather than one per thread.
  */
 const diffRowsCache = new WeakMap<FlowSet, FlowRow[][]>();
 function diffRows(set: FlowSet): FlowRow[][] {
@@ -334,17 +317,18 @@ function diffRows(set: FlowSet): FlowRow[][] {
   return rows;
 }
 
-/** A flow's step, by number: flow 1, step 5. */
+/** A flow's step: flow 1, at `load()`. */
 export interface StepAt {
   /** 1-based, as the story numbers flows */
   flow: number;
-  step: number;
+  /** The step's label, as its row in the open flow shows it */
+  label: string;
   /** The step's row in the flow's diff mode */
   row: FlowRow;
 }
 
 /**
- * The step a line is on, for a comment's badge and its "On flow 1, step 5".
+ * The step a line is on, for a comment's badge and its "On flow 1, at load()".
  * One step only: a line two flows share names the first flow's, so a comment
  * gets one badge, not two.
  */
@@ -357,7 +341,7 @@ export function stepsAt(
   for (const [i, rows] of diffRows(set).entries()) {
     for (const row of rows) {
       if (row.side === side && row.step.file === path && row.step.line === line)
-        return { flow: i + 1, step: stepNumber(row) ?? 0, row };
+        return { flow: i + 1, label: row.step.label, row };
     }
   }
   return null;
@@ -388,31 +372,5 @@ export function fileFlows(
     ].sort((a, b) => a - b);
     out.set(path, flows.length > 0 ? flows : "yourself");
   }
-  return out;
-}
-
-/** Every flow's steps, by file and by the line each sits on. */
-export function stepMarks(set: FlowSet): Map<string, StepMarks> {
-  const out = new Map<string, StepMarks>();
-  diffRows(set).forEach((rows, i) => {
-    for (const row of rows) {
-      const entry = out.get(row.step.file) ?? {
-        old: new Map(),
-        new: new Map(),
-      };
-      const side = entry[row.side];
-      side.set(row.step.line, [
-        ...(side.get(row.step.line) ?? []),
-        {
-          key: `${i}/${row.key}`,
-          flow: i,
-          row: row.key,
-          chip: `${i + 1}·${stepNumber(row)}`,
-          was: row.kind === "del",
-        },
-      ]);
-      out.set(row.step.file, entry);
-    }
-  });
   return out;
 }

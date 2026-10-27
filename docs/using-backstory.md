@@ -89,10 +89,10 @@ lists them by path instead, each file naming its component. On uncommitted
 work, the row above the files gives its size in files and lines. Once the change is
 traced, each file says which flows it is on, or **read yourself** when it is app
 code no flow explains, and filters above the files show only the hunks to read
-yourself, or the files on one flow; **read these yourself** beside the flows on
-Story opens the first.
-Marks in the gutter beside a line open what is there: `⇄ 1·7` opens flow 1, step
-7 in the story, and `💬 2` opens review comment 2 in Comments.
+yourself, or the files on one flow; the link beside the flows on Story, such as
+**3 changes no flow reaches**, opens the first.
+A mark in the gutter beside a line, such as `💬 2`, opens review comment 2 in
+Comments.
 
 **View file** — every file header has a _View file_ toggle that swaps the hunks
 for the entire file at that commit, change still highlighted in place, for when
@@ -124,10 +124,10 @@ repo's header until it ends.
 Once Claude Code has drawn anything on the page, one footnote at the bottom of
 Story says so and has:
 
-- **Turn off**, which stops reading this repo's maps, data models and
-  descriptions as it and its worktrees open; a read already running finishes.
-  Once the repo is turned off, **Read automatically** takes its place and turns
-  reading back on.
+- **Stop reading this repo automatically**, which stops reading this repo's
+  maps, data models and descriptions as it and its worktrees open; a read
+  already running finishes. Once the repo is turned off, **Read this repo
+  automatically** takes its place and turns reading back on.
 - **Draw the map again**, which reads main's map in full again and removes every
   map worked out from the old one.
 - **Read the data model again**, when Claude Code read the data model, which
@@ -172,8 +172,8 @@ before reading its lines:
     repo, or to `~/.backstory/models/`.
   - Opening a repo starts the read of main's map, and opening a view on Story
     starts the view's read. For a repo you turned off, **Draw the map** where
-    the map goes reads one view, and **Read automatically** beside it turns
-    reading back on.
+    the map goes reads one view, and **Read this repo automatically** beside
+    it turns reading back on.
   - The map draws each component inside its container's box, and each
     container inside its system's box. An arrow ends at the box the model
     names, so an arrow to a container meets the container's edge.
@@ -267,8 +267,8 @@ Every read runs through your own Claude Code login:
   on a large repo and cents on a small one, and each change after it is cents. A
   trace usually costs $0.10–0.40, and a change's description a few cents.
 - On a Claude subscription, reads count toward Claude's usage limits.
-- Each repo has **Turn off**, in the footnote at the bottom of Story, to stop
-  reading it as it opens.
+- Each repo has **Stop reading this repo automatically**, in the footnote at
+  the bottom of Story, to stop reading it as it opens.
 
 ## Reviewing an agent's work
 
@@ -300,8 +300,7 @@ commit, and press **+**. **+ Note for the agent**, at the top of Story, covers
 the work as a whole. In a note, `⌘↵` saves it and `Esc` cancels.
 
 The notes box appears at the bottom of the window with your first note, or as
-soon as an agent is waiting, and has **Add a general note** for more. When you
-review a stack of commits one at a time, the notes on each commit are kept to
+soon as an agent is waiting. When you review a stack of commits one at a time, the notes on each commit are kept to
 send together, and the box lists the ones on other changes.
 
 A note on a commit is sent naming the commit, and whether it's been pushed.
