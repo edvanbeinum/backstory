@@ -387,9 +387,9 @@ function DataGraph({
   );
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState<OpenEntity | null>(null);
-  if (focus && focus !== focused) {
+  if (focus !== focused) {
     setFocused(focus);
-    setOpen((cur) => new Set(cur).add(focus.name));
+    if (focus) setOpen((cur) => new Set(cur).add(focus.name));
   }
   // Draw changed entities, the neighbours a changed one links to, and the
   // entity the map asked for, which may be an unchanged one a component
