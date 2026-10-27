@@ -1524,16 +1524,23 @@ tr.step-code-target td.diff-num {
 .story-map .map-key {
   margin-top: 8px;
 }
+/* A box that uses the record the pointer is on. It comes before highlight so
+   a box that is both keeps the stronger ring. */
+.map-node.uses {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+}
 .map-node.highlight,
 .map-group.highlight,
 .data-card.highlight {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
-/* A box that uses the record the pointer is on. */
-.map-node.uses {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent);
+/* Keep an added card's green bar under the outline. */
+.data-card.added.highlight {
+  box-shadow:
+    inset 3px 0 0 var(--success),
+    0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 
 /* The line under the map: its parts, a dot between each, wrapping; the data
