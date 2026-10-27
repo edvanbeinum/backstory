@@ -35,9 +35,7 @@
 
   --overlay-shadow: 0 8px 24px rgba(31, 35, 40, 0.12);
 
-  /* For the flow and map views: Primer's emphasis green (diffstat squares),
-     the UnderlineNav's active tab, and an empty diffstat square. */
-  --success-emphasis: #1f883d;
+  /* For the flow and map views: the UnderlineNav's active tab. */
   --tab-active: #fd8c73;
   --lifeline: #c4ccd5;
 
@@ -73,7 +71,6 @@
 
     --overlay-shadow: 0 8px 24px rgba(1, 4, 9, 0.8);
 
-    --success-emphasis: #238636;
     --tab-active: #f78166;
     --lifeline: #4b535d;
 
@@ -107,7 +104,6 @@
 
   --overlay-shadow: 0 8px 24px rgba(1, 4, 9, 0.8);
 
-  --success-emphasis: #238636;
   --tab-active: #f78166;
   --lifeline: #4b535d;
 
