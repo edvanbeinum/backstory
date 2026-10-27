@@ -129,7 +129,8 @@ primitives:
     symbols:
       - stepsAt
       - fileFlows
-    use: 'Where flows meet the diff''s lines. `stepsAt` is the one step a line is on, for a comment''s badge and its place in the story; `fileFlows` is each file''s flows, or "read yourself" for app code on none.'
+      - recordsOnComponents
+    use: 'Where flows meet the diff''s lines. `stepsAt` is the one step a line is on, for a comment''s badge and its place in the story; `fileFlows` is each file''s flows, or "read yourself" for app code on none; `recordsOnComponents` is the records each component uses, from the steps'' data tags and the data model, which the map''s boxes list.'
   - name: read the C4 model
     block: model reader (the map)
     file: lib/model.ts

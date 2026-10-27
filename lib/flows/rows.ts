@@ -1,3 +1,4 @@
+import type { EntityDiff } from "../data/types";
 import { isAddedLine } from "./hunks";
 import type { Flow, FlowHunk, FlowSet, FlowStep } from "./types";
 
@@ -372,5 +373,63 @@ export function fileFlows(
     ].sort((a, b) => a - b);
     out.set(path, flows.length > 0 ? flows : "yourself");
   }
+  return out;
+}
+
+/** A stored record one component uses, from the data model and the flows' data tags. */
+export interface RecordUse {
+  entity: string;
+  /** The data model declares it in this component */
+  declared: boolean;
+  /** What the steps here do to it, each once, in flow and step order */
+  does: string[];
+  /** The steps' chips, "1·3", for the title */
+  steps: string[];
+}
+
+/**
+ * The records each component uses, by component name: the ones the data
+ * model declares in it, then the ones its after-side steps tag, in the
+ * order first met. A step is on its caller's component, or else on its
+ * file's, so a step from a participant the model doesn't place still counts
+ * when its file changed.
+ */
+export function recordsOnComponents(
+  set: FlowSet | null,
+  fileComponents: Record<string, string>,
+  entities: EntityDiff[] | null,
+): Map<string, RecordUse[]> {
+  const out = new Map<string, RecordUse[]>();
+  const recordOn = (component: string, entity: string): RecordUse => {
+    const list = out.get(component) ?? [];
+    out.set(component, list);
+    let found = list.find((r) => r.entity === entity);
+    if (!found) {
+      found = { entity, declared: false, does: [], steps: [] };
+      list.push(found);
+    }
+    return found;
+  };
+  for (const e of entities ?? [])
+    if (e.component && e.state !== "removed")
+      recordOn(e.component, e.name).declared = true;
+  set?.flows.forEach((flow, i) => {
+    const byName = new Map(flow.participants.map((p) => [p.name, p]));
+    flow.after.forEach((step, j) => {
+      if (!step.data?.length) return;
+      const from = byName.get(step.from);
+      const component =
+        (from && !from.external && from.component) ||
+        fileComponents[step.file] ||
+        null;
+      if (!component) return;
+      for (const d of step.data) {
+        const record = recordOn(component, d.entity);
+        if (!record.does.includes(d.does)) record.does.push(d.does);
+        const chip = `${i + 1}·${j + 1}`;
+        if (!record.steps.includes(chip)) record.steps.push(chip);
+      }
+    });
+  });
   return out;
 }
