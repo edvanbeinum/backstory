@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import type { DataResponse } from "@/lib/data/types";
-import type { StepMark } from "@/lib/flows/rows";
 import type { DiffFile } from "@/lib/types";
 import { filesNotSeen, type Stop } from "@/lib/walk";
 import { DataCards } from "./DataSummary";
@@ -167,7 +166,6 @@ export function StopView({
   entityNotes,
   renderFiles,
   onNote,
-  onStep,
   onGo,
   onMap,
   onShowOnMap,
@@ -187,8 +185,6 @@ export function StopView({
   renderFiles: (files: DiffFile[]) => React.ReactNode;
   /** Save a general note; null while the change on screen is loading */
   onNote: ((body: string) => void) | null;
-  /** Open a flow step in Story on one page */
-  onStep: (mark: StepMark) => void;
   onGo: (index: number) => void;
   /** Whether the map draws a component, so its chip can outline it */
   onMap: (name: string) => boolean;
@@ -248,22 +244,6 @@ export function StopView({
           {stop.sentence && (
             <p className="text-[14px]">
               <Ticked text={stop.sentence} />
-            </p>
-          )}
-          {stop.steps.length > 0 && (
-            <p className="walk-steps">
-              <span>On the flows at</span>
-              {stop.steps.map((mark) => (
-                <button
-                  key={mark.key}
-                  type="button"
-                  className="mono"
-                  title={`Open flow ${mark.flow + 1} at this step`}
-                  onClick={() => onStep(mark)}
-                >
-                  ⇄ {mark.chip}
-                </button>
-              ))}
             </p>
           )}
           {map}

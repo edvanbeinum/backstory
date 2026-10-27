@@ -106,7 +106,7 @@ Story opens on the change's overview, then takes you through it in order:
    to the overview's map, outlining it, when the change doesn't touch it.
 3. **Each changed component**, in the map's order, top to bottom and left to
    right: what the change does in it, the records its flow steps use beside
-   its file count, the flow steps its files are on as `⇄ 1·3` chips, the map
+   its file count, the map
    outlining it, and its files with their diffs. Leave line notes on them as
    in Files changed, or **+ Note for the agent** for a note on the component as
    a whole, which starts "On" and its name.

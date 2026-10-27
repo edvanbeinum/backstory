@@ -1722,24 +1722,6 @@ tr.step-code-target td.diff-num {
   font-size: 12px;
   color: var(--fg-muted);
 }
-.walk-steps {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
-  font-size: 12px;
-  color: var(--fg-muted);
-}
-.walk-steps button {
-  padding: 1px 7px;
-  border: 1px solid var(--border);
-  border-radius: 2em;
-  font-size: 11px;
-  color: var(--accent);
-}
-.walk-steps button:hover {
-  border-color: var(--accent);
-}
 .walk-ahead {
   font-size: 13px;
   color: var(--fg-muted);

@@ -1183,7 +1183,6 @@ export default function Page() {
                                       )
                                   : null
                               }
-                              onStep={openStep}
                             />
                           </div>
                         )}

@@ -6,7 +6,7 @@ import { filePaths } from "@/lib/anchor";
 import { WORKING_REV } from "@/lib/constants";
 import type { DataResponse } from "@/lib/data/types";
 import { isOnMap } from "@/lib/description/types";
-import type { FlowRow, StepMark } from "@/lib/flows/rows";
+import type { FlowRow } from "@/lib/flows/rows";
 import type { MapResponse } from "@/lib/map";
 import type { DiffFile, DiffResponse } from "@/lib/types";
 import { resolveStop, viewKey } from "@/lib/url";
@@ -71,7 +71,6 @@ export function Story({
   walkNavRef,
   renderFiles,
   onNote,
-  onStep,
 }: {
   repo: string;
   rev: string;
@@ -112,8 +111,6 @@ export function Story({
   renderFiles: (files: DiffFile[]) => React.ReactNode;
   /** Save a general note; null while the change on screen is loading */
   onNote: ((body: string) => void) | null;
-  /** Open a flow step, leaving the walk */
-  onStep: (mark: StepMark) => void;
 }) {
   const filesInDiff = useMemo(
     () => (diff ? new Set(diff.files.flatMap(filePaths)) : null),
@@ -335,7 +332,6 @@ export function Story({
             entityNotes={entityNotes}
             renderFiles={renderFiles}
             onNote={onNote}
-            onStep={onStep}
             onGo={go}
             onMap={onMap}
             onShowOnMap={toStop}

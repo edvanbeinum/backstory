@@ -309,23 +309,6 @@ test("a component's stop names its container and its arrows on the map", () => {
   assert.equal(store?.kind === "component" && store.container, null);
 });
 
-test("a component's stop lists the flow steps its files are on, and none untraced", () => {
-  const chips = (flows: FlowSet | null) =>
-    Object.fromEntries(
-      all({ flows }).flatMap((s) =>
-        s.kind === "component"
-          ? [[s.node.name, s.steps.map((m) => m.chip)]]
-          : [],
-      ),
-    );
-  assert.deepEqual(chips(FLOWS), {
-    Screen: [],
-    Api: ["1·1", "1·3"],
-    Store: ["1·2"],
-  });
-  assert.deepEqual(chips(null), { Screen: [], Api: [], Store: [] });
-});
-
 test("a component's stop lists the entities its steps use, each once, in flow and step order", () => {
   const tagged = (s: FlowStep, ...entities: string[]): FlowStep => ({
     ...s,
