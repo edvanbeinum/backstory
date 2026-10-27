@@ -107,6 +107,15 @@ const fileName = (path: string) => path.split("/").pop() ?? path;
 
 const NO_RECORDS = new Map<string, RecordUse[]>();
 
+/**
+ * Splits a box's list into the items it names and the ones folded into
+ * "+N more". Names one past `max` too, since "+1 more" takes a line anyway.
+ */
+function fold<T>(list: T[], max: number): [T[], T[]] {
+  const at = list.length === max + 1 ? max + 1 : max;
+  return [list.slice(0, at), list.slice(at)];
+}
+
 function recordTitle(r: RecordUse) {
   const parts = r.declared ? ["Declared here"] : [];
   if (r.steps.length > 0)
@@ -329,18 +338,12 @@ function MapCanvas({
 
       {[...placed.values()].map((n) => {
         if (n.group) return null;
-        // "+1 more" takes a line anyway: name the file instead.
-        const shown = n.fileStats.slice(
-          0,
-          n.fileStats.length === MAX_FILES + 1 ? MAX_FILES + 1 : MAX_FILES,
+        const [shown, folded] = fold(n.fileStats, MAX_FILES);
+        const more = folded.length;
+        const [usesShown, usesMore] = fold(
+          records.get(n.name) ?? [],
+          MAX_RECORDS,
         );
-        const more = n.fileStats.length - shown.length;
-        const uses = records.get(n.name) ?? [];
-        const usesShown = uses.slice(
-          0,
-          uses.length === MAX_RECORDS + 1 ? MAX_RECORDS + 1 : MAX_RECORDS,
-        );
-        const usesMore = uses.slice(usesShown.length);
         return (
           <div
             key={n.id}
