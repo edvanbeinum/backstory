@@ -105,8 +105,6 @@ export function jumpToFile(path: string, root: ParentNode = document): boolean {
 
 const fileName = (path: string) => path.split("/").pop() ?? path;
 
-const NO_RECORDS = new Map<string, RecordUse[]>();
-
 /**
  * Splits a box's list into the items it names and the ones folded into
  * "+N more". Names one past `max` too, since "+1 more" takes a line anyway.
@@ -130,7 +128,7 @@ function MapCanvas({
   edges,
   width,
   highlight,
-  records = NO_RECORDS,
+  records,
   onJump,
   onShowRecord,
   onHoverNode,
@@ -141,12 +139,12 @@ function MapCanvas({
   /** A component's name, outlined as hovering it would */
   highlight: string | null;
   /** The records each component uses, by its name */
-  records?: Map<string, RecordUse[]>;
+  records: Map<string, RecordUse[]>;
   onJump: (path: string) => void;
   /** A record was clicked, to show it in the data model */
-  onShowRecord?: (entity: string) => void;
+  onShowRecord: (entity: string) => void;
   /** The pointer moved onto a box, by its component's name, or off it */
-  onHoverNode?: (name: string | null) => void;
+  onHoverNode: (name: string | null) => void;
 }) {
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const { placed, height } = useMemo(
@@ -353,8 +351,8 @@ function MapCanvas({
             }}
             className={`map-node ${n.state} ${n.files.length ? "jumps" : ""} ${highlight === n.name ? "highlight" : ""} ${usesHovered(n.name) ? "uses" : ""}`}
             style={{ left: n.x, top: n.y, width: n.w }}
-            onMouseEnter={onHoverNode && (() => onHoverNode(n.name))}
-            onMouseLeave={onHoverNode && (() => onHoverNode(null))}
+            onMouseEnter={() => onHoverNode(n.name)}
+            onMouseLeave={() => onHoverNode(null)}
             onClick={() => {
               if (n.files[0]) onJump(n.files[0]);
             }}
@@ -417,31 +415,21 @@ function MapCanvas({
             {usesShown.length > 0 && (
               <ul className="map-records">
                 {usesShown.map((r) => {
-                  const cls = `map-record mono ${hoverRecord === r.entity ? "uses" : ""}`;
-                  const hover = {
-                    onMouseEnter: () => setHoverRecord(r.entity),
-                    onMouseLeave: () => setHoverRecord(null),
-                  };
                   return (
                     <li key={r.entity}>
-                      {onShowRecord ? (
-                        <button
-                          type="button"
-                          className={cls}
-                          title={`${recordTitle(r)}\nShow it in the data model`}
-                          {...hover}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onShowRecord(r.entity);
-                          }}
-                        >
-                          {r.entity}
-                        </button>
-                      ) : (
-                        <span className={cls} title={recordTitle(r)} {...hover}>
-                          {r.entity}
-                        </span>
-                      )}
+                      <button
+                        type="button"
+                        className={`map-record mono ${hoverRecord === r.entity ? "uses" : ""}`}
+                        title={`${recordTitle(r)}\nShow it in the data model`}
+                        onMouseEnter={() => setHoverRecord(r.entity)}
+                        onMouseLeave={() => setHoverRecord(null)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onShowRecord(r.entity);
+                        }}
+                      >
+                        {r.entity}
+                      </button>
                     </li>
                   );
                 })}
@@ -793,7 +781,7 @@ export function SystemMap({
   repo,
   rev,
   highlight = null,
-  records = NO_RECORDS,
+  records,
   onOpenFile,
   onShowRecord,
   onHoverNode,
@@ -809,11 +797,11 @@ export function SystemMap({
   /** A component to outline, asked for from Files changed */
   highlight?: { name: string; at: number } | null;
   /** The records each component uses, by its name, from `recordsOnComponents` */
-  records?: Map<string, RecordUse[]>;
+  records: Map<string, RecordUse[]>;
   /** A record was clicked, to show it in the data model */
-  onShowRecord?: (entity: string) => void;
+  onShowRecord: (entity: string) => void;
   /** The pointer moved onto a box, by its component's name, or off it */
-  onHoverNode?: (name: string | null) => void;
+  onHoverNode: (name: string | null) => void;
   /** Show a file in Files changed */
   onOpenFile: (path: string) => void;
   /** The rest of the line under the map: the data model's summary */
