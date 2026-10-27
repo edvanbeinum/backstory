@@ -249,9 +249,9 @@ export function Story({
       (s) => s.kind === "component" && s.node.name === name,
     );
     if (i !== -1) return go(i);
-    // Go to the overview to outline a component with no stop, since the data
-    // stop, where its chip was clicked, draws no map.
-    go(0);
+    // Outline a component with no stop on the overview's map, going there
+    // first from the data stop, which draws no map.
+    if (index !== 0) go(0);
     onShowOnMap(name);
   };
 
