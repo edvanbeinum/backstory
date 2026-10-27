@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { filePaths } from "@/lib/anchor";
 import { WORKING_REV } from "@/lib/constants";
 import type { DataResponse } from "@/lib/data/types";
+import { isOnMap } from "@/lib/description/types";
 import type { FlowRow, StepMark } from "@/lib/flows/rows";
 import type { MapResponse } from "@/lib/map";
 import type { DiffFile, DiffResponse } from "@/lib/types";
@@ -244,6 +245,8 @@ export function Story({
     };
   }, [walk, index, stops.length, walkNavRef]);
 
+  const onMap = (name: string) => isOnMap(name, map);
+
   const toStop = (name: string) => {
     const i = stops.findIndex(
       (s) => s.kind === "component" && s.node.name === name,
@@ -290,6 +293,7 @@ export function Story({
           notes={entityNotes}
           repo={repo}
           rev={rev}
+          onMap={onMap}
           onShowOnMap={onShowOnMap}
         />
       )}
@@ -333,6 +337,7 @@ export function Story({
             onNote={onNote}
             onStep={onStep}
             onGo={go}
+            onMap={onMap}
             onShowOnMap={toStop}
           />
           {footnote}

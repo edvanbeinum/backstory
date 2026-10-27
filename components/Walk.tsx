@@ -169,6 +169,7 @@ export function StopView({
   onNote,
   onStep,
   onGo,
+  onMap,
   onShowOnMap,
 }: {
   stops: Stop[];
@@ -189,6 +190,8 @@ export function StopView({
   /** Open a flow step in Story on one page */
   onStep: (mark: StepMark) => void;
   onGo: (index: number) => void;
+  /** Whether the map draws a component, so its chip can outline it */
+  onMap: (name: string) => boolean;
   /** An entity's component was clicked: go to its stop, or outline it on the overview's map */
   onShowOnMap: (name: string) => void;
 }) {
@@ -223,6 +226,7 @@ export function StopView({
             <DataCards
               data={data}
               notes={entityNotes}
+              onMap={onMap}
               onShowOnMap={onShowOnMap}
             />
           )}

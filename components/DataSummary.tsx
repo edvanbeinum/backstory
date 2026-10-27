@@ -119,11 +119,14 @@ function Row({
 
 function ComponentChip({
   name,
+  onMap,
   onShowOnMap,
 }: {
   name: string;
+  onMap: (name: string) => boolean;
   onShowOnMap: (name: string) => void;
 }) {
+  if (!onMap(name)) return <span className="file-owner">{name}</span>;
   return (
     <button
       type="button"
@@ -146,12 +149,14 @@ function EntityCard({
   p,
   open,
   onToggle,
+  onMap,
   onShowOnMap,
   notes = [],
 }: {
   p: Presented;
   open: boolean;
   onToggle: () => void;
+  onMap: (name: string) => boolean;
   onShowOnMap: (name: string) => void;
   /** "Worth a look" notes pinned on this entity */
   notes?: string[];
@@ -163,7 +168,11 @@ function EntityCard({
       <div className="data-card same compact" title={e.file ?? undefined}>
         <span className="name">{e.name}</span>
         {e.component && (
-          <ComponentChip name={e.component} onShowOnMap={onShowOnMap} />
+          <ComponentChip
+            name={e.component}
+            onMap={onMap}
+            onShowOnMap={onShowOnMap}
+          />
         )}
       </div>
     );
@@ -190,7 +199,11 @@ function EntityCard({
           )}
         </button>
         {e.component && (
-          <ComponentChip name={e.component} onShowOnMap={onShowOnMap} />
+          <ComponentChip
+            name={e.component}
+            onMap={onMap}
+            onShowOnMap={onShowOnMap}
+          />
         )}
       </div>
       <button type="button" className="data-card-line" onClick={onToggle}>
@@ -326,11 +339,13 @@ function DataGraph({
   shown,
   width,
   notes,
+  onMap,
   onShowOnMap,
 }: {
   shown: Presented[];
   width: number;
   notes?: Map<string, string[]>;
+  onMap: (name: string) => boolean;
   onShowOnMap: (name: string) => void;
 }) {
   const changedNames = useMemo(
@@ -514,6 +529,7 @@ function DataGraph({
             p={n}
             open={open.has(n.id)}
             notes={notes?.get(n.id)}
+            onMap={onMap}
             onShowOnMap={onShowOnMap}
             onToggle={() =>
               setOpen((cur) => {
@@ -643,10 +659,13 @@ export type DataDraftApi = ReturnType<typeof useDataDraft>;
 export function DataCards({
   data,
   notes,
+  onMap,
   onShowOnMap,
 }: {
   data: DataResponse;
   notes?: Map<string, string[]>;
+  /** Whether the map draws a component, so its chip can outline it */
+  onMap: (name: string) => boolean;
   /** An entity's component was clicked: go to its stop, or outline it on the map */
   onShowOnMap: (name: string) => void;
 }) {
@@ -671,6 +690,7 @@ export function DataCards({
             shown={shown}
             width={width - 2}
             notes={notes}
+            onMap={onMap}
             onShowOnMap={onShowOnMap}
           />
         )}
@@ -694,6 +714,7 @@ export function DataSummary({
   notes,
   repo,
   rev,
+  onMap,
   onShowOnMap,
 }: {
   /** The view's data model and its read, from `useDataDraft` */
@@ -701,6 +722,8 @@ export function DataSummary({
   notes?: Map<string, string[]>;
   repo: string;
   rev: string;
+  /** Whether the map draws a component, so its chip can outline it */
+  onMap: (name: string) => boolean;
   /** An entity's component was clicked: outline it on the map */
   onShowOnMap: (name: string) => void;
 }) {
@@ -796,6 +819,7 @@ export function DataSummary({
                 shown={shown}
                 width={width - 2}
                 notes={notes}
+                onMap={onMap}
                 onShowOnMap={onShowOnMap}
               />
             )}
