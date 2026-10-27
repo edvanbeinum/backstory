@@ -410,15 +410,10 @@ const names = (list: MapNode[]) => {
     : `${n.slice(0, 3).join(", ")} +${n.length - 3}`;
 };
 
-/** What the map's colours say changed in its structure, or why it can't say: nothing when every box and arrow is the same. */
+/** What the map's colours say changed in its boxes, or why it can't say: nothing when every box is the same. */
 function summary(map: MapResponse) {
   const added = map.nodes.filter((n) => n.state === "added");
   const removed = map.nodes.filter((n) => n.state === "removed");
-  const arrows = {
-    added: map.edges.filter((e) => e.state === "added").length,
-    removed: map.edges.filter((e) => e.state === "removed").length,
-    changed: map.edges.filter((e) => e.state === "changed").length,
-  };
   const parts: React.ReactNode[] = [];
   if (map.baseError)
     parts.push(
@@ -436,26 +431,6 @@ function summary(map: MapResponse) {
   if (removed.length)
     parts.push(
       <span className="text-[var(--danger)]">{names(removed)} removed</span>,
-    );
-  const plural = (n: number, w: string) =>
-    `${n} ${w} ${n === 1 ? "arrow" : "arrows"}`;
-  if (arrows.added)
-    parts.push(
-      <span className="text-[var(--success)]">
-        {plural(arrows.added, "new")}
-      </span>,
-    );
-  if (arrows.changed)
-    parts.push(
-      <span className="text-[var(--attention)]">
-        {plural(arrows.changed, "relabelled")}
-      </span>,
-    );
-  if (arrows.removed)
-    parts.push(
-      <span className="text-[var(--danger)]">
-        {plural(arrows.removed, "removed")}
-      </span>,
     );
   return parts;
 }
