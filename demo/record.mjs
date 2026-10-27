@@ -51,9 +51,12 @@ page.on("response", async (response) => {
 
 const settle = (ms = 2000) => page.waitForTimeout(ms);
 await page.goto(`${server}/?${new URLSearchParams({ repo: checkout })}`);
-await settle(12000);
 
 const trace = page.getByRole("button", { name: "Trace this change" });
+await trace
+  .or(page.locator(".flow-card"))
+  .first()
+  .waitFor({ timeout: 120_000 });
 if (await trace.count()) {
   await trace.click();
   const started = Date.now();
