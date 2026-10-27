@@ -101,7 +101,7 @@ export interface DataResponse {
    * drafted view the change touched none of, every entity, unchanged
    */
   entities: EntityDiff[];
-  /** On a drafted view: where the data is stored, what one stored unit is and when it is written */
+  /** On a drafted view: the kinds of store the data is kept in */
   storage?: string;
   /** Who drafted the model, when no reader found one and the AI provider read it */
   drafted: { provider: string; model: string | null } | null;

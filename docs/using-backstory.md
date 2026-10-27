@@ -224,8 +224,8 @@ before reading its lines:
   worked out from main's model, and its head from its base, so a second branch
   from the same point, or a branch rebased onto main, reads only its own
   change. The result is kept in `~/.backstory/data/`.
-  - On a model Claude Code read, one sentence under the graph says where the
-    data is stored, what one stored unit is and when it is written. A value
+  - On a model Claude Code read, a short sentence under the graph names the
+    kinds of store the data is kept in, such as a database or the Keychain. A value
     stored whole inside a record, such as a nested struct, is an arrow from
     the record to the value's entity, named after the field it is stored in, so
     two fields of the same type are two arrows.

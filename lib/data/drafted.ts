@@ -17,7 +17,7 @@ import type { Entity } from "./types";
 export const MAX_PATCH_BYTES = 400 * 1024;
 
 export interface DraftedHead {
-  /** One sentence: where the program keeps its records, what one stored unit is and when it is written */
+  /** A short sentence naming the kinds of store the program keeps its records in */
   storage: string;
   entities: Entity[];
 }
@@ -27,7 +27,7 @@ export interface DraftedDelta {
   changed: Entity[];
   /** Entities of the model the delta starts from that this commit doesn't have */
   absent: string[];
-  /** This commit's storage sentence, only when the patch changes where or how records are stored */
+  /** This commit's storage sentence, only when the patch adds or removes a kind of store */
   storage?: string;
 }
 
@@ -91,7 +91,7 @@ export const headSchema = () => ({
     storage: {
       type: "string",
       description:
-        "One short sentence: where this program keeps its records, what one stored unit is (a row per record, one value per server, one file per document) and when it is written",
+        'The kinds of store this program keeps its records in, in at most 15 plain words, with no file names, keys or contents, e.g. "A Postgres database." or "JSON files in the app\'s folders, UserDefaults and the Keychain."',
     },
     entities: entitiesSchema,
   },
@@ -107,7 +107,7 @@ const deltaSchema = () => ({
     storage: {
       type: "string",
       description:
-        "Only when the patch changes where or how records are stored: this commit's storage sentence, in the same form as the model below",
+        "Only when the patch adds or removes a kind of store: this commit's storage sentence, in the same form as the model below",
     },
   },
 });
@@ -128,7 +128,7 @@ const steering = (files: string[] | null) =>
 export const headPrompt = (files: string[] | null = null) =>
   `You are reading the code of one commit of a repository, in the current directory. Nothing may be run.
 
-Write down this program's data model: the records it persists, the things a reader would draw as an entity-relationship diagram. Whatever the storage is: a database, an ORM, JSON files, a key-value store, browser storage. In storage, say in one short sentence where it keeps them, what one stored unit is (a row per record, one value per server, one file per document) and when it is written.
+Write down this program's data model: the records it persists, the things a reader would draw as an entity-relationship diagram. Whatever the storage is: a database, an ORM, JSON files, a key-value store, browser storage. In storage, name the kinds of store it keeps them in, in at most 15 plain words, with no file names, keys or contents, e.g. "A Postgres database." or "JSON files in the app's folders, UserDefaults and the Keychain."
 ${steering(files)}
 ${RULES}
 
@@ -147,7 +147,7 @@ Below is the data model of another commit of this repository, and the patch from
 
 - changed: for every entity the patch changed or added, its full version as it is in THIS commit. Write each one in the same style as the model below, keeping everything the patch does not touch word for word.
 - absent: the names of entities in the model below that the patch removed, so they don't exist here.
-- storage: only when the patch changes where records are kept, what one stored unit is or when it is written, this commit's storage sentence in the same form. Otherwise leave it out.
+- storage: only when the patch adds or removes a kind of store, this commit's storage sentence in the same form. Otherwise leave it out.
 
 An entity the patch does not touch goes in neither list. If the patch changes no stored records, both lists are empty. Check the code here when the patch is unclear.
 ${steering(files)}
