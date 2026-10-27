@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChangeHeader } from "@/components/ChangeHeader";
 import { ClaudeCodeGate } from "@/components/ClaudeCodeGate";
 import { Comments } from "@/components/Comments";
-import { DiffView } from "@/components/DiffView";
 import { FeedbackBar } from "@/components/FeedbackBar";
 import { FilesChanged, type FilesJump } from "@/components/FilesChanged";
 import type { StoryTarget } from "@/components/FlowCard";
@@ -169,11 +168,6 @@ export default function Page() {
     null,
   );
   const [tab, setTab] = useState<Tab>("story");
-  /** Story walks through the change; false shows it all on one page. */
-  const [walk, setWalk] = useState(true);
-  /** The stop Story's walk is on, from 1, as the URL names it. */
-  const [stop, setStop] = useState(1);
-  const walkNavRef = useRef<((delta: number) => boolean) | null>(null);
   /** Bumped by watcher events; retriggers the working-tree diff fetch. */
   const [workingTick, setWorkingTick] = useState(0);
   /**
@@ -250,8 +244,6 @@ export default function Page() {
     setSetup(Boolean(fromUrl.setup));
     if (fromUrl.rev) setRev(fromUrl.rev);
     setTab(resolveTab(fromUrl));
-    setWalk(fromUrl.walk ?? true);
-    setStop(fromUrl.stop ?? 1);
     if (fromUrl.comment) {
       setCommentId(fromUrl.comment);
       setFocusAsk({ id: fromUrl.comment, at: Date.now() });
@@ -360,12 +352,11 @@ export default function Page() {
         comment: commentId,
         tab: inWorkspace ? tab : undefined,
         setup: setup && !inWorkspace,
-        ...(inWorkspace && { walk, stop }),
       },
       { push: inWorkspace !== wasInWorkspace.current },
     );
     wasInWorkspace.current = inWorkspace;
-  }, [ready, repoPath, ref, rev, commentId, tab, setup, walk, stop]);
+  }, [ready, repoPath, ref, rev, commentId, tab, setup]);
 
   // Someone navigating with the back/forward buttons, or editing the URL by
   // hand, should land on the view they asked for.
@@ -378,8 +369,6 @@ export default function Page() {
       setCommentId(fromUrl.comment);
       setTab(resolveTab(fromUrl));
       setSetup(Boolean(fromUrl.setup));
-      setWalk(fromUrl.walk ?? true);
-      setStop(fromUrl.stop ?? 1);
     };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
@@ -743,24 +732,14 @@ export default function Page() {
     setTab("files");
   }, []);
 
-  // A step opens in Story on one page, where the flows are, so every link
-  // into a step works the same from the walk.
   const openStep = useCallback((mark: Pick<StepMark, "flow" | "row">) => {
     setStoryTarget({ flow: mark.flow, row: mark.row, at: Date.now() });
-    setWalk(false);
     setTab("story");
   }, []);
 
   const showOnMap = useCallback((name: string) => {
     setMapHighlight({ name, at: Date.now() });
     setTab("story");
-  }, []);
-
-  // Clear the outline on every move through the walk, since each stop mounts
-  // its own map, which would otherwise scroll to the outline and keep it.
-  const goToStop = useCallback((to: number) => {
-    setStop(to);
-    setMapHighlight(null);
   }, []);
 
   const showYourself = useCallback(() => {
@@ -893,8 +872,6 @@ export default function Page() {
     setCommentId(null);
     setRev(WORKING_REV);
     setTab("story");
-    setWalk(true);
-    setStop(1);
   }, []);
 
   /**
@@ -912,7 +889,6 @@ export default function Page() {
     setRepoPath(trimmed);
     setSetup(false);
     setTab("story");
-    setStop(1);
   }, []);
 
   /** A change picked above the tabs: it opens on Story, as every view does. */
@@ -929,7 +905,6 @@ export default function Page() {
       }
       setRev(next);
       setTab("story");
-      setStop(1);
     },
     [session],
   );
@@ -993,14 +968,10 @@ export default function Page() {
         return;
       }
 
-      // On Story, j/k move between the walk's stops, or on one page walk the
-      // steps of the topmost open flow; with none to walk, they move changes
-      // as Files changed does.
+      // On Story, j/k walk the steps of the topmost open flow; with no flow
+      // open, they move changes as Files changed does.
       const delta = event.key === "j" ? 1 : -1;
-      if (
-        tab === "story" &&
-        (walkNavRef.current?.(delta) || flowNavRef.current?.(delta))
-      ) {
+      if (tab === "story" && flowNavRef.current?.(delta)) {
         event.preventDefault();
         return;
       }
@@ -1020,7 +991,6 @@ export default function Page() {
 
       event.preventDefault();
       setRev(order[next]);
-      setStop(1);
       window.scrollTo({ top: 0 });
     };
 
@@ -1145,29 +1115,6 @@ export default function Page() {
                               flowNotes={flowNotes}
                               badges={badges}
                               onBadge={selectComment}
-                              walk={walk}
-                              stop={stop}
-                              onStop={goToStop}
-                              onWalk={setWalk}
-                              walkNavRef={walkNavRef}
-                              renderFiles={(files) => (
-                                <DiffView
-                                  diff={diffIsCurrent ? diff : null}
-                                  loading={false}
-                                  error={null}
-                                  threads={threads}
-                                  repo={session.repo}
-                                  commit={commitForRev}
-                                  focusedThreadId={focusedThreadId}
-                                  notes={noteRev ? notes : null}
-                                  noteRev={noteRev}
-                                  marks={diffIsCurrent ? marks : null}
-                                  sections={[{ key: "stop", files }]}
-                                  commentNumbers={commentNumbers}
-                                  onStep={openStep}
-                                  onComment={selectComment}
-                                />
-                              )}
                               onNote={
                                 noteRev
                                   ? (body) =>

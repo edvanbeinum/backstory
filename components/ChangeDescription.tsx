@@ -193,7 +193,7 @@ export function ChangeDescription({
   read: DescriptionApi;
   /** The map on screen, for which places to look first link to it */
   map: MapResponse | null;
-  /** Outline a component on the map, or in Story's walk go to its stop */
+  /** Outline a component on the map */
   onShowOnMap: (name: string) => void;
 }) {
   const { status, start } = read;

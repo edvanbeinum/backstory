@@ -655,55 +655,6 @@ export function useDataDraft(
 
 export type DataDraftApi = ReturnType<typeof useDataDraft>;
 
-/** The changed entities as cards, as Show data opens them, for Story's walk. */
-export function DataCards({
-  data,
-  notes,
-  onMap,
-  onShowOnMap,
-}: {
-  data: DataResponse;
-  notes?: Map<string, string[]>;
-  /** Whether the map draws a component, so its chip can outline it */
-  onMap: (name: string) => boolean;
-  /** An entity's component was clicked: go to its stop, or outline it on the map */
-  onShowOnMap: (name: string) => void;
-}) {
-  const shown = useMemo(() => present(data.entities), [data]);
-  const boxRef = useRef<HTMLDivElement>(null);
-  const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-    const observer = new ResizeObserver(([entry]) =>
-      setWidth(entry.contentRect.width),
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-  return (
-    <div ref={boxRef}>
-      <p className="mb-2 text-[13px]">{summary(shown)}</p>
-      <div className="map-card">
-        {width > 0 && (
-          <DataGraph
-            shown={shown}
-            width={width - 2}
-            notes={notes}
-            onMap={onMap}
-            onShowOnMap={onShowOnMap}
-          />
-        )}
-      </div>
-      {data.storage && (
-        <p className="mt-2 px-1 text-[12px] text-[var(--fg-muted)]">
-          {data.storage}
-        </p>
-      )}
-    </div>
-  );
-}
-
 /**
  * The data model's part of the line under the map. Its parts sit in the
  * line's wrapping row; the graph opens on a row of its own beneath it,

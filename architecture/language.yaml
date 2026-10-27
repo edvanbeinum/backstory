@@ -37,19 +37,11 @@ terms:
       - panel
       - column
   - name: story
-    means: "The Story tab, where every view lands: the walk through the change, or with Show everything on one page the change description, then the map at full width with a line under it only when its structure changed, then each flow as a card (`components/Story.tsx`). Story holds the map's, the data model's and the description's reads: one progress line at the top says which run, a failed read's error and Try again, and a line for a big repo (`components/ReadLine.tsx`), except the map's running read, which the space the map will take shows instead, with a large spinner, on the first read a line that later reads are much quicker, and the big-repo line; one footnote at the bottom, once the AI drew anything, says who drew it and has Turn off, each drawing's Read again, and on one page Trace again once the flows are traced (`components/ReadFootnote.tsx`)."
+    means: "The Story tab, where every view lands, on one page: the change description, then the map at full width with a line under it only when its structure changed, then each flow as a card (`components/Story.tsx`). Story holds the map's, the data model's and the description's reads: one progress line at the top says which run, a failed read's error and Try again, and a line for a big repo (`components/ReadLine.tsx`), except the map's running read, which the space the map will take shows instead, with a large spinner, on the first read a line that later reads are much quicker, and the big-repo line; one footnote at the bottom, once the AI drew anything, says who drew it and has Turn off, each drawing's Read again, and Trace again once the flows are traced (`components/ReadFootnote.tsx`)."
     avoid:
       - strip, for the map or the data model's summary
-  - name: walk
-    means: "Story as it opens: the change one stop at a time under a pinned bar, with the map on each component stop outlining it, and no data phrase under it, since the data model has its own stop (`lib/walk.ts`, `components/Walk.tsx`). On uncommitted work, which has no description, the overview is the map. `stop=` in the URL names the stop, and `walk=0` opens Story on one page. The UI never says walk: it offers Walk me through it and Show everything on one page."
-    avoid:
-      - tour (reads as an app's onboarding tour)
-  - name: stop
-    means: "One part of the walk: the overview, the data model when it changed, one per changed component in the map's order (naming the records its steps' data tags use), the files no component has, and the finish with your notes. Every changed file is in exactly one stop. The UI never says stop: its bar reads 3 of 6."
-    avoid:
-      - step (that's a flow's step, as in `1·3`)
   - name: notes box
-    means: "The box pinned to the bottom of every tab with the notes for your agent, Add a general note, Send to agent and Copy (`components/FeedbackBar.tsx`). It shows once there is a note, while an agent is waiting on `backstory review`, or when a note couldn't be saved or sent; before that, + Note for the agent on the walk's finish or beside Walk me through it writes the first general note."
+    means: "The box pinned to the bottom of every tab with the notes for your agent, Add a general note, Send to agent and Copy (`components/FeedbackBar.tsx`). It shows once there is a note, while an agent is waiting on `backstory review`, or when a note couldn't be saved or sent; before that, + Note for the agent at the top of Story writes the first general note."
   - name: gutter mark
     means: "A mark beside a line in Files changed: `⇄ 1·7` is flow 1, step 7, and opens it in the story; `💬 2` is review comment 2, and opens it in Comments."
     avoid:
@@ -253,8 +245,7 @@ blocks:
       - app/page.tsx
       - components/
       - lib/recents.ts
-      - lib/walk.ts
-    summary: The page, the change's header and its three tabs (Story, which opens as a walk through the change, Files changed and Comments), and the recent repos kept in the browser's localStorage.
+    summary: The page, the change's header and its three tabs (Story, Files changed and Comments), and the recent repos kept in the browser's localStorage.
     read: "`components/Story.tsx`, the comment on `Story`"
   - name: CLI
     code:
