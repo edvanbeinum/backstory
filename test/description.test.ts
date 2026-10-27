@@ -134,12 +134,6 @@ const ANSWER: DescriptionOutput = {
   what: "Retries a failed upload in Sync Engine three times.",
   why: "Orders went missing when the network dropped for a moment.",
   lookFirst: [{ name: "Sync Engine", reason: "The retry count changed." }],
-  components: [
-    {
-      name: "Sync Engine",
-      sentence: "Tries a failed upload three times before giving up.",
-    },
-  ],
 };
 
 const isDescription = (prompt: string) =>
@@ -205,7 +199,6 @@ test("a view's description is read once from its patch, commits, PR and componen
     what: ANSWER.what,
     why: ANSWER.why,
     lookFirst: [ANSWER.lookFirst[0]],
-    components: [ANSWER.components[0]],
   });
   assert.equal(done.status === "done" && done.provider, "Claude Code");
   assert.equal(done.status === "done" && done.model, "test-model");
@@ -272,7 +265,7 @@ test("the prompt states every writing rule, with two good and two bad examples",
   const ai = recorder();
   await read(repo.view, { runner: ai.runner });
 
-  assert.equal(WRITING_RULES.length, 10);
+  assert.equal(WRITING_RULES.length, 9);
   assert.equal(GOOD_EXAMPLES.length, 2);
   assert.equal(BAD_EXAMPLES.length, 2);
   for (const line of [...WRITING_RULES, ...GOOD_EXAMPLES, ...BAD_EXAMPLES])
@@ -287,7 +280,6 @@ test("the prompt states every writing rule, with two good and two bad examples",
     /gives stored data a lifecycle[\s\S]*naming the slots or states/,
     /why comes only from the commit messages and the pull request/,
     /copied exactly\. At most 2/,
-    /components names come only from the list of components given/,
   ])
     assert.match(ai.prompts[0], rule);
 });
@@ -303,57 +295,35 @@ test("with no why given, the description has none, and nothing is filled in", as
   assert.equal(toDescription({ ...ANSWER, why: "  " }).why, null);
 });
 
-test("the schema and prompt ask for one sentence per changed component, under the same writing rules", async () => {
+test("the schema asks for what, why and where to look first", async () => {
   const schema = descriptionSchema();
-  assert.ok(schema.required.includes("components"));
-  assert.deepEqual(schema.properties.components.items.required, [
-    "name",
-    "sentence",
-  ]);
+  assert.deepEqual(schema.required, ["what", "why", "lookFirst"]);
+  assert.equal("components" in schema.properties, false);
 
   const repo = shopRepo();
   const ai = recorder();
   await read(repo.view, { runner: ai.runner });
-  assert.match(
-    ai.prompts[0],
-    /components: for every component the change touches, its name and one sentence/,
-  );
-  assert.match(
-    ai.prompts[0],
-    /Every sentence, in every part, follows the writing rules\./,
-  );
+  assert.match(ai.prompts[0], /Answer in three parts:/);
+  assert.doesNotMatch(ai.prompts[0], /^- components:/m);
 });
 
-test("component sentences are trimmed, each name kept once, and blanks dropped", () => {
-  assert.deepEqual(
-    toDescription({
-      ...ANSWER,
-      components: [
-        { name: " Sync Engine", sentence: " Retries uploads. " },
-        { name: "Sync Engine", sentence: "Again." },
-        { name: "Checkout", sentence: " " },
-        { name: "Checkout", sentence: "Takes cards." },
-        { name: "", sentence: "No name." },
-      ],
-    }).components,
-    [
-      { name: "Sync Engine", sentence: "Retries uploads." },
-      { name: "Checkout", sentence: "Takes cards." },
-    ],
-  );
-});
-
-test("a description cached before it named components reads as naming none", async () => {
+test("a description cached with component sentences reads without them", async () => {
   const repo = shopRepo();
   await read(repo.view, { runner: recorder().runner });
   const dir = await cacheDir(repo.root);
   const [file] = readdirSync(dir);
   const cached = JSON.parse(readFileSync(path.join(dir, file), "utf8"));
-  delete cached.description.components;
+  cached.description.components = [
+    { name: "Sync Engine", sentence: "Tries a failed upload three times." },
+  ];
   writeFileSync(path.join(dir, file), JSON.stringify(cached));
 
   const done = await descriptionStatus(repo.view);
-  assert.deepEqual(done.status === "done" && done.description.components, []);
+  assert.deepEqual(done.status === "done" && done.description, {
+    what: ANSWER.what,
+    why: ANSWER.why,
+    lookFirst: ANSWER.lookFirst,
+  });
 });
 
 test("where to look first names are trimmed and each kept once", () => {

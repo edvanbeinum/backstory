@@ -15,19 +15,12 @@ interface LookFirst {
 export const isOnMap = (name: string, map: MapResponse | null) =>
   map?.status === "ok" && map.nodes.some((n) => n.name === name);
 
-/** One sentence on what the change does in a component, by its name on the map */
-interface ComponentSentence {
-  name: string;
-  sentence: string;
-}
-
 /** What a change does, why, and where to look first, in a few plain sentences */
 export interface ChangeDescription {
   what: string;
   /** Null when the commit messages and the PR don't say why */
   why: string | null;
   lookFirst: LookFirst[];
-  components: ComponentSentence[];
 }
 
 /** A view's description read, as Story shows it */

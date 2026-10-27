@@ -141,11 +141,12 @@ export async function descriptionStatus(
   if (cached)
     return {
       status: "done",
-      // Default to no components for a description cached before it named
-      // them.
+      // Read only these fields, since a description cached with component
+      // sentences has them on disk too.
       description: {
-        ...cached.description,
-        components: cached.description.components ?? [],
+        what: cached.description.what,
+        why: cached.description.why,
+        lookFirst: cached.description.lookFirst,
       },
       provider: providerName(cached.provider),
       model: cached.model,
@@ -278,8 +279,8 @@ const eachOnce = <T extends { name: string }>(items: T[]) =>
   );
 
 /**
- * The answer, tidied: a blank why is none, lookFirst is cut to its limit, and
- * each name, in lookFirst and components, is kept once.
+ * The answer, tidied: a blank why is none, and lookFirst keeps each name once
+ * and is cut to its limit.
  */
 export function toDescription(output: DescriptionOutput): ChangeDescription {
   const why = output.why?.trim();
@@ -289,16 +290,10 @@ export function toDescription(output: DescriptionOutput): ChangeDescription {
       reason: l.reason.trim(),
     })),
   ).slice(0, LOOK_FIRST_MAX);
-  const components = eachOnce(
-    (output.components ?? [])
-      .map((c) => ({ name: c.name.trim(), sentence: c.sentence.trim() }))
-      .filter((c) => c.sentence),
-  );
   return {
     what: output.what.trim(),
     why: why ? why : null,
     lookFirst,
-    components,
   };
 }
 
