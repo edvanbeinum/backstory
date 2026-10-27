@@ -4,9 +4,10 @@
 //   node demo/record.mjs http://127.0.0.1:3000 /path/to/checkout demo/pr-117.json
 //
 // It opens the change, traces it if it isn't traced yet, clicks every flow
-// step so each step's code is recorded, and opens Files changed. The checkout's path, your home folder and BACKSTORY_HOME, if the
-// server runs with one, are replaced with DEMO_REPO and DEMO_HOME, so the
-// recording names no folder on this machine.
+// step so each step's code is recorded, and opens Files changed. The
+// checkout's path, your home folder and BACKSTORY_HOME, if the server runs
+// with one, are replaced with DEMO_REPO and DEMO_HOME, so the recording names
+// no folder on this machine.
 import { realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 
