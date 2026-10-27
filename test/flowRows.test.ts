@@ -134,7 +134,7 @@ test("a new flow marks only steps on added lines", () => {
   assert.deepEqual(shape(f), ["ctx - 1 init", "add - 2 fresh"]);
 });
 
-test("sameAs reads as the range of steps it re-runs", () => {
+test("sameAs reads as the step it runs again", () => {
   const steps = [
     step("open", 1),
     step("load", 2, { nesting: 1 }),
@@ -144,7 +144,7 @@ test("sameAs reads as the range of steps it re-runs", () => {
     step("reload", 6, { nesting: 1, sameAs: "load" }),
   ];
   const rows = flowRows(flow(null, steps), "after", hunks);
-  assert.equal(rows[5].again, "runs 2–4 again");
+  assert.equal(rows[5].again, "runs load again");
 });
 
 test("lanes drop a shared prefix unless that makes two lanes one name", () => {
@@ -359,6 +359,7 @@ test("stepsAt finds a comment's step, and names only one", () => {
   const at = stepsAt(set, draft, 78);
   assert.equal(at?.flow, 1, "the first flow, not the second");
   assert.equal(at?.step, 5);
+  assert.equal(at?.label, "s5");
   assert.equal(stepsAt(set, draft, 79), null);
 });
 

@@ -79,7 +79,7 @@ export function Comments({
               />
               {at && (
                 <p className="comment-story">
-                  ⇄ On flow {at.flow}, step {at.step} ·{" "}
+                  ⇄ On flow {at.flow}, at {at.label} ·{" "}
                   <button
                     type="button"
                     className="text-[var(--accent)] hover:underline"

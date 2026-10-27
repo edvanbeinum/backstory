@@ -253,7 +253,6 @@ export function FlowCard({
           rows={rows}
           participants={participants}
           groups={groups}
-          mode={shownMode}
           activeKeys={steps}
           onRowClick={toggleStep}
           open={steps}

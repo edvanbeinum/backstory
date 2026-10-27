@@ -17,7 +17,7 @@ export interface FlowRow {
   step: FlowStep;
   /** Which side of the diff the step's line is on */
   side: "old" | "new";
-  /** "runs 2–7 again", from `sameAs` */
+  /** "runs load() again", from `sameAs` */
   again: string | null;
 }
 
@@ -46,20 +46,11 @@ function commonIds(a: string[], b: string[]): Set<string> {
   return out;
 }
 
-/** The note a `sameAs` step carries: the range of steps it re-runs. */
+/** The note a `sameAs` step carries: the step whose calls it runs again. */
 function againNote(steps: FlowStep[], step: FlowStep): string | null {
   if (!step.sameAs) return null;
-  const start = steps.findIndex((s) => s.id === step.sameAs);
-  if (start === -1) return null;
-  let end = start;
-  while (
-    end + 1 < steps.length &&
-    steps[end + 1].nesting > steps[start].nesting
-  )
-    end++;
-  return end > start
-    ? `runs ${start + 1}–${end + 1} again`
-    : `runs ${start + 1} again`;
+  const same = steps.find((s) => s.id === step.sameAs);
+  return same ? `runs ${same.label} again` : null;
 }
 
 const sameWords = (a: FlowStep, b: FlowStep) =>
@@ -330,17 +321,19 @@ function diffRows(set: FlowSet): FlowRow[][] {
   return rows;
 }
 
-/** A flow's step, by number: flow 1, step 5. */
+/** A flow's step: flow 1, step 5, `load()`. */
 export interface StepAt {
   /** 1-based, as the story numbers flows */
   flow: number;
   step: number;
+  /** The step's label, as its row in the open flow shows it */
+  label: string;
   /** The step's row in the flow's diff mode */
   row: FlowRow;
 }
 
 /**
- * The step a line is on, for a comment's badge and its "On flow 1, step 5".
+ * The step a line is on, for a comment's badge and its "On flow 1, at load()".
  * One step only: a line two flows share names the first flow's, so a comment
  * gets one badge, not two.
  */
@@ -353,7 +346,12 @@ export function stepsAt(
   for (const [i, rows] of diffRows(set).entries()) {
     for (const row of rows) {
       if (row.side === side && row.step.file === path && row.step.line === line)
-        return { flow: i + 1, step: stepNumber(row) ?? 0, row };
+        return {
+          flow: i + 1,
+          step: stepNumber(row) ?? 0,
+          label: row.step.label,
+          row,
+        };
     }
   }
   return null;

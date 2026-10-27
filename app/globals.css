@@ -492,8 +492,8 @@ tr.note-row td {
 /* --- Flows ------------------------------------------------------------- */
 
 /*
- * A sequence diagram on a row grid, drawn to read like the diff beside it:
- * a gutter of step numbers (was, now), a +/− marker, and one call per row.
+ * A sequence diagram on a row grid, one call per row, each added or removed
+ * call coloured and named so as the diff's lines are.
  * Lanes, lifelines and arrows are one SVG laid over the rows.
  */
 
@@ -592,20 +592,11 @@ tr.note-row td {
 }
 .flow-grid {
   display: grid;
-  grid-template-columns: 28px 28px 20px 1fr;
+  grid-template-columns: 1fr;
 }
 .flow-head {
   border-bottom: 1px solid var(--border);
   background: var(--canvas-subtle);
-}
-.flow-head .oh {
-  align-self: center;
-  padding-right: 6px;
-  text-align: right;
-  font-size: 10px;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-  color: var(--fg-subtle);
 }
 .flow-lanes {
   position: relative;
@@ -641,7 +632,7 @@ tr.note-row td {
 }
 .flow-svg {
   position: absolute;
-  left: 76px;
+  left: 0;
   top: 0;
   z-index: 1;
   pointer-events: none;
@@ -690,21 +681,6 @@ tr.note-row td {
   cursor: pointer;
   transition: background-color 160ms ease;
 }
-.flow-row .n {
-  display: flex;
-  align-items: flex-start;
-  justify-content: flex-end;
-  padding: 5px 6px 0 0;
-  color: var(--fg-subtle);
-}
-.flow-row .m {
-  display: flex;
-  justify-content: center;
-  padding-top: 5px;
-  font-weight: 600;
-}
-.flow-row .n,
-.flow-row .m,
 .flow-row .lab {
   font-family:
     ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono",
@@ -715,31 +691,13 @@ tr.note-row td {
 .flow-row .l {
   position: relative;
 }
-.flow-row.k-add .m::before {
-  content: "+";
-  color: var(--success);
-}
-.flow-row.k-del .m::before {
-  content: "−";
-  color: var(--danger);
-}
 .flow-row.k-del .lab {
   color: var(--fg-muted);
 }
-.flow-row:hover .l,
-.flow-row:hover .m,
-.flow-row:hover .n {
+.flow-row:hover .l {
   background: color-mix(in srgb, var(--accent-subtle) 55%, transparent);
 }
-.flow-row.inview .n {
-  color: var(--accent);
-  font-weight: 600;
-}
-.flow-row.inview .n:first-child {
-  box-shadow: inset 3px 0 0 var(--accent);
-}
-.flow-row.inview .l,
-.flow-row.inview .m {
+.flow-row.inview .l {
   background: color-mix(in srgb, var(--accent-subtle) 70%, transparent);
 }
 .flow-row .lab {
