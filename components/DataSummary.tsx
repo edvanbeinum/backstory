@@ -342,10 +342,13 @@ function dataEdges(
   return out;
 }
 
-/** An entity to open the graph on, asked for from the map; `at` tells two asks apart */
+/**
+ * An entity to open the graph on, asked for from the map. Each ask is a new
+ * object, compared by identity, so asking for the same entity twice opens and
+ * scrolls to it again.
+ */
 export interface OpenEntity {
   name: string;
-  at: number;
 }
 
 const NO_NAMES = new Set<string>();

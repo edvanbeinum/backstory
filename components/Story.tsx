@@ -165,7 +165,7 @@ export function Story({
     [records, hoverName],
   );
   const showRecord = useCallback(
-    (name: string) => setRecordOpen({ view, entity: { name, at: Date.now() } }),
+    (name: string) => setRecordOpen({ view, entity: { name } }),
     [view],
   );
 
