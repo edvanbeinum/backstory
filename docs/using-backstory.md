@@ -102,9 +102,12 @@ Story opens on the change's overview, then takes you through it in order:
 1. **Overview**: the change's description, with the map under it. Its places to
    look first go to their part of the walk.
 2. **Data model**, when the change touches it: the changed entities as cards.
+   Click an entity's component to go to that component's part of the walk, or
+   to the overview's map, outlining it, when the change doesn't touch it.
 3. **Each changed component**, in the map's order, top to bottom and left to
-   right: what the change does in it, the flow steps its files are on as
-   `⇄ 1·3` chips, the map outlining it, and its files with their diffs. Leave line notes on them as
+   right: what the change does in it, the records its flow steps use beside
+   its file count, the map
+   outlining it, and its files with their diffs. Leave line notes on them as
    in Files changed, or **+ Note for the agent** for a note on the component as
    a whole, which starts "On" and its name.
 4. **Not on the map**: the files no component has, such as tests.
@@ -134,7 +137,9 @@ footer says so.
 At the top of Story, Claude Code describes the change in three parts: **Why**,
 **What it does**, and **Where to look first**. It reads the patch, the commit
 messages and the pull request, and writes **Why** only when the commits or the
-pull request say why. Click a place to look first that is on the map to outline
+pull request say why. When the change moves stored data through stages, such
+as a value moved from one field to another or a status that changes, **What it
+does** says so in one sentence that names them. Click a place to look first that is on the map to outline
 it there. Opening a commit or the whole branch describes it, unless you turned
 the repo off; then **Describe this change** reads it.
 
@@ -219,6 +224,11 @@ before reading its lines:
   worked out from main's model, and its head from its base, so a second branch
   from the same point, or a branch rebased onto main, reads only its own
   change. The result is kept in `~/.backstory/data/`.
+  - On a model Claude Code read, a short sentence under the graph names the
+    kinds of store the data is kept in, such as a database or the Keychain. A value
+    stored whole inside a record, such as a nested struct, is an arrow from
+    the record to the value's entity, named after the field it is stored in, so
+    two fields of the same type are two arrows.
   - Reads start as a repo and a view open: opening a repo starts the reads of
     main's data model and map, and opening a view on Story starts the view's
     reads. For a repo you turned off, **Read the data model** under the map on
@@ -226,7 +236,8 @@ before reading its lines:
   - On a view Claude Code read, **Show data** opens the whole model when the
     change touches none of it.
   - The Data line's graph opens by itself when the change touches the data
-    model; **Hide data** closes it.
+    model; **Hide data** closes it. Click an entity's component to outline it
+    on the map.
   - Main's data model moves forward when a view's base is on main and past it:
     the read that view's base needed is main's change since, and the base
     becomes main's model. Main is read in full again only when the patch from
@@ -235,7 +246,10 @@ before reading its lines:
     again and removes every model worked out from the old one, since a mistake
     in main's model is copied into each of them.
 - **Flows** are sequence diagrams of what the code does for each user action the
-  change touches, before and after, beside the code they come from.
+  change touches, before and after, beside the code they come from. A step that
+  reads or writes stored data names each record after it, with what the step
+  does to it, such as "Basket · sets the shopper's items". A step that names no
+  records shows the changed fields its call uses.
 
 In a hand-written map, Backstory reads the part of the DSL that describes
 elements and arrows:

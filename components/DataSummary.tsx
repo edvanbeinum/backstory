@@ -9,7 +9,7 @@ import {
   useState,
 } from "react";
 
-import { present, type Presented } from "@/lib/data/present";
+import { isArrow, present, type Presented } from "@/lib/data/present";
 import type {
   Constraint,
   DataResponse,
@@ -117,6 +117,28 @@ function Row({
   );
 }
 
+function ComponentChip({
+  name,
+  onMap,
+  onShowOnMap,
+}: {
+  name: string;
+  onMap: (name: string) => boolean;
+  onShowOnMap: (name: string) => void;
+}) {
+  if (!onMap(name)) return <span className="file-owner">{name}</span>;
+  return (
+    <button
+      type="button"
+      className="file-owner hover:underline"
+      title={`Outline ${name} on the map`}
+      onClick={() => onShowOnMap(name)}
+    >
+      {name}
+    </button>
+  );
+}
+
 /**
  * One entity. Level 2: its name and one line. Click for level 3, the field
  * changes and any relationship the arrows don't already say. "Details" is
@@ -127,11 +149,15 @@ function EntityCard({
   p,
   open,
   onToggle,
+  onMap,
+  onShowOnMap,
   notes = [],
 }: {
   p: Presented;
   open: boolean;
   onToggle: () => void;
+  onMap: (name: string) => boolean;
+  onShowOnMap: (name: string) => void;
   /** "Worth a look" notes pinned on this entity */
   notes?: string[];
 }) {
@@ -141,7 +167,13 @@ function EntityCard({
     return (
       <div className="data-card same compact" title={e.file ?? undefined}>
         <span className="name">{e.name}</span>
-        {e.component && <span className="file-owner">{e.component}</span>}
+        {e.component && (
+          <ComponentChip
+            name={e.component}
+            onMap={onMap}
+            onShowOnMap={onShowOnMap}
+          />
+        )}
       </div>
     );
   }
@@ -153,20 +185,27 @@ function EntityCard({
       className={`data-card ${p.state} ${open ? "open" : ""}`}
       title={e.file ?? undefined}
     >
-      <button
-        type="button"
-        className="data-card-head"
-        onClick={onToggle}
-        aria-expanded={open}
-      >
-        <span className="name">{e.name}</span>
-        {p.state === "added" && <span className="map-tag new">New</span>}
-        {p.state === "removed" && (
-          <span className="map-tag removed">Removed</span>
+      <div className="data-card-head">
+        <button
+          type="button"
+          className="flex min-w-0 flex-1 items-center gap-1.5 self-stretch text-left"
+          onClick={onToggle}
+          aria-expanded={open}
+        >
+          <span className="name">{e.name}</span>
+          {p.state === "added" && <span className="map-tag new">New</span>}
+          {p.state === "removed" && (
+            <span className="map-tag removed">Removed</span>
+          )}
+        </button>
+        {e.component && (
+          <ComponentChip
+            name={e.component}
+            onMap={onMap}
+            onShowOnMap={onShowOnMap}
+          />
         )}
-        <span className="flex-1" />
-        {e.component && <span className="file-owner">{e.component}</span>}
-      </button>
+      </div>
       <button type="button" className="data-card-line" onClick={onToggle}>
         <span>
           {p.state === "added"
@@ -252,8 +291,9 @@ interface DataEdge {
 /**
  * The relationships to draw: each belongs-to from the entity holding the
  * link to the one it points at (a polymorphic one to each entity that fills
- * it), and many-to-many. A has-many is the other end of a belongs-to, so
- * drawing both would be one link twice.
+ * it), each contains from the record to the value stored inside it, and
+ * many-to-many. A has-many is the other end of a belongs-to, so drawing both
+ * would be one link twice.
  */
 function dataEdges(
   entities: EntityDiff[],
@@ -265,7 +305,7 @@ function dataEdges(
   for (const e of entities) {
     for (const d of e.relationships) {
       const r = d.item;
-      if (r.kind !== "belongs to" && r.kind !== "many to many") continue;
+      if (!isArrow(r, e.name, shown)) continue;
       const targets = r.polymorphic
         ? (r.candidates ?? [])
         : r.target
@@ -299,10 +339,14 @@ function DataGraph({
   shown,
   width,
   notes,
+  onMap,
+  onShowOnMap,
 }: {
   shown: Presented[];
   width: number;
   notes?: Map<string, string[]>;
+  onMap: (name: string) => boolean;
+  onShowOnMap: (name: string) => void;
 }) {
   const changedNames = useMemo(
     () =>
@@ -485,6 +529,8 @@ function DataGraph({
             p={n}
             open={open.has(n.id)}
             notes={notes?.get(n.id)}
+            onMap={onMap}
+            onShowOnMap={onShowOnMap}
             onToggle={() =>
               setOpen((cur) => {
                 const next = new Set(cur);
@@ -613,9 +659,15 @@ export type DataDraftApi = ReturnType<typeof useDataDraft>;
 export function DataCards({
   data,
   notes,
+  onMap,
+  onShowOnMap,
 }: {
   data: DataResponse;
   notes?: Map<string, string[]>;
+  /** Whether the map draws a component, so its chip can outline it */
+  onMap: (name: string) => boolean;
+  /** An entity's component was clicked: go to its stop, or outline it on the map */
+  onShowOnMap: (name: string) => void;
 }) {
   const shown = useMemo(() => present(data.entities), [data]);
   const boxRef = useRef<HTMLDivElement>(null);
@@ -634,9 +686,20 @@ export function DataCards({
       <p className="mb-2 text-[13px]">{summary(shown)}</p>
       <div className="map-card">
         {width > 0 && (
-          <DataGraph shown={shown} width={width - 2} notes={notes} />
+          <DataGraph
+            shown={shown}
+            width={width - 2}
+            notes={notes}
+            onMap={onMap}
+            onShowOnMap={onShowOnMap}
+          />
         )}
       </div>
+      {data.storage && (
+        <p className="mt-2 px-1 text-[12px] text-[var(--fg-muted)]">
+          {data.storage}
+        </p>
+      )}
     </div>
   );
 }
@@ -651,12 +714,18 @@ export function DataSummary({
   notes,
   repo,
   rev,
+  onMap,
+  onShowOnMap,
 }: {
   /** The view's data model and its read, from `useDataDraft` */
   draft: DataDraftApi;
   notes?: Map<string, string[]>;
   repo: string;
   rev: string;
+  /** Whether the map draws a component, so its chip can outline it */
+  onMap: (name: string) => boolean;
+  /** An entity's component was clicked: outline it on the map */
+  onShowOnMap: (name: string) => void;
 }) {
   const data = draft.data;
   const shown = useMemo(() => present(data?.entities ?? []), [data]);
@@ -746,9 +815,20 @@ export function DataSummary({
         <div ref={boxRef} className="basis-full pt-1">
           <div className="map-card">
             {width > 0 && (
-              <DataGraph shown={shown} width={width - 2} notes={notes} />
+              <DataGraph
+                shown={shown}
+                width={width - 2}
+                notes={notes}
+                onMap={onMap}
+                onShowOnMap={onShowOnMap}
+              />
             )}
           </div>
+          {data.storage && (
+            <p className="mt-2 px-1 text-[12px] text-[var(--fg-muted)]">
+              {data.storage}
+            </p>
+          )}
         </div>
       )}
     </>

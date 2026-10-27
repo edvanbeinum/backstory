@@ -228,6 +228,8 @@ export const providerName = (id: string) =>
 export async function readDrafted(view: DataView): Promise<{
   base: DataModel | null;
   head: DataModel;
+  /** The head's sentence on where the data is stored; missing from a model saved before it was asked for */
+  storage?: string;
   provider: string;
   model: string | null;
 } | null> {
@@ -237,6 +239,7 @@ export async function readDrafted(view: DataView): Promise<{
   return {
     base: hit.base ? toModel(hit.base.entities) : null,
     head: toModel(hit.head.entities),
+    ...(hit.head.storage ? { storage: hit.head.storage } : {}),
     provider: hit.head.provider,
     model: hit.head.model,
   };
@@ -442,7 +445,7 @@ async function modelAt(
       c.files,
     );
     model = {
-      storage: start.model.storage,
+      storage: read.output.storage?.trim() || start.model.storage,
       entities: mergeDelta(start.model.entities, read.output),
       files: c.files,
       from: start.tree,

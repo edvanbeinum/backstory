@@ -8,11 +8,15 @@ terms:
     avoid:
       - mockup
   - name: flow
-    means: "What the code does for one user action a change touches: the data, a card in the story and the feature."
+    means: "What the code does for one user action a change touches: the data, a card in the story and the feature. A step that reads or writes stored data says which records and what it does to them, in its data tags."
     drawing: sequence
     avoid:
       - sequence, for the data
       - trace as a noun (trace stays the verb, as in "Trace this change")
+  - name: data tag
+    means: "One stored record a flow step reads or writes, by the data model's name for it, and what the step does to it in a few words (`StepData` in `lib/flows/types.ts`, the `backstory.data` step property in the flow cache). At most three on a step, drawn as badges after its label, in place of the changed-field chips."
+    avoid:
+      - chip, for the tag
   - name: participant
     means: One actor in a flow, a type the calls go between (`FlowParticipant`, SARIF `logicalLocations`).
     drawing: lane
@@ -41,7 +45,7 @@ terms:
     avoid:
       - tour (reads as an app's onboarding tour)
   - name: stop
-    means: "One part of the walk: the overview, the data model when it changed, one per changed component in the map's order, the files no component has, and the finish with your notes. Every changed file is in exactly one stop. The UI never says stop: its bar reads 3 of 6."
+    means: "One part of the walk: the overview, the data model when it changed, one per changed component in the map's order (naming the records its steps' data tags use), the files no component has, and the finish with your notes. Every changed file is in exactly one stop. The UI never says stop: its bar reads 3 of 6."
     avoid:
       - step (that's a flow's step, as in `1·3`)
   - name: notes box
@@ -62,7 +66,7 @@ terms:
     means: "`data.files` and `data.format` in a workspace's properties: which files hold the data model, and which data reader reads them. Read at the head and used at both ends of a view."
     avoid: []
   - name: drafted data model
-    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`). Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read as repos and views open, unless the repo is turned off (Turn off in Story's footnote), or on a click (Read the data model). Read the data model again, in Story's footnote, reads main's data model in full again."
+    means: "The AI provider's reading of a data model, for a repo no data reader understands (`lib/data/drafted.ts`), with a short sentence naming the kinds of store the data is kept in, shown under the data graph. Its `contains` relationship is a value embedded whole in a record, drawn as an arrow named after the field it is stored in; no data reader produces one. Main's data model is read in full once; every other commit's is derived forward from the nearest model already read, by one read of the patch between them. Read as repos and views open, unless the repo is turned off (Turn off in Story's footnote), or on a click (Read the data model). Read the data model again, in Story's footnote, reads main's data model in full again."
     avoid: []
   - name: main's data model
     means: "The drafted data model of the repo's default branch that every view's base is derived from, pointed at by `trunk.json` in the repo's data folder (`lib/data/cache.ts`). Read in full once, and moved forward when a view's base is on main past it."
@@ -97,7 +101,7 @@ terms:
     avoid:
       - store
   - name: change description
-    means: "A few plain sentences at the top of Story: why the change was made (only when its commit messages or PR say), what it does, and at most two places to look first, each outlining its component on the map when the name is one. The AI provider reads it from the view's patch, commit messages, PR and the names of the components and entities it touches (`lib/description/`), once per view, cached by base and head trees in `~/.backstory/descriptions/`. Read as views open unless the repo is turned off (Turn off in Story's footnote), or on a click (Describe this change). Describe again, in Story's footnote, reads it once more, and the earlier one stays if that read fails."
+    means: "A few plain sentences at the top of Story: why the change was made (only when its commit messages or PR say), what it does, with one sentence naming the slots or states when it gives stored data a lifecycle, and at most two places to look first, each outlining its component on the map when the name is one. The AI provider reads it from the view's patch, commit messages, PR and the names of the components and entities it touches (`lib/description/`), once per view, cached by base and head trees in `~/.backstory/descriptions/`. Read as views open unless the repo is turned off (Turn off in Story's footnote), or on a click (Describe this change). Describe again, in Story's footnote, reads it once more, and the earlier one stays if that read fails."
     avoid:
       - summary, for the description (that's the line under the map)
   - name: repo key

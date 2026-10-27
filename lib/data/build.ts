@@ -61,6 +61,7 @@ export async function buildData(
       ...noDataModel(),
       status: "ok",
       source: "drafted",
+      ...(drafted.storage ? { storage: drafted.storage } : {}),
       drafted: {
         provider: providerName(drafted.provider),
         model: drafted.model,

@@ -997,6 +997,121 @@ test("an empty change reads once, its head is its base's model, and every entity
   );
 });
 
+test("a drafted view says where the data is stored", async () => {
+  const repo = tempRepo();
+  repo.write("lib/notes.ts", notes(["id", "body"]));
+  const head = repo.commit("Add notes");
+  const saved = (storage?: string) => ({
+    ...(storage ? { storage } : {}),
+    entities: [entity("Note", ["id", "body"])],
+    provider: "claude",
+    model: "test-model",
+    costUsd: 0,
+    readAt: 1,
+    from: null,
+  });
+  const file = path.join(
+    await dataFolder(repo.root),
+    `${repo.git("rev-parse", `${head}^{tree}`)}.json`,
+  );
+  mkdirSync(path.dirname(file), { recursive: true });
+  const storage =
+    "One value per server, in the Keychain, rewritten on every save";
+  writeFileSync(file, JSON.stringify(saved(storage)));
+  const data = await buildData(repo.root, null, head);
+  assert.equal(data.source, "drafted");
+  assert.equal(data.storage, storage);
+
+  // A model saved before the sentence was asked for loads without one.
+  writeFileSync(file, JSON.stringify(saved()));
+  const older = await buildData(repo.root, null, head);
+  assert.equal(older.status, "ok");
+  assert.equal(older.storage, undefined);
+
+  repo.write("schema.sql", "CREATE TABLE notes (id integer PRIMARY KEY);\n");
+  const sql = await buildData(repo.root, null, repo.commit("Store notes"));
+  assert.equal(sql.source, "sql");
+  assert.equal(sql.storage, undefined);
+});
+
+test("a contained value is said by its arrow, not listed again", async () => {
+  const { present } = await import("../lib/data/present");
+  const { headSchema } = await import("../lib/data/drafted");
+  const credential = (name: string) => ({
+    name,
+    kind: "contains" as const,
+    target: "Credential",
+    polymorphic: false,
+  });
+  const before: DataModel = {
+    source: "drafted",
+    entities: new Map([
+      ["Credential", entity("Credential", ["token"])],
+      ["Server", entity("Server", ["url"])],
+    ]),
+  };
+  const after: DataModel = {
+    source: "drafted",
+    entities: new Map([
+      ["Credential", entity("Credential", ["token"])],
+      [
+        "Server",
+        {
+          ...entity("Server", ["url"]),
+          relationships: [credential("active"), credential("candidate")],
+        },
+      ],
+    ]),
+  };
+  const server = present(diffModels(before, after)).find(
+    (p) => p.entity.name === "Server",
+  )!;
+  assert.equal(server.summary, "+2 relationships");
+  assert.deepEqual(server.relationships, []);
+
+  const unshown: DataModel = {
+    source: "drafted",
+    entities: new Map([
+      [
+        "Server",
+        {
+          ...entity("Server", ["url"]),
+          relationships: [
+            credential("active"),
+            { ...credential("mirror"), target: "Server" },
+          ],
+        },
+      ],
+    ]),
+  };
+  const listed = present(
+    diffModels({ source: "drafted", entities: new Map() }, unshown),
+  ).find((p) => p.entity.name === "Server")!;
+  assert.deepEqual(
+    listed.relationships.map((d) => d.item.name),
+    ["active", "mirror"],
+  );
+
+  const schema = headSchema() as unknown as {
+    properties: {
+      entities: {
+        items: {
+          properties: {
+            relationships: {
+              items: { properties: { kind: { enum: string[] } } };
+            };
+          };
+        };
+      };
+    };
+  };
+  assert.ok(
+    schema.properties.entities.items.properties.relationships.items.properties.kind.enum.includes(
+      "contains",
+    ),
+  );
+});
+
 test("a forward delta merges onto its start: changed replaces and adds, absent removes", () => {
   const head = [
     entity("Note", ["id", "rev"]),
@@ -1047,6 +1162,24 @@ test("a view whose head is cached reads only its base", async () => {
     { runner: ai.runner },
   );
   assert.deepEqual(ai.calls, ["delta"]);
+});
+
+test("a derived model says where its data is stored: the delta's sentence when the patch moves it, the start's otherwise", async () => {
+  for (const storage of [undefined, "One value per server, in the Keychain"]) {
+    const repo = notesRepo();
+    repo.write("README.md", "notes\n");
+    const tip = repo.commit("Say what notes are");
+    await read(
+      { root: repo.root, base: repo.head, head: tip },
+      {
+        runner: recorder({
+          delta: { changed: [], absent: [], ...(storage ? { storage } : {}) },
+        }).runner,
+      },
+    );
+    const data = await buildData(repo.root, repo.head, tip);
+    assert.equal(data.storage, storage ?? noteHead.storage);
+  }
 });
 
 test("a failed run isn't retried, fails with the provider's message and caches nothing", async () => {

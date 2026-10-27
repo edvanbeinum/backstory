@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { filePaths } from "@/lib/anchor";
 import { WORKING_REV } from "@/lib/constants";
 import type { DataResponse } from "@/lib/data/types";
-import type { FlowRow, StepMark } from "@/lib/flows/rows";
+import { isOnMap } from "@/lib/description/types";
+import type { FlowRow } from "@/lib/flows/rows";
 import type { MapResponse } from "@/lib/map";
 import type { DiffFile, DiffResponse } from "@/lib/types";
 import { resolveStop, viewKey } from "@/lib/url";
@@ -70,7 +71,6 @@ export function Story({
   walkNavRef,
   renderFiles,
   onNote,
-  onStep,
 }: {
   repo: string;
   rev: string;
@@ -111,8 +111,6 @@ export function Story({
   renderFiles: (files: DiffFile[]) => React.ReactNode;
   /** Save a general note; null while the change on screen is loading */
   onNote: ((body: string) => void) | null;
-  /** Open a flow step, leaving the walk */
-  onStep: (mark: StepMark) => void;
 }) {
   const filesInDiff = useMemo(
     () => (diff ? new Set(diff.files.flatMap(filePaths)) : null),
@@ -244,12 +242,17 @@ export function Story({
     };
   }, [walk, index, stops.length, walkNavRef]);
 
+  const onMap = (name: string) => isOnMap(name, map);
+
   const toStop = (name: string) => {
     const i = stops.findIndex(
       (s) => s.kind === "component" && s.node.name === name,
     );
-    if (i === -1) onShowOnMap(name);
-    else go(i);
+    if (i !== -1) return go(i);
+    // Outline a component with no stop on the overview's map, going there
+    // first from the data stop, which draws no map.
+    if (index !== 0) go(0);
+    onShowOnMap(name);
   };
 
   const overview =
@@ -287,6 +290,8 @@ export function Story({
           notes={entityNotes}
           repo={repo}
           rev={rev}
+          onMap={onMap}
+          onShowOnMap={onShowOnMap}
         />
       )}
     </SystemMap>
@@ -327,8 +332,9 @@ export function Story({
             entityNotes={entityNotes}
             renderFiles={renderFiles}
             onNote={onNote}
-            onStep={onStep}
             onGo={go}
+            onMap={onMap}
+            onShowOnMap={toStop}
           />
           {footnote}
         </div>

@@ -1,6 +1,5 @@
 import type { EntityDiff, DataResponse } from "./data/types";
 import type { ChangeDescription } from "./description/types";
-import { stepMarks, type StepMark } from "./flows/rows";
 import type { FlowSet } from "./flows/types";
 import type { MapNode, MapResponse } from "./map";
 import { ownsCode } from "./mapGroups";
@@ -29,10 +28,10 @@ export type Stop<F extends WalkFile = DiffFile> = {
       container: string | null;
       /** The description's sentence on it, or the map's description of it */
       sentence: string;
-      /** The flow steps its files are on, in flow and step order */
-      steps: StepMark[];
       /** Its arrows on the map, by key */
       edges: string[];
+      /** The records its steps read or write, by their data tags, in flow and step order */
+      uses: string[];
     }
   | { kind: "yourself" }
   | { kind: "finish" }
@@ -48,20 +47,15 @@ function mapOrder(order: string[] | null, nodes: MapNode[]): MapNode[] {
   return [...nodes].sort((a, b) => at(a) - at(b));
 }
 
-/** The flow steps on any of these files, each once. */
-function stepsOn(
-  marks: ReturnType<typeof stepMarks> | null,
-  files: WalkFile[],
-): StepMark[] {
-  if (!marks) return [];
-  const found = new Map<string, StepMark>();
-  for (const file of files)
-    for (const path of new Set([file.newPath, file.oldPath]))
-      if (path)
-        for (const side of Object.values(marks.get(path) ?? {}))
-          for (const list of side.values())
-            for (const mark of list) found.set(mark.key, mark);
-  return [...found.values()].sort((a, b) => a.flow - b.flow || a.step - b.step);
+/** The entities the after side's steps on any of these files tag, each once. */
+function usesOn(flows: FlowSet | null, files: WalkFile[]): string[] {
+  const paths = new Set(files.flatMap((f) => [f.newPath, f.oldPath]));
+  const names = new Set<string>();
+  for (const flow of flows?.flows ?? [])
+    for (const step of flow.after)
+      if (paths.has(step.file))
+        for (const d of step.data ?? []) names.add(d.entity);
+  return [...names];
 }
 
 export function buildStops<F extends WalkFile>({
@@ -104,7 +98,6 @@ export function buildStops<F extends WalkFile>({
       filesOf.set(node, [...(filesOf.get(node) ?? []), file]);
       held.add(file);
     }
-    const marks = flows ? stepMarks(flows) : null;
     const nameOf = new Map(map.nodes.map((n) => [n.id, n.name]));
     for (const node of mapOrder(
       order,
@@ -120,10 +113,10 @@ export function buildStops<F extends WalkFile>({
         sentence:
           description?.components.find((c) => c.name === node.name)?.sentence ??
           (node.description || map.descriptions[node.name] || ""),
-        steps: stepsOn(marks, own),
         edges: map.edges
           .filter((e) => e.source === node.id || e.destination === node.id)
           .map((e) => e.key),
+        uses: usesOn(flows, own),
       });
     }
   }

@@ -26,8 +26,18 @@ const TIMESTAMPS = new Set([
   "updatedAt",
 ]);
 
-const isArrow = (r: Relationship) =>
-  r.kind === "belongs to" || r.kind === "many to many";
+/**
+ * Whether the graph draws a relationship as an arrow. A contains is drawn
+ * only to another entity in the model, so one whose value isn't stored as an
+ * entity of its own, or is the record's own type, stays on the card's list.
+ */
+export const isArrow = (r: Relationship, owner: string, names: Set<string>) =>
+  r.kind === "belongs to" ||
+  r.kind === "many to many" ||
+  (r.kind === "contains" &&
+    r.target !== null &&
+    r.target !== owner &&
+    names.has(r.target));
 
 export interface Presented {
   entity: EntityDiff;
@@ -69,6 +79,7 @@ function tally(list: Diffed<unknown>[], word: string) {
 }
 
 export function present(entities: EntityDiff[]): Presented[] {
+  const names = new Set(entities.map((e) => e.name));
   /** Does `other` hold a belongs-to that points back at `name`? */
   const pointsAt = (other: string, name: string) =>
     entities
@@ -97,11 +108,13 @@ export function present(entities: EntityDiff[]): Presented[] {
       (f) => !TIMESTAMPS.has(f.item.name) && !linkFields.includes(f),
     );
 
-    const arrows = changed(entity.relationships).filter((d) => isArrow(d.item));
+    const arrows = changed(entity.relationships).filter((d) =>
+      isArrow(d.item, entity.name, names),
+    );
     // A has-many or has-one is the far end of another entity's belongs-to.
     const listed = changed(entity.relationships).filter(
       (d) =>
-        !isArrow(d.item) &&
+        !isArrow(d.item, entity.name, names) &&
         !(d.item.target && pointsAt(d.item.target, entity.name)) &&
         !d.item.as,
     );

@@ -6,8 +6,14 @@
  * Claude returns compact steps; Backstory verifies them and wraps them in SARIF.
  */
 
+import type { StepData } from "./types";
+
 export const MAX_FLOWS = 5;
 export const MAX_STEPS = 15;
+/** Data tags on one step */
+export const MAX_DATA = 3;
+/** Entity names the head trace is given */
+export const MAX_ENTITIES = 60;
 
 const STEP_SCHEMA = {
   type: "object",
@@ -23,6 +29,18 @@ const STEP_SCHEMA = {
     returns: { type: "string" },
     repeat: { type: "string" },
     sameAs: { type: "string" },
+    data: {
+      type: "array",
+      maxItems: MAX_DATA,
+      items: {
+        type: "object",
+        properties: {
+          entity: { type: "string" },
+          does: { type: "string" },
+        },
+        required: ["entity", "does"],
+      },
+    },
     nesting: { type: "integer" },
   },
   required: [
@@ -105,6 +123,7 @@ export interface RawStep {
   returns?: string;
   repeat?: string;
   sameAs?: string;
+  data?: StepData[];
   nesting: number;
 }
 
@@ -135,16 +154,26 @@ const STEP_RULES = `For each step give:
 - returns: what comes back, in a few words, only if it matters to the flow.
 - repeat: if the call runs more than once per trigger, how often, e.g. "for each of 2 contexts".
 - sameAs: if this step re-runs an earlier step's whole subtree, that step's id, instead of listing its steps again.
+- data: only if the call reads or writes stored data (a database row, a file, a keychain item, a stored setting), the records it touches, at most ${MAX_DATA}. entity is the record's name in PascalCase; does is what the call does to it, in a few words in code terms, e.g. "sets candidate", "moves candidate to active, clears challenge", "reads the token". Leave it out for a call that touches no stored data.
 - nesting: call depth from the trigger; 0 for the entry call.
 - id: "<flow id>.<short-kebab-name>", descriptive.
 
 Describe only what the code does. Don't judge it, and don't add a step you can't point to on a line.`;
+
+// Keep the naming rule when the list is cut, so a record past the cut still
+// gets a name the data view is likely to use.
+const records = (entities: string[] | null) =>
+  entities && entities.length > 0
+    ? `Records this program stores, by the names to use: ${entities.slice(0, MAX_ENTITIES).join(", ")}.${entities.length > MAX_ENTITIES ? " Name any other stored record after the type it is stored as." : ""}`
+    : "Name each stored record after the type it is stored as.";
 
 export function headPrompt(opts: {
   sha: string;
   subject: string;
   hunks: string;
   hasBase: boolean;
+  /** The records the repo stores at this commit, when Backstory knows them */
+  entities: string[] | null;
 }): string {
   return `You are tracing flows through a code change, for a reviewer. A flow is what the code does when one trigger happens: a user action (open a screen, tap a button, submit a form, call an endpoint) or a system event (app launch, background job, sync). Each flow is a sequence of calls between types.
 
@@ -159,7 +188,9 @@ ${opts.hunks}
 3. isNew: true if the trigger didn't exist before this change (a new feature); false if it existed and the change altered what happens.
 4. For each hunk, list the ids of the flows whose steps sit in it.
 
-${STEP_RULES}`;
+${STEP_RULES}
+
+${records(opts.entities)}`;
 }
 
 export function basePrompt(opts: {
@@ -167,6 +198,8 @@ export function basePrompt(opts: {
   head: string;
   hunks: string;
   flows: string;
+  /** The records the repo stores at the head, so a carried step's tags keep their names */
+  entities: string[] | null;
 }): string {
   return `You are tracing flows through a codebase, for a reviewer comparing the code before and after a change. A flow is what the code does when one trigger happens, as a sequence of calls between types. The flows below were traced at the head commit ${opts.head}. Your job is to write each of them as it ran at the base commit ${opts.base}, before the change.
 
@@ -177,7 +210,7 @@ The change, from base (old) to head (new):
 ${opts.hunks}
 
 The flows at the head, with each step marked:
-- "carried": the change didn't touch its line; it has already been moved to its line at the base and checked there. Keep its id, file, line and symbol. But the code around it may have done something different at the base (a different query, a different loop): re-read it, and update its label, returns and repeat if they weren't true then.
+- "carried": the change didn't touch its line; it has already been moved to its line at the base and checked there. Keep its id, file, line and symbol. But the code around it may have done something different at the base (a different query, a different loop): re-read it, and update its label, returns, repeat and data if they weren't true then.
 - "affected": the change added or edited its line. If the same call existed at the base, keep the step's id with its base file, line and symbol. If it didn't exist, leave it out.
 
 ${opts.flows}
@@ -188,7 +221,9 @@ Return every flow above, with the same id, name and trigger, and its full step l
 - Leave out steps for calls that didn't exist at the base.
 - Line numbers, files and symbols are the base's.
 
-${STEP_RULES}`;
+${STEP_RULES}
+
+${records(opts.entities)}`;
 }
 
 export function tracePrompt(opts: {
@@ -196,6 +231,8 @@ export function tracePrompt(opts: {
   subject: string;
   hunk: string;
   known: string;
+  /** The records the repo stores at this commit, when Backstory knows them */
+  entities: string[] | null;
 }): string {
   return `You are tracing one flow through a code change, for a reviewer. A flow is what the code does when one trigger happens: a user action or a system event. It is a sequence of calls between types.
 
@@ -209,5 +246,7 @@ Flows already traced for this change (don't repeat them): ${opts.known || "none"
 
 Return exactly one flow: name the trigger that reaches this hunk, and list the steps from the trigger's entry point through the changed code, at most ${MAX_STEPS}. isNew: true if the trigger didn't exist before this change. List the hunk with the flow's id.
 
-${STEP_RULES}`;
+${STEP_RULES}
+
+${records(opts.entities)}`;
 }

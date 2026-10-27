@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import type { DataResponse } from "@/lib/data/types";
-import type { StepMark } from "@/lib/flows/rows";
 import type { DiffFile } from "@/lib/types";
 import { filesNotSeen, type Stop } from "@/lib/walk";
 import { DataCards } from "./DataSummary";
@@ -167,8 +166,9 @@ export function StopView({
   entityNotes,
   renderFiles,
   onNote,
-  onStep,
   onGo,
+  onMap,
+  onShowOnMap,
 }: {
   stops: Stop[];
   index: number;
@@ -185,9 +185,11 @@ export function StopView({
   renderFiles: (files: DiffFile[]) => React.ReactNode;
   /** Save a general note; null while the change on screen is loading */
   onNote: ((body: string) => void) | null;
-  /** Open a flow step in Story on one page */
-  onStep: (mark: StepMark) => void;
   onGo: (index: number) => void;
+  /** Whether the map draws a component, so its chip can outline it */
+  onMap: (name: string) => boolean;
+  /** An entity's component was clicked: go to its stop, or outline it on the overview's map */
+  onShowOnMap: (name: string) => void;
 }) {
   const stop = stops[index];
   switch (stop.kind) {
@@ -216,7 +218,14 @@ export function StopView({
       return (
         <section className="space-y-3">
           <StopHeading title="Data model" />
-          {data && <DataCards data={data} notes={entityNotes} />}
+          {data && (
+            <DataCards
+              data={data}
+              notes={entityNotes}
+              onMap={onMap}
+              onShowOnMap={onShowOnMap}
+            />
+          )}
         </section>
       );
     case "component":
@@ -228,28 +237,13 @@ export function StopView({
               <>
                 {stop.container && <>In {stop.container} · </>}
                 {fileWord(stop.files.length)}
+                {stop.uses.length > 0 && <> · uses {stop.uses.join(", ")}</>}
               </>
             }
           />
           {stop.sentence && (
             <p className="text-[14px]">
               <Ticked text={stop.sentence} />
-            </p>
-          )}
-          {stop.steps.length > 0 && (
-            <p className="walk-steps">
-              <span>On the flows at</span>
-              {stop.steps.map((mark) => (
-                <button
-                  key={mark.key}
-                  type="button"
-                  className="mono"
-                  title={`Open flow ${mark.flow + 1} at this step`}
-                  onClick={() => onStep(mark)}
-                >
-                  ⇄ {mark.chip}
-                </button>
-              ))}
             </p>
           )}
           {map}

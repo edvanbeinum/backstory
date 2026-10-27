@@ -46,8 +46,9 @@ export interface DataField {
 
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-/** The changed fields a step's call names. */
+/** The changed fields a step's call names, on a step with no data tags. */
 function fieldsIn(step: FlowRow["step"], fields: DataField[]) {
+  if (step.data?.length) return [];
   const text = `${step.label} ${step.symbol}`;
   return fields
     .filter((f) => new RegExp(`\\b${escapeRe(f.field)}\\b`).test(text))
@@ -344,8 +345,12 @@ export function FlowSequence({
               const text = [
                 row.step.label,
                 row.step.returns ? `→ ${row.step.returns}` : "",
+                ...(row.step.data ?? []).map((d) => `${d.entity} · ${d.does}`),
               ].join(" ");
-              const fits = start + text.length * 7.3 + 8 <= area;
+              // Count each data badge's 12px of padding and the row's 8px gap
+              // too, so three badges don't run off the card.
+              const tagWidth = (row.step.data?.length ?? 0) * 20;
+              const fits = start + text.length * 7.3 + tagWidth + 8 <= area;
               const place = fits
                 ? { left: start, maxWidth: `calc(100% - ${start + 8}px)` }
                 : { right: 8, maxWidth: area - 16 };
@@ -382,6 +387,15 @@ export function FlowSequence({
                         {row.again && (
                           <span className="flow-badge">{row.again}</span>
                         )}
+                        {row.step.data?.map((d) => (
+                          <span
+                            key={`${d.entity}:${d.does}`}
+                            className="flow-badge"
+                            title={`This step uses ${d.entity}: ${d.does}`}
+                          >
+                            {d.entity} · {d.does}
+                          </span>
+                        ))}
                         {fieldsIn(row.step, dataFields).map((f) => (
                           <span
                             key={f.field}

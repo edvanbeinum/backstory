@@ -309,21 +309,39 @@ test("a component's stop names its container and its arrows on the map", () => {
   assert.equal(store?.kind === "component" && store.container, null);
 });
 
-test("a component's stop lists the flow steps its files are on, and none untraced", () => {
-  const chips = (flows: FlowSet | null) =>
-    Object.fromEntries(
-      all({ flows }).flatMap((s) =>
-        s.kind === "component"
-          ? [[s.node.name, s.steps.map((m) => m.chip)]]
-          : [],
-      ),
-    );
-  assert.deepEqual(chips(FLOWS), {
-    Screen: [],
-    Api: ["1·1", "1·3"],
-    Store: ["1·2"],
+test("a component's stop lists the entities its steps use, each once, in flow and step order", () => {
+  const tagged = (s: FlowStep, ...entities: string[]): FlowStep => ({
+    ...s,
+    data: entities.map((entity) => ({ entity, does: "sets it" })),
   });
-  assert.deepEqual(chips(null), { Screen: [], Api: [], Store: [] });
+  const flows: FlowSet = {
+    ...FLOWS,
+    flows: [
+      {
+        ...FLOWS.flows[0],
+        after: [
+          tagged(step("s1", "src/api/routes.ts", 3), "Basket"),
+          step("s2", "src/store/db.ts", 9),
+          tagged(step("s3", "src/api/routes.ts", 7), "Basket"),
+        ],
+      },
+      {
+        ...FLOWS.flows[0],
+        id: "pay",
+        after: [tagged(step("p1", "src/api/routes.ts", 12), "Order", "Basket")],
+      },
+    ],
+  };
+  const uses = Object.fromEntries(
+    all({ flows }).flatMap((s) =>
+      s.kind === "component" ? [[s.node.name, s.uses]] : [],
+    ),
+  );
+  assert.deepEqual(uses, {
+    Screen: [],
+    Api: ["Basket", "Order"],
+    Store: [],
+  });
 });
 
 test("files not seen empties only once every stop with files is seen", () => {

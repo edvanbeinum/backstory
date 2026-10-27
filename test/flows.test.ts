@@ -13,7 +13,12 @@ import {
   mapOldToNew,
   parseZeroContext,
 } from "../lib/flows/hunks";
-import type { HeadOutput } from "../lib/flows/prompts";
+import {
+  basePrompt,
+  headPrompt,
+  MAX_ENTITIES,
+  type HeadOutput,
+} from "../lib/flows/prompts";
 import { fromSarif, toSarif } from "../lib/flows/sarif";
 
 const PATCH = `diff --git a/a.ts b/a.ts
@@ -263,6 +268,212 @@ test("flows are traced at the head, then walked back to the base", async () => {
   );
   assert.deepEqual(roundTrip.flows, set.flows);
   assert.deepEqual(roundTrip.hunks, set.hunks);
+});
+
+test("a step says which record it writes and how, and keeps it through the cache", async () => {
+  const basket = { entity: "Basket", does: "sets the shopper's items" };
+  const runner: Runner = async <T>(prompt: string) => {
+    const atBase = prompt.includes("as it ran at the base");
+    const answer = structuredClone(atBase ? BASE_ANSWER : HEAD_ANSWER);
+    const fetch = answer.flows[0]
+      .steps[0] as HeadOutput["flows"][0]["steps"][0];
+    fetch.data = atBase
+      ? undefined
+      : [
+          { entity: " Basket ", does: " sets the shopper's items " },
+          { entity: "", does: "reads nothing" },
+          basket,
+          { entity: "Order", does: "reads the total" },
+          { entity: "Shopper", does: "reads the id" },
+          { entity: "Stock", does: "takes one" },
+        ];
+    // The carried step is tagged on both sides.
+    const render = answer.flows[0].steps.find((s) => s.id === "load.render")!;
+    (render as HeadOutput["flows"][0]["steps"][0]).data = [basket];
+    return { output: answer as T, costUsd: 0.5, model: "claude-test" };
+  };
+  const set = await generateFlows({
+    root: repo,
+    base: BASE,
+    head: HEAD,
+    runner,
+  });
+  const [flow] = set.flows;
+  assert.deepEqual(flow.after[0].data, [
+    basket,
+    { entity: "Order", does: "reads the total" },
+    { entity: "Shopper", does: "reads the id" },
+  ]);
+  assert.deepEqual(flow.after.find((s) => s.id === "load.render")?.data, [
+    basket,
+  ]);
+  assert.deepEqual(flow.before?.find((s) => s.id === "load.render")?.data, [
+    basket,
+  ]);
+  assert.equal(flow.after.find((s) => s.id === "load.ghost")?.data, undefined);
+  const roundTrip = fromSarif(
+    JSON.parse(JSON.stringify(toSarif(set, `file://${repo}`))),
+  );
+  assert.deepEqual(roundTrip.flows, set.flows);
+});
+
+test("a trace is told the records the repo stores, by name", async () => {
+  const dir = mkdtempSync(path.join(os.tmpdir(), "backstory-flows-data-"));
+  try {
+    const git = (...args: string[]) =>
+      execFileSync("git", ["-C", dir, ...args], { encoding: "utf8" }).trim();
+    git("init", "-q");
+    git("config", "user.email", "t@example.com");
+    git("config", "user.name", "Test");
+    writeFileSync(path.join(dir, "app.ts"), "export const a = 1;\n");
+    git("add", ".");
+    git("commit", "-qm", "base");
+    const base = git("rev-parse", "HEAD");
+    writeFileSync(path.join(dir, "app.ts"), "export const a = 2;\n");
+    git("add", ".");
+    git("commit", "-qm", "Change a");
+    const bare = git("rev-parse", "HEAD");
+    writeFileSync(
+      path.join(dir, "schema.sql"),
+      [
+        "CREATE TABLE baskets (id integer PRIMARY KEY);",
+        "CREATE TABLE orders (id integer PRIMARY KEY);",
+        "",
+      ].join("\n"),
+    );
+    writeFileSync(path.join(dir, "app.ts"), "export const a = 3;\n");
+    git("add", ".");
+    git("commit", "-qm", "Store baskets");
+    const stored = git("rev-parse", "HEAD");
+
+    const prompts: string[] = [];
+    const runner: Runner = async <T>(prompt: string) => {
+      prompts.push(prompt);
+      return {
+        output: { flows: [], hunks: [] } as T,
+        costUsd: 0,
+        model: "claude-test",
+      };
+    };
+    await generateFlows({ root: dir, base: bare, head: stored, runner });
+    const { readDataModel, dataSteer } = await import("../lib/data/readers");
+    const names = [
+      ...(await readDataModel(
+        dir,
+        stored,
+        dataSteer(undefined),
+      ))!.model.entities.keys(),
+    ];
+    assert.equal(names.length, 2);
+    const listed = prompts[0].match(
+      /Records this program stores, by the names to use: (.*)\./,
+    );
+    assert.deepEqual(listed?.[1].split(", "), names);
+
+    const set = await generateFlows({
+      root: dir,
+      base: bare,
+      head: stored,
+      runner,
+    });
+    prompts.length = 0;
+    await traceHunk({
+      root: dir,
+      base: bare,
+      head: stored,
+      runner,
+      set,
+      hunkId: set.hunks[0].id,
+    });
+    assert.deepEqual(
+      prompts[0]
+        .match(/Records this program stores, by the names to use: (.*)\./)?.[1]
+        .split(", "),
+      names,
+    );
+    prompts.length = 0;
+
+    await generateFlows({ root: dir, base, head: bare, runner });
+    assert.doesNotMatch(prompts[0], /Records this program stores/);
+    assert.match(
+      prompts[0],
+      /Name each stored record after the type it is stored as/,
+    );
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("the base trace gets the head's record names, and a cut list still says how to name the rest", () => {
+  const listed = /Records this program stores, by the names to use: ([^.]*)\./;
+  const base = basePrompt({
+    base: "aaaaaaa",
+    head: "bbbbbbb",
+    hunks: "",
+    flows: "[]",
+    entities: ["Basket", "Order"],
+  });
+  assert.equal(base.match(listed)?.[1], "Basket, Order");
+  assert.doesNotMatch(base, /Name any other stored record/);
+
+  const many = Array.from({ length: MAX_ENTITIES + 1 }, (_, i) => `R${i}`);
+  const head = headPrompt({
+    sha: "bbbbbbb",
+    subject: "Change",
+    hunks: "",
+    hasBase: true,
+    entities: many,
+  });
+  assert.equal(head.match(listed)?.[1].split(", ").length, MAX_ENTITIES);
+  assert.match(
+    head,
+    /Name any other stored record after the type it is stored as/,
+  );
+});
+
+test("flows cached before steps said what they do to the data read as saying nothing", () => {
+  const step = {
+    id: "s",
+    from: "A",
+    to: "B",
+    file: "a.ts",
+    line: 1,
+    caller: "A.run",
+    label: "save()",
+    symbol: "save(",
+    nesting: 0,
+    verified: true,
+  };
+  const set = {
+    base: null,
+    head: "abc",
+    generatedAt: 1,
+    flows: [
+      {
+        id: "f",
+        name: "Save",
+        trigger: "Tap save",
+        isNew: true,
+        participants: [],
+        before: null,
+        after: [step, { ...step, id: "t" }],
+      },
+    ],
+    hunks: [],
+    appFiles: [],
+    costUsd: 0,
+    durationMs: 0,
+  };
+  const log = toSarif(set, "file:///repo");
+  const locations =
+    log.runs[0].results[0].codeFlows[0].threadFlows[0].locations;
+  assert.equal(locations[0].properties["backstory.data"], undefined);
+  locations[1].properties["backstory.data"] = [{ entity: "Basket" }];
+  const read = fromSarif(JSON.parse(JSON.stringify(log)));
+  assert.deepEqual(
+    read.flows[0].after.map((s) => "data" in s),
+    [false, false],
+  );
 });
 
 test("a new flow needs one run and has no before side", async () => {

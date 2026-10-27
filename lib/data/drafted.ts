@@ -17,7 +17,7 @@ import type { Entity } from "./types";
 export const MAX_PATCH_BYTES = 400 * 1024;
 
 export interface DraftedHead {
-  /** One sentence: where and how the program keeps its data */
+  /** A short sentence naming the kinds of store the program keeps its records in */
   storage: string;
   entities: Entity[];
 }
@@ -27,6 +27,8 @@ export interface DraftedDelta {
   changed: Entity[];
   /** Entities of the model the delta starts from that this commit doesn't have */
   absent: string[];
+  /** This commit's storage sentence, only when the patch adds or removes a kind of store */
+  storage?: string;
 }
 
 const fieldSchema = {
@@ -46,7 +48,9 @@ const relationshipSchema = {
   required: ["name", "kind", "target", "polymorphic"],
   properties: {
     name: { type: "string" },
-    kind: { enum: ["belongs to", "has many", "has one", "many to many"] },
+    kind: {
+      enum: ["belongs to", "has many", "has one", "many to many", "contains"],
+    },
     target: { type: ["string", "null"] },
     polymorphic: { type: "boolean" },
     candidates: { type: "array", items: { type: "string" } },
@@ -87,7 +91,7 @@ export const headSchema = () => ({
     storage: {
       type: "string",
       description:
-        "One short sentence: where and how this program keeps its data",
+        'The kinds of store this program keeps its records in, in at most 15 plain words, with no file names, keys or contents, e.g. "A Postgres database." or "JSON files in the app\'s folders, UserDefaults and the Keychain."',
     },
     entities: entitiesSchema,
   },
@@ -100,13 +104,18 @@ const deltaSchema = () => ({
   properties: {
     changed: entitiesSchema,
     absent: { type: "array", items: { type: "string" } },
+    storage: {
+      type: "string",
+      description:
+        "Only when the patch adds or removes a kind of store: this commit's storage sentence, in the same form as the model below",
+    },
   },
 });
 
 const RULES = `- An entity is a kind of record that is stored and read back. Leave out types that only travel (API request and response shapes, props, view models, in-memory caches that are rebuilt) unless they are themselves written to storage.
 - Fields are the stored properties, with the language's own type name ("string", "number", "string[]", a union written out, including "| null" when it can be null). required is false only when the key itself may be missing from a stored record (an optional property, or an older record written before the field existed); a field that is always present but may be null is required, with "| null" in its type.
 - A field whose values are a fixed set of literals is an enum: put them in values.
-- A relationship is a stored reference from one entity to another (an id, a list of ids, an embedded record of another entity). "belongs to" for a reference this entity holds, "has many" or "has one" for the other end. target is the entity's name. fields lists this entity's fields that hold it.
+- A relationship is a stored reference from one entity to another (an id, a list of ids, an embedded record of another entity). "belongs to" for a reference by id this entity holds, "has many" or "has one" for the other end. "contains" for a value of another entity's type embedded whole in this record's stored form (a nested struct, an embedded document), named after the field that holds it. target is the entity's name. fields lists this entity's fields that hold it.
 - A constraint is a rule the code enforces on stored data: "unique" for a key that identifies a record, "foreign key" for a reference that must resolve.
 - file is the path of the file that declares the entity's type.
 - Name each entity after the record it stores, in PascalCase: the table, collection or record type, never the variable or constant that declares it. A table declared as \`incidentTable\` for the table "incident" is Incident, not IncidentTable.`;
@@ -119,7 +128,7 @@ const steering = (files: string[] | null) =>
 export const headPrompt = (files: string[] | null = null) =>
   `You are reading the code of one commit of a repository, in the current directory. Nothing may be run.
 
-Write down this program's data model: the records it persists, the things a reader would draw as an entity-relationship diagram. Whatever the storage is: a database, an ORM, JSON files, a key-value store, browser storage. In storage, say in one short sentence where and how it keeps them.
+Write down this program's data model: the records it persists, the things a reader would draw as an entity-relationship diagram. Whatever the storage is: a database, an ORM, JSON files, a key-value store, browser storage. In storage, name the kinds of store it keeps them in, in at most 15 plain words, with no file names, keys or contents, e.g. "A Postgres database." or "JSON files in the app's folders, UserDefaults and the Keychain."
 ${steering(files)}
 ${RULES}
 
@@ -138,6 +147,7 @@ Below is the data model of another commit of this repository, and the patch from
 
 - changed: for every entity the patch changed or added, its full version as it is in THIS commit. Write each one in the same style as the model below, keeping everything the patch does not touch word for word.
 - absent: the names of entities in the model below that the patch removed, so they don't exist here.
+- storage: only when the patch adds or removes a kind of store, this commit's storage sentence in the same form. Otherwise leave it out.
 
 An entity the patch does not touch goes in neither list. If the patch changes no stored records, both lists are empty. Check the code here when the patch is unclear.
 ${steering(files)}
