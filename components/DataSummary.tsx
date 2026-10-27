@@ -385,19 +385,28 @@ function DataGraph({
       ),
     [shown, changedNames, whole],
   );
-  // Changed entities, and only the neighbours a changed one links to.
-  const nodes = useMemo(() => {
-    const linked = new Set(edges.flatMap((e) => [e.source, e.destination]));
-    return shown
-      .filter((p) => whole || p.state !== "same" || linked.has(p.entity.name))
-      .map((p) => ({ ...p, id: p.entity.name }));
-  }, [shown, edges, whole]);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [focused, setFocused] = useState<OpenEntity | null>(null);
   if (focus && focus !== focused) {
     setFocused(focus);
     setOpen((cur) => new Set(cur).add(focus.name));
   }
+  // Draw changed entities, the neighbours a changed one links to, and the
+  // entity the map asked for, which may be an unchanged one a component
+  // declares.
+  const focusName = focused?.name ?? null;
+  const nodes = useMemo(() => {
+    const linked = new Set(edges.flatMap((e) => [e.source, e.destination]));
+    return shown
+      .filter(
+        (p) =>
+          whole ||
+          p.state !== "same" ||
+          linked.has(p.entity.name) ||
+          p.entity.name === focusName,
+      )
+      .map((p) => ({ ...p, id: p.entity.name }));
+  }, [shown, edges, whole, focusName]);
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const [hover, setHover] = useState<string | null>(null);
   const cards = useRef(new Map<string, HTMLDivElement>());
