@@ -37,7 +37,7 @@ terms:
       - panel
       - column
   - name: story
-    means: "The Story tab, where every view lands, on one page: the change description, then the map at full width with a line under it only when its structure changed, then each flow as a card (`components/Story.tsx`). Story holds the map's, the data model's and the description's reads: one progress line at the top says which run, a failed read's error and Try again, and a line for a big repo (`components/ReadLine.tsx`), except the map's running read, which the space the map will take shows instead, with a large spinner, on the first read a line that later reads are much quicker, and the big-repo line; one footnote at the bottom, once the AI drew anything, says who drew it and has Turn off, each drawing's Read again, and Trace again once the flows are traced (`components/ReadFootnote.tsx`)."
+    means: "The Story tab, where every view lands, on one page: the change description, then the map at full width with a line under it only when its structure changed, then each flow as a card (`components/Story.tsx`). Story runs the map's, the data model's and the description's reads: one progress line at the top says which run, a failed read's error and Try again, and a line for a big repo (`components/ReadLine.tsx`), except the map's running read, which the space the map will take shows instead, with a large spinner, on the first read a line that later reads are much quicker, and the big-repo line; one footnote at the bottom, once the AI drew anything, says who drew it and has Turn off, each drawing's Read again, and Trace again once the flows are traced (`components/ReadFootnote.tsx`)."
     avoid:
       - strip, for the map or the data model's summary
   - name: notes box
