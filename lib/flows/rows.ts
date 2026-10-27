@@ -117,8 +117,8 @@ export function flowRows(
       rows.push(row("del", b, "old", i + 1, null, before));
       i++;
     } else if (a && !shared.has(a.id)) {
-      // Newly on the flow but on unchanged code: a step without a "was"
-      // number, not a "+".
+      // Mark a step new to the flow as added only when its line is, since
+      // the flow reaching unchanged code doesn't change that code.
       const kind = isAddedLine(hunks, a.file, a.line) ? "add" : "ctx";
       rows.push(row(kind, a, "new", null, j + 1, after));
       j++;
