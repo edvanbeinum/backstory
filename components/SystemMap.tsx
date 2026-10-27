@@ -52,10 +52,7 @@ function estimateHeight(n: MapNode, w: number) {
       inner,
   );
   const files = Math.min(n.files.length, MAX_FILES + 1);
-  const foot = n.state === "touched" || n.state === "added" ? 24 : 0;
-  return (
-    16 + nameLines * 18 + descLines * 16 + (files ? 8 + files * 18 : 0) + foot
-  );
+  return 16 + nameLines * 18 + descLines * 16 + (files ? 8 + files * 18 : 0);
 }
 
 function layout(
@@ -77,19 +74,6 @@ function layout(
       pad: PAD,
     },
     { header: GROUP_HEADER, inset: GROUP_INSET },
-  );
-}
-
-function Squares({ add, del }: { add: number; del: number }) {
-  const total = add + del;
-  const green = total ? Math.round((5 * add) / total) : 0;
-  const red = total ? Math.min(5 - green, Math.round((5 * del) / total)) : 0;
-  return (
-    <span className="map-squares">
-      {Array.from({ length: 5 }, (_, i) => (
-        <i key={i} className={i < green ? "g" : i < green + red ? "r" : ""} />
-      ))}
-    </span>
   );
 }
 
@@ -165,40 +149,46 @@ function MapCanvas({
     <div className="map-canvas" style={{ height }}>
       {[...placed.values()]
         .filter((n) => n.group)
-        .map((n) => (
-          <div
-            key={n.id}
-            className={`map-group ${n.state} ${highlight === n.name ? "highlight" : ""}`}
-            style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
-            title={n.description || undefined}
-          >
-            <h4 style={{ height: GROUP_HEADER }}>
-              <span className="name">{n.name}</span>
-              <span className="type">{GROUP_TYPE[n.type] ?? n.type}</span>
-              {n.state === "added" && <span className="map-tag new">New</span>}
-              {n.state === "removed" && (
-                <span className="map-tag removed">Removed</span>
-              )}
-              {n.files.length > 0 && (
-                <button
-                  type="button"
-                  className="files mono"
-                  title={`${n.files.join("\n")}\nShow them in Files changed`}
-                  onClick={() => onJump(n.files[0])}
-                >
-                  {n.files.length} {n.files.length === 1 ? "file" : "files"}{" "}
-                  <span className="text-[var(--success)]">+{n.additions}</span>
-                  {n.deletions > 0 && (
-                    <span className="text-[var(--danger)]">
-                      {" "}
-                      −{n.deletions}
-                    </span>
-                  )}
-                </button>
-              )}
-            </h4>
-          </div>
-        ))}
+        .map((n) => {
+          const additions = n.fileStats.reduce((t, f) => t + f.additions, 0);
+          const deletions = n.fileStats.reduce((t, f) => t + f.deletions, 0);
+          return (
+            <div
+              key={n.id}
+              className={`map-group ${n.state} ${highlight === n.name ? "highlight" : ""}`}
+              style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
+              title={n.description || undefined}
+            >
+              <h4 style={{ height: GROUP_HEADER }}>
+                <span className="name">{n.name}</span>
+                <span className="type">{GROUP_TYPE[n.type] ?? n.type}</span>
+                {n.state === "added" && (
+                  <span className="map-tag new">New</span>
+                )}
+                {n.state === "removed" && (
+                  <span className="map-tag removed">Removed</span>
+                )}
+                {n.files.length > 0 && (
+                  <button
+                    type="button"
+                    className="files mono"
+                    title={`${n.files.join("\n")}\nShow them in Files changed`}
+                    onClick={() => onJump(n.files[0])}
+                  >
+                    {n.files.length} {n.files.length === 1 ? "file" : "files"}{" "}
+                    <span className="text-[var(--success)]">+{additions}</span>
+                    {deletions > 0 && (
+                      <span className="text-[var(--danger)]">
+                        {" "}
+                        −{deletions}
+                      </span>
+                    )}
+                  </button>
+                )}
+              </h4>
+            </div>
+          );
+        })}
       <svg
         className="map-edges"
         width={width}
@@ -375,26 +365,6 @@ function MapCanvas({
                   </li>
                 )}
               </ul>
-            )}
-            {(n.state === "touched" || n.state === "added") && (
-              <div className="foot">
-                <span className="mono">
-                  <span className="text-[var(--success)]">+{n.additions}</span>
-                  {n.deletions > 0 && (
-                    <span className="text-[var(--danger)]">
-                      {" "}
-                      −{n.deletions}
-                    </span>
-                  )}
-                </span>
-                <Squares add={n.additions} del={n.deletions} />
-                <span>
-                  {n.files.length} {n.files.length === 1 ? "file" : "files"}
-                  {n.newFiles > 0 &&
-                    n.newFiles < n.files.length &&
-                    `, ${n.newFiles} new`}
-                </span>
-              </div>
             )}
           </div>
         );
@@ -846,14 +816,6 @@ export function SystemMap({
             onJump={onOpenFile}
           />
         )}
-        {map.hidden > 0 && (
-          <div className="map-foot">
-            <span className="map-chip">
-              <b>+{map.hidden}</b> unchanged{" "}
-              {map.hidden === 1 ? "component" : "components"}
-            </span>
-          </div>
-        )}
       </div>
       <MapKey map={map} />
       <div className="story-line">
@@ -862,23 +824,6 @@ export function SystemMap({
             {p}
           </span>
         ))}
-        {map.source !== "drafted" &&
-          (map.unmapped.length > 0 || map.ambiguous.length > 0) && (
-            <span
-              className="part"
-              title={[
-                ...map.unmapped,
-                ...map.ambiguous.map((a) => `${a.file} ← ${a.ids.join(", ")}`),
-              ].join("\n")}
-            >
-              {map.unmapped.length > 0 &&
-                (map.local
-                  ? `${map.unmapped.length} ${map.unmapped.length === 1 ? "file" : "files"} the hand-written map has no place for`
-                  : `${map.unmapped.length} unmapped`)}
-              {map.unmapped.length > 0 && map.ambiguous.length > 0 && " · "}
-              {map.ambiguous.length > 0 && `${map.ambiguous.length} ambiguous`}
-            </span>
-          )}
         {children}
         <DrawBase map={map} draft={draft} />
         {map.local && <LocalModel map={map} />}

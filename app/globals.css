@@ -39,7 +39,6 @@
      the UnderlineNav's active tab, and an empty diffstat square. */
   --success-emphasis: #1f883d;
   --tab-active: #fd8c73;
-  --square-empty: #d1d9e0;
   --lifeline: #c4ccd5;
 
   color-scheme: light;
@@ -76,7 +75,6 @@
 
     --success-emphasis: #238636;
     --tab-active: #f78166;
-    --square-empty: #3d444d;
     --lifeline: #4b535d;
 
     color-scheme: dark;
@@ -111,7 +109,6 @@
 
   --success-emphasis: #238636;
   --tab-active: #f78166;
-  --square-empty: #3d444d;
   --lifeline: #4b535d;
 
   color-scheme: dark;
@@ -1014,15 +1011,6 @@ tr.line-del .diff-gutter {
 .map-files .more {
   color: var(--fg-muted);
 }
-.map-node .foot {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-top: 7px;
-  font-size: 11px;
-  line-height: 14px;
-  color: var(--fg-muted);
-}
 .map-node.touched {
   border: 1.5px solid var(--fg-muted);
   padding: 7.5px 10.5px 6.5px;
@@ -1118,46 +1106,6 @@ tr.line-del .diff-gutter {
 .map-group.removed {
   border: 1px dashed var(--danger);
   background: color-mix(in srgb, var(--diff-del-bg) 35%, transparent);
-}
-.map-squares {
-  display: inline-flex;
-  gap: 2px;
-}
-.map-squares i {
-  width: 8px;
-  height: 8px;
-  border-radius: 2px;
-  background: var(--square-empty);
-}
-.map-squares i.g {
-  background: var(--success-emphasis);
-}
-.map-squares i.r {
-  background: var(--danger);
-}
-.map-foot {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-top: 1px solid var(--border-muted);
-  background: var(--canvas-subtle);
-  font-size: 12px;
-  color: var(--fg-muted);
-}
-.map-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 2px 10px;
-  border: 1px solid var(--border);
-  border-radius: 2em;
-  background: var(--canvas);
-  font-size: 12px;
-}
-.map-chip b {
-  color: var(--fg);
-  font-weight: 600;
 }
 .map-key {
   display: flex;
