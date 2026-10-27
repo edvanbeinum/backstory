@@ -22,6 +22,7 @@ import { ChevronDownIcon, ChevronRightIcon } from "./icons";
 
 /** A flow and step for the story to open: a row key in the flow's diff mode. */
 export interface StoryTarget {
+  /** 0-based, unlike `StepAt.flow` */
   flow: number;
   row: string;
   /** When it was asked for, so asking twice opens it twice */

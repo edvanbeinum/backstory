@@ -726,7 +726,7 @@ export default function Page() {
     setTab("files");
   }, []);
 
-  const openStep = useCallback((step: { flow: number; row: string }) => {
+  const openStep = useCallback((step: Omit<StoryTarget, "at">) => {
     setStoryTarget({ flow: step.flow, row: step.row, at: Date.now() });
     setTab("story");
   }, []);
