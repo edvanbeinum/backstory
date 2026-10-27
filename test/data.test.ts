@@ -544,6 +544,26 @@ end
     (p) => p.entity.name === "Item",
   )!;
   assert.equal(item.summary, "1 field added, 1 changed");
+
+  // Commas join one entity's parts, since " · " separates entities on the
+  // line under the map.
+  const linked = present(
+    diffModels(
+      before,
+      readRails({
+        schema: schema(
+          `t.text "title"\n    t.string "owner_type"\n    t.bigint "owner_id"`,
+        ),
+        models: new Map([
+          [
+            "app/models/item.rb",
+            `class Item < ApplicationRecord\n  belongs_to :owner, polymorphic: true\nend\n`,
+          ],
+        ]),
+      }),
+    ),
+  ).find((p) => p.entity.name === "Item")!;
+  assert.equal(linked.summary, "1 field changed, 1 relationship added");
 });
 
 test("a unique rule's column order is no change; a foreign key's still is", () => {

@@ -159,7 +159,7 @@ export function present(entities: EntityDiff[]): Presented[] {
       ].filter(Boolean) as string[];
       // A rule is detail, unless it's all that changed.
       summary = parts.length
-        ? parts.join(" · ")
+        ? parts.join(", ")
         : (tally(rules, "rule") ?? tally(timestamps, "field") ?? "");
     }
 
