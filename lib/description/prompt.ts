@@ -9,7 +9,6 @@ export interface DescriptionOutput {
   what: string;
   why: string | null;
   lookFirst: { name: string; reason: string }[];
-  components: { name: string; sentence: string }[];
 }
 
 /** At most this many places to look first */
@@ -18,7 +17,7 @@ export const LOOK_FIRST_MAX = 2;
 export const descriptionSchema = () => ({
   type: "object",
   additionalProperties: false,
-  required: ["what", "why", "lookFirst", "components"],
+  required: ["what", "why", "lookFirst"],
   properties: {
     what: { type: "string" },
     why: { type: ["string", "null"] },
@@ -35,18 +34,6 @@ export const descriptionSchema = () => ({
         },
       },
     },
-    components: {
-      type: "array",
-      items: {
-        type: "object",
-        additionalProperties: false,
-        required: ["name", "sentence"],
-        properties: {
-          name: { type: "string" },
-          sentence: { type: "string" },
-        },
-      },
-    },
   },
 });
 
@@ -60,7 +47,6 @@ export const WRITING_RULES = [
   "When the change gives stored data a lifecycle, such as a value moved from one slot to another or a status that moves through states, what says so in one sentence, naming the slots or states.",
   "why comes only from the commit messages and the pull request. When they don't say why, it is null. Never guess it from the code.",
   `lookFirst names come only from the lists of components and entities given, copied exactly. At most ${LOOK_FIRST_MAX}, chosen for where a reviewer is most likely to find a mistake.`,
-  "components names come only from the list of components given, copied exactly, each once.",
 ];
 
 export const GOOD_EXAMPLES = [
@@ -93,11 +79,10 @@ const named = (items: string[] | null, none: string) =>
 export const descriptionPrompt = (inputs: DescriptionInputs) =>
   `You are describing one change to a repository for the person about to review it. The code at the end of the change is in the current directory: read files with Read, Grep and Glob when the patch is unclear. Don't modify anything.
 
-Answer in four parts:
+Answer in three parts:
 - what: one or two sentences saying what the change does.
 - why: one or two sentences saying why the change was made, or null.
 - lookFirst: the places a reviewer should look first, each a name and a one-sentence reason.
-- components: for every component the change touches, its name and one sentence saying what the change does in it. Empty when there are no component names.
 
 Every sentence, in every part, follows the writing rules.
 

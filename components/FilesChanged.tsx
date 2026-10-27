@@ -32,10 +32,6 @@ export interface FilesJump {
   at: number;
 }
 
-/**
- * The file in this tab. Looked up inside the tab, since Story's walk shows
- * the same files with the same ids.
- */
 const sectionFor = (root: ParentNode, path: string) =>
   root.querySelector<HTMLElement>(
     `#${CSS.escape(`file-${encodeURIComponent(path)}`)}`,
@@ -242,8 +238,6 @@ export function FilesChanged({
           row.classList.add("flash");
           done = true;
         } else if (!revealed) {
-          // Ask this tab's copy of the file to show its whole text, leaving
-          // the copy Story's walk may show as it is.
           const section = sectionFor(root, path);
           section?.dispatchEvent(new CustomEvent("backstory:reveal"));
           revealed = !!section;

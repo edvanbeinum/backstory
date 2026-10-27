@@ -4,10 +4,10 @@
 //   node demo/record.mjs http://127.0.0.1:3000 /path/to/checkout demo/pr-117.json
 //
 // It opens the change, traces it if it isn't traced yet, clicks every flow
-// step so each step's code is recorded, walks every part and opens Files
-// changed. The checkout's path, your home folder and BACKSTORY_HOME, if the
-// server runs with one, are replaced with DEMO_REPO and DEMO_HOME, so the
-// recording names no folder on this machine.
+// step so each step's code is recorded, and opens Files changed. The
+// checkout's path, your home folder and BACKSTORY_HOME, if the server runs
+// with one, are replaced with DEMO_REPO and DEMO_HOME, so the recording names
+// no folder on this machine.
 import { realpathSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 
@@ -51,11 +51,12 @@ page.on("response", async (response) => {
 
 const settle = (ms = 2000) => page.waitForTimeout(ms);
 await page.goto(`${server}/?${new URLSearchParams({ repo: checkout })}`);
-await settle(12000);
 
-await page.getByText("Show everything on one page").click();
-await settle(3000);
 const trace = page.getByRole("button", { name: "Trace this change" });
+await trace
+  .or(page.locator(".flow-card"))
+  .first()
+  .waitFor({ timeout: 120_000 });
 if (await trace.count()) {
   await trace.click();
   const started = Date.now();
@@ -79,13 +80,6 @@ for (let i = 0; i < (await cards.count()); i++) {
   }
 }
 
-await page.getByText("Walk me through it").click();
-await settle();
-const next = page.locator(".walk-bar button").filter({ hasText: "›" });
-while ((await next.count()) && !(await next.isDisabled())) {
-  await next.click();
-  await settle();
-}
 await page.getByText("Files changed").first().click();
 await settle(4000);
 await browser.close();

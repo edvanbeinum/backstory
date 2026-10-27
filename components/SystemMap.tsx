@@ -108,51 +108,26 @@ export function jumpToFile(path: string, root: ParentNode = document): boolean {
 
 const fileName = (path: string) => path.split("/").pop() ?? path;
 
-/** One component and its arrows, outlined, with the rest of the map dimmed */
-interface MapFocus {
-  node: string;
-  edges: string[];
-}
-
 function MapCanvas({
   nodes,
   edges,
   width,
   highlight,
-  focus = null,
   onJump,
-  onPickNode,
-  onOrder,
 }: {
   nodes: MapNode[];
   edges: MapEdge[];
   width: number;
   /** A component's name, outlined as hovering it would */
   highlight: string | null;
-  focus?: MapFocus | null;
   onJump: (path: string) => void;
-  /** A changed component was clicked; its first file opens when unset */
-  onPickNode?: (id: string) => void;
-  /** Each box's id, top to bottom then left to right, whenever the layout moves one */
-  onOrder?: (ids: string[]) => void;
 }) {
-  const focusEdges = useMemo(() => new Set(focus?.edges ?? []), [focus]);
-  const dimNode = (id: string) => focus !== null && focus.node !== id;
-  const dimEdge = (key: string) => focus !== null && !focusEdges.has(key);
   const [heights, setHeights] = useState<Map<string, number>>(new Map());
   const { placed, height } = useMemo(
     () => layout(nodes, edges, width, heights),
     [nodes, edges, width, heights],
   );
   const boxes = useRef(new Map<string, HTMLDivElement>());
-
-  useEffect(() => {
-    if (!onOrder) return;
-    const at = (id: string) => placed.get(id)!;
-    onOrder(
-      [...placed.keys()].sort((a, b) => at(a).y - at(b).y || at(a).x - at(b).x),
-    );
-  }, [placed, onOrder]);
 
   // Boxes size to what they say; lay out again once their real heights are
   // known, so arrows meet their edges.
@@ -193,7 +168,7 @@ function MapCanvas({
         .map((n) => (
           <div
             key={n.id}
-            className={`map-group ${n.state} ${highlight === n.name ? "highlight" : ""} ${focus?.node === n.id ? "here" : ""}`}
+            className={`map-group ${n.state} ${highlight === n.name ? "highlight" : ""}`}
             style={{ left: n.x, top: n.y, width: n.w, height: n.h }}
             title={n.description || undefined}
           >
@@ -208,14 +183,8 @@ function MapCanvas({
                 <button
                   type="button"
                   className="files mono"
-                  title={
-                    onPickNode
-                      ? `${n.files.join("\n")}\nShow them below`
-                      : `${n.files.join("\n")}\nShow them in Files changed`
-                  }
-                  onClick={() =>
-                    onPickNode ? onPickNode(n.id) : onJump(n.files[0])
-                  }
+                  title={`${n.files.join("\n")}\nShow them in Files changed`}
+                  onClick={() => onJump(n.files[0])}
                 >
                   {n.files.length} {n.files.length === 1 ? "file" : "files"}{" "}
                   <span className="text-[var(--success)]">+{n.additions}</span>
@@ -289,7 +258,7 @@ function MapCanvas({
               <path d={d} className="map-hit" />
               <path
                 d={d}
-                className={`map-edge ${e.state} ${hoverEdge === e.key ? "hover" : ""} ${dimEdge(e.key) ? "dim" : ""}`}
+                className={`map-edge ${e.state} ${hoverEdge === e.key ? "hover" : ""}`}
                 markerEnd={`url(#map-${kind})`}
               />
               <title>{`${a.name} → ${b.name}: ${e.description}${e.before ? ` (was: ${e.before})` : ""}`}</title>
@@ -317,7 +286,7 @@ function MapCanvas({
         return (
           <div
             key={e.key}
-            className={`map-label ${e.state} ${dimEdge(e.key) ? "dim" : ""}`}
+            className={`map-label ${e.state}`}
             style={{ left: lx, top: ly }}
           >
             {e.state === "changed" ? (
@@ -346,12 +315,10 @@ function MapCanvas({
               if (el) boxes.current.set(n.id, el);
               else boxes.current.delete(n.id);
             }}
-            className={`map-node ${n.state} ${n.files.length ? "jumps" : ""} ${highlight === n.name ? "highlight" : ""} ${focus?.node === n.id ? "here" : ""} ${dimNode(n.id) ? "dim" : ""}`}
+            className={`map-node ${n.state} ${n.files.length ? "jumps" : ""} ${highlight === n.name ? "highlight" : ""}`}
             style={{ left: n.x, top: n.y, width: n.w }}
             onClick={() => {
-              if (!n.files[0]) return;
-              if (onPickNode) onPickNode(n.id);
-              else onJump(n.files[0]);
+              if (n.files[0]) onJump(n.files[0]);
             }}
           >
             <h4>
@@ -443,15 +410,10 @@ const names = (list: MapNode[]) => {
     : `${n.slice(0, 3).join(", ")} +${n.length - 3}`;
 };
 
-/** What the map's colours say changed in its structure, or why it can't say: nothing when every box and arrow is the same. */
+/** What the map's colours say changed in its boxes, or why it can't say: nothing when every box is the same. */
 function summary(map: MapResponse) {
   const added = map.nodes.filter((n) => n.state === "added");
   const removed = map.nodes.filter((n) => n.state === "removed");
-  const arrows = {
-    added: map.edges.filter((e) => e.state === "added").length,
-    removed: map.edges.filter((e) => e.state === "removed").length,
-    changed: map.edges.filter((e) => e.state === "changed").length,
-  };
   const parts: React.ReactNode[] = [];
   if (map.baseError)
     parts.push(
@@ -469,26 +431,6 @@ function summary(map: MapResponse) {
   if (removed.length)
     parts.push(
       <span className="text-[var(--danger)]">{names(removed)} removed</span>,
-    );
-  const plural = (n: number, w: string) =>
-    `${n} ${w} ${n === 1 ? "arrow" : "arrows"}`;
-  if (arrows.added)
-    parts.push(
-      <span className="text-[var(--success)]">
-        {plural(arrows.added, "new")}
-      </span>,
-    );
-  if (arrows.changed)
-    parts.push(
-      <span className="text-[var(--attention)]">
-        {plural(arrows.changed, "relabelled")}
-      </span>,
-    );
-  if (arrows.removed)
-    parts.push(
-      <span className="text-[var(--danger)]">
-        {plural(arrows.removed, "removed")}
-      </span>,
     );
   return parts;
 }
@@ -634,10 +576,6 @@ export type MapDraftApi = ReturnType<typeof useMapDraft>;
 /** Whether the repo is turned off and the read hasn't started, so the page offers the one click that starts it. */
 const offered = (map: MapResponse) =>
   map.draft?.status === "idle" ? !map.draft.auto : map.draft?.status === "done";
-
-/** Whether the map's space shows its read running, so nothing else on the page reads as the walk's final shape. */
-export const mapDrawing = (map: MapResponse | null) =>
-  map?.status === "none" && !map.error && !!map.draft && !offered(map);
 
 /** The map's read in the space the map will take, so a read that takes minutes doesn't look frozen. */
 function DraftPending({ map }: { map: MapResponse | null }) {
@@ -788,9 +726,6 @@ export function SystemMap({
   repo,
   rev,
   highlight = null,
-  focus = null,
-  onPickNode,
-  onOrder,
   onOpenFile,
   onSetAuto,
   children,
@@ -803,12 +738,6 @@ export function SystemMap({
   rev: string;
   /** A component to outline, asked for from Files changed */
   highlight?: { name: string; at: number } | null;
-  /** The component Story's walk is on, outlined with its arrows */
-  focus?: MapFocus | null;
-  /** A changed component was clicked, for Story's walk to go to */
-  onPickNode?: (id: string) => void;
-  /** The map's boxes in reading order, for Story's walk to follow */
-  onOrder?: (ids: string[]) => void;
   /** Show a file in Files changed */
   onOpenFile: (path: string) => void;
   /** The rest of the line under the map: the data model's summary */
@@ -914,10 +843,7 @@ export function SystemMap({
             edges={map.edges}
             width={width - 2}
             highlight={highlight?.name ?? null}
-            focus={focus}
             onJump={onOpenFile}
-            onPickNode={onPickNode}
-            onOrder={onOrder}
           />
         )}
         {map.hidden > 0 && (

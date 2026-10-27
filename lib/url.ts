@@ -25,10 +25,6 @@ interface UrlState {
   tab?: Tab;
   /** The inbox shows the setup checklist, as the Mac app's Set Up Backstory… asks */
   setup?: boolean;
-  /** The stop Story's walk is on, counted from 1; absent for the first */
-  stop?: number;
-  /** False when Story shows everything on one page instead of the walk */
-  walk?: boolean;
 }
 
 export type Tab = "story" | "files" | "comments";
@@ -42,7 +38,6 @@ export function parseUrlState(search: string): UrlState {
   const rev = params.get("rev")?.trim();
   const comment = params.get("comment")?.trim();
   const tab = TABS.find((t) => t === params.get("tab")?.trim());
-  const stop = Number(params.get("stop")?.trim());
 
   return {
     repo: repo ? repo : null,
@@ -51,17 +46,7 @@ export function parseUrlState(search: string): UrlState {
     comment: comment ? comment : null,
     ...(tab && { tab }),
     ...(params.get("setup") === "1" && { setup: true }),
-    ...(Number.isInteger(stop) && stop > 1 && { stop }),
-    ...(params.get("walk") === "0" && { walk: false }),
   };
-}
-
-/**
- * The stop a walk of `count` stops opens on, from 0: the one asked for, or
- * the last when a link names one past the end.
- */
-export function resolveStop(requested: number | undefined, count: number) {
-  return Math.max(0, Math.min((requested ?? 1) - 1, count - 1));
 }
 
 /**
@@ -85,8 +70,6 @@ export function buildUrl(state: Partial<UrlState>, pathname = "/"): string {
     params.set("tab", state.tab);
   if (state.comment) params.set("comment", state.comment);
   if (state.setup) params.set("setup", "1");
-  if (state.walk === false) params.set("walk", "0");
-  else if (state.stop && state.stop > 1) params.set("stop", String(state.stop));
 
   // URLSearchParams percent-encodes slashes, which turns every repo path into
   // an unreadable %2F soup. A slash is legal unencoded in a query string, and

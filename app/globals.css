@@ -1604,25 +1604,6 @@ tr.step-code-target td.diff-num {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
-/* The component Story's walk is on, with the rest of the map dimmed. */
-.map-node.here,
-.map-group.here {
-  border: 2px solid var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
-}
-.map-node.here {
-  padding: 7px 10px 6px;
-}
-.map-node.dim,
-.map-label.dim {
-  opacity: 0.45;
-}
-.map-node.dim:hover {
-  opacity: 1;
-}
-.map-edge.dim {
-  opacity: 0.3;
-}
 
 /* The line under the map: its parts, a dot between each, wrapping; the data
    graph opens on a row of its own beneath it. */
@@ -1656,80 +1637,6 @@ tr.step-code-target td.diff-num {
   color: var(--accent);
 }
 .story-disclose:hover {
-  text-decoration: underline;
-}
-
-/* Story's walk: the bar and the map stay pinned under the app bar while the
-   stop beneath them scrolls. */
-.walk-top {
-  position: sticky;
-  top: var(--header-height, 0px);
-  z-index: 15;
-  margin: 0 -4px;
-  padding: 0 4px 8px;
-  background: var(--canvas);
-}
-.walk-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px 12px;
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--canvas-subtle);
-  font-size: 13px;
-}
-.walk-where b {
-  font-weight: 600;
-}
-.walk-dots {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-}
-.walk-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  border: 1px solid var(--fg-subtle);
-  background: transparent;
-}
-.walk-dot.seen {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 45%, transparent);
-}
-.walk-dot[aria-current="step"] {
-  border-color: var(--accent);
-  background: var(--accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 25%, transparent);
-}
-.walk-stop {
-  padding-top: 12px;
-}
-.walk-h {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 4px 10px;
-}
-.walk-h h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-}
-.walk-h span {
-  font-size: 12px;
-  color: var(--fg-muted);
-}
-.walk-ahead {
-  font-size: 13px;
-  color: var(--fg-muted);
-}
-.walk-ahead button {
-  color: var(--accent);
-}
-.walk-ahead button:hover {
   text-decoration: underline;
 }
 

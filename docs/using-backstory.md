@@ -72,13 +72,12 @@ Uncommitted work is drawn on the map from your last commit, so it shows which
 components the work touched, not which ones it added or removed. Under the header are three tabs,
 as on a pull request, and every change opens on the first:
 
-- **Story** walks you through the change one part at a time (see [Walking through a change](#walking-through-a-change)).
-  **Show everything on one page** shows it all at once instead: a few sentences
-  on the change, the map at full width, a line under it saying what it shows,
-  then each flow as a card. Before a change is traced, one card in place of the
-  flows offers **Trace this change**. Click a step to open its code under it;
-  click it again or press `Esc` to close it, and **Show in Files changed** opens
-  the diff at the same lines. **Walk me through it** goes back to the walk.
+- **Story** shows the change on one page: a few sentences on the change, the
+  map at full width, a line under it saying what it shows, then each flow as a
+  card. Before a change is traced, one card in place of the flows offers
+  **Trace this change**. Click a step to open its code under it; click it again
+  or press `Esc` to close it, and **Show in Files changed** opens the diff at
+  the same lines.
 - **Files changed** is the diff.
 - **Comments** lists the pull request's review comments, when it has any.
 
@@ -94,35 +93,6 @@ yourself, or the files on one flow; **read these yourself** beside the flows on
 Story opens the first.
 Marks in the gutter beside a line open what is there: `⇄ 1·7` opens flow 1, step
 7 in the story, and `💬 2` opens review comment 2 in Comments.
-
-### Walking through a change
-
-Story opens on the change's overview, then takes you through it in order:
-
-1. **Overview**: the change's description, with the map under it. Its places to
-   look first go to their part of the walk.
-2. **Data model**, when the change touches it: the changed entities as cards.
-   Click an entity's component to go to that component's part of the walk, or
-   to the overview's map, outlining it, when the change doesn't touch it.
-3. **Each changed component**, in the map's order, top to bottom and left to
-   right: what the change does in it, the records its flow steps use beside
-   its file count, the map
-   outlining it, and its files with their diffs. Leave line notes on them as
-   in Files changed, or **+ Note for the agent** for a note on the component as
-   a whole, which starts "On" and its name.
-4. **Not on the map**: the files no component has, such as tests.
-5. **Your notes**: says you've seen the whole change, or names the files you
-   haven't seen yet, with **+ Note for the agent** for a note on the change as a
-   whole.
-
-On uncommitted work, the overview is the map from your last commit, with no
-description, and the walk goes through each component the work changed.
-
-The bar at the top says where you are, as "3 of 6 · Sync Engine", with a dot
-for each part. `j` and `k`, or **‹** and **›**, move between the parts, and
-clicking a changed component on the map goes to its part. On each component, the map outlines it and its
-arrows. A flow step's chip, or a link from Files changed or Comments to a step,
-opens it on **Show everything on one page**.
 
 **View file** — every file header has a _View file_ toggle that swaps the hunks
 for the entire file at that commit, change still highlighted in place, for when
@@ -164,8 +134,8 @@ Story says so and has:
   does the same for the data model.
 - **Describe again**, which reads the description once more, and keeps the
   earlier description if that read fails.
-- **Trace again**, on one page once the change is traced, which traces its
-  flows once more, and keeps the earlier flows if that trace fails.
+- **Trace again**, once the change is traced, which traces its flows once more,
+  and keeps the earlier flows if that trace fails.
 
 Backstory draws what a change did to the system, so you can see its effect
 before reading its lines:
@@ -326,9 +296,8 @@ opens it in Backstory. If you move the app, choose it again to fix the link.
 When an agent is making the change, you review what it made — uncommitted work,
 or the commits it made on its own if you let it run. Notes go on any change:
 in Files changed, hover a line of **Uncommitted**, **All changes**, or any one
-commit, and press **+**. **+ Note for the agent**, on the walk's last part or
-beside **Walk me through it** on one page, covers the work as a whole. In a
-note, `⌘↵` saves it and `Esc` cancels.
+commit, and press **+**. **+ Note for the agent**, at the top of Story, covers
+the work as a whole. In a note, `⌘↵` saves it and `Esc` cancels.
 
 The notes box appears at the bottom of the window with your first note, or as
 soon as an agent is waiting, and has **Add a general note** for more. When you
@@ -388,20 +357,15 @@ with **open in the story**. On the Comments tab `j`/`k` move between comments.
 
 ## Shareable URLs
 
-The repo, the selected commit, the open tab and where you are in Story's walk
-live in the address bar, so a view can be bookmarked, reopened after a restart,
-or pasted to another machine with the same checkout. A copy button in the
-header copies the current one.
+The repo, the selected commit and the open tab live in the address bar, so a
+view can be bookmarked, reopened after a restart, or pasted to another machine
+with the same checkout. A copy button in the header copies the current one.
 
 ```text
 /?repo=/Users/you/code/your-repo
 /?repo=/Users/you/code/your-repo&rev=1e61946e49974e250cf688eda4c158132e12be83
 /?repo=/Users/you/code/your-repo&rev=1e61946&tab=files
-/?repo=/Users/you/code/your-repo&rev=1e61946&stop=3
 ```
-
-`stop=3` opens Story's walk on its third part, and `walk=0` opens Story with
-everything on one page.
 
 `rev` is optional and accepts a short sha, which is normalised to the full one.
 If a URL points at a commit that's since been pushed, Backstory falls back to
