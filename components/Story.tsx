@@ -25,8 +25,8 @@ import type { FlowsApi } from "./useFlows";
 import { useView } from "./ViewContext";
 
 /**
- * A note on the change as a whole. The notes box shows only once there is a
- * note, so this is where the first general note is written.
+ * A note on the change as a whole. The notes box has no note button of its
+ * own, so this is where every general note is written.
  */
 function NoteForAgent({ onNote }: { onNote: (body: string) => void }) {
   const [writing, setWriting] = useState(false);
