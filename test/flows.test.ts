@@ -13,7 +13,12 @@ import {
   mapOldToNew,
   parseZeroContext,
 } from "../lib/flows/hunks";
-import type { HeadOutput } from "../lib/flows/prompts";
+import {
+  basePrompt,
+  headPrompt,
+  MAX_ENTITIES,
+  type HeadOutput,
+} from "../lib/flows/prompts";
 import { fromSarif, toSarif } from "../lib/flows/sarif";
 
 const PATCH = `diff --git a/a.ts b/a.ts
@@ -397,6 +402,33 @@ test("a trace is told the records the repo stores, by name", async () => {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test("the base trace gets the head's record names, and a cut list still says how to name the rest", () => {
+  const listed = /Records this program stores, by the names to use: ([^.]*)\./;
+  const base = basePrompt({
+    base: "aaaaaaa",
+    head: "bbbbbbb",
+    hunks: "",
+    flows: "[]",
+    entities: ["Basket", "Order"],
+  });
+  assert.equal(base.match(listed)?.[1], "Basket, Order");
+  assert.doesNotMatch(base, /Name any other stored record/);
+
+  const many = Array.from({ length: MAX_ENTITIES + 1 }, (_, i) => `R${i}`);
+  const head = headPrompt({
+    sha: "bbbbbbb",
+    subject: "Change",
+    hunks: "",
+    hasBase: true,
+    entities: many,
+  });
+  assert.equal(head.match(listed)?.[1].split(", ").length, MAX_ENTITIES);
+  assert.match(
+    head,
+    /Name any other stored record after the type it is stored as/,
+  );
 });
 
 test("flows cached before steps said what they do to the data read as saying nothing", () => {

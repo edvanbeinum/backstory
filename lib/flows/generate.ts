@@ -327,6 +327,7 @@ async function traceBefore(
   ctx: Context,
   runner: Runner,
   flows: { raw: RawFlow; after: FlowStep[] }[],
+  entities: string[] | null,
 ): Promise<{
   before: Map<string, { raw: RawFlow; steps: FlowStep[] }>;
   costUsd: number;
@@ -363,6 +364,7 @@ async function traceBefore(
         head: ctx.head.slice(0, 7),
         hunks: hunkText(ctx.hunks),
         flows: JSON.stringify(marked, null, 1),
+        entities,
       }),
       baseSchema(),
       dir,
@@ -426,7 +428,7 @@ export async function generateFlows(opts: GenerateOptions): Promise<FlowSet> {
   let before = new Map<string, { raw: RawFlow; steps: FlowStep[] }>();
   if (existing.length > 0) {
     phase("Tracing the same flows at the base");
-    const result = await traceBefore(ctx, runner, existing);
+    const result = await traceBefore(ctx, runner, existing, entities);
     before = result.before;
     costUsd += result.costUsd;
   }
@@ -532,7 +534,7 @@ export async function traceHunk(
   let prior: { raw: RawFlow; steps: FlowStep[] } | undefined;
   const isNew = ctx.base === null || found.raw.isNew;
   if (!isNew) {
-    const result = await traceBefore(ctx, runner, [found]);
+    const result = await traceBefore(ctx, runner, [found], entities);
     prior = result.before.get(found.raw.id);
     costUsd += result.costUsd;
   }

@@ -160,9 +160,11 @@ const STEP_RULES = `For each step give:
 
 Describe only what the code does. Don't judge it, and don't add a step you can't point to on a line.`;
 
+// Keep the naming rule when the list is cut, so a record past the cut still
+// gets a name the data view is likely to use.
 const records = (entities: string[] | null) =>
   entities && entities.length > 0
-    ? `Records this program stores, by the names to use: ${entities.slice(0, MAX_ENTITIES).join(", ")}.`
+    ? `Records this program stores, by the names to use: ${entities.slice(0, MAX_ENTITIES).join(", ")}.${entities.length > MAX_ENTITIES ? " Name any other stored record after the type it is stored as." : ""}`
     : "Name each stored record after the type it is stored as.";
 
 export function headPrompt(opts: {
@@ -196,6 +198,8 @@ export function basePrompt(opts: {
   head: string;
   hunks: string;
   flows: string;
+  /** The records the repo stores at the head, so a carried step's tags keep their names */
+  entities: string[] | null;
 }): string {
   return `You are tracing flows through a codebase, for a reviewer comparing the code before and after a change. A flow is what the code does when one trigger happens, as a sequence of calls between types. The flows below were traced at the head commit ${opts.head}. Your job is to write each of them as it ran at the base commit ${opts.base}, before the change.
 
@@ -217,7 +221,9 @@ Return every flow above, with the same id, name and trigger, and its full step l
 - Leave out steps for calls that didn't exist at the base.
 - Line numbers, files and symbols are the base's.
 
-${STEP_RULES}`;
+${STEP_RULES}
+
+${records(opts.entities)}`;
 }
 
 export function tracePrompt(opts: {
