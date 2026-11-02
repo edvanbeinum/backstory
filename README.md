@@ -15,9 +15,12 @@ For a branch, a commit or your uncommitted work, Backstory draws:
 
 - **The map**: the parts of your system, drawn from the code, with the ones the
   change touched, added or removed.
+- **The data model**: the entities, fields and relationships the change touched.
+
+For a branch or a commit, it also draws:
+
 - **Flows**: a sequence diagram of each user action the change touches, before
   and after.
-- **The data model**: the entities, fields and relationships the change touched.
 
 The diff is a click away from any component or step. Notes on what needs fixing
 go back to the agent that wrote the change. The PR's review comments appear on
@@ -53,7 +56,8 @@ You need:
    folder on the window. The workspace opens on its branch.
 2. In the header, pick the change to review: the whole branch, your uncommitted
    work, or one commit.
-3. The change opens on **Story**, with the map at the top. Press **Trace this
+3. The change opens on **Story**, with the map. For a branch or a commit, a
+   few sentences on what the change does sit above the map; press **Trace this
    change** under it. Claude Code reads the change through your own `claude`
    login, the same way it does when you use Claude Code in that repo. It takes
    about a minute. When it finishes, each flow appears as a card under the map.
