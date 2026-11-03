@@ -15,8 +15,8 @@ download="https://github.com/edvanbeinum/backstory/releases/download/v$version/"
 # Fetch Sparkle's tools from the zip its Swift package resolves to, checked
 # against the sum in Sparkle's own Package.swift, so they match the framework
 # in the app. To bump it, take `checksum` from Package.swift at the new tag.
-sparkle_version=2.10.0
-sparkle_sha256=17e28312b8e18ab7cdbbe09a6fb28cc55a5479ec6c371dbc07cdecd2a14fd959
+sparkle_version=2.10.1
+sparkle_sha256=4c2e48a3e50ebcc2c88a58a4c7264a1a99c3c31857ce754357afb9cdb323022a
 sparkle_zip="$out/Sparkle-$sparkle_version.zip"
 tools="$out/sparkle-$sparkle_version"
 
