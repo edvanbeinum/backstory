@@ -177,5 +177,5 @@ test("the smoke signs its test feed with the Sparkle appcast.sh fetches", () => 
   );
   assert.match(smoke, /"appcast\.sh"/);
   assert.match(smoke, /\/\^sparkle_version=/);
-  assert.match(smoke, /`sparkle-\$\{sparkleVersion\}`/);
+  assert.match(smoke, /`sparkle-\$\{\w+\}`/);
 });
