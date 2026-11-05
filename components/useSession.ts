@@ -164,8 +164,13 @@ export function useSession({
       opts: { background?: boolean; fresh?: boolean } = {},
     ) => {
       if (!path) {
+        // Bump the sequence so a load still on its way for the last repo is
+        // dropped, rather than opening it again over the inbox.
+        seq.current += 1;
+        lookPending.current = null;
         setSession(null);
         setError(null);
+        setLoading(false);
         opened.current = null;
         return;
       }

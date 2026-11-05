@@ -118,6 +118,28 @@ test("a slower earlier answer is dropped", async () => {
   assert.equal(result.current.shown.repo, "/repos/b");
 });
 
+test("an answer that arrives after going back to the inbox is dropped", async () => {
+  let answer = () => {};
+  const { result, rerender, props, calls, opened, url } = await mount(
+    (call) =>
+      new Promise((resolve) => {
+        const repo = call.url.searchParams.get("repo")!;
+        answer = () => resolve({ json: sessionFor(repo, { threads: ["t1"] }) });
+      }),
+    { comment: "t1" },
+  );
+  url.comment = null;
+  await rerender({ ...props, repo: "" });
+  answer();
+  await settle();
+  assert.equal(result.current.session, null);
+  assert.equal(result.current.shown.repo, "");
+  assert.equal(result.current.loading, false);
+  assert.deepEqual(opened, []);
+  assert.equal(url.comment, null);
+  assert.equal(calls.filter((c) => c.url.pathname === "/api/looked").length, 0);
+});
+
 test("opening a branch marks it looked at once, with its tip; a background refresh doesn't", async () => {
   const { calls } = await mount(() => ({ json: sessionFor("/repos/a") }));
   const looked = () => calls.filter((c) => c.url.pathname === "/api/looked");
