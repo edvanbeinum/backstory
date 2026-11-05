@@ -431,6 +431,11 @@ test("a stack starts below every listed PR when the PR itself isn't listed", () 
   assert.equal(stackStartOf(ends("stack-b", "stack-a"), open), "main");
 });
 
+test("a fork's PR from a branch named like the base isn't part of the stack", () => {
+  const open = [{ ...ends("release-1", "main"), isCrossRepository: true }];
+  assert.equal(stackStartOf(ends("feature", "release-1"), open), null);
+});
+
 test("two PRs targeting each other end with no stack rather than looping", () => {
   const open = [ends("x", "y"), ends("y", "x")];
   assert.equal(stackStartOf(open[0], open), null);

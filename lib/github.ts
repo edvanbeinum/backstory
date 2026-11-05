@@ -394,6 +394,7 @@ query($owner: String!, $name: String!) {
       nodes {
         headRefName
         baseRefName
+        isCrossRepository
       }
     }
   }
@@ -402,6 +403,7 @@ query($owner: String!, $name: String!) {
 interface PullRequestEnds {
   headRefName: string;
   baseRefName: string;
+  isCrossRepository?: boolean;
 }
 
 interface GqlThreadNode {
@@ -559,7 +561,13 @@ export function stackStartOf(
   pr: PullRequestEnds,
   openPrs: PullRequestEnds[],
 ): string | null {
-  const baseOf = new Map(openPrs.map((p) => [p.headRefName, p.baseRefName]));
+  // Skip PRs from forks: a fork's branch named like this repo's base is a
+  // different branch, and following it ends the stack in the wrong place.
+  const baseOf = new Map(
+    openPrs
+      .filter((p) => p.isCrossRepository !== true)
+      .map((p) => [p.headRefName, p.baseRefName]),
+  );
   let start = pr.baseRefName;
   if (!baseOf.has(start)) return null;
   for (let step = 0; step <= openPrs.length; step++) {
