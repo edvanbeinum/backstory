@@ -1,5 +1,5 @@
 import { filePaths } from "./anchor";
-import { BRANCH_REV, WORKING_REV } from "./constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "./constants";
 import { langForPath } from "./lang";
 import type { DiffFile, Note } from "./types";
 
@@ -122,7 +122,7 @@ function whereQualifier(
   ref: string | null,
 ): string | null {
   if (note.rev === WORKING_REV) return mixed ? "uncommitted" : null;
-  if (note.rev === BRANCH_REV)
+  if (note.rev === BRANCH_REV || note.rev === STACK_REV)
     return ref ? `committed, at the tip of ${ref}` : "committed, at HEAD";
   const commit = commits.find((c) => c.sha === note.rev);
   const short = note.rev.slice(0, 7);
@@ -174,9 +174,13 @@ function heading(
     : location;
 }
 
-/** Commits oldest first, then the branch as a whole, then uncommitted work. */
+/**
+ * Commits oldest first, then the branch as a whole, then the whole stack,
+ * then uncommitted work.
+ */
 function revRank(rev: string, commits: NoteCommit[]): number {
-  if (rev === WORKING_REV) return commits.length + 2;
+  if (rev === WORKING_REV) return commits.length + 3;
+  if (rev === STACK_REV) return commits.length + 2;
   if (rev === BRANCH_REV) return commits.length + 1;
   const index = commits.findIndex((c) => c.sha === rev);
   return index === -1 ? commits.length : index;

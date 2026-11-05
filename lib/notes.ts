@@ -1,6 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 
-import { BRANCH_REV, WORKING_REV } from "./constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "./constants";
 import {
   isObject,
   isTime,
@@ -31,6 +31,7 @@ const isTimeOrNull = (value: unknown) => value === null || isTime(value);
 const isRev = (value: unknown) =>
   value === WORKING_REV ||
   value === BRANCH_REV ||
+  value === STACK_REV ||
   (typeof value === "string" && /^[0-9a-f]{40}$/.test(value));
 
 /**

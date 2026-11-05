@@ -1,6 +1,6 @@
 "use client";
 
-import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "@/lib/constants";
 import type { CommitSummary, DiffResponse } from "@/lib/types";
 import { FileDiffIcon, GitCommitIcon } from "./icons";
 import { Badge, RelativeTime } from "./ui";
@@ -22,7 +22,7 @@ export function CommitHeader({
 }) {
   if (!commit || commit.sha === WORKING_REV) return null;
 
-  const isBranch = commit.sha === BRANCH_REV;
+  const isBranch = commit.sha === BRANCH_REV || commit.sha === STACK_REV;
   const fileCount = diff?.files.length ?? 0;
 
   return (

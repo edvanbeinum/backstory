@@ -1,4 +1,4 @@
-import { BRANCH_REV, WORKING_REV } from "./constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "./constants";
 import type { CommitSummary } from "./types";
 
 /**
@@ -191,6 +191,7 @@ export function resolveRev(
    * keeps a stale bookmark graceful.
    */
   pinned: string[] = [],
+  hasStackDiff = false,
 ): RevResolution {
   // Open on uncommitted work while there is some, as that's what an agent
   // waiting on review has just written; otherwise on the whole branch.
@@ -206,11 +207,16 @@ export function resolveRev(
       : { rev: fallback, notice: null };
   }
 
+  // The combined views simply aren't there when there's nothing to diff
+  // against; falling back silently beats a scary notice.
   if (requested === BRANCH_REV) {
-    // The combined view simply isn't there when there's nothing to diff
-    // against; falling back silently beats a scary notice.
     return hasBranchDiff
       ? { rev: BRANCH_REV, notice: null }
+      : { rev: fallback, notice: null };
+  }
+  if (requested === STACK_REV) {
+    return hasStackDiff
+      ? { rev: STACK_REV, notice: null }
       : { rev: fallback, notice: null };
   }
 

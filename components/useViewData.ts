@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 import type { OpenView } from "@/components/ViewContext";
-import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "@/lib/constants";
 import type { DataResponse } from "@/lib/data/types";
 import type { MapResponse } from "@/lib/map";
 import type { ApiError, DiffResponse, SessionResponse } from "@/lib/types";
@@ -62,9 +62,9 @@ export function useViewData({
 
   const viewId = viewKey({ ...shown, rev });
   const haveSession = session !== null;
-  // A commit's diff is immutable, so watcher ticks only matter for the two
-  // views that move — uncommitted work, and the branch diff (its tip end
-  // advances with every commit); pinning the key otherwise keeps background
+  // A commit's diff is immutable, so watcher ticks only matter for the views
+  // that move — uncommitted work, and the branch and stack diffs (their tip
+  // end advances with every commit); pinning the key otherwise keeps background
   // session refreshes from refetching a diff that cannot have changed. A
   // branch opened by ref keys on its base and tip instead: saves in the
   // checkout fire watcher ticks, but can't move another branch.
@@ -72,7 +72,9 @@ export function useViewData({
     ? `${session?.base.sha}..${session?.commits[0]?.sha}`
     : ticks.working;
   const workingDiffKey =
-    rev === WORKING_REV || rev === BRANCH_REV ? branchEnds : -1;
+    rev === WORKING_REV || rev === BRANCH_REV || rev === STACK_REV
+      ? branchEnds
+      : -1;
 
   // Start reading main's data model and map as a repo opens, while a pull
   // request is still being chosen. The server starts each unless the repo is

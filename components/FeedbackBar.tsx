@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 
-import { BRANCH_REV, DIFF_API, WORKING_REV } from "@/lib/constants";
+import { BRANCH_REV, DIFF_API, STACK_REV, WORKING_REV } from "@/lib/constants";
 import { fileForNote, formatFeedback, type NoteCommit } from "@/lib/feedback";
 import type {
   DiffFile,
@@ -93,7 +93,9 @@ export function FeedbackBar({
         drafts
           .map((n) => n.rev)
           .filter(
-            (r) => (r === WORKING_REV || r === BRANCH_REV) && !diffs.has(r),
+            (r) =>
+              (r === WORKING_REV || r === BRANCH_REV || r === STACK_REV) &&
+              !diffs.has(r),
           ),
       ),
     ];
@@ -402,6 +404,7 @@ function branchCommits(session: SessionResponse): NoteCommit[] {
 function changeLabel(rev: string, commits: NoteCommit[]): string {
   if (rev === WORKING_REV) return "Uncommitted";
   if (rev === BRANCH_REV) return "All changes";
+  if (rev === STACK_REV) return "Whole stack";
   return (
     rev.slice(0, 7) + (commits.some((c) => c.sha === rev) ? "" : " (gone)")
   );

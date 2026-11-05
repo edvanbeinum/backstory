@@ -1,8 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "@/lib/constants";
 import type {
   CommitSummary,
   DiffResponse,
@@ -11,7 +11,9 @@ import type {
 } from "@/lib/types";
 import { CommitHeader } from "./CommitHeader";
 import { CommitPicker } from "./CommitPicker";
+import { requestFetch } from "./fetchBranch";
 import { FileDiffIcon, GitCommitIcon, PencilIcon } from "./icons";
+import { Spinner } from "./ui";
 
 interface ChangeOption {
   rev: string;
@@ -32,12 +34,33 @@ function changesFor(
   session: SessionResponse,
 ): ChangeOption[] {
   const options: ChangeOption[] = [];
+  const { stackStart } = session.github;
 
   if (session.branchDiff) {
+    options.push(
+      stackStart
+        ? {
+            rev: BRANCH_REV,
+            label: "This PR",
+            hint: `this pull request's changes ${session.branchDiff.label}`,
+            icon: <FileDiffIcon size={12} />,
+          }
+        : {
+            rev: BRANCH_REV,
+            label: "All changes",
+            hint: `everything ${session.branchDiff.label}`,
+            icon: <FileDiffIcon size={12} />,
+          },
+    );
+  }
+
+  if (stackStart) {
     options.push({
-      rev: BRANCH_REV,
-      label: "All changes",
-      hint: `everything ${session.branchDiff.label}`,
+      rev: STACK_REV,
+      label: "Whole stack",
+      hint: session.stackDiff
+        ? `everything the stack brings ${session.stackDiff.label}`
+        : `fetches ${stackStart} from origin, then shows everything the stack brings vs it`,
       icon: <FileDiffIcon size={12} />,
     });
   }
@@ -71,6 +94,7 @@ export function ChangeHeader({
   diff,
   thread,
   pushed,
+  onFetched,
 }: {
   session: SessionResponse;
   rev: string;
@@ -80,8 +104,47 @@ export function ChangeHeader({
   /** The focused comment, so Uncommitted can say it touches the comment's file */
   thread: ReviewThread | null;
   pushed: boolean;
+  /** Called after Whole stack fetches the branch the stack starts from, to load the session again */
+  onFetched: () => void;
 }) {
   const options = useMemo(() => changesFor(thread, session), [thread, session]);
+  const [fetching, setFetching] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
+  /** Set once the stack's start is fetched, so the view opens on it when the session has it */
+  const openStack = useRef(false);
+
+  useEffect(() => {
+    if (!openStack.current || !session.stackDiff) return;
+    openStack.current = false;
+    onRevChange(STACK_REV);
+  }, [session, onRevChange]);
+
+  const fetchStackStart = async () => {
+    const { root, branch } = session.repo;
+    const { stackStart } = session.github;
+    if (!branch || !stackStart) return;
+    setFetching(true);
+    setFetchError(null);
+    try {
+      // Fetches the branch with its stack's start as the base, which brings
+      // in `origin/<start>` alongside whatever happens to the branch itself.
+      await requestFetch(root, branch, stackStart);
+      openStack.current = true;
+      onFetched();
+    } catch (err) {
+      setFetchError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  const pick = (option: ChangeOption) => {
+    if (option.rev === STACK_REV && !session.stackDiff) {
+      if (!fetching) void fetchStackStart();
+      return;
+    }
+    onRevChange(option.rev);
+  };
 
   /**
    * Any commit on the branch, so the change picked isn't limited to the
@@ -101,17 +164,26 @@ export function ChangeHeader({
             key={option.rev}
             type="button"
             title={option.hint}
-            onClick={() => onRevChange(option.rev)}
+            onClick={() => pick(option)}
             className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-[3px] text-[11px] font-medium transition-colors ${
               rev === option.rev
                 ? "border-[var(--accent)] bg-[var(--accent-subtle)] text-[var(--accent)]"
                 : "border-[var(--border)] text-[var(--fg-muted)] hover:text-[var(--fg)]"
             }`}
           >
-            {option.icon}
+            {option.rev === STACK_REV && fetching ? (
+              <Spinner className="!h-3 !w-3" />
+            ) : (
+              option.icon
+            )}
             {option.label}
           </button>
         ))}
+        {fetchError && (
+          <span className="text-[11px] text-[var(--fg-subtle)]">
+            {fetchError}
+          </span>
+        )}
         {/* A commit picked from the dropdown isn't one of the offered
               options, but still needs to read as the current selection. */}
         {!options.some((o) => o.rev === rev) && commit && (

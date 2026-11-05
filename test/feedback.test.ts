@@ -5,7 +5,7 @@ import path from "node:path";
 import { test } from "node:test";
 
 import { parseUnifiedDiff } from "../lib/diff";
-import { BRANCH_REV, WORKING_REV } from "../lib/constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "../lib/constants";
 import { anchorNotes, formatFeedback, locateNote } from "../lib/feedback";
 import { changeNotes, getNotes, parseChange } from "../lib/notes";
 import { db } from "../lib/store";
@@ -342,6 +342,20 @@ test("a branch note on a branch opened by ref names that branch's tip, not HEAD"
     text,
     /^## src\/h\.ts:1 \(committed, at the tip of stack\/b\)$/m,
   );
+});
+
+test("a note on the whole stack is accepted, and placed at the tip of the branch", () => {
+  const stacked = note({ rev: STACK_REV, path: "src/s.ts", line: 1 });
+  assert.deepEqual(parseChange({ op: "save", note: stacked }), {
+    op: "save",
+    note: stacked,
+  });
+  const text = formatFeedback([stacked], {
+    diffs: new Map(),
+    commits: [],
+    ref: "stack-c",
+  });
+  assert.match(text, /^## src\/s\.ts:1 \(committed, at the tip of stack-c\)$/m);
 });
 
 test("a commit note placed against its loaded diff uses that diff's line", () => {

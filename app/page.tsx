@@ -35,7 +35,7 @@ import { useRecents } from "@/components/useRecents";
 import { useSession } from "@/components/useSession";
 import { useUrlState } from "@/components/useUrlState";
 import { useViewData } from "@/components/useViewData";
-import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "@/lib/constants";
 import { viewKey, type Tab } from "@/lib/url";
 import type { CommitSummary, Note } from "@/lib/types";
 
@@ -158,6 +158,15 @@ export default function Page() {
         sha: BRANCH_REV,
         shortSha: BRANCH_REV,
         subject: `All changes ${bd?.label ?? "vs base"}`,
+        body: "",
+      };
+    }
+    if (rev === STACK_REV) {
+      return {
+        ...WORKING_COMMIT,
+        sha: STACK_REV,
+        shortSha: STACK_REV,
+        subject: `Whole stack ${session?.stackDiff?.label ?? "vs base"}`,
         body: "",
       };
     }
@@ -422,7 +431,8 @@ export default function Page() {
   // and a note left then would be filed against the wrong change.
   const noteRev = useMemo(() => {
     if (!diffIsCurrent) return null;
-    if (rev === WORKING_REV || rev === BRANCH_REV) return rev;
+    if (rev === WORKING_REV || rev === BRANCH_REV || rev === STACK_REV)
+      return rev;
     if (commitForRev && /^[0-9a-f]{40}$/.test(commitForRev.sha))
       return commitForRev.sha;
     return /^[0-9a-f]{40}$/.test(rev) ? rev : null;
@@ -485,6 +495,7 @@ export default function Page() {
 
       const order = [
         ...(session.branchDiff ? [BRANCH_REV] : []),
+        ...(session.stackDiff ? [STACK_REV] : []),
         ...(session.working.hasChanges ? [WORKING_REV] : []),
         ...session.commits.map((c) => c.sha),
         // j keeps going straight across the push boundary into history
@@ -586,6 +597,7 @@ export default function Page() {
                     diff={diff}
                     thread={selectedThread}
                     pushed={revIsPushed}
+                    onFetched={() => openSession.reload(true)}
                   />
 
                   <Tabs

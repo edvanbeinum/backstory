@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { WORKING_REV } from "../lib/constants";
+import { STACK_REV, WORKING_REV } from "../lib/constants";
 import type { CommitSummary } from "../lib/types";
 import {
   buildUrl,
@@ -259,6 +259,25 @@ test("the branch pseudo-rev holds when a branch diff exists, falls back otherwis
     rev: NEWEST,
     notice: null,
   });
+});
+
+test("the stack pseudo-rev holds when the session has a stack diff, and falls back silently otherwise", () => {
+  assert.deepEqual(resolveRev(STACK_REV, COMMITS, false, true, [], true), {
+    rev: STACK_REV,
+    notice: null,
+  });
+  assert.deepEqual(resolveRev(STACK_REV, COMMITS, false, true, [], false), {
+    rev: "branch",
+    notice: null,
+  });
+  assert.deepEqual(resolveRev(STACK_REV, COMMITS, false, false), {
+    rev: NEWEST,
+    notice: null,
+  });
+  assert.equal(
+    buildUrl({ repo: "/tmp/r", ref: "stack-c", rev: STACK_REV }),
+    "/?repo=/tmp/r&ref=stack-c&rev=stack",
+  );
 });
 
 test("an empty repo with a clean tree still resolves to something", () => {

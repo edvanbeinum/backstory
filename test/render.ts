@@ -1,7 +1,7 @@
 import "./dom";
 
 import { afterEach } from "node:test";
-import { act, createElement } from "react";
+import { act, createElement, type ReactElement } from "react";
 import { createRoot, type Root } from "react-dom/client";
 
 export { act };
@@ -43,9 +43,26 @@ export async function renderHook<P, R>(hook: (props: P) => R, props: P) {
   };
 }
 
+/**
+ * Renders `element` into a detached container under the same DOM, and
+ * returns the container so a test can find and click what it drew.
+ */
+export async function render(element: ReactElement) {
+  const container = document.createElement("div");
+  const root = createRoot(container);
+  mounted.add(root);
+  await act(async () => root.render(element));
+  return {
+    container,
+    rerender: (next: ReactElement) => act(async () => root.render(next)),
+  };
+}
+
 export interface FetchCall {
   url: URL;
   method: string;
+  /** The request's body, parsed as JSON, when it sent one */
+  body?: unknown;
 }
 
 export interface FetchAnswer {
@@ -63,9 +80,10 @@ type Answerer =
 export function standInFetch(table: Record<string, Answerer>): FetchCall[] {
   const calls: FetchCall[] = [];
   globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
-    const call = {
+    const call: FetchCall = {
       url: new URL(String(input), "http://127.0.0.1:3000"),
       method: init?.method ?? "GET",
+      ...(typeof init?.body === "string" && { body: JSON.parse(init.body) }),
     };
     calls.push(call);
     const entry = table[call.url.pathname];

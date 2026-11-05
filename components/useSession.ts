@@ -231,6 +231,7 @@ export function useSession({
             data.working.hasChanges,
             data.branchDiff !== null,
             pinned.current,
+            Boolean(data.stackDiff),
           );
           setRevNotice(notice);
           return next;
