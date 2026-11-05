@@ -33,19 +33,9 @@ import { useStaleReload } from "@/components/useStaleReload";
 import { ViewProvider, type OpenView } from "@/components/ViewContext";
 import { pushedState } from "@/lib/pushed";
 import { RepoBar } from "@/components/RepoBar";
-import {
-  BRANCH_REV,
-  INBOX_ROOTS_KEY,
-  STORAGE_KEY,
-  WORKING_REV,
-} from "@/lib/constants";
-import {
-  loadRecents,
-  removeFromList,
-  saveRecents,
-  touchList,
-  type RecentRepo,
-} from "@/lib/recents";
+import { useInboxRepos } from "@/components/useInboxRepos";
+import { useRecents } from "@/components/useRecents";
+import { BRANCH_REV, STORAGE_KEY, WORKING_REV } from "@/lib/constants";
 import {
   readUrlState,
   resolveComment,
@@ -152,8 +142,8 @@ export default function Page() {
   const [browsing, setBrowsing] = useState(false);
   /** `?setup=1`: the inbox shows the setup checklist whatever else it holds */
   const [setup, setSetup] = useState(false);
-  /** Previously-opened repos for the RepoBar dropdown. */
-  const [recents, setRecents] = useState<RecentRepo[]>([]);
+  const recents = useRecents();
+  const inboxRepos = useInboxRepos();
 
   /** The focused review thread, outlined in Comments. */
   const [commentId, setCommentId] = useState<string | null>(null);
@@ -243,7 +233,6 @@ export default function Page() {
       setFocusAsk({ id: fromUrl.comment, at: Date.now() });
     }
     if (fromUrl.repo) window.localStorage.setItem(STORAGE_KEY, fromUrl.repo);
-    setRecents(loadRecents());
     setReady(true);
   }, []);
 
@@ -252,83 +241,13 @@ export default function Page() {
   // refreshes don't rewrite storage every few seconds.
   const sessionRoot = session?.repo.root;
   const sessionBranch = session?.repo.branch;
+  const { touch: touchRecent, remove: removeRecent } = recents;
+  const rememberRoot = inboxRepos.remember;
   useEffect(() => {
     if (!sessionRoot) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- recents live in localStorage, kept in step with the session
-    setRecents((current) => {
-      const next = touchList(
-        current,
-        { path: sessionRoot, branch: sessionBranch ?? null },
-        Date.now(),
-      );
-      saveRecents(next);
-      return next;
-    });
-  }, [sessionRoot, sessionBranch]);
-
-  /**
-   * Which repos the inbox scans.
-   *
-   * Not `recents` directly: that holds *worktree* paths capped at twelve, so
-   * with twenty worktrees it fills up with one repo and quietly evicts the
-   * other. The inbox reports the canonical root of everything it finds, and
-   * those get written back here — twelve volatile worktree paths converge to
-   * two stable repo roots after one load.
-   */
-  const [inboxRoots, setInboxRoots] = useState<string[]>([]);
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(INBOX_ROOTS_KEY);
-      const stored = raw ? (JSON.parse(raw) as unknown) : null;
-      const known = Array.isArray(stored)
-        ? stored.filter((v): v is string => typeof v === "string")
-        : [];
-      const seeds = loadRecents().map((r) => r.path);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
-      setInboxRoots([...new Set([...known, ...seeds])]);
-    } catch {
-      setInboxRoots(loadRecents().map((r) => r.path));
-    }
-  }, []);
-
-  const rememberRoot = useCallback((root: string) => {
-    setInboxRoots((current) => {
-      if (current.includes(root)) return current;
-      const next = [...current, root];
-      try {
-        window.localStorage.setItem(INBOX_ROOTS_KEY, JSON.stringify(next));
-      } catch {
-        // Storage full or blocked — the inbox just rescans from recents.
-      }
-      return next;
-    });
-  }, []);
-
-  const forgetRoot = useCallback((roots: string[]) => {
-    const drop = new Set(roots);
-    setInboxRoots((current) => {
-      const next = current.filter((r) => !drop.has(r));
-      try {
-        window.localStorage.setItem(INBOX_ROOTS_KEY, JSON.stringify(next));
-      } catch {
-        // As above.
-      }
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- inbox roots live in localStorage, kept in step with the session
-    if (sessionRoot) rememberRoot(sessionRoot);
-  }, [sessionRoot, rememberRoot]);
-
-  const removeRecent = useCallback((path: string) => {
-    setRecents((current) => {
-      const next = removeFromList(current, path);
-      saveRecents(next);
-      return next;
-    });
-  }, []);
+    touchRecent(sessionRoot, sessionBranch ?? null);
+    rememberRoot(sessionRoot);
+  }, [sessionRoot, sessionBranch, touchRecent, rememberRoot]);
 
   // Keep the address bar in step with what's on screen. Entering or leaving a
   // workspace is a real navigation and gets a history entry; moving between
@@ -445,11 +364,7 @@ export default function Page() {
             err instanceof ApiFetchError &&
             (err.kind === "missing-path" || err.kind === "not-a-repo")
           ) {
-            setRecents((current) => {
-              const next = removeFromList(current, path);
-              saveRecents(next);
-              return next;
-            });
+            removeRecent(path);
           }
         }
       } finally {
@@ -458,7 +373,7 @@ export default function Page() {
         }
       }
     },
-    [],
+    [removeRecent],
   );
 
   useEffect(() => {
@@ -999,7 +914,7 @@ export default function Page() {
             session={session}
             loading={sessionLoading || diffLoading}
             onRefresh={() => void loadSession(repoPath, { fresh: true })}
-            recents={recents}
+            recents={recents.list}
             onRemoveRecent={removeRecent}
             onBackToInbox={backToInbox}
           />
@@ -1008,17 +923,17 @@ export default function Page() {
         {!repoPath ? (
           <>
             <Inbox
-              roots={inboxRoots}
+              roots={inboxRepos.repos}
               onOpen={selectRepo}
               onAdd={rememberRoot}
               onBrowse={() => setBrowsing(true)}
-              onForget={forgetRoot}
+              onForget={inboxRepos.forget}
               setupAsked={setup}
               onSetupDone={() => setSetup(false)}
             />
             {browsing && (
               <RepoBrowser
-                currentRepo={inboxRoots[0] ?? null}
+                currentRepo={inboxRepos.repos[0] ?? null}
                 onPick={(path) => {
                   setBrowsing(false);
                   selectRepo(path);
