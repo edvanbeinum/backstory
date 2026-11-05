@@ -75,7 +75,6 @@ function WithReview({
 }
 
 export default function Page() {
-  const url = useUrlState();
   const {
     repo: repoPath,
     ref,
@@ -88,7 +87,9 @@ export default function Page() {
     setTab,
     setComment: setCommentId,
     setSetup,
-  } = url;
+    open,
+    toInbox,
+  } = useUrlState();
   const recents = useRecents();
   const inboxRepos = useInboxRepos();
   const { touch: touchRecent, remove: removeRecent } = recents;
@@ -396,7 +397,6 @@ export default function Page() {
   );
 
   /** Open a checkout, optionally on a branch other than the one it has checked out. */
-  const { open } = url;
   const selectRepo = useCallback(
     (path: string, branch?: string | null) => {
       const trimmed = path.trim();
@@ -517,7 +517,7 @@ export default function Page() {
             onRefresh={() => openSession.reload(true)}
             recents={recents.list}
             onRemoveRecent={removeRecent}
-            onBackToInbox={url.toInbox}
+            onBackToInbox={toInbox}
           />
         )}
 
