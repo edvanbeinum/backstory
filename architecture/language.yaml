@@ -65,7 +65,7 @@ terms:
     avoid:
       - trunk, in copy
   - name: data cache
-    means: "`lib/data/cache.ts`: the drafted data models in `~/.backstory/data/`, one file per tree with the tree it was derived from, plus `trunk.json` for main's data model and the queue of reads that make them."
+    means: "`lib/data/cache.ts`: the drafted data models in `~/.backstory/data/`, one file per tree and steer with the tree it was derived from (`<tree>.json` under the default `data.files`, `<tree>.<steer hash>.json` for a steered read), plus `trunk.json` for main's data model and the queue of reads that make them."
     avoid:
       - store
   - name: store
