@@ -129,9 +129,10 @@ bump it, set `node_version` and take `node_sha256` from
 
 ## Ports
 
-Default is **4460** (`BACKSTORY_PORT` or `--port` to override). The app and the
-CLI probe `/api/health` before using a port, so an unrelated server on 4460
-is detected rather than hijacked; the health endpoint identifies the app.
+The Mac app's server listens on **4460**. The `backstory` command looks there,
+or on the port `--port` or `BACKSTORY_PORT` names. The app and the CLI probe
+`/api/health` before using a port, so an unrelated server on 4460 is detected
+rather than hijacked; the health endpoint identifies the app.
 
 ## Security posture
 
