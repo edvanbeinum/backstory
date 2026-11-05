@@ -31,10 +31,10 @@ import type { DataDraftStatus, DataModel, TrunkReadStatus } from "./types";
  * `~/.backstory/data/<repo>/` has one file per tree and steer: `<tree>.json`
  * under the default `data.files`, `<tree>.<steer hash>.json` for a read that
  * `data.files` steered. Each is the model at that tree, with `from`, the tree
- * it was derived from, null for a read in full. Keyed by tree, not commit: the model depends only on the files, so an
- * amended message, a clean reorder or a rebase that leaves a commit's files
- * as they were reads from the cache. A cache, safe to delete; after a prompt
- * change, delete it.
+ * it was derived from, null for a read in full. Keyed by tree, not commit:
+ * the model depends only on the files, so an amended message, a clean
+ * reorder or a rebase that leaves a commit's files as they were reads from
+ * the cache. A cache, safe to delete; after a prompt change, delete it.
  *
  * A model is derived forward from the nearest model Backstory already has:
  * the provider is given that model and the patch from its tree to this one,
@@ -49,9 +49,9 @@ import type { DataDraftStatus, DataModel, TrunkReadStatus } from "./types";
  * needed anyway is main's drift, and main's model moves to the base. Main is
  * read in full again only when the patch from main's model to a commit on
  * main is past the cap, which reads that commit in full and, when it is past
- * main's model, makes it main's model, or on Redraft. Redraft reads main in full again and removes every
- * derived model of the view's steer, since an error in main's model is copied
- * into each of them. A Redraft under a steer other than main's own leaves
+ * main's model, makes it main's model, or on Redraft. Redraft reads main in
+ * full again and removes every derived model of the view's steer, since an
+ * error in main's model is copied into each of them. A Redraft under a steer other than main's own leaves
  * `trunk.json` where it was.
  *
  * Reads run one at a time, to keep within the user's usage limits: a full
