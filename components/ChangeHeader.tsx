@@ -110,12 +110,14 @@ export function ChangeHeader({
   const options = useMemo(() => changesFor(thread, session), [thread, session]);
   const [fetching, setFetching] = useState(false);
   const [fetchError, setFetchError] = useState<{
+    root: string;
     branch: string;
     message: string;
   } | null>(null);
   /**
    * The session a fetch of the stack's start finished on, so the view opens
-   * on the stack only once the session after it arrives for the same branch.
+   * on the stack only once the session after it arrives for the same repo
+   * and branch.
    */
   const openStack = useRef<SessionResponse | null>(null);
 
@@ -123,7 +125,11 @@ export function ChangeHeader({
     const from = openStack.current;
     if (!from || session === from) return;
     openStack.current = null;
-    if (session.stackDiff && session.repo.branch === from.repo.branch)
+    if (
+      session.stackDiff &&
+      session.repo.root === from.repo.root &&
+      session.repo.branch === from.repo.branch
+    )
       onRevChange(STACK_REV);
   }, [session, onRevChange]);
 
@@ -141,6 +147,7 @@ export function ChangeHeader({
       onFetched();
     } catch (err) {
       setFetchError({
+        root,
         branch,
         message: err instanceof Error ? err.message : String(err),
       });
@@ -190,11 +197,12 @@ export function ChangeHeader({
             {option.label}
           </button>
         ))}
-        {fetchError?.branch === session.repo.branch && (
-          <span className="text-[11px] text-[var(--fg-subtle)]">
-            {fetchError.message}
-          </span>
-        )}
+        {fetchError?.root === session.repo.root &&
+          fetchError.branch === session.repo.branch && (
+            <span className="text-[11px] text-[var(--fg-subtle)]">
+              {fetchError.message}
+            </span>
+          )}
         {/* A commit picked from the dropdown isn't one of the offered
               options, but still needs to read as the current selection. */}
         {!options.some((o) => o.rev === rev) && commit && (
