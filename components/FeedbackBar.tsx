@@ -95,7 +95,11 @@ export function FeedbackBar({
           .map((n) => n.rev)
           .filter(
             (r) =>
-              (r === WORKING_REV || r === BRANCH_REV || r === STACK_REV) &&
+              (r === WORKING_REV ||
+                r === BRANCH_REV ||
+                // Skip the stack once it's gone, so a note left on it is
+                // placed by its own line rather than blocking every draft.
+                (r === STACK_REV && session.stackDiff !== null)) &&
               !diffs.has(r),
           ),
       ),
