@@ -1,9 +1,18 @@
 import "./dom";
 
+import { afterEach } from "node:test";
 import { act, createElement } from "react";
-import { createRoot } from "react-dom/client";
+import { createRoot, type Root } from "react-dom/client";
 
 export { act };
+
+// Unmount every hook after each test, or its window listeners answer the next
+// test's events too.
+const mounted = new Set<Root>();
+afterEach(async () => {
+  for (const root of mounted) await act(async () => root.unmount());
+  mounted.clear();
+});
 
 /** Lets pending promises, such as a stand-in fetch's answer, settle. */
 export function settle(): Promise<void> {
@@ -21,12 +30,16 @@ export async function renderHook<P, R>(hook: (props: P) => R, props: P) {
     return null;
   }
   const root = createRoot(document.createElement("div"));
+  mounted.add(root);
   await act(async () => root.render(createElement(Probe, { p: props })));
   return {
     result,
     rerender: (next: P) =>
       act(async () => root.render(createElement(Probe, { p: next }))),
-    unmount: () => act(async () => root.unmount()),
+    unmount: () => {
+      mounted.delete(root);
+      return act(async () => root.unmount());
+    },
   };
 }
 

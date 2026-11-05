@@ -27,22 +27,17 @@ import { AlertIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
 import { PrTitle } from "@/components/PrTitle";
-import { useStaleReload } from "@/components/useStaleReload";
-import { ViewProvider, type OpenView } from "@/components/ViewContext";
+import { ViewProvider } from "@/components/ViewContext";
 import { pushedState } from "@/lib/pushed";
 import { RepoBar } from "@/components/RepoBar";
 import { useInboxRepos } from "@/components/useInboxRepos";
 import { useRecents } from "@/components/useRecents";
+import { useSession } from "@/components/useSession";
 import { useUrlState } from "@/components/useUrlState";
 import { useViewData } from "@/components/useViewData";
 import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
-import { resolveComment, resolveRev, viewKey, type Tab } from "@/lib/url";
-import type {
-  ApiError,
-  CommitSummary,
-  Note,
-  SessionResponse,
-} from "@/lib/types";
+import { viewKey, type Tab } from "@/lib/url";
+import type { CommitSummary, Note } from "@/lib/types";
 
 const WORKING_COMMIT: CommitSummary = {
   sha: WORKING_REV,
@@ -55,28 +50,6 @@ const WORKING_COMMIT: CommitSummary = {
   url: null,
   isMerge: false,
 };
-
-class ApiFetchError extends Error {
-  constructor(
-    message: string,
-    readonly kind?: ApiError["kind"],
-  ) {
-    super(message);
-  }
-}
-
-async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: "no-store" });
-  const data = await response.json();
-  if (!response.ok) {
-    const err = data as ApiError;
-    throw new ApiFetchError(
-      err.detail ? `${err.error} (${err.detail})` : err.error,
-      err.kind,
-    );
-  }
-  return data as T;
-}
 
 /**
  * The repo's notes, agent review and outbox, held only while a repo is open
@@ -116,25 +89,50 @@ export default function Page() {
     setComment: setCommentId,
     setSetup,
   } = url;
-  const checkBuild = useStaleReload();
-
-  const [session, setSession] = useState<SessionResponse | null>(null);
-  /**
-   * The repo and branch the session was loaded for. Every view request uses
-   * this rather than `repoPath` and `ref`, so a switch keeps showing the last
-   * view whole until the new session, and the rev it settles on, arrive
-   * together.
-   */
-  const [shown, setShown] = useState<OpenView>({ repo: "", ref: null });
-  const [sessionError, setSessionError] = useState<string | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(false);
-
-  const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
-  /** Set when a URL asked for a rev that isn't in the unpushed list. */
-  const [revNotice, setRevNotice] = useState<string | null>(null);
-  const [browsing, setBrowsing] = useState(false);
   const recents = useRecents();
   const inboxRepos = useInboxRepos();
+  const { touch: touchRecent, remove: removeRecent } = recents;
+  const rememberRoot = inboxRepos.remember;
+  // Every repo that loads earns a spot in the dropdown, with its branch as
+  // context, and in the inbox.
+  const onOpened = useCallback(
+    (root: string, branch: string | null) => {
+      touchRecent(root, branch);
+      rememberRoot(root);
+    },
+    [touchRecent, rememberRoot],
+  );
+  const openSession = useSession({
+    repo: repoPath,
+    ref,
+    ready,
+    setRev,
+    setComment: setCommentId,
+    onOpened,
+    onGone: removeRecent,
+  });
+  const { session, shown, ticks, reopen, pin } = openSession;
+  const view = useViewData({
+    repo: repoPath,
+    ready,
+    shown,
+    rev,
+    session,
+    ticks,
+  });
+  const {
+    viewId,
+    workingDiffKey,
+    diff,
+    diffLoading,
+    diffError,
+    diffIsCurrent,
+    map,
+    data: dataModel,
+  } = view;
+
+  const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
+  const [browsing, setBrowsing] = useState(false);
 
   /** Focus asked for from outside Comments, which scrolls the thread into view. */
   const [focusAsk, setFocusAsk] = useState<{ id: string; at: number } | null>(
@@ -148,244 +146,7 @@ export default function Page() {
     setUrlRead(true);
     if (commentId) setFocusAsk({ id: commentId, at: 0 });
   }
-  /** Bumped by watcher events; retriggers the working-tree diff fetch. */
-  const [workingTick, setWorkingTick] = useState(0);
-  /**
-   * Bumped when an agent starts or stops waiting for a review, or a sent
-   * round is queued, collected or withdrawn.
-   */
-  const [reviewTick, setReviewTick] = useState(0);
-  /** Bumped when a flow run finishes. */
-  const [flowsTick, setFlowsTick] = useState(0);
   const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
-  /** Bumped when a model or data model draft is written, so both are read again */
-  const [modelTick, setModelTick] = useState(0);
-  const onModelChange = useCallback(() => setModelTick((t) => t + 1), []);
-  const view = useViewData({
-    repo: repoPath,
-    ready,
-    shown,
-    rev,
-    session,
-    ticks: { working: workingTick, model: modelTick },
-  });
-  const {
-    viewId,
-    workingDiffKey,
-    diff,
-    diffLoading,
-    diffError,
-    diffIsCurrent,
-    map,
-    data: dataModel,
-  } = view;
-  const repoRef = useRef(repoPath);
-  const refRef = useRef(ref);
-  /** Discards out-of-order session responses from overlapping refreshes. */
-  const sessionSeq = useRef(0);
-  /**
-   * The repo a foreground load opened and hasn't yet marked as looked at.
-   * Whichever load of it shows first marks it, because the watch stream's
-   * background load often supersedes the one that opened the branch.
-   */
-  const lookPending = useRef<string | null>(null);
-  /**
-   * Shas typed or pasted into the commit picker rather than chosen from the
-   * list. The session only carries the branch's recent commits, so without
-   * remembering these the next background refresh would decide the rev didn't
-   * exist and bounce you off it.
-   */
-  const pickedRevs = useRef<string[]>([]);
-  /**
-   * Set when another repo or branch is opened, so its session starts the view
-   * afresh. A commit picked on the last branch isn't this one's, and looking
-   * it up here would claim it's already on GitHub.
-   */
-  const reopened = useRef(false);
-  useEffect(() => {
-    repoRef.current = repoPath;
-  }, [repoPath]);
-  useEffect(() => {
-    refRef.current = ref;
-  }, [ref]);
-
-  // Every repo that loads successfully earns a spot in the dropdown, with
-  // its branch as context; keyed on root+branch so background session
-  // refreshes don't rewrite storage every few seconds.
-  const sessionRoot = session?.repo.root;
-  const sessionBranch = session?.repo.branch;
-  const { touch: touchRecent, remove: removeRecent } = recents;
-  const rememberRoot = inboxRepos.remember;
-  useEffect(() => {
-    if (!sessionRoot) return;
-    touchRecent(sessionRoot, sessionBranch ?? null);
-    rememberRoot(sessionRoot);
-  }, [sessionRoot, sessionBranch, touchRecent, rememberRoot]);
-
-  const loadSession = useCallback(
-    async (
-      path: string,
-      opts: { background?: boolean; fresh?: boolean } = {},
-    ) => {
-      if (!path) {
-        setSession(null);
-        setSessionError(null);
-        return;
-      }
-
-      const seq = ++sessionSeq.current;
-      const ref = refRef.current;
-      // Background refreshes (watcher, focus) skip the loading state — a
-      // spinner flashing on every keystroke-burst would be worse than the
-      // staleness it replaces.
-      if (!opts.background) {
-        lookPending.current = path;
-        setSessionLoading(true);
-        setSessionError(null);
-      }
-      try {
-        const data = await getJson<SessionResponse>(
-          `/api/session?repo=${encodeURIComponent(path)}` +
-            (ref ? `&ref=${encodeURIComponent(ref)}` : "") +
-            (opts.fresh ? "&fresh=1" : ""),
-        );
-        if (seq !== sessionSeq.current) return; // superseded by a newer fetch
-        setSession(data);
-        setShown((current) =>
-          current.repo === path && current.ref === ref
-            ? current
-            : { repo: path, ref },
-        );
-        setSessionError(null);
-        const shownTip = data.commits[0]?.sha ?? data.history[0]?.sha;
-        if (lookPending.current === path && data.repo.branch && shownTip) {
-          lookPending.current = null;
-          void fetch(
-            `/api/looked?repo=${encodeURIComponent(path)}&ref=${encodeURIComponent(data.repo.branch)}&tip=${shownTip}`,
-            { method: "POST" },
-          ).catch(() => {
-            // The inbox shows the branch as changed a while longer, nothing worse.
-          });
-        }
-
-        setCommentId((current) => resolveComment(current, data.github.threads));
-
-        const fresh = reopened.current;
-        reopened.current = false;
-        if (fresh) pickedRevs.current = [];
-        setRev((current) => {
-          // History counts: a URL can point at an already-pushed commit and
-          // that's a perfectly good thing to view.
-          const { rev: next, notice } = resolveRev(
-            fresh ? WORKING_REV : current,
-            [...data.commits, ...data.history],
-            data.working.hasChanges,
-            data.branchDiff !== null,
-            pickedRevs.current,
-          );
-          setRevNotice(notice);
-          return next;
-        });
-      } catch (err) {
-        if (seq !== sessionSeq.current) return;
-        // A background failure keeps the last good view — the repo may just
-        // be mid-rebase or briefly locked; the next event will retry.
-        if (!opts.background) {
-          setSession(null);
-          setSessionError(err instanceof Error ? err.message : String(err));
-          // A recent that no longer resolves is a deleted worktree — prune
-          // it so the dropdown doesn't accumulate dead entries.
-          if (
-            err instanceof ApiFetchError &&
-            (err.kind === "missing-path" || err.kind === "not-a-repo")
-          ) {
-            removeRecent(path);
-          }
-        }
-      } finally {
-        if (seq === sessionSeq.current && !opts.background) {
-          setSessionLoading(false);
-        }
-      }
-    },
-    [removeRecent, setRev, setCommentId],
-  );
-
-  useEffect(() => {
-    if (!ready) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches when its key changes
-    void loadSession(repoPath);
-    // `ref` matters as much as the path: two branches of one stack are
-    // reviewed from the same worktree, so switching between them changes
-    // nothing else.
-  }, [ready, repoPath, ref, loadSession]);
-
-  // Catch up on focus, the Cmd-Tab-into-the-window moment, on anything that
-  // changed while the window was in the background.
-  useEffect(() => {
-    if (!ready) return;
-
-    const catchUp = async () => {
-      if (await checkBuild()) return;
-      setWorkingTick((t) => t + 1);
-      setReviewTick((t) => t + 1);
-      setModelTick((t) => t + 1);
-      void loadSession(repoRef.current, { background: true });
-    };
-
-    window.addEventListener("focus", catchUp);
-    return () => window.removeEventListener("focus", catchUp);
-  }, [ready, loadSession, checkBuild]);
-
-  // Live updates: one SSE stream per repo. The server watches the repo's
-  // filesystem and pushes a debounced event when git state or the working
-  // tree changes; the window refetches instead of the user hitting reload.
-  useEffect(() => {
-    if (!ready || !repoPath) return;
-
-    const source = new EventSource(
-      `/api/watch?repo=${encodeURIComponent(repoPath)}`,
-    );
-
-    source.onopen = () => {
-      void checkBuild();
-      // Reconnects (server restarted, laptop woke) mean missed events —
-      // catch up once, bypassing the GitHub cache since time has passed.
-      setWorkingTick((t) => t + 1);
-      setReviewTick((t) => t + 1);
-      void loadSession(repoPath, { background: true, fresh: true });
-    };
-
-    source.onmessage = (event) => {
-      let kinds: string[] = [];
-      try {
-        const parsed = JSON.parse(event.data) as { kinds?: string[] };
-        if (parsed.kinds) kinds = parsed.kinds;
-      } catch {
-        return;
-      }
-      if (kinds.length === 0) return;
-
-      const agentKinds = ["review", "outbox"];
-      if (kinds.some((kind) => agentKinds.includes(kind)))
-        setReviewTick((t) => t + 1);
-      if (kinds.includes("flows")) setFlowsTick((t) => t + 1);
-      // A review request, a queued round or a finished flow run changes
-      // nothing on disk.
-      if (kinds.every((kind) => kind === "flows" || agentKinds.includes(kind)))
-        return;
-
-      setWorkingTick((t) => t + 1);
-      void loadSession(repoPath, {
-        background: true,
-        // refs/remotes moved — a push or fetch landed, so GitHub's view
-        // really may have changed; everything else is local-only.
-        fresh: kinds.includes("remote"),
-      });
-    };
-
-    return () => source.close();
-  }, [ready, repoPath, loadSession, checkBuild]);
 
   const commitForRev = useMemo((): CommitSummary | null => {
     if (rev === WORKING_REV) return WORKING_COMMIT;
@@ -441,7 +202,7 @@ export default function Page() {
     session ? shown.repo : "",
     shown.ref,
     rev,
-    `${flowsTick}:${workingDiffKey}`,
+    `${ticks.flows}:${workingDiffKey}`,
   );
   const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
 
@@ -634,41 +395,25 @@ export default function Page() {
     [setCommentId, setTab],
   );
 
-  /** Back to the home screen. Clearing the repo is what the inbox *is*. */
-  const { toInbox, open } = url;
-  const backToInbox = useCallback(() => {
-    toInbox();
-    setSession(null);
-    setSessionError(null);
-  }, [toInbox]);
-
   /** Open a checkout, optionally on a branch other than the one it has checked out. */
+  const { open } = url;
   const selectRepo = useCallback(
     (path: string, branch?: string | null) => {
       const trimmed = path.trim();
-      if (trimmed !== repoRef.current || (branch ?? null) !== refRef.current)
-        reopened.current = true;
+      if (trimmed !== repoPath || (branch ?? null) !== ref) reopen();
       open(trimmed, branch ?? null);
     },
-    [open],
+    [repoPath, ref, reopen, open],
   );
 
   /** A change picked above the tabs: it opens on Story, as every view does. */
   const pickRev = useCallback(
     (next: string) => {
-      // Remember anything that isn't in the offered list, so a pasted sha
-      // survives the next refresh.
-      if (
-        session &&
-        !session.commits.some((c) => c.sha === next) &&
-        !session.history.some((c) => c.sha === next)
-      ) {
-        pickedRevs.current = [...new Set([...pickedRevs.current, next])];
-      }
+      pin(next);
       setRev(next);
       setTab("story");
     },
-    [session, setRev, setTab],
+    [pin, setRev, setTab],
   );
 
   // The change on screen as a note records it: a commit by its full sha,
@@ -768,11 +513,11 @@ export default function Page() {
             repoPath={repoPath}
             onRepoPathChange={selectRepo}
             session={session}
-            loading={sessionLoading || diffLoading}
-            onRefresh={() => void loadSession(repoPath, { fresh: true })}
+            loading={openSession.loading || diffLoading}
+            onRefresh={() => openSession.reload(true)}
             recents={recents.list}
             onRemoveRecent={removeRecent}
-            onBackToInbox={backToInbox}
+            onBackToInbox={url.toInbox}
           />
         )}
 
@@ -798,11 +543,11 @@ export default function Page() {
               />
             )}
           </>
-        ) : sessionError ? (
+        ) : openSession.error ? (
           <div className="mx-auto max-w-3xl p-6">
             <div className="flex items-start gap-2 rounded-md border border-[var(--danger)] bg-[var(--canvas)] p-4 text-[13px]">
               <AlertIcon className="mt-0.5 shrink-0 text-[var(--danger)]" />
-              <span>{sessionError}</span>
+              <span>{openSession.error}</span>
             </div>
           </div>
         ) : session ? (
@@ -812,20 +557,20 @@ export default function Page() {
                 <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
                   {session.github.pr && <PrTitle pr={session.github.pr} />}
 
-                  {revNotice && (
+                  {openSession.revNotice && (
                     <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
                       <AlertIcon
                         size={13}
                         className="mt-0.5 shrink-0 text-[var(--attention)]"
                       />
                       <span className="flex-1">
-                        <span className="mono">{revNotice}</span> isn&apos;t
-                        waiting to be pushed any more — it may already be on
-                        GitHub. Showing the latest instead.
+                        <span className="mono">{openSession.revNotice}</span>{" "}
+                        isn&apos;t waiting to be pushed any more — it may
+                        already be on GitHub. Showing the latest instead.
                       </span>
                       <button
                         type="button"
-                        onClick={() => setRevNotice(null)}
+                        onClick={openSession.dismissNotice}
                         className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
                       >
                         Dismiss
@@ -852,7 +597,7 @@ export default function Page() {
                     threads={threads}
                   />
 
-                  <WithReview root={session.repo.root} tick={reviewTick}>
+                  <WithReview root={session.repo.root} tick={ticks.review}>
                     {({ notes, review, outbox }) => (
                       <>
                         {visited.has("story") && (
@@ -863,7 +608,7 @@ export default function Page() {
                               map={map}
                               data={dataModel}
                               entityNotes={entityNotes}
-                              onModelChange={onModelChange}
+                              onModelChange={openSession.bumpModel}
                               mapHighlight={mapHighlight}
                               onShowOnMap={showOnMap}
                               onOpenFile={openFile}
