@@ -1,22 +1,20 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse } from "@/lib/api";
-import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "@/lib/constants";
 import { parseUnifiedDiff, totals } from "@/lib/diff";
 import {
-  getBranchDiffBase,
   getCommitPatch,
   getRangePatch,
   getWorkingPatch,
   getWorkingTree,
   isMergeCommit,
-  resolveBase,
   resolveRepo,
   resolveRev,
 } from "@/lib/git";
-import { loadGitHubDataCached } from "@/lib/github";
 import { highlightFiles } from "@/lib/highlight";
 import type { ApiError, DiffResponse } from "@/lib/types";
+import { viewRange } from "@/lib/view";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,23 +49,15 @@ export async function GET(request: Request) {
       patch = await getWorkingPatch(repo.root, working.untrackedPaths, {
         pathspec,
       });
-    } else if (rev === BRANCH_REV) {
-      // The combined branch diff: fork point (or push boundary) → the tip.
-      // The PR's base branch decides the fork — on a stacked PR that's the
-      // parent branch, not the default one. Cached, so usually free.
-      const github = await loadGitHubDataCached(repo);
-      const info = await getBranchDiffBase(
-        repo,
-        await resolveBase(repo),
-        github.pr?.baseRefName ?? null,
-      );
-      if (!info) {
+    } else if (rev === BRANCH_REV || rev === STACK_REV) {
+      const range = await viewRange(repo, rev);
+      if (!range?.base) {
         return NextResponse.json<ApiError>(
           { error: "Nothing to diff the branch against.", kind: "git" },
           { status: 404 },
         );
       }
-      patch = await getRangePatch(repo.root, info.baseSha, repo.tip, {
+      patch = await getRangePatch(repo.root, range.base, range.head, {
         pathspec,
       });
     } else {

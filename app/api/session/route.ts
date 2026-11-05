@@ -79,6 +79,11 @@ export async function GET(request: Request) {
       base,
       rawGithub.pr?.baseRefName ?? null,
     );
+    const stackDiff = rawGithub.stackStart
+      ? await getBranchDiffSummary(repo, base, rawGithub.stackStart, {
+          only: true,
+        })
+      : null;
 
     // "Not yet pushed" is the wrong axis for a branch you're only reading —
     // it's pushed, that's why it has review comments. What matters is which
@@ -148,6 +153,7 @@ export async function GET(request: Request) {
       working,
       github,
       branchDiff,
+      stackDiff,
     };
     return NextResponse.json(body, {
       headers: { "Cache-Control": "no-store" },

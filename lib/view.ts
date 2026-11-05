@@ -1,4 +1,4 @@
-import { BRANCH_REV, WORKING_REV } from "./constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "./constants";
 import { gitLine } from "./exec";
 import { getBranchDiffBase, isOnBranch, resolveBase, resolveRev } from "./git";
 import { loadGitHubDataCached } from "./github";
@@ -7,7 +7,9 @@ import type { RepoInfo } from "./types";
 /**
  * The two commits a view compares, the same ones /api/diff diffs: a commit
  * and its first parent, or for "All changes" the branch's fork point and
- * `repo.tip`: the branch the repo was opened to review, or HEAD. Null for
+ * `repo.tip`: the branch the repo was opened to review, or HEAD. "Whole
+ * stack" runs to the same tip from the fork point of the branch the stack
+ * starts from, and is null when the clone doesn't have that branch. Null for
  * uncommitted work, which has no commit of its own to key anything on: its
  * map keys on HEAD's view instead.
  */
@@ -16,12 +18,14 @@ export async function viewRange(
   rev: string,
 ): Promise<{ base: string | null; head: string } | null> {
   if (rev === WORKING_REV) return null;
-  if (rev === BRANCH_REV) {
+  if (rev === BRANCH_REV || rev === STACK_REV) {
     const github = await loadGitHubDataCached(repo);
+    const stack = rev === STACK_REV;
     const info = await getBranchDiffBase(
       repo,
       await resolveBase(repo),
-      github.pr?.baseRefName ?? null,
+      stack ? github.stackStart : (github.pr?.baseRefName ?? null),
+      { only: stack },
     );
     const head = await resolveRev(repo.root, repo.tip);
     if (!info || !head) return null;

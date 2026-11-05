@@ -1,26 +1,24 @@
 import { NextResponse } from "next/server";
 
 import { errorResponse } from "@/lib/api";
-import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
+import { BRANCH_REV, STACK_REV, WORKING_REV } from "@/lib/constants";
 import { parseUnifiedDiff } from "@/lib/diff";
 import {
   FULL_CONTEXT,
-  getBranchDiffBase,
   getCommitPatch,
   getRangePatch,
   getWorkingPatch,
   getWorkingTree,
   isMergeCommit,
-  resolveBase,
   resolveRepo,
   resolveRev,
 } from "@/lib/git";
-import { loadGitHubDataCached } from "@/lib/github";
 import {
   highlightFiles,
   MAX_HIGHLIGHT_LINES_SINGLE_FILE,
 } from "@/lib/highlight";
 import type { ApiError, FileViewResponse } from "@/lib/types";
+import { viewRange } from "@/lib/view";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -66,20 +64,15 @@ export async function GET(request: Request) {
         context: FULL_CONTEXT,
         pathspec: paths,
       });
-    } else if (rev === BRANCH_REV) {
-      const github = await loadGitHubDataCached(repo);
-      const info = await getBranchDiffBase(
-        repo,
-        await resolveBase(repo),
-        github.pr?.baseRefName ?? null,
-      );
-      if (!info) {
+    } else if (rev === BRANCH_REV || rev === STACK_REV) {
+      const range = await viewRange(repo, rev);
+      if (!range?.base) {
         return NextResponse.json<ApiError>(
           { error: "Nothing to diff the branch against.", kind: "git" },
           { status: 404 },
         );
       }
-      patch = await getRangePatch(repo.root, info.baseSha, repo.tip, {
+      patch = await getRangePatch(repo.root, range.base, range.head, {
         context: FULL_CONTEXT,
         pathspec: paths,
       });

@@ -387,6 +387,23 @@ query($owner: String!, $name: String!, $branch: String!) {
   }
 }`;
 
+const OPEN_PULL_REQUESTS_QUERY = `
+query($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(states: OPEN, first: 100) {
+      nodes {
+        headRefName
+        baseRefName
+      }
+    }
+  }
+}`;
+
+interface PullRequestEnds {
+  headRefName: string;
+  baseRefName: string;
+}
+
 interface GqlThreadNode {
   id: string;
   isResolved: boolean;
@@ -469,6 +486,7 @@ export async function loadGitHubData(repo: RepoInfo): Promise<GitHubData> {
     reviews: [],
     unavailable: null,
     connect: false,
+    stackStart: null,
   };
 
   if (!repo.owner || !repo.name || !repo.branch) return empty;
@@ -483,13 +501,72 @@ export async function loadGitHubData(repo: RepoInfo): Promise<GitHubData> {
 
   if (!pr) return empty;
 
-  try {
-    const { threads, reviews } = await loadThreads(repo, pr.number);
-    return { pr, threads, reviews, unavailable: null, connect: false };
-  } catch (err) {
-    const { message, connect } = describeGhError(err);
-    return { ...empty, pr, unavailable: message, connect };
+  const [stackStart, threads] = await Promise.all([
+    findStackStart(repo, pr),
+    loadThreads(repo, pr.number).then(
+      (loaded) => ({ ok: true as const, ...loaded }),
+      (err: unknown) => ({ ok: false as const, err }),
+    ),
+  ]);
+  if (!threads.ok) {
+    const { message, connect } = describeGhError(threads.err);
+    return { ...empty, pr, unavailable: message, connect, stackStart };
   }
+  return {
+    pr,
+    threads: threads.threads,
+    reviews: threads.reviews,
+    unavailable: null,
+    connect: false,
+    stackStart,
+  };
+}
+
+/**
+ * Where the stack under an open PR starts, asking GitHub only when the PR's
+ * base isn't the default branch. A failed read counts as no stack: the PR
+ * and its own changes are still worth showing.
+ */
+async function findStackStart(
+  repo: RepoInfo,
+  pr: PullRequestInfo,
+): Promise<string | null> {
+  if (pr.state !== "OPEN" || pr.baseRefName === repo.defaultBranch) return null;
+  try {
+    const data = await githubGraphql<{
+      repository?: { pullRequests?: { nodes: PullRequestEnds[] } };
+    }>(
+      repo.root,
+      OPEN_PULL_REQUESTS_QUERY,
+      { owner: repo.owner ?? "", name: repo.name ?? "" },
+      { host: repo.host },
+    );
+    return stackStartOf(pr, data?.repository?.pullRequests?.nodes ?? []);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Follows `pr`'s base down through the open PRs: while an open PR has the
+ * base as its head, the base becomes that PR's base. Returns the first base
+ * no open PR has as its head, or null when the PR's own base is one already,
+ * which means it isn't stacked. Stops after as many steps as there are open
+ * PRs, so two PRs targeting each other end with null instead of looping.
+ */
+export function stackStartOf(
+  pr: PullRequestEnds,
+  openPrs: PullRequestEnds[],
+): string | null {
+  const baseOf = new Map(openPrs.map((p) => [p.headRefName, p.baseRefName]));
+  let start = pr.baseRefName;
+  if (!baseOf.has(start)) return null;
+  for (let step = 0; step < openPrs.length; step++) {
+    const below = baseOf.get(start);
+    if (below === undefined) return start;
+    start = below;
+  }
+  return null;
 }
 
 interface PullRequestRow {

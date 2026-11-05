@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { test } from "node:test";
 
-import { loadGitHubData } from "../lib/github";
+import { loadGitHubData, stackStartOf } from "../lib/github";
 import { parseRemote } from "../lib/git";
 import type { RepoInfo } from "../lib/types";
 import {
@@ -86,12 +86,13 @@ const github = (call: ApiCall): ApiAnswer => ({
     : THREADS_JSON,
 });
 
-/** A `gh` that answers either query from files beside it, logging its argv. */
+/** A `gh` that answers each query from a file beside it, logging its argv. */
 const GH = `PATH=/usr/bin:/bin
 dir="\${0%/*}"
 echo "$*" >> "$dir/gh.log"
 case "$*" in
   "pr list"*) cat "$dir/pr-list.json" ;;
+  *"pullRequests(states"*) cat "$dir/open-prs.json" ;;
   *) cat "$dir/threads.json" ;;
 esac`;
 
@@ -406,6 +407,93 @@ test("an organisation's SAML refusal through a signed-in gh isn't mistaken for s
 
   assert.equal(data.connect, false);
   assert.match(data.unavailable ?? "", /SAML enforcement/);
+});
+
+const ends = (head: string, base: string) => ({
+  headRefName: head,
+  baseRefName: base,
+});
+
+test("a stack starts at the first base no open PR has as its head", () => {
+  const open = [
+    ends("stack-c", "stack-b"),
+    ends("stack-b", "stack-a"),
+    ends("stack-a", "main"),
+  ];
+  assert.equal(stackStartOf(open[0], open), "main");
+  assert.equal(stackStartOf(open[1], open), "main");
+  assert.equal(stackStartOf(open[2], open), null);
+  assert.equal(stackStartOf(ends("lone", "epic"), open), null);
+});
+
+test("two PRs targeting each other end with no stack rather than looping", () => {
+  const open = [ends("x", "y"), ends("y", "x")];
+  assert.equal(stackStartOf(open[0], open), null);
+});
+
+const STACKED_PR = { ...PR, baseRefName: "stack-b" };
+const OPEN_PRS = [
+  ends("feature", "stack-b"),
+  ends("stack-b", "stack-a"),
+  ends("stack-a", "main"),
+];
+const OPEN_PRS_JSON = {
+  data: { repository: { pullRequests: { nodes: OPEN_PRS } } },
+};
+
+const stackedGitHub = (call: ApiCall): ApiAnswer => ({
+  json: call.query.includes("pullRequests(headRefName")
+    ? { data: { repository: { pullRequests: { nodes: [STACKED_PR] } } } }
+    : call.query.includes("pullRequests(states")
+      ? OPEN_PRS_JSON
+      : THREADS_JSON,
+});
+
+test("with a saved token, a stacked PR's load asks for the open PRs and finds where its stack starts", async () => {
+  const { data, calls } = await load(machine({ token: true }), stackedGitHub);
+
+  assert.equal(data.pr?.number, 7);
+  assert.equal(data.stackStart, "main");
+  assert.equal(data.threads.length, 1);
+  assert.equal(calls.length, 3);
+  const open = calls.find((c) => c.query.includes("pullRequests(states"));
+  assert.deepEqual(open?.variables, { owner: "acme", name: "app" });
+});
+
+test("through gh, a stacked PR's load asks the same open-PR query", async () => {
+  const on = machine({ gh: true });
+  writeFileSync(
+    path.join(on.dir, "pr-list.json"),
+    JSON.stringify([STACKED_PR]),
+  );
+  writeFileSync(
+    path.join(on.dir, "open-prs.json"),
+    JSON.stringify(OPEN_PRS_JSON),
+  );
+  const { data } = await load(on, github);
+
+  assert.equal(data.stackStart, "main");
+  assert.equal(data.threads.length, 1);
+  assert.match(on.ghLog(), /pullRequests\(states: OPEN/);
+});
+
+test("a PR based on the default branch asks GitHub nothing more", async () => {
+  const { data, calls } = await load(machine({ token: true }), github);
+  assert.equal(data.stackStart, null);
+  assert.ok(!calls.some((c) => c.query.includes("pullRequests(states")));
+});
+
+test("an open-PR query that fails keeps the PR and its threads, with no stack", async () => {
+  const { data } = await load(machine({ token: true }), (call) =>
+    call.query.includes("pullRequests(states")
+      ? { json: { errors: [{ message: "Something went wrong" }] } }
+      : stackedGitHub(call),
+  );
+
+  assert.equal(data.pr?.number, 7);
+  assert.equal(data.threads.length, 1);
+  assert.equal(data.unavailable, null);
+  assert.equal(data.stackStart, null);
 });
 
 test("the remote's host comes out of every spelling, so the token knows where it may go", () => {

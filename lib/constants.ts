@@ -8,6 +8,13 @@ export const WORKING_REV = "working";
  */
 export const BRANCH_REV = "branch";
 
+/**
+ * The pseudo-rev for the whole stack against where it starts: everything a
+ * stacked PR and the open PRs below it bring into the branch the stack
+ * starts from. Offered only on a PR whose base is another open PR's branch.
+ */
+export const STACK_REV = "stack";
+
 export const DIFF_API = "/api/diff";
 export const NOTES_API = "/api/notes";
 export const REVIEW_API = "/api/review";

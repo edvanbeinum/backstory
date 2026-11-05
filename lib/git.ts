@@ -538,12 +538,6 @@ async function logRange(
   return commits;
 }
 
-/**
- * What the combined branch diff is measured against: the fork point from the
- * default branch on a feature branch, or the push boundary itself when on
- * the default branch (there "vs main" means "vs origin/main"). Null when
- * there's nothing meaningful to diff against.
- */
 /** Fork point from `branchName`, if a local or remote ref for it exists. */
 async function forkPointFrom(
   root: string,
@@ -565,6 +559,12 @@ async function forkPointFrom(
   return null;
 }
 
+/**
+ * What the combined branch diff is measured against: the fork point from the
+ * default branch on a feature branch, or the push boundary itself when on
+ * the default branch (there "vs main" means "vs origin/main"). Null when
+ * there's nothing meaningful to diff against.
+ */
 export async function getBranchDiffBase(
   repo: RepoInfo,
   base: BaseInfo,
@@ -575,15 +575,20 @@ export async function getBranchDiffBase(
    * branch PLUS the whole parent stack — the PR itself shows far less.
    */
   prBaseRef?: string | null,
+  /**
+   * Answer only from `prBaseRef`, null when the clone has no ref for it.
+   * The whole stack uses this: falling back to the default branch would
+   * quietly add everything below the stack.
+   */
+  opts: { only?: boolean } = {},
 ): Promise<{ baseSha: string; label: string } | null> {
   const { root, branch, defaultBranch } = repo;
 
   if (prBaseRef && prBaseRef !== branch) {
     const fork = await forkPointFrom(root, prBaseRef, repo.tip);
     if (fork) return { baseSha: fork, label: `vs ${prBaseRef}` };
-    // The base branch isn't checked out locally — fall through rather than
-    // silently diffing against something else.
   }
+  if (opts.only) return null;
 
   if (defaultBranch && branch && branch !== defaultBranch) {
     const fork = await forkPointFrom(root, defaultBranch, repo.tip);
@@ -599,8 +604,9 @@ export async function getBranchDiffSummary(
   repo: RepoInfo,
   base: BaseInfo,
   prBaseRef?: string | null,
+  opts: { only?: boolean } = {},
 ): Promise<BranchDiffSummary | null> {
-  const info = await getBranchDiffBase(repo, base, prBaseRef);
+  const info = await getBranchDiffBase(repo, base, prBaseRef, opts);
   if (!info) return null;
 
   const count = await gitLine(repo.root, [

@@ -186,6 +186,12 @@ export interface GitHubData {
   unavailable: string | null;
   /** The fix is Connect GitHub, so the page links to the setup checklist */
   connect: boolean;
+  /**
+   * The branch the stack starts from, when the PR's base is another open
+   * PR's branch: the first base down the chain that no open PR has as its
+   * head. Null when the PR isn't stacked.
+   */
+  stackStart: string | null;
 }
 
 /** Headline numbers for the combined branch-vs-default diff. */
@@ -217,6 +223,11 @@ export interface SessionResponse {
   github: GitHubData;
   /** Null when there's nothing to diff (on the default branch tip, no base) */
   branchDiff: BranchDiffSummary | null;
+  /**
+   * The whole stack against `github.stackStart`. Null when there is no stack,
+   * or when the clone has no ref for the branch it starts from.
+   */
+  stackDiff: BranchDiffSummary | null;
 }
 
 export interface DiffResponse {
@@ -247,7 +258,7 @@ export interface FileViewResponse {
 export interface Note {
   id: string;
   /**
-   * The change it was left on: WORKING_REV, BRANCH_REV, or a commit's full
+   * The change it was left on: WORKING_REV, BRANCH_REV, STACK_REV, or a commit's full
    * sha. A commit's diff never moves, so a note on one stays exactly where it
    * was put.
    */
