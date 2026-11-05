@@ -18,8 +18,6 @@ import { Story } from "@/components/Story";
 import { Tabs } from "@/components/Tabs";
 import { draftNote } from "@/lib/feedback";
 import { findings as designQuestions } from "@/lib/findings";
-import type { DataResponse } from "@/lib/data/types";
-import type { MapResponse } from "@/lib/map";
 import { useFlows } from "@/components/useFlows";
 import { useNotes, type NotesApi } from "@/components/useNotes";
 import { useOutbox, type OutboxApi } from "@/components/useOutbox";
@@ -29,40 +27,17 @@ import { AlertIcon } from "@/components/icons";
 import { Inbox } from "@/components/Inbox";
 import { RepoBrowser } from "@/components/RepoBrowser";
 import { PrTitle } from "@/components/PrTitle";
-import { useStaleReload } from "@/components/useStaleReload";
-import { ViewProvider, type OpenView } from "@/components/ViewContext";
+import { ViewProvider } from "@/components/ViewContext";
 import { pushedState } from "@/lib/pushed";
 import { RepoBar } from "@/components/RepoBar";
-import {
-  BRANCH_REV,
-  INBOX_ROOTS_KEY,
-  STORAGE_KEY,
-  WORKING_REV,
-} from "@/lib/constants";
-import {
-  loadRecents,
-  removeFromList,
-  saveRecents,
-  touchList,
-  type RecentRepo,
-} from "@/lib/recents";
-import {
-  readUrlState,
-  resolveComment,
-  resolveRev,
-  resolveTab,
-  viewKey,
-  viewParams,
-  writeUrlState,
-  type Tab,
-} from "@/lib/url";
-import type {
-  ApiError,
-  CommitSummary,
-  DiffResponse,
-  Note,
-  SessionResponse,
-} from "@/lib/types";
+import { useInboxRepos } from "@/components/useInboxRepos";
+import { useRecents } from "@/components/useRecents";
+import { useSession } from "@/components/useSession";
+import { useUrlState } from "@/components/useUrlState";
+import { useViewData } from "@/components/useViewData";
+import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
+import { viewKey, type Tab } from "@/lib/url";
+import type { CommitSummary, Note } from "@/lib/types";
 
 const WORKING_COMMIT: CommitSummary = {
   sha: WORKING_REV,
@@ -75,28 +50,6 @@ const WORKING_COMMIT: CommitSummary = {
   url: null,
   isMerge: false,
 };
-
-class ApiFetchError extends Error {
-  constructor(
-    message: string,
-    readonly kind?: ApiError["kind"],
-  ) {
-    super(message);
-  }
-}
-
-async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url, { cache: "no-store" });
-  const data = await response.json();
-  if (!response.ok) {
-    const err = data as ApiError;
-    throw new ApiFetchError(
-      err.detail ? `${err.error} (${err.detail})` : err.error,
-      err.kind,
-    );
-  }
-  return data as T;
-}
 
 /**
  * The repo's notes, agent review and outbox, held only while a repo is open
@@ -122,501 +75,79 @@ function WithReview({
 }
 
 export default function Page() {
-  const [repoPath, setRepoPath] = useState("");
-  /** A branch to review instead of the worktree's own. Null = the checkout. */
-  const [ref, setRef] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
-  const checkBuild = useStaleReload();
-
-  const [session, setSession] = useState<SessionResponse | null>(null);
-  /**
-   * The repo and branch the session was loaded for. Every view request uses
-   * this rather than `repoPath` and `ref`, so a switch keeps showing the last
-   * view whole until the new session, and the rev it settles on, arrive
-   * together.
-   */
-  const [shown, setShown] = useState<OpenView>({ repo: "", ref: null });
-  const [sessionError, setSessionError] = useState<string | null>(null);
-  const [sessionLoading, setSessionLoading] = useState(false);
-
-  const [rev, setRev] = useState<string>(WORKING_REV);
-  const [diff, setDiff] = useState<DiffResponse | null>(null);
-  /** The view the diff on screen was read for: its `rev` alone doesn't name the branch. */
-  const [diffView, setDiffView] = useState<string | null>(null);
-  const [diffError, setDiffError] = useState<string | null>(null);
-  const [diffLoading, setDiffLoading] = useState(false);
+  const {
+    repo: repoPath,
+    ref,
+    rev,
+    tab,
+    comment: commentId,
+    setup,
+    ready,
+    setRev,
+    setTab,
+    setComment: setCommentId,
+    setSetup,
+    open,
+    toInbox,
+  } = useUrlState();
+  const recents = useRecents();
+  const inboxRepos = useInboxRepos();
+  const { touch: touchRecent, remove: removeRecent } = recents;
+  const rememberRoot = inboxRepos.remember;
+  // Every repo that loads earns a spot in the dropdown, with its branch as
+  // context, and in the inbox.
+  const onOpened = useCallback(
+    (root: string, branch: string | null) => {
+      touchRecent(root, branch);
+      rememberRoot(root);
+    },
+    [touchRecent, rememberRoot],
+  );
+  const openSession = useSession({
+    repo: repoPath,
+    ref,
+    ready,
+    setRev,
+    setComment: setCommentId,
+    onOpened,
+    onGone: removeRecent,
+  });
+  const { session, shown, ticks, reopen, pin } = openSession;
+  const view = useViewData({
+    repo: repoPath,
+    ready,
+    shown,
+    rev,
+    session,
+    ticks,
+  });
+  const {
+    viewId,
+    workingDiffKey,
+    diff,
+    diffLoading,
+    diffError,
+    diffIsCurrent,
+    map,
+    data: dataModel,
+  } = view;
 
   const [focusedThreadId, setFocusedThreadId] = useState<string | null>(null);
-  /** Set when a URL asked for a rev that isn't in the unpushed list. */
-  const [revNotice, setRevNotice] = useState<string | null>(null);
   const [browsing, setBrowsing] = useState(false);
-  /** `?setup=1`: the inbox shows the setup checklist whatever else it holds */
-  const [setup, setSetup] = useState(false);
-  /** Previously-opened repos for the RepoBar dropdown. */
-  const [recents, setRecents] = useState<RecentRepo[]>([]);
 
-  /** The focused review thread, outlined in Comments. */
-  const [commentId, setCommentId] = useState<string | null>(null);
   /** Focus asked for from outside Comments, which scrolls the thread into view. */
   const [focusAsk, setFocusAsk] = useState<{ id: string; at: number } | null>(
     null,
   );
-  const [tab, setTab] = useState<Tab>("story");
-  /** Bumped by watcher events; retriggers the working-tree diff fetch. */
-  const [workingTick, setWorkingTick] = useState(0);
-  /**
-   * Bumped when an agent starts or stops waiting for a review, or a sent
-   * round is queued, collected or withdrawn.
-   */
-  const [reviewTick, setReviewTick] = useState(0);
-  /** Bumped when a flow run finishes. */
-  const [flowsTick, setFlowsTick] = useState(0);
+  // A `?comment=` link asks for its thread once the URL is read. Comments
+  // scrolls on each new ask, and a render can't read the clock, so this one
+  // is at 0.
+  const [urlRead, setUrlRead] = useState(false);
+  if (ready && !urlRead) {
+    setUrlRead(true);
+    if (commentId) setFocusAsk({ id: commentId, at: 0 });
+  }
   const flowNavRef = useRef<((delta: number) => boolean) | null>(null);
-  /** Keeps the map with the view it was read for, as `dataRead` does the data model. */
-  const [mapRead, setMapRead] = useState<{
-    view: string;
-    map: MapResponse;
-  } | null>(null);
-  /** Bumped when a model or data model draft is written, so both are read again */
-  const [modelTick, setModelTick] = useState(0);
-  const onModelChange = useCallback(() => setModelTick((t) => t + 1), []);
-  /**
-   * Keeps the data with the view it was read for, and shows none while
-   * another view's read is on the way, so the story never offers a paid
-   * Read again for one view beside the data model of another.
-   */
-  const [dataRead, setDataRead] = useState<{
-    view: string;
-    data: DataResponse;
-  } | null>(null);
-  const viewId = viewKey({ ...shown, rev });
-  const map = mapRead?.view === viewId ? mapRead.map : null;
-  const dataModel = dataRead?.view === viewId ? dataRead.data : null;
-  const revRef = useRef(rev);
-  const repoRef = useRef(repoPath);
-  const refRef = useRef(ref);
-  /** Discards out-of-order session responses from overlapping refreshes. */
-  const sessionSeq = useRef(0);
-  /**
-   * The repo a foreground load opened and hasn't yet marked as looked at.
-   * Whichever load of it shows first marks it, because the watch stream's
-   * background load often supersedes the one that opened the branch.
-   */
-  const lookPending = useRef<string | null>(null);
-  /**
-   * Shas typed or pasted into the commit picker rather than chosen from the
-   * list. The session only carries the branch's recent commits, so without
-   * remembering these the next background refresh would decide the rev didn't
-   * exist and bounce you off it.
-   */
-  const pickedRevs = useRef<string[]>([]);
-  /**
-   * Set when another repo or branch is opened, so its session starts the view
-   * afresh. A commit picked on the last branch isn't this one's, and looking
-   * it up here would claim it's already on GitHub.
-   */
-  const reopened = useRef(false);
-  useEffect(() => {
-    repoRef.current = repoPath;
-  }, [repoPath]);
-  useEffect(() => {
-    refRef.current = ref;
-  }, [ref]);
-
-  // A bare `/` is the inbox. It used to reopen whatever you last had open,
-  // which now hides the home screen behind a checkout you may be done with —
-  // the key is still written, so the inbox can mark where you were, but it is
-  // no longer an instruction to skip past it. A URL with `repo` still opens
-  // exactly the view it describes.
-  useEffect(() => {
-    const fromUrl = readUrlState();
-    const path = fromUrl.repo ?? "";
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL is only readable after mount
-    setRepoPath(path);
-    setRef(fromUrl.ref ?? null);
-    setSetup(Boolean(fromUrl.setup));
-    if (fromUrl.rev) setRev(fromUrl.rev);
-    setTab(resolveTab(fromUrl));
-    if (fromUrl.comment) {
-      setCommentId(fromUrl.comment);
-      setFocusAsk({ id: fromUrl.comment, at: Date.now() });
-    }
-    if (fromUrl.repo) window.localStorage.setItem(STORAGE_KEY, fromUrl.repo);
-    setRecents(loadRecents());
-    setReady(true);
-  }, []);
-
-  // Every repo that loads successfully earns a spot in the dropdown, with
-  // its branch as context; keyed on root+branch so background session
-  // refreshes don't rewrite storage every few seconds.
-  const sessionRoot = session?.repo.root;
-  const sessionBranch = session?.repo.branch;
-  useEffect(() => {
-    if (!sessionRoot) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- recents live in localStorage, kept in step with the session
-    setRecents((current) => {
-      const next = touchList(
-        current,
-        { path: sessionRoot, branch: sessionBranch ?? null },
-        Date.now(),
-      );
-      saveRecents(next);
-      return next;
-    });
-  }, [sessionRoot, sessionBranch]);
-
-  /**
-   * Which repos the inbox scans.
-   *
-   * Not `recents` directly: that holds *worktree* paths capped at twelve, so
-   * with twenty worktrees it fills up with one repo and quietly evicts the
-   * other. The inbox reports the canonical root of everything it finds, and
-   * those get written back here — twelve volatile worktree paths converge to
-   * two stable repo roots after one load.
-   */
-  const [inboxRoots, setInboxRoots] = useState<string[]>([]);
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(INBOX_ROOTS_KEY);
-      const stored = raw ? (JSON.parse(raw) as unknown) : null;
-      const known = Array.isArray(stored)
-        ? stored.filter((v): v is string => typeof v === "string")
-        : [];
-      const seeds = loadRecents().map((r) => r.path);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage is only readable after mount
-      setInboxRoots([...new Set([...known, ...seeds])]);
-    } catch {
-      setInboxRoots(loadRecents().map((r) => r.path));
-    }
-  }, []);
-
-  const rememberRoot = useCallback((root: string) => {
-    setInboxRoots((current) => {
-      if (current.includes(root)) return current;
-      const next = [...current, root];
-      try {
-        window.localStorage.setItem(INBOX_ROOTS_KEY, JSON.stringify(next));
-      } catch {
-        // Storage full or blocked — the inbox just rescans from recents.
-      }
-      return next;
-    });
-  }, []);
-
-  const forgetRoot = useCallback((roots: string[]) => {
-    const drop = new Set(roots);
-    setInboxRoots((current) => {
-      const next = current.filter((r) => !drop.has(r));
-      try {
-        window.localStorage.setItem(INBOX_ROOTS_KEY, JSON.stringify(next));
-      } catch {
-        // As above.
-      }
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- inbox roots live in localStorage, kept in step with the session
-    if (sessionRoot) rememberRoot(sessionRoot);
-  }, [sessionRoot, rememberRoot]);
-
-  const removeRecent = useCallback((path: string) => {
-    setRecents((current) => {
-      const next = removeFromList(current, path);
-      saveRecents(next);
-      return next;
-    });
-  }, []);
-
-  // Keep the address bar in step with what's on screen. Entering or leaving a
-  // workspace is a real navigation and gets a history entry; moving between
-  // comments and commits inside one replaces, so Back doesn't have to walk
-  // back through every keystroke.
-  const wasInWorkspace = useRef(false);
-  useEffect(() => {
-    if (!ready) return;
-    const inWorkspace = Boolean(repoPath);
-    writeUrlState(
-      {
-        repo: repoPath || null,
-        ref,
-        rev,
-        comment: commentId,
-        tab: inWorkspace ? tab : undefined,
-        setup: setup && !inWorkspace,
-      },
-      { push: inWorkspace !== wasInWorkspace.current },
-    );
-    wasInWorkspace.current = inWorkspace;
-  }, [ready, repoPath, ref, rev, commentId, tab, setup]);
-
-  // Someone navigating with the back/forward buttons, or editing the URL by
-  // hand, should land on the view they asked for.
-  useEffect(() => {
-    const onPopState = () => {
-      const fromUrl = readUrlState();
-      setRepoPath(fromUrl.repo ?? "");
-      setRef(fromUrl.ref ?? null);
-      setRev(fromUrl.rev ?? WORKING_REV);
-      setCommentId(fromUrl.comment);
-      setTab(resolveTab(fromUrl));
-      setSetup(Boolean(fromUrl.setup));
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
-
-  const loadSession = useCallback(
-    async (
-      path: string,
-      opts: { background?: boolean; fresh?: boolean } = {},
-    ) => {
-      if (!path) {
-        setSession(null);
-        setSessionError(null);
-        return;
-      }
-
-      const seq = ++sessionSeq.current;
-      const ref = refRef.current;
-      // Background refreshes (watcher, focus) skip the loading state — a
-      // spinner flashing on every keystroke-burst would be worse than the
-      // staleness it replaces.
-      if (!opts.background) {
-        lookPending.current = path;
-        setSessionLoading(true);
-        setSessionError(null);
-      }
-      try {
-        const data = await getJson<SessionResponse>(
-          `/api/session?repo=${encodeURIComponent(path)}` +
-            (ref ? `&ref=${encodeURIComponent(ref)}` : "") +
-            (opts.fresh ? "&fresh=1" : ""),
-        );
-        if (seq !== sessionSeq.current) return; // superseded by a newer fetch
-        setSession(data);
-        setShown((current) =>
-          current.repo === path && current.ref === ref
-            ? current
-            : { repo: path, ref },
-        );
-        setSessionError(null);
-        const shownTip = data.commits[0]?.sha ?? data.history[0]?.sha;
-        if (lookPending.current === path && data.repo.branch && shownTip) {
-          lookPending.current = null;
-          void fetch(
-            `/api/looked?repo=${encodeURIComponent(path)}&ref=${encodeURIComponent(data.repo.branch)}&tip=${shownTip}`,
-            { method: "POST" },
-          ).catch(() => {
-            // The inbox shows the branch as changed a while longer, nothing worse.
-          });
-        }
-
-        setCommentId((current) => resolveComment(current, data.github.threads));
-
-        const fresh = reopened.current;
-        reopened.current = false;
-        if (fresh) pickedRevs.current = [];
-        setRev((current) => {
-          // History counts: a URL can point at an already-pushed commit and
-          // that's a perfectly good thing to view.
-          const { rev: next, notice } = resolveRev(
-            fresh ? WORKING_REV : current,
-            [...data.commits, ...data.history],
-            data.working.hasChanges,
-            data.branchDiff !== null,
-            pickedRevs.current,
-          );
-          setRevNotice(notice);
-          return next;
-        });
-      } catch (err) {
-        if (seq !== sessionSeq.current) return;
-        // A background failure keeps the last good view — the repo may just
-        // be mid-rebase or briefly locked; the next event will retry.
-        if (!opts.background) {
-          setSession(null);
-          setSessionError(err instanceof Error ? err.message : String(err));
-          // A recent that no longer resolves is a deleted worktree — prune
-          // it so the dropdown doesn't accumulate dead entries.
-          if (
-            err instanceof ApiFetchError &&
-            (err.kind === "missing-path" || err.kind === "not-a-repo")
-          ) {
-            setRecents((current) => {
-              const next = removeFromList(current, path);
-              saveRecents(next);
-              return next;
-            });
-          }
-        }
-      } finally {
-        if (seq === sessionSeq.current && !opts.background) {
-          setSessionLoading(false);
-        }
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (!ready) return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetches when its key changes
-    void loadSession(repoPath);
-    // `ref` matters as much as the path: two branches of one stack are
-    // reviewed from the same worktree, so switching between them changes
-    // nothing else.
-  }, [ready, repoPath, ref, loadSession]);
-
-  // Start reading main's data model and map as a repo opens, while a pull
-  // request is still being chosen. The server starts each unless the repo is
-  // turned off or main has a model of that kind already.
-  useEffect(() => {
-    if (!ready || !repoPath) return;
-    const trunk = `repo=${encodeURIComponent(repoPath)}&trunk=1`;
-    for (const api of ["data", "map"])
-      void fetch(`/api/${api}?${trunk}`, { method: "POST" }).catch(() => {});
-  }, [ready, repoPath]);
-
-  // Catch up on focus, the Cmd-Tab-into-the-window moment, on anything that
-  // changed while the window was in the background.
-  useEffect(() => {
-    if (!ready) return;
-
-    const catchUp = async () => {
-      if (await checkBuild()) return;
-      setWorkingTick((t) => t + 1);
-      setReviewTick((t) => t + 1);
-      setModelTick((t) => t + 1);
-      void loadSession(repoRef.current, { background: true });
-    };
-
-    window.addEventListener("focus", catchUp);
-    return () => window.removeEventListener("focus", catchUp);
-  }, [ready, loadSession, checkBuild]);
-
-  // Live updates: one SSE stream per repo. The server watches the repo's
-  // filesystem and pushes a debounced event when git state or the working
-  // tree changes; the window refetches instead of the user hitting reload.
-  useEffect(() => {
-    if (!ready || !repoPath) return;
-
-    const source = new EventSource(
-      `/api/watch?repo=${encodeURIComponent(repoPath)}`,
-    );
-
-    source.onopen = () => {
-      void checkBuild();
-      // Reconnects (server restarted, laptop woke) mean missed events —
-      // catch up once, bypassing the GitHub cache since time has passed.
-      setWorkingTick((t) => t + 1);
-      setReviewTick((t) => t + 1);
-      void loadSession(repoPath, { background: true, fresh: true });
-    };
-
-    source.onmessage = (event) => {
-      let kinds: string[] = [];
-      try {
-        const parsed = JSON.parse(event.data) as { kinds?: string[] };
-        if (parsed.kinds) kinds = parsed.kinds;
-      } catch {
-        return;
-      }
-      if (kinds.length === 0) return;
-
-      const agentKinds = ["review", "outbox"];
-      if (kinds.some((kind) => agentKinds.includes(kind)))
-        setReviewTick((t) => t + 1);
-      if (kinds.includes("flows")) setFlowsTick((t) => t + 1);
-      // A review request, a queued round or a finished flow run changes
-      // nothing on disk.
-      if (kinds.every((kind) => kind === "flows" || agentKinds.includes(kind)))
-        return;
-
-      setWorkingTick((t) => t + 1);
-      void loadSession(repoPath, {
-        background: true,
-        // refs/remotes moved — a push or fetch landed, so GitHub's view
-        // really may have changed; everything else is local-only.
-        fresh: kinds.includes("remote"),
-      });
-    };
-
-    return () => source.close();
-  }, [ready, repoPath, loadSession, checkBuild]);
-
-  const haveSession = session !== null;
-  // A commit's diff is immutable, so watcher ticks only matter for the two
-  // views that move — uncommitted work, and the branch diff (its tip end
-  // advances with every commit); pinning the key otherwise keeps background
-  // session refreshes from refetching a diff that cannot have changed. A
-  // branch opened by ref keys on its base and tip instead: saves in the
-  // checkout fire watcher ticks, but can't move another branch.
-  const branchEnds = shown.ref
-    ? `${session?.base.sha}..${session?.commits[0]?.sha}`
-    : workingTick;
-  const workingDiffKey =
-    rev === WORKING_REV || rev === BRANCH_REV ? branchEnds : -1;
-
-  useEffect(() => {
-    revRef.current = rev;
-    if (!shown.repo || !haveSession) return;
-
-    let cancelled = false;
-    // Watcher-driven refetches of the working diff keep the old content on
-    // screen until the new one arrives; only a rev switch shows the loader.
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- shows the loader, then fetches the new rev
-    setDiffLoading(true);
-    setDiffError(null);
-
-    getJson<DiffResponse>(
-      `/api/diff?${viewParams({ repo: shown.repo, ref: shown.ref, rev })}`,
-    )
-      .then((data) => {
-        if (cancelled) return;
-        setDiff(data);
-        setDiffView(viewId);
-      })
-      .catch((err: unknown) => {
-        if (cancelled) return;
-        setDiff(null);
-        setDiffError(err instanceof Error ? err.message : String(err));
-      })
-      .finally(() => {
-        if (!cancelled) setDiffLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [shown, rev, viewId, haveSession, workingDiffKey]);
-
-  // The map follows the diff: a commit's never changes; the branch's moves
-  // with its tip, and uncommitted work's with each save. The data model reads
-  // files at a commit, so uncommitted work has none.
-  useEffect(() => {
-    if (!shown.repo || !haveSession) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clears the map where there is none, else fetches it
-      setMapRead(null);
-      setDataRead(null);
-      return;
-    }
-    let cancelled = false;
-    const query = viewParams({ repo: shown.repo, ref: shown.ref, rev });
-    getJson<MapResponse>(`/api/map?${query}`)
-      .then((data) => !cancelled && setMapRead({ view: viewId, map: data }))
-      .catch(() => !cancelled && setMapRead(null));
-    if (rev === WORKING_REV) setDataRead(null);
-    else
-      getJson<DataResponse>(`/api/data?${query}`)
-        .then((data) => !cancelled && setDataRead({ view: viewId, data }))
-        .catch(() => !cancelled && setDataRead(null));
-    return () => {
-      cancelled = true;
-    };
-  }, [shown, rev, viewId, haveSession, workingDiffKey, modelTick]);
 
   const commitForRev = useMemo((): CommitSummary | null => {
     if (rev === WORKING_REV) return WORKING_COMMIT;
@@ -672,7 +203,7 @@ export default function Page() {
     session ? shown.repo : "",
     shown.ref,
     rev,
-    `${flowsTick}:${workingDiffKey}`,
+    `${ticks.flows}:${workingDiffKey}`,
   );
   const flowSet = flows.status?.status === "ready" ? flows.status.flows : null;
 
@@ -702,15 +233,18 @@ export default function Page() {
     setFilesFilter(null);
   }
 
-  const showInFiles = useCallback((row: FlowRow) => {
-    setFilesJump({
-      path: row.step.file,
-      side: row.side,
-      line: row.step.line,
-      at: Date.now(),
-    });
-    setTab("files");
-  }, []);
+  const showInFiles = useCallback(
+    (row: FlowRow) => {
+      setFilesJump({
+        path: row.step.file,
+        side: row.side,
+        line: row.step.line,
+        at: Date.now(),
+      });
+      setTab("files");
+    },
+    [setTab],
+  );
 
   const clearFilesJump = useCallback(() => setFilesJump(null), []);
 
@@ -721,30 +255,35 @@ export default function Page() {
     [],
   );
 
-  const openFile = useCallback((path: string) => {
-    setFilesJump({ path, at: Date.now() });
-    setTab("files");
-  }, []);
+  const openFile = useCallback(
+    (path: string) => {
+      setFilesJump({ path, at: Date.now() });
+      setTab("files");
+    },
+    [setTab],
+  );
 
-  const openStep = useCallback((step: Omit<StoryTarget, "at">) => {
-    setStoryTarget({ flow: step.flow, row: step.row, at: Date.now() });
-    setTab("story");
-  }, []);
+  const openStep = useCallback(
+    (step: Omit<StoryTarget, "at">) => {
+      setStoryTarget({ flow: step.flow, row: step.row, at: Date.now() });
+      setTab("story");
+    },
+    [setTab],
+  );
 
-  const showOnMap = useCallback((name: string) => {
-    setMapHighlight({ name, at: Date.now() });
-    setTab("story");
-  }, []);
+  const showOnMap = useCallback(
+    (name: string) => {
+      setMapHighlight({ name, at: Date.now() });
+      setTab("story");
+    },
+    [setTab],
+  );
 
   const showYourself = useCallback(() => {
     setFilesFilter({ filter: "yourself", at: Date.now() });
     setTab("files");
     window.scrollTo({ top: 0 });
-  }, []);
-
-  // The last view's diff stays on screen while this one's loads; this view's
-  // flows must wait for it, or they're matched against the old diff's files.
-  const diffIsCurrent = diff !== null && diffView === viewId;
+  }, [setTab]);
 
   /** Notes on the change's shape, pinned on the data cards and under flow titles. */
   const questions = useMemo(
@@ -847,57 +386,34 @@ export default function Page() {
   );
 
   /** Focusing a comment opens Comments on it, and leaves the change alone. */
-  const selectComment = useCallback((id: string) => {
-    setCommentId(id);
-    setFocusedThreadId(id);
-    setFocusAsk({ id, at: Date.now() });
-    setTab("comments");
-  }, []);
+  const selectComment = useCallback(
+    (id: string) => {
+      setCommentId(id);
+      setFocusedThreadId(id);
+      setFocusAsk({ id, at: Date.now() });
+      setTab("comments");
+    },
+    [setCommentId, setTab],
+  );
 
-  /** Back to the home screen. Clearing the repo is what the inbox *is*. */
-  const backToInbox = useCallback(() => {
-    setRepoPath("");
-    setRef(null);
-    setSession(null);
-    setSessionError(null);
-    setCommentId(null);
-    setRev(WORKING_REV);
-    setTab("story");
-  }, []);
-
-  /**
-   * Open a checkout, optionally reviewing a branch other than the one it has
-   * checked out. The ref is always set, never left alone: typing a new path
-   * with a stale branch still applied would review something that isn't
-   * there.
-   */
-  const selectRepo = useCallback((path: string, branch?: string | null) => {
-    const trimmed = path.trim();
-    window.localStorage.setItem(STORAGE_KEY, trimmed);
-    if (trimmed !== repoRef.current || (branch ?? null) !== refRef.current)
-      reopened.current = true;
-    setRef(branch ?? null);
-    setRepoPath(trimmed);
-    setSetup(false);
-    setTab("story");
-  }, []);
+  /** Open a checkout, optionally on a branch other than the one it has checked out. */
+  const selectRepo = useCallback(
+    (path: string, branch?: string | null) => {
+      const trimmed = path.trim();
+      if (trimmed !== repoPath || (branch ?? null) !== ref) reopen();
+      open(trimmed, branch ?? null);
+    },
+    [repoPath, ref, reopen, open],
+  );
 
   /** A change picked above the tabs: it opens on Story, as every view does. */
   const pickRev = useCallback(
     (next: string) => {
-      // Remember anything that isn't in the offered list, so a pasted sha
-      // survives the next refresh.
-      if (
-        session &&
-        !session.commits.some((c) => c.sha === next) &&
-        !session.history.some((c) => c.sha === next)
-      ) {
-        pickedRevs.current = [...new Set([...pickedRevs.current, next])];
-      }
+      pin(next);
       setRev(next);
       setTab("story");
     },
-    [session],
+    [pin, setRev, setTab],
   );
 
   // The change on screen as a note records it: a commit by its full sha,
@@ -926,7 +442,7 @@ export default function Page() {
         });
       setTab("files");
     },
-    [noteRev, pickRev, shown],
+    [noteRev, pickRev, shown, setTab],
   );
 
   // j/k move through a list the way they would in a TUI, the open tab's:
@@ -987,7 +503,7 @@ export default function Page() {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session, rev, threads, commentId, selectComment, tab]);
+  }, [session, rev, threads, commentId, selectComment, tab, setRev]);
 
   return (
     <ClaudeCodeGate>
@@ -997,28 +513,28 @@ export default function Page() {
             repoPath={repoPath}
             onRepoPathChange={selectRepo}
             session={session}
-            loading={sessionLoading || diffLoading}
-            onRefresh={() => void loadSession(repoPath, { fresh: true })}
-            recents={recents}
+            loading={openSession.loading || diffLoading}
+            onRefresh={() => openSession.reload(true)}
+            recents={recents.list}
             onRemoveRecent={removeRecent}
-            onBackToInbox={backToInbox}
+            onBackToInbox={toInbox}
           />
         )}
 
         {!repoPath ? (
           <>
             <Inbox
-              roots={inboxRoots}
+              roots={inboxRepos.repos}
               onOpen={selectRepo}
               onAdd={rememberRoot}
               onBrowse={() => setBrowsing(true)}
-              onForget={forgetRoot}
+              onForget={inboxRepos.forget}
               setupAsked={setup}
               onSetupDone={() => setSetup(false)}
             />
             {browsing && (
               <RepoBrowser
-                currentRepo={inboxRoots[0] ?? null}
+                currentRepo={inboxRepos.repos[0] ?? null}
                 onPick={(path) => {
                   setBrowsing(false);
                   selectRepo(path);
@@ -1027,11 +543,11 @@ export default function Page() {
               />
             )}
           </>
-        ) : sessionError ? (
+        ) : openSession.error ? (
           <div className="mx-auto max-w-3xl p-6">
             <div className="flex items-start gap-2 rounded-md border border-[var(--danger)] bg-[var(--canvas)] p-4 text-[13px]">
               <AlertIcon className="mt-0.5 shrink-0 text-[var(--danger)]" />
-              <span>{sessionError}</span>
+              <span>{openSession.error}</span>
             </div>
           </div>
         ) : session ? (
@@ -1041,20 +557,20 @@ export default function Page() {
                 <div className="mx-auto w-full max-w-[1280px] space-y-3 p-4 pt-3">
                   {session.github.pr && <PrTitle pr={session.github.pr} />}
 
-                  {revNotice && (
+                  {openSession.revNotice && (
                     <p className="flex items-start gap-2 rounded-md border border-[var(--attention)] bg-[var(--canvas)] px-3 py-2 text-[12px]">
                       <AlertIcon
                         size={13}
                         className="mt-0.5 shrink-0 text-[var(--attention)]"
                       />
                       <span className="flex-1">
-                        <span className="mono">{revNotice}</span> isn&apos;t
-                        waiting to be pushed any more — it may already be on
-                        GitHub. Showing the latest instead.
+                        <span className="mono">{openSession.revNotice}</span>{" "}
+                        isn&apos;t waiting to be pushed any more — it may
+                        already be on GitHub. Showing the latest instead.
                       </span>
                       <button
                         type="button"
-                        onClick={() => setRevNotice(null)}
+                        onClick={openSession.dismissNotice}
                         className="shrink-0 text-[var(--fg-muted)] hover:text-[var(--fg)]"
                       >
                         Dismiss
@@ -1075,11 +591,13 @@ export default function Page() {
                   <Tabs
                     tab={tab}
                     onTab={setTab}
-                    fileCount={diffIsCurrent ? diff.files.length : null}
+                    fileCount={
+                      diffIsCurrent ? (diff?.files.length ?? null) : null
+                    }
                     threads={threads}
                   />
 
-                  <WithReview root={session.repo.root} tick={reviewTick}>
+                  <WithReview root={session.repo.root} tick={ticks.review}>
                     {({ notes, review, outbox }) => (
                       <>
                         {visited.has("story") && (
@@ -1090,7 +608,7 @@ export default function Page() {
                               map={map}
                               data={dataModel}
                               entityNotes={entityNotes}
-                              onModelChange={onModelChange}
+                              onModelChange={openSession.bumpModel}
                               mapHighlight={mapHighlight}
                               onShowOnMap={showOnMap}
                               onOpenFile={openFile}
