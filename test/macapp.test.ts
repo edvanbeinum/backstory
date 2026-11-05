@@ -135,3 +135,20 @@ test("the Mac app asks this repo's latest release for updates, signed by a real 
     "SUPublicEDKey isn't an Ed25519 public key",
   );
 });
+
+test("the smoke signs its test feed with the Sparkle appcast.sh fetches", () => {
+  const version = readText("mac/appcast.sh").match(
+    /^sparkle_version=(\S+)$/m,
+  )?.[1];
+  assert.ok(version, "mac/appcast.sh has no sparkle_version= line");
+  const smoke = readText("mac/smoke.mjs");
+  const pinned = [...smoke.matchAll(/sparkle-(\d[\w.]*)/g)].map((m) => m[1]);
+  assert.deepEqual(
+    pinned.filter((v) => v !== version),
+    [],
+    "mac/smoke.mjs names a Sparkle version appcast.sh doesn't fetch",
+  );
+  assert.match(smoke, /"appcast\.sh"/);
+  assert.match(smoke, /\/\^sparkle_version=/);
+  assert.match(smoke, /`sparkle-\$\{sparkleVersion\}`/);
+});

@@ -202,10 +202,20 @@ async function owned() {
   }
 }
 
+// Read the Sparkle version from appcast.sh, which fetches the tools, so a bump
+// there can't leave the smoke looking in an old directory.
+const sparkleVersion = readFileSync(
+  path.join(here, "appcast.sh"),
+  "utf8",
+).match(/^sparkle_version=(\S+)$/m)?.[1];
+if (!sparkleVersion) {
+  console.error("mac:smoke: no sparkle_version= line in mac/appcast.sh");
+  process.exit(1);
+}
 const signUpdate = path.join(
   here,
   "build",
-  "sparkle-2.10.0",
+  `sparkle-${sparkleVersion}`,
   "bin",
   "sign_update",
 );
