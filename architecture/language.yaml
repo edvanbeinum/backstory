@@ -239,7 +239,7 @@ blocks:
       - app/api/watch/
       - components/useSession.ts
       - components/useStaleReload.ts
-    summary: Watches the worktree and git dir and pushes change events to the window over SSE.
+    summary: Watches the worktree and git dir and pushes change events to the window over SSE. In the window, `useSession` loads the open session, reloads it on each event and on focus, and settles the rev and comment from it.
     read: "`app/api/watch/route.ts` header"
   - name: UI tabs
     code:
