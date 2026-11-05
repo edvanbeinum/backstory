@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
@@ -27,9 +28,10 @@ import type { DataDraftStatus, DataModel, TrunkReadStatus } from "./types";
 /**
  * Drafted data models and the reads that make them.
  *
- * `~/.backstory/data/<repo>/` has one file per tree, `<tree>.json`: the model
- * at that tree, with `from`, the tree it was derived from, null for a read in
- * full. Keyed by tree, not commit: the model depends only on the files, so an
+ * `~/.backstory/data/<repo>/` has one file per tree and steer: `<tree>.json`
+ * under the default `data.files`, `<tree>.<steer hash>.json` for a read that
+ * `data.files` steered. Each is the model at that tree, with `from`, the tree
+ * it was derived from, null for a read in full. Keyed by tree, not commit: the model depends only on the files, so an
  * amended message, a clean reorder or a rebase that leaves a commit's files
  * as they were reads from the cache. A cache, safe to delete; after a prompt
  * change, delete it.
@@ -48,7 +50,9 @@ import type { DataDraftStatus, DataModel, TrunkReadStatus } from "./types";
  * read in full again only when the patch from main's model to a commit on
  * main is past the cap, which reads that commit in full and, when it is past
  * main's model, makes it main's model, or on Redraft. Redraft reads main in full again and removes every
- * derived model, since an error in main's model is copied into each of them.
+ * derived model of the view's steer, since an error in main's model is copied
+ * into each of them. A Redraft under a steer other than main's own leaves
+ * `trunk.json` where it was.
  *
  * Reads run one at a time, to keep within the user's usage limits: a full
  * read on a large repo is a few minutes. They start as a repo and a view
@@ -160,7 +164,20 @@ const tree = async (root: string, rev: string) => {
 
 const dataDir = async (root: string) =>
   path.join(homeDir(), "data", await repoKey(root));
-const modelPath = (dir: string, t: string) => path.join(dir, `${t}.json`);
+/**
+ * Names a steered read's file by a hash of its steer, so a branch that edits
+ * `data.files` saves beside main's model instead of overwriting it. The
+ * default steer keeps `<tree>.json`, so files saved before steers were part
+ * of the name are still found.
+ */
+const modelPath = (dir: string, t: string, files?: string[] | null) => {
+  if (!files) return path.join(dir, `${t}.json`);
+  const steer = createHash("sha1")
+    .update(JSON.stringify(files))
+    .digest("hex")
+    .slice(0, 8);
+  return path.join(dir, `${t}.${steer}.json`);
+};
 const trunkPath = (dir: string) => path.join(dir, "trunk.json");
 const trunkKey = (dir: string) => path.join(dir, "trunk");
 
@@ -191,12 +208,12 @@ const sameSteer = (a?: string[] | null, b?: string[] | null) =>
   JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /**
- * The saved model at a tree, unless it was read with other `data.files` than
- * the view has now. The key is the tree, and editing the local model's steer
- * doesn't change the tree.
+ * The saved model at a tree under this steer. Checks the file's own steer
+ * too, since a `<tree>.json` saved before steers were part of the name may
+ * come from a steered read.
  */
 async function savedModel(dir: string, t: string, files?: string[] | null) {
-  const model = await readJson<ModelFile>(modelPath(dir, t));
+  const model = await readJson<ModelFile>(modelPath(dir, t, files));
   return model && sameSteer(model.files, files) ? model : null;
 }
 
@@ -470,7 +487,7 @@ async function modelAt(
   }
   c.costUsd += model.costUsd;
   c.made.set(at.tree, model);
-  if (!c.fresh) await writeJson(modelPath(c.dir, at.tree), model);
+  if (!c.fresh) await writeJson(modelPath(c.dir, at.tree, c.files), model);
   return model;
 }
 
@@ -514,8 +531,13 @@ async function readView(
     const model = await modelAt(c, { tree: t, rev: main }, null, {
       full: PHASES.main,
     });
-    moved = { tree: t, commit: main, files: c.files };
-    trunk = { pointer: moved, model };
+    const pointer = { tree: t, commit: main, files: c.files };
+    // Move main's pointer only under main's own steer: a branch that edits
+    // `data.files` would otherwise take it, and main's next view would read
+    // its base in full.
+    if (sameSteer((await mainSteer(c.root, main)).files, c.files))
+      moved = pointer;
+    trunk = { pointer, model };
   } else if (!c.fresh) {
     // A Redraft with no main to read again reads the base in full, rather
     // than from the old main's model it is meant to replace.
@@ -559,18 +581,21 @@ async function readView(
 }
 
 /**
- * Saves a redraft once every read in it succeeded: removes the repo's derived
- * models, which may have copied an error from the old main, then writes the
- * new ones.
+ * Saves a redraft once every read in it succeeded: removes the derived models
+ * of its steer, which may have copied an error from the old main, then writes
+ * the new ones. Other steers' derived models start from models this read
+ * didn't replace.
  */
 async function saveRedraft(c: Chain, trunk: Trunk | null) {
   for (const name of await fs.readdir(c.dir).catch(() => [])) {
-    const t = /^([0-9a-f]+)\.json$/.exec(name)?.[1];
+    const t = /^([0-9a-f]+)(\.[0-9a-f]+)?\.json$/.exec(name)?.[1];
     if (!t || c.made.has(t)) continue;
     const file = await readJson<ModelFile>(path.join(c.dir, name));
-    if (file?.from) await fs.rm(path.join(c.dir, name), { force: true });
+    if (file?.from && sameSteer(file.files, c.files))
+      await fs.rm(path.join(c.dir, name), { force: true });
   }
-  for (const [t, model] of c.made) await writeJson(modelPath(c.dir, t), model);
+  for (const [t, model] of c.made)
+    await writeJson(modelPath(c.dir, t, c.files), model);
   if (trunk) await writeJson(trunkPath(c.dir), trunk);
 }
 

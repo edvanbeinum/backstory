@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   existsSync,
   mkdirSync,
@@ -962,10 +963,18 @@ async function dataFolder(root: string) {
   return path.join(homeDir(), "data", await repoKey(root));
 }
 
-const readModelFile = async (root: string, tree: string) =>
+const modelName = (tree: string, files?: string[]) =>
+  files
+    ? `${tree}.${createHash("sha1").update(JSON.stringify(files)).digest("hex").slice(0, 8)}.json`
+    : `${tree}.json`;
+
+const readModelFile = async (root: string, tree: string, files?: string[]) =>
   JSON.parse(
-    readFileSync(path.join(await dataFolder(root), `${tree}.json`), "utf8"),
-  ) as { from?: string | null; readAt: number };
+    readFileSync(
+      path.join(await dataFolder(root), modelName(tree, files)),
+      "utf8",
+    ),
+  ) as { from?: string | null; readAt: number; files?: string[] | null };
 
 const readTrunk = async (root: string) =>
   JSON.parse(
@@ -1395,6 +1404,13 @@ test("data.files tells the drafted read where the model is, and a changed steer 
       (await buildData(repo.root, repo.base, repo.head)).source,
       "drafted",
     );
+
+    // Both steers' models are saved side by side, so changing back reads nothing.
+    steer("lib/**/*.ts");
+    assert.equal(
+      (await buildData(repo.root, repo.base, repo.head)).source,
+      "drafted",
+    );
   } finally {
     rmSync(file);
   }
@@ -1517,6 +1533,117 @@ test("once main's data.files changes, a base on main with the new steer moves ma
   } finally {
     rmSync(file);
   }
+});
+
+test("a branch that changes data.files reads main's tree under its own steer, and main's view reads nothing of main again", async () => {
+  const repo = mainRepo();
+  const main = recorder();
+  await readMain(repo.root, main.runner);
+  assert.deepEqual(main.calls, ["head"]);
+  const mainTree = repo.tree(repo.main);
+  const { readAt } = await readModelFile(repo.root, mainTree);
+
+  const files = ["lib/**/*.ts"];
+  const steered = repo.on(["id", "body", "rev"]);
+  const ai = recorder();
+  await read({ root: repo.root, base: repo.main, head: steered, files }, ai);
+  assert.deepEqual(ai.calls, ["head", "delta"]);
+
+  repo.git("checkout", "-q", "-b", "plain", repo.main);
+  const plain = repo.on(["id", "body", "colour"]);
+  const next = recorder();
+  await read({ root: repo.root, base: repo.main, head: plain }, next);
+  assert.deepEqual(next.calls, ["delta"]);
+
+  const own = await readModelFile(repo.root, mainTree);
+  assert.equal(own.files, null);
+  assert.equal(own.readAt, readAt);
+  assert.deepEqual(
+    (await readModelFile(repo.root, mainTree, files)).files,
+    files,
+  );
+  assert.deepEqual(await readTrunk(repo.root), {
+    tree: mainTree,
+    commit: repo.main,
+    files: null,
+  });
+});
+
+test("Read the data model again on a branch that changes data.files leaves main's model on main's steer", async () => {
+  const repo = mainRepo();
+  await readMain(repo.root, recorder().runner);
+  const mainTree = repo.tree(repo.main);
+
+  repo.git("checkout", "-q", "-b", "plain", repo.main);
+  const plain = repo.on(["id", "body", "colour"]);
+  const plainView = { root: repo.root, base: repo.main, head: plain };
+  await read(plainView, recorder());
+
+  repo.git("checkout", "-q", "-b", "steered", repo.main);
+  const steered = repo.on(["id", "body", "rev"]);
+  const steeredView = {
+    root: repo.root,
+    base: repo.main,
+    head: steered,
+    files: ["lib/**/*.ts"],
+  };
+  await read(steeredView, recorder());
+
+  const redraft = recorder();
+  await read(steeredView, { runner: redraft.runner, redraft: true });
+  assert.deepEqual(redraft.calls, ["head", "delta"]);
+  assert.deepEqual(await readTrunk(repo.root), {
+    tree: mainTree,
+    commit: repo.main,
+    files: null,
+  });
+  assert.equal(
+    existsSync(
+      path.join(await dataFolder(repo.root), modelName(repo.tree(plain))),
+    ),
+    true,
+  );
+
+  const again = recorder();
+  await read(plainView, again);
+  assert.deepEqual(again.calls, []);
+  assert.equal((await dataStatus(plainView)).status, "done");
+});
+
+test("a data folder written before the change still finds its models", async () => {
+  const repo = mainRepo();
+  const dir = await dataFolder(repo.root);
+  const mainTree = repo.tree(repo.main);
+  const saved = {
+    ...noteHead,
+    files: null,
+    from: null,
+    provider: "claude",
+    model: "test-model",
+    costUsd: 1,
+    readAt: 1,
+  };
+  const trunk = { tree: mainTree, commit: repo.main, files: null };
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, `${mainTree}.json`), JSON.stringify(saved));
+  writeFileSync(path.join(dir, "trunk.json"), JSON.stringify(trunk));
+
+  const head = repo.on(["id", "body", "rev"]);
+  const ai = recorder();
+  await read({ root: repo.root, base: repo.main, head }, ai);
+  assert.deepEqual(ai.calls, ["delta"]);
+
+  // A steered read saved as `<tree>.json` is not taken for the default steer.
+  repo.git("checkout", "-q", "-b", "other", repo.main);
+  const other = repo.on(["id", "body", "colour"]);
+  writeFileSync(
+    path.join(dir, `${repo.tree(other)}.json`),
+    JSON.stringify({ ...saved, files: ["lib/**/*.ts"] }),
+  );
+  const next = recorder();
+  await read({ root: repo.root, base: repo.main, head: other }, next);
+  assert.deepEqual(next.calls, ["delta"]);
+  assert.deepEqual(await readTrunk(repo.root), trunk);
 });
 
 test("after main is rewritten, a base on main moves main's model", async () => {
