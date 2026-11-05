@@ -557,20 +557,16 @@ async function readView(
       { delta: PHASES.base, full: PHASES.baseInFull },
     );
     base = { tree: files.base, model };
-    // Move a pointer read with other `data.files` only for a view with main's
-    // own steer: a branch that edits the steer would otherwise take it over,
-    // and once main edits it, main's views must take it, or every base is read
-    // in full. Replace a commit main no longer reaches, as after a force-push,
-    // or main's model would never move again.
-    const pointer = trunk?.pointer ?? (await readJson<Trunk>(trunkPath(c.dir)));
-    const past = !pointer
-      ? true
-      : !trunk
-        ? !!main && sameSteer((await mainSteer(c.root, main)).files, c.files)
-        : trunk.pointer.commit !== view.base &&
-          ((await isOnBranch(c.root, trunk.pointer.commit, view.base)) ||
-            (!!main &&
-              !(await isOnBranch(c.root, trunk.pointer.commit, main))));
+    // Write a missing pointer, or move one read with other `data.files`, only
+    // for a view with main's own steer: a branch that edits the steer would
+    // otherwise take it over, and once main edits it, main's views must take
+    // it, or every base is read in full. Replace a commit main no longer
+    // reaches, as after a force-push, or main's model would never move again.
+    const past = !trunk
+      ? !!main && sameSteer((await mainSteer(c.root, main)).files, c.files)
+      : trunk.pointer.commit !== view.base &&
+        ((await isOnBranch(c.root, trunk.pointer.commit, view.base)) ||
+          (!!main && !(await isOnBranch(c.root, trunk.pointer.commit, main))));
     if (main && past && (await isOnBranch(c.root, view.base, main))) {
       moved = { tree: files.base, commit: view.base, files: c.files };
       if (!c.fresh) await writeJson(trunkPath(c.dir), moved);

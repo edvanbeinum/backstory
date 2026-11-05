@@ -1569,6 +1569,19 @@ test("a branch that changes data.files reads main's tree under its own steer, an
   });
 });
 
+test("before main is read, a branch that changes data.files writes no main's model", async () => {
+  const repo = mainRepo();
+  const steered = repo.on(["id", "body", "rev"]);
+  await read(
+    { root: repo.root, base: repo.main, head: steered, files: ["lib/**/*.ts"] },
+    recorder(),
+  );
+  assert.equal(
+    existsSync(path.join(await dataFolder(repo.root), "trunk.json")),
+    false,
+  );
+});
+
 test("Read the data model again on a branch that changes data.files leaves main's model on main's steer", async () => {
   const repo = mainRepo();
   await readMain(repo.root, recorder().runner);
