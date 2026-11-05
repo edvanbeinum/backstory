@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { crossSite, errorResponse } from "@/lib/api";
+import { STACK_REV } from "@/lib/constants";
 import { descriptionStatus, startDescription } from "@/lib/description/cache";
 import type { DescriptionResponse } from "@/lib/description/types";
 import { resolveRepo } from "@/lib/git";
@@ -59,12 +60,16 @@ export async function POST(request: Request) {
       );
     const repo = r.repo;
     const head = r.range.head;
+    // Give no PR to Whole stack: the top PR's title and body describe only
+    // its own part of the stack.
+    const wholeStack = r.searchParams.get("rev") === STACK_REV;
     return answer(
       await startDescription(
         { root: repo.root, ...r.range },
         {
           redraft: r.searchParams.get("redraft") === "1",
           pr: async () => {
+            if (wholeStack) return null;
             const { pr } = await loadGitHubDataCached(repo);
             if (!pr || !(await onBranchOnly(repo, head))) return null;
             return { title: pr.title, body: pr.body };
