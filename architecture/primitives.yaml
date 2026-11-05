@@ -196,6 +196,36 @@ primitives:
       - viewParams
       - viewKey
     use: "Builds and writes the page state into the URL, so a view can be shared. `viewParams` builds every view request's query, with `ref` when the repo is open on a branch it hasn't checked out, and `viewKey` names a view from that query for state kept with it."
+  - name: the view in the address bar
+    block: UI tabs
+    file: components/useUrlState.ts
+    symbols:
+      - useUrlState
+    use: "The page's repo, branch, rev, tab, comment and setup checklist, read from the URL once the page mounts (`ready` turns true then), written back as they change, and restored by Back and Forward. Opening a repo from the inbox and going back to it each add a history entry; everything else replaces. `open` opens a checkout on Story, and `toInbox` goes back to the inbox."
+  - name: the open session
+    block: UI tabs
+    file: components/useSession.ts
+    symbols:
+      - useSession
+    use: "Loads `/api/session` for the repo and branch in the address bar, drops an answer a newer load has overtaken, and settles the rev and comment through the setters it's given. Keeps it current through the watch stream and a catch-up on focus, and counts each kind of change in `ticks` (working, review, flows, model) for the reads that follow them. `shown` is the repo and branch the session was loaded for, which every view request uses. `reopen` starts the next load's view afresh, and `pin` keeps a pasted sha across refreshes."
+  - name: recent repos
+    block: UI tabs
+    file: components/useRecents.ts
+    symbols:
+      - useRecents
+    use: "The RepoBar dropdown's recent repos, read from localStorage on mount; `touch` and `remove` write the list back."
+  - name: the inbox's repos
+    block: UI tabs
+    file: components/useInboxRepos.ts
+    symbols:
+      - useInboxRepos
+    use: "The repos the inbox scans, by each repo's canonical root, read from localStorage on mount and seeded from the recent repos; `remember` and `forget` write the list back."
+  - name: a view's data
+    block: UI tabs
+    file: components/useViewData.ts
+    symbols:
+      - useViewData
+    use: "A view's diff, map and data model, each kept with the view it was read for, so `diffIsCurrent`, `map` and `data` never pair one view's answer with another. `workingDiffKey` says when a view's diff can have moved, which its flows follow too. Posts main's map and data model reads as a repo opens."
   - name: the open view
     block: UI tabs
     file: components/ViewContext.tsx

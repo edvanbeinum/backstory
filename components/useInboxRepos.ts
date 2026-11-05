@@ -16,7 +16,7 @@ function save(repos: string[]) {
 /**
  * The repos the inbox scans, kept in localStorage.
  *
- * Not the recents list: that holds *worktree* paths capped at twelve, so with
+ * Not the recents list: that has *worktree* paths capped at twelve, so with
  * twenty worktrees it fills up with one repo and quietly evicts the other. The
  * inbox reports the canonical root of everything it finds, and those get
  * written back here, so twelve volatile worktree paths converge to two stable

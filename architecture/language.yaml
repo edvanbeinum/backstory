@@ -237,6 +237,7 @@ blocks:
   - name: live updates
     code:
       - app/api/watch/
+      - components/useSession.ts
       - components/useStaleReload.ts
     summary: Watches the worktree and git dir and pushes change events to the window over SSE.
     read: "`app/api/watch/route.ts` header"
