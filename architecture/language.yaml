@@ -23,7 +23,7 @@ terms:
     avoid:
       - lane, for the data
   - name: view
-    means: 'The two commits being compared: one commit and its first parent, or "All changes" from the fork point to the reviewed branch''s tip, HEAD unless the URL has `ref` (`lib/view.ts`). Uncommitted work is the working tree against HEAD, drawn on HEAD''s map.'
+    means: 'The two commits being compared: one commit and its first parent, or "All changes" from the fork point to the reviewed branch''s tip, HEAD unless the URL has `ref` (`lib/view.ts`). On a stacked pull request, "All changes" reads "This PR", and "Whole stack" runs to the same tip from the fork point of the branch the stack starts from. Uncommitted work is the working tree against HEAD, drawn on HEAD''s map.'
     avoid:
       - view, for the Diff / Before / After switch
   - name: flow mode

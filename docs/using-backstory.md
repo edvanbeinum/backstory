@@ -68,6 +68,13 @@ is left as it is, and Fetch says so.
 **The workspace** is one branch. Its header picks the change: the whole branch,
 your uncommitted work, or any one commit on it. It opens on your uncommitted
 work when there is some, and on the whole branch otherwise.
+
+On a pull request whose base is another open pull request's branch, the whole
+branch's chip reads **This PR**: its own changes against the branch below it.
+**Whole stack** beside it shows everything the stack brings into the branch it
+starts from. When the clone doesn't have that branch, clicking Whole stack
+fetches it from origin first, then opens the view.
+
 Uncommitted work is drawn on the map from your last commit, so it shows which
 components the work touched, not which ones it added or removed. Under the header are three tabs,
 as on a pull request, and every change opens on the first:
@@ -301,7 +308,7 @@ opens it in Backstory. If you move the app, choose it again to fix the link.
 
 When an agent is making the change, you review what it made — uncommitted work,
 or the commits it made on its own if you let it run. Notes go on any change:
-in Files changed, hover a line of **Uncommitted**, **All changes**, or any one
+in Files changed, hover a line of **Uncommitted**, **All changes**, **Whole stack**, or any one
 commit, and press **+**. **+ Note for the agent**, at the top of Story, covers
 the work as a whole. In a note, `⌘↵` saves it and `Esc` cancels.
 

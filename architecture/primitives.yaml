@@ -30,7 +30,7 @@ primitives:
     file: lib/fetch.ts
     symbols:
       - fetchBranch
-    use: "The one place Backstory writes refs. Fetches a branch and its base from origin into remote-tracking refs, then creates the local branch, or moves it when it has nothing of its own. It never moves a branch a worktree has checked out, or one with commits origin doesn't have. A github.com https remote signs in with Connect GitHub's token first, then git's own credentials."
+    use: "The one place Backstory writes refs. Fetches a branch and its base from origin into remote-tracking refs, then creates the local branch, or moves it when it has nothing of its own. It never moves a branch a worktree has checked out, or one with commits origin doesn't have. A github.com https remote signs in with Connect GitHub's token first, then git's own credentials. Whole stack passes the branch the stack starts from as the base, which brings it in as a remote-tracking ref only."
   - name: a repo's key
     block: git reader
     file: lib/git.ts
@@ -45,7 +45,7 @@ primitives:
     symbols:
       - viewRange
       - onBranchOnly
-    use: "The same base and head that `/api/diff` diffs, so every view of a change agrees on its commits. All changes runs to `repo.tip`, so a branch opened with `ref` is read at its own tip, not the checkout's. `onBranchOnly` says whether a commit is one of the branch's own, past that base."
+    use: "The same base and head that `/api/diff` diffs, so every view of a change agrees on its commits. All changes runs to `repo.tip`, so a branch opened with `ref` is read at its own tip, not the checkout's. Whole stack runs to that tip from the fork point of the branch the stack starts from, and has no range when the clone doesn't have it. `onBranchOnly` says whether a commit is one of the branch's own, past that base."
   - name: patches
     block: git reader
     file: lib/git.ts
@@ -96,7 +96,7 @@ primitives:
     file: lib/github.ts
     symbols:
       - loadGitHubDataCached
-    use: A branch's PR, threads and reviews, cached, degrading to "unavailable" instead of throwing.
+    use: A branch's PR, threads and reviews, and on a stacked PR the branch its stack starts from (`stackStart`), cached, degrading to "unavailable" instead of throwing.
   - name: store
     block: store
     file: lib/store.ts

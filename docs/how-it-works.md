@@ -25,7 +25,9 @@ doesn't count until you update the branch.
 The counts are local git: commits, files and lines from where the branch left
 its base. The base is the branch its pull request targets, so a stacked branch
 counts only its own work, or the default branch when it has no pull request.
-Each uses `origin/<base>` when there is one, else the local branch.
+Each uses `origin/<base>` when there is one, else the local branch. In the
+workspace, **Whole stack** follows each open pull request's base down to the
+first branch no open pull request comes from, and diffs against that.
 
 Pull requests cost **one GitHub call per repository**, not per worktree: a
 single aliased GraphQL query asks for every branch at once. Three repos and
@@ -93,9 +95,11 @@ nothing for them by default.
 - The server binds to `127.0.0.1` — it runs git against whatever path you give
   it, so it should not be reachable from your network.
 - `git` and `gh` are always invoked with an argv array, never a shell string.
-- Backstory writes to a repo only when you open a branch from **On GitHub** or
-  press **Fetch**. It updates origin's remote-tracking refs for that branch and
-  its base, and creates or moves the local branch of the same name. It never
+- Backstory writes to a repo only when you open a branch from **On GitHub**,
+  press **Fetch**, or click **Whole stack** on a stack whose start the clone
+  doesn't have, which brings in the branch the stack starts from. It updates
+  origin's remote-tracking refs for that branch and its base, and creates or
+  moves the local branch of the same name. It never
   changes what a worktree has checked out, and never moves a branch that has
   commits origin doesn't have. A github.com https remote signs in with Connect
   GitHub's token, passed to that one `git fetch` in its environment, then with
