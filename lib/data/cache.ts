@@ -51,8 +51,8 @@ import type { DataDraftStatus, DataModel, TrunkReadStatus } from "./types";
  * main is past the cap, which reads that commit in full and, when it is past
  * main's model, makes it main's model, or on Redraft. Redraft reads main in
  * full again and removes every derived model of the view's steer, since an
- * error in main's model is copied into each of them. A Redraft under a steer other than main's own leaves
- * `trunk.json` where it was.
+ * error in main's model is copied into each of them. A Redraft under a steer
+ * other than main's own leaves `trunk.json` where it was.
  *
  * Reads run one at a time, to keep within the user's usage limits: a full
  * read on a large repo is a few minutes. They start as a repo and a view
@@ -588,7 +588,9 @@ async function readView(
 async function saveRedraft(c: Chain, trunk: Trunk | null) {
   for (const name of await fs.readdir(c.dir).catch(() => [])) {
     const t = /^([0-9a-f]+)(\.[0-9a-f]+)?\.json$/.exec(name)?.[1];
-    if (!t || c.made.has(t)) continue;
+    if (!t) continue;
+    if (c.made.has(t) && name === path.basename(modelPath(c.dir, t, c.files)))
+      continue;
     const file = await readJson<ModelFile>(path.join(c.dir, name));
     if (file?.from && sameSteer(file.files, c.files))
       await fs.rm(path.join(c.dir, name), { force: true });
