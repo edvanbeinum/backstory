@@ -426,6 +426,11 @@ test("a stack starts at the first base no open PR has as its head", () => {
   assert.equal(stackStartOf(ends("lone", "epic"), open), null);
 });
 
+test("a stack starts below every listed PR when the PR itself isn't listed", () => {
+  const open = [ends("stack-a", "main")];
+  assert.equal(stackStartOf(ends("stack-b", "stack-a"), open), "main");
+});
+
 test("two PRs targeting each other end with no stack rather than looping", () => {
   const open = [ends("x", "y"), ends("y", "x")];
   assert.equal(stackStartOf(open[0], open), null);

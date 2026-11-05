@@ -551,8 +551,9 @@ async function findStackStart(
  * Follows `pr`'s base down through the open PRs: while an open PR has the
  * base as its head, the base becomes that PR's base. Returns the first base
  * no open PR has as its head, or null when the PR's own base is one already,
- * which means it isn't stacked. Stops after as many steps as there are open
- * PRs, so two PRs targeting each other end with null instead of looping.
+ * which means it isn't stacked. Stops one step past the number of open PRs,
+ * which a chain through all of them needs when `pr` itself isn't listed, so
+ * two PRs targeting each other end with null instead of looping.
  */
 export function stackStartOf(
   pr: PullRequestEnds,
@@ -561,7 +562,7 @@ export function stackStartOf(
   const baseOf = new Map(openPrs.map((p) => [p.headRefName, p.baseRefName]));
   let start = pr.baseRefName;
   if (!baseOf.has(start)) return null;
-  for (let step = 0; step < openPrs.length; step++) {
+  for (let step = 0; step <= openPrs.length; step++) {
     const below = baseOf.get(start);
     if (below === undefined) return start;
     start = below;
