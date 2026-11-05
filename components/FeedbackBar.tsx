@@ -77,7 +77,8 @@ export function FeedbackBar({
   const orphaned = diff ? here.filter((n) => !fileForNote(files, n)) : [];
   const count = drafts.length;
 
-  const label = (rev: string) => changeLabel(rev, commits);
+  const label = (rev: string) =>
+    changeLabel(rev, commits, session.github.stackStart !== null);
 
   /**
    * The message, with every note placed against its own change. Uncommitted
@@ -401,9 +402,13 @@ function branchCommits(session: SessionResponse): NoteCommit[] {
     }));
 }
 
-function changeLabel(rev: string, commits: NoteCommit[]): string {
+function changeLabel(
+  rev: string,
+  commits: NoteCommit[],
+  stacked: boolean,
+): string {
   if (rev === WORKING_REV) return "Uncommitted";
-  if (rev === BRANCH_REV) return "All changes";
+  if (rev === BRANCH_REV) return stacked ? "This PR" : "All changes";
   if (rev === STACK_REV) return "Whole stack";
   return (
     rev.slice(0, 7) + (commits.some((c) => c.sha === rev) ? "" : " (gone)")

@@ -157,7 +157,7 @@ export default function Page() {
         ...WORKING_COMMIT,
         sha: BRANCH_REV,
         shortSha: BRANCH_REV,
-        subject: `All changes ${bd?.label ?? "vs base"}`,
+        subject: `${session?.github.stackStart ? "This PR" : "All changes"} ${bd?.label ?? "vs base"}`,
         body: "",
       };
     }
