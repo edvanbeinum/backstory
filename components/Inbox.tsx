@@ -512,8 +512,7 @@ function NoCheckouts({
       <FolderIcon size={28} className="mx-auto text-[var(--fg-subtle)]" />
       <h1 className="mt-3 text-[16px] font-semibold">No checkouts yet</h1>
       <p className="mt-1 text-[13px] text-[var(--fg-muted)]">
-        Point Backstory at a repo and it will list every worktree beside it,
-        with the branch each one holds.
+        Point Backstory at a repo and it will list every worktree and branch.
       </p>
 
       <div className="mt-5 flex items-center justify-center gap-2">
