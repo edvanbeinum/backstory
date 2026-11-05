@@ -42,7 +42,11 @@ and signs the DMG but says it isn't notarized.
 A release is a version tag. `.github/workflows/release.yml` runs on any `v*`
 tag on a macOS runner: `npm run verify`, `mac:build`, `mac:dmg` with the
 `backstory` notary profile, `mac:appcast`, `mac:smoke`, then a GitHub release
-marked latest with `Backstory-<version>.dmg` and `appcast.xml`. The app's
+marked latest with `Backstory-<version>.dmg`, a copy of it named
+`Backstory.dmg`, and `appcast.xml`.
+`https://github.com/edvanbeinum/backstory/releases/latest/download/Backstory.dmg`
+serves that copy, so the landing page and the README download the newest DMG
+from one address. The app's
 **Check for Updates…** reads
 `https://github.com/edvanbeinum/backstory/releases/latest/download/appcast.xml`,
 so each release offers itself to every installed copy. That address answers

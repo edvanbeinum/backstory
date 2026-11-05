@@ -136,6 +136,30 @@ test("the Mac app asks this repo's latest release for updates, signed by a real 
   );
 });
 
+test("the release publishes Backstory.dmg, and the page and README download it from the permanent address", () => {
+  const latest =
+    "https://github.com/edvanbeinum/backstory/releases/latest/download/Backstory.dmg";
+  const workflow = readText(".github/workflows/release.yml");
+  const publish = workflow.slice(workflow.indexOf("gh release create"));
+  assert.match(publish, /"mac\/build\/Backstory-\$version\.dmg"/);
+  assert.match(publish, /mac\/build\/Backstory\.dmg/);
+  assert.match(publish, /mac\/build\/appcast\.xml/);
+  assert.match(
+    workflow,
+    /cp "mac\/build\/Backstory-\$version\.dmg" mac\/build\/Backstory\.dmg/,
+  );
+
+  const page = readText("site/index.html");
+  const button = page.match(
+    /<a[^>]*href="([^"]*)"[^>]*>\s*Download Backstory BETA for Mac/,
+  )?.[1];
+  assert.equal(button, latest);
+
+  const readme = readText("README.md");
+  assert.ok(readme.includes(latest), "README.md doesn't link Backstory.dmg");
+  assert.doesNotMatch(readme, /Backstory-<version>\.dmg/);
+});
+
 test("the smoke signs its test feed with the Sparkle appcast.sh fetches", () => {
   const version = readText("mac/appcast.sh").match(
     /^sparkle_version=(\S+)$/m,
