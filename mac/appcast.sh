@@ -11,27 +11,19 @@ out=mac/build
 version="$(node -p 'require("./package.json").version')"
 dmg="$out/Backstory-$version.dmg"
 download="https://github.com/edvanbeinum/backstory/releases/download/v$version/"
-
-# Fetch Sparkle's tools from the zip its Swift package resolves to, checked
-# against the sum in Sparkle's own Package.swift, so they match the framework
-# in the app. To bump it, take `checksum` from Package.swift at the new tag.
-sparkle_version=2.10.1
-sparkle_sha256=4c2e48a3e50ebcc2c88a58a4c7264a1a99c3c31857ce754357afb9cdb323022a
-sparkle_zip="$out/Sparkle-$sparkle_version.zip"
-tools="$out/sparkle-$sparkle_version"
+# Use the Sparkle tools Xcode resolved for mac:build, so they're always the
+# version the app links: Package.resolved pins it and Xcode checks the zip's
+# checksum. The path is Xcode's package cache layout, which Apple doesn't
+# document, so an Xcode update could move it.
+tools="$out/DerivedData/SourcePackages/artifacts/sparkle/Sparkle"
 
 if [ ! -f "$dmg" ]; then
   echo "mac:appcast: no $dmg — run npm run mac:dmg first" >&2
   exit 1
 fi
 if [ ! -x "$tools/bin/generate_appcast" ]; then
-  curl -fsSL "https://github.com/sparkle-project/Sparkle/releases/download/$sparkle_version/Sparkle-for-Swift-Package-Manager.zip" \
-    -o "$sparkle_zip"
-  echo "$sparkle_sha256  $sparkle_zip" | shasum -a 256 -c --quiet
-  rm -rf "$tools"
-  mkdir -p "$tools"
-  unzip -q "$sparkle_zip" 'bin/*' -d "$tools"
-  rm "$sparkle_zip"
+  echo "mac:appcast: no $tools/bin/generate_appcast — run npm run mac:build first" >&2
+  exit 1
 fi
 
 key=()

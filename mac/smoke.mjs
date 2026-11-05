@@ -5,8 +5,8 @@
  * server keeps a note in its database, and the server goes when the app quits
  * or is killed. Update: Sparkle, given a local
  * appcast signed with the release key, offers a newer version and not its
- * own; run `npm run mac:appcast` first for `sign_update`, which takes the key
- * from SPARKLE_PRIVATE_KEY_FILE as `mac:appcast` does. Command: the
+ * own, signed by the `sign_update` Xcode resolved for `mac:build`, which takes
+ * the key from SPARKLE_PRIVATE_KEY_FILE as `mac:appcast` does. Command: the
  * `backstory` command in a copy of the bundle runs, and still runs once the
  * copy is replaced at the same path, as a Sparkle update does, both by its path
  * and through a link like the one in /usr/local/bin. Needs a login
@@ -202,25 +202,14 @@ async function owned() {
   }
 }
 
-// Read the Sparkle version from appcast.sh, which fetches the tools, so a bump
-// there can't leave the smoke looking in an old directory.
+// Use the Sparkle tools Xcode resolved for mac:build, as mac:appcast does.
 function findSignUpdate() {
-  const sparkleVersion = readFileSync(
-    path.join(here, "appcast.sh"),
-    "utf8",
-  ).match(/^sparkle_version=(\S+)$/m)?.[1];
-  if (!sparkleVersion) {
-    throw new Error("no sparkle_version= line in mac/appcast.sh");
-  }
   const signUpdate = path.join(
     here,
-    "build",
-    `sparkle-${sparkleVersion}`,
-    "bin",
-    "sign_update",
+    "build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update",
   );
   if (!existsSync(signUpdate)) {
-    throw new Error(`no ${signUpdate} — run npm run mac:appcast first`);
+    throw new Error(`no ${signUpdate} — run npm run mac:build first`);
   }
   return signUpdate;
 }

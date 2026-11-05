@@ -37,9 +37,7 @@ updates:
       actions:
         patterns: ["*"]
 
-  # Sparkle, resolved in the Xcode project's Package.resolved. A Sparkle bump
-  # also needs mac/appcast.sh's pin changed by hand; packaging/README.md says
-  # how.
+  # Sparkle, resolved in the Xcode project's Package.resolved.
   - package-ecosystem: swift
     directory: /mac/backstory
     schedule:

@@ -63,8 +63,6 @@ jobs:
         env:
           BACKSTORY_NOTARY_PROFILE: backstory
       - run: npm run mac:appcast
-      # Smoke after the appcast, whose step fetches the `sign_update` the
-      # update mode signs its test feed with.
       - run: npm run mac:smoke
 
       # Attach a copy of the DMG named Backstory.dmg, so that
