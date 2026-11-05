@@ -66,8 +66,6 @@ export function Inbox({
   const [data, setData] = useState<InboxResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** How many dead paths were dropped this load — said once, quietly. */
-  const [forgot, setForgot] = useState(0);
   const [adding, setAdding] = useState("");
   const [addError, setAddError] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
@@ -141,7 +139,6 @@ export function Inbox({
         // signature of git being broken, not of you deleting everything, and
         // forgetting the lot on that basis would be unrecoverable.
         if (result.unresolved.length > 0 && result.repos.length > 0) {
-          setForgot(result.unresolved.length);
           onForget(result.unresolved.map((entry) => entry.path));
         }
       } catch (err) {
@@ -247,13 +244,6 @@ export function Inbox({
                   ? "Nothing new since you last looked"
                   : `${changed} ${changed === 1 ? "branch" : "branches"} changed since you last looked`}
             </h1>
-
-            {forgot > 0 && (
-              <p className="mt-2 text-[12px] text-[var(--fg-subtle)]">
-                Forgot {forgot} {forgot === 1 ? "checkout" : "checkouts"} that
-                no longer {forgot === 1 ? "exists" : "exist"}.
-              </p>
-            )}
 
             {error && (
               <p className="mt-4 flex items-start gap-2 rounded-md border border-[var(--danger)] bg-[var(--canvas)] px-3 py-2 text-[13px]">
