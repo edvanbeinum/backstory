@@ -1646,6 +1646,35 @@ test("a data folder written before the change still finds its models", async () 
   assert.deepEqual(await readTrunk(repo.root), trunk);
 });
 
+test("a data folder written before the change still finds main's model when main sets data.files", async () => {
+  const repo = mainRepo();
+  const dir = await dataFolder(repo.root);
+  const mainTree = repo.tree(repo.main);
+  const files = ["lib/**/*.ts"];
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    path.join(dir, `${mainTree}.json`),
+    JSON.stringify({
+      ...noteHead,
+      files,
+      from: null,
+      provider: "claude",
+      model: "test-model",
+      costUsd: 1,
+      readAt: 1,
+    }),
+  );
+  writeFileSync(
+    path.join(dir, "trunk.json"),
+    JSON.stringify({ tree: mainTree, commit: repo.main, files }),
+  );
+
+  const head = repo.on(["id", "body", "rev"]);
+  const ai = recorder();
+  await read({ root: repo.root, base: repo.main, head, files }, ai);
+  assert.deepEqual(ai.calls, ["delta"]);
+});
+
 test("after main is rewritten, a base on main moves main's model", async () => {
   const repo = mainRepo();
   await readMain(repo.root, recorder().runner);

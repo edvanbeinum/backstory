@@ -208,12 +208,15 @@ const sameSteer = (a?: string[] | null, b?: string[] | null) =>
   JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
 
 /**
- * The saved model at a tree under this steer. Checks the file's own steer
- * too, since a `<tree>.json` saved before steers were part of the name may
- * come from a steered read.
+ * The saved model at a tree under this steer. Falls back to `<tree>.json` and
+ * checks the file's own steer, since a file saved before steers were part of
+ * the name may come from a steered read, and a repo whose main sets
+ * `data.files` would otherwise read main in full again.
  */
 async function savedModel(dir: string, t: string, files?: string[] | null) {
-  const model = await readJson<ModelFile>(modelPath(dir, t, files));
+  const model =
+    (await readJson<ModelFile>(modelPath(dir, t, files))) ??
+    (files ? await readJson<ModelFile>(modelPath(dir, t)) : null);
   return model && sameSteer(model.files, files) ? model : null;
 }
 
