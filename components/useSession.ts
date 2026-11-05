@@ -251,7 +251,9 @@ export function useSession({
           }
         }
       } finally {
-        if (mine === seq.current && !opts.background) setLoading(false);
+        // Clear loading after a background load too: the stream's catch-up on
+        // open often supersedes the foreground load that set it.
+        if (mine === seq.current) setLoading(false);
       }
     },
     [],

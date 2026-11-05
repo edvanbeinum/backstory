@@ -140,6 +140,23 @@ test("an answer that arrives after going back to the inbox is dropped", async ()
   assert.equal(calls.filter((c) => c.url.pathname === "/api/looked").length, 0);
 });
 
+test("loading ends when the stream's catch-up overtakes the load that opened the repo", async () => {
+  const held: Array<() => void> = [];
+  const { result } = await mount(
+    (call) =>
+      new Promise((resolve) => {
+        const repo = call.url.searchParams.get("repo")!;
+        held.push(() => resolve({ json: sessionFor(repo) }));
+      }),
+  );
+  assert.equal(result.current.loading, true);
+  await FakeEventSource.opened[0].open();
+  for (const answer of held) answer();
+  await settle();
+  assert.equal(result.current.loading, false);
+  assert.equal(result.current.session?.repo.root, "/repos/a");
+});
+
 test("opening a branch marks it looked at once, with its tip; a background refresh doesn't", async () => {
   const { calls } = await mount(() => ({ json: sessionFor("/repos/a") }));
   const looked = () => calls.filter((c) => c.url.pathname === "/api/looked");
