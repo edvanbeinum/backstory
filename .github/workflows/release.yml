@@ -67,9 +67,10 @@ jobs:
       # update mode signs its test feed with.
       - run: npm run mac:smoke
 
-      # Attach a copy of the DMG named Backstory.dmg, because
-      # releases/latest/download/ serves only a file whose name is the same in
-      # every release. The appcast keeps pointing Sparkle at the versioned DMG.
+      # Attach a copy of the DMG named Backstory.dmg, so that
+      # releases/latest/download/Backstory.dmg is one link that always
+      # downloads the newest release. The appcast keeps pointing Sparkle at the
+      # versioned DMG.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
