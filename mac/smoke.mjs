@@ -204,23 +204,28 @@ async function owned() {
 
 // Read the Sparkle version from appcast.sh, which fetches the tools, so a bump
 // there can't leave the smoke looking in an old directory.
-const sparkleVersion = readFileSync(
-  path.join(here, "appcast.sh"),
-  "utf8",
-).match(/^sparkle_version=(\S+)$/m)?.[1];
-if (!sparkleVersion) {
-  console.error("mac:smoke: no sparkle_version= line in mac/appcast.sh");
-  process.exit(1);
+function findSignUpdate() {
+  const sparkleVersion = readFileSync(
+    path.join(here, "appcast.sh"),
+    "utf8",
+  ).match(/^sparkle_version=(\S+)$/m)?.[1];
+  if (!sparkleVersion) {
+    throw new Error("no sparkle_version= line in mac/appcast.sh");
+  }
+  const signUpdate = path.join(
+    here,
+    "build",
+    `sparkle-${sparkleVersion}`,
+    "bin",
+    "sign_update",
+  );
+  if (!existsSync(signUpdate)) {
+    throw new Error(`no ${signUpdate} — run npm run mac:appcast first`);
+  }
+  return signUpdate;
 }
-const signUpdate = path.join(
-  here,
-  "build",
-  `sparkle-${sparkleVersion}`,
-  "bin",
-  "sign_update",
-);
 
-async function checkForUpdates(feed, advertised) {
+async function checkForUpdates(signUpdate, feed, advertised) {
   const dir = mkdtempSync(path.join(tmpdir(), "backstory-smoke-update-"));
   const archive = path.join(dir, `Backstory-${advertised}.dmg`);
   writeFileSync(archive, "not a real update");
@@ -279,9 +284,7 @@ async function checkForUpdates(feed, advertised) {
 }
 
 async function update() {
-  if (!existsSync(signUpdate)) {
-    throw new Error(`no ${signUpdate} — run npm run mac:appcast first`);
-  }
+  const signUpdate = findSignUpdate();
   const feed = { appcast: "" };
   const server = http.createServer((req, res) => {
     if (req.url === "/appcast.xml") {
@@ -295,11 +298,11 @@ async function update() {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   feed.base = `http://127.0.0.1:${server.address().port}`;
   try {
-    const newer = await checkForUpdates(feed, "99.0.0");
+    const newer = await checkForUpdates(signUpdate, feed, "99.0.0");
     if (!newer.includes("Backstory: update 99.0.0 available")) {
       throw new Error(`no update offered from 99.0.0; it logged:\n${newer}`);
     }
-    const same = await checkForUpdates(feed, version);
+    const same = await checkForUpdates(signUpdate, feed, version);
     if (!same.includes("Backstory: no update")) {
       throw new Error(`an update offered from ${version}; it logged:\n${same}`);
     }
