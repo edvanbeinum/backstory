@@ -35,15 +35,13 @@ import { pushedState } from "@/lib/pushed";
 import { RepoBar } from "@/components/RepoBar";
 import { useInboxRepos } from "@/components/useInboxRepos";
 import { useRecents } from "@/components/useRecents";
-import { BRANCH_REV, STORAGE_KEY, WORKING_REV } from "@/lib/constants";
+import { useUrlState } from "@/components/useUrlState";
+import { BRANCH_REV, WORKING_REV } from "@/lib/constants";
 import {
-  readUrlState,
   resolveComment,
   resolveRev,
-  resolveTab,
   viewKey,
   viewParams,
-  writeUrlState,
   type Tab,
 } from "@/lib/url";
 import type {
@@ -112,10 +110,20 @@ function WithReview({
 }
 
 export default function Page() {
-  const [repoPath, setRepoPath] = useState("");
-  /** A branch to review instead of the worktree's own. Null = the checkout. */
-  const [ref, setRef] = useState<string | null>(null);
-  const [ready, setReady] = useState(false);
+  const url = useUrlState();
+  const {
+    repo: repoPath,
+    ref,
+    rev,
+    tab,
+    comment: commentId,
+    setup,
+    ready,
+    setRev,
+    setTab,
+    setComment: setCommentId,
+    setSetup,
+  } = url;
   const checkBuild = useStaleReload();
 
   const [session, setSession] = useState<SessionResponse | null>(null);
@@ -129,7 +137,6 @@ export default function Page() {
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [sessionLoading, setSessionLoading] = useState(false);
 
-  const [rev, setRev] = useState<string>(WORKING_REV);
   const [diff, setDiff] = useState<DiffResponse | null>(null);
   /** The view the diff on screen was read for: its `rev` alone doesn't name the branch. */
   const [diffView, setDiffView] = useState<string | null>(null);
@@ -140,18 +147,21 @@ export default function Page() {
   /** Set when a URL asked for a rev that isn't in the unpushed list. */
   const [revNotice, setRevNotice] = useState<string | null>(null);
   const [browsing, setBrowsing] = useState(false);
-  /** `?setup=1`: the inbox shows the setup checklist whatever else it holds */
-  const [setup, setSetup] = useState(false);
   const recents = useRecents();
   const inboxRepos = useInboxRepos();
 
-  /** The focused review thread, outlined in Comments. */
-  const [commentId, setCommentId] = useState<string | null>(null);
   /** Focus asked for from outside Comments, which scrolls the thread into view. */
   const [focusAsk, setFocusAsk] = useState<{ id: string; at: number } | null>(
     null,
   );
-  const [tab, setTab] = useState<Tab>("story");
+  // A `?comment=` link asks for its thread once the URL is read. Comments
+  // scrolls on each new ask, and a render can't read the clock, so this one
+  // is at 0.
+  const [urlRead, setUrlRead] = useState(false);
+  if (ready && !urlRead) {
+    setUrlRead(true);
+    if (commentId) setFocusAsk({ id: commentId, at: 0 });
+  }
   /** Bumped by watcher events; retriggers the working-tree diff fetch. */
   const [workingTick, setWorkingTick] = useState(0);
   /**
@@ -182,7 +192,6 @@ export default function Page() {
   const viewId = viewKey({ ...shown, rev });
   const map = mapRead?.view === viewId ? mapRead.map : null;
   const dataModel = dataRead?.view === viewId ? dataRead.data : null;
-  const revRef = useRef(rev);
   const repoRef = useRef(repoPath);
   const refRef = useRef(ref);
   /** Discards out-of-order session responses from overlapping refreshes. */
@@ -213,29 +222,6 @@ export default function Page() {
     refRef.current = ref;
   }, [ref]);
 
-  // A bare `/` is the inbox. It used to reopen whatever you last had open,
-  // which now hides the home screen behind a checkout you may be done with —
-  // the key is still written, so the inbox can mark where you were, but it is
-  // no longer an instruction to skip past it. A URL with `repo` still opens
-  // exactly the view it describes.
-  useEffect(() => {
-    const fromUrl = readUrlState();
-    const path = fromUrl.repo ?? "";
-
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the URL is only readable after mount
-    setRepoPath(path);
-    setRef(fromUrl.ref ?? null);
-    setSetup(Boolean(fromUrl.setup));
-    if (fromUrl.rev) setRev(fromUrl.rev);
-    setTab(resolveTab(fromUrl));
-    if (fromUrl.comment) {
-      setCommentId(fromUrl.comment);
-      setFocusAsk({ id: fromUrl.comment, at: Date.now() });
-    }
-    if (fromUrl.repo) window.localStorage.setItem(STORAGE_KEY, fromUrl.repo);
-    setReady(true);
-  }, []);
-
   // Every repo that loads successfully earns a spot in the dropdown, with
   // its branch as context; keyed on root+branch so background session
   // refreshes don't rewrite storage every few seconds.
@@ -248,44 +234,6 @@ export default function Page() {
     touchRecent(sessionRoot, sessionBranch ?? null);
     rememberRoot(sessionRoot);
   }, [sessionRoot, sessionBranch, touchRecent, rememberRoot]);
-
-  // Keep the address bar in step with what's on screen. Entering or leaving a
-  // workspace is a real navigation and gets a history entry; moving between
-  // comments and commits inside one replaces, so Back doesn't have to walk
-  // back through every keystroke.
-  const wasInWorkspace = useRef(false);
-  useEffect(() => {
-    if (!ready) return;
-    const inWorkspace = Boolean(repoPath);
-    writeUrlState(
-      {
-        repo: repoPath || null,
-        ref,
-        rev,
-        comment: commentId,
-        tab: inWorkspace ? tab : undefined,
-        setup: setup && !inWorkspace,
-      },
-      { push: inWorkspace !== wasInWorkspace.current },
-    );
-    wasInWorkspace.current = inWorkspace;
-  }, [ready, repoPath, ref, rev, commentId, tab, setup]);
-
-  // Someone navigating with the back/forward buttons, or editing the URL by
-  // hand, should land on the view they asked for.
-  useEffect(() => {
-    const onPopState = () => {
-      const fromUrl = readUrlState();
-      setRepoPath(fromUrl.repo ?? "");
-      setRef(fromUrl.ref ?? null);
-      setRev(fromUrl.rev ?? WORKING_REV);
-      setCommentId(fromUrl.comment);
-      setTab(resolveTab(fromUrl));
-      setSetup(Boolean(fromUrl.setup));
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
 
   const loadSession = useCallback(
     async (
@@ -373,7 +321,7 @@ export default function Page() {
         }
       }
     },
-    [removeRecent],
+    [removeRecent, setRev, setCommentId],
   );
 
   useEffect(() => {
@@ -476,7 +424,6 @@ export default function Page() {
     rev === WORKING_REV || rev === BRANCH_REV ? branchEnds : -1;
 
   useEffect(() => {
-    revRef.current = rev;
     if (!shown.repo || !haveSession) return;
 
     let cancelled = false;
@@ -617,15 +564,18 @@ export default function Page() {
     setFilesFilter(null);
   }
 
-  const showInFiles = useCallback((row: FlowRow) => {
-    setFilesJump({
-      path: row.step.file,
-      side: row.side,
-      line: row.step.line,
-      at: Date.now(),
-    });
-    setTab("files");
-  }, []);
+  const showInFiles = useCallback(
+    (row: FlowRow) => {
+      setFilesJump({
+        path: row.step.file,
+        side: row.side,
+        line: row.step.line,
+        at: Date.now(),
+      });
+      setTab("files");
+    },
+    [setTab],
+  );
 
   const clearFilesJump = useCallback(() => setFilesJump(null), []);
 
@@ -636,26 +586,35 @@ export default function Page() {
     [],
   );
 
-  const openFile = useCallback((path: string) => {
-    setFilesJump({ path, at: Date.now() });
-    setTab("files");
-  }, []);
+  const openFile = useCallback(
+    (path: string) => {
+      setFilesJump({ path, at: Date.now() });
+      setTab("files");
+    },
+    [setTab],
+  );
 
-  const openStep = useCallback((step: Omit<StoryTarget, "at">) => {
-    setStoryTarget({ flow: step.flow, row: step.row, at: Date.now() });
-    setTab("story");
-  }, []);
+  const openStep = useCallback(
+    (step: Omit<StoryTarget, "at">) => {
+      setStoryTarget({ flow: step.flow, row: step.row, at: Date.now() });
+      setTab("story");
+    },
+    [setTab],
+  );
 
-  const showOnMap = useCallback((name: string) => {
-    setMapHighlight({ name, at: Date.now() });
-    setTab("story");
-  }, []);
+  const showOnMap = useCallback(
+    (name: string) => {
+      setMapHighlight({ name, at: Date.now() });
+      setTab("story");
+    },
+    [setTab],
+  );
 
   const showYourself = useCallback(() => {
     setFilesFilter({ filter: "yourself", at: Date.now() });
     setTab("files");
     window.scrollTo({ top: 0 });
-  }, []);
+  }, [setTab]);
 
   // The last view's diff stays on screen while this one's loads; this view's
   // flows must wait for it, or they're matched against the old diff's files.
@@ -762,40 +721,34 @@ export default function Page() {
   );
 
   /** Focusing a comment opens Comments on it, and leaves the change alone. */
-  const selectComment = useCallback((id: string) => {
-    setCommentId(id);
-    setFocusedThreadId(id);
-    setFocusAsk({ id, at: Date.now() });
-    setTab("comments");
-  }, []);
+  const selectComment = useCallback(
+    (id: string) => {
+      setCommentId(id);
+      setFocusedThreadId(id);
+      setFocusAsk({ id, at: Date.now() });
+      setTab("comments");
+    },
+    [setCommentId, setTab],
+  );
 
   /** Back to the home screen. Clearing the repo is what the inbox *is*. */
+  const { toInbox, open } = url;
   const backToInbox = useCallback(() => {
-    setRepoPath("");
-    setRef(null);
+    toInbox();
     setSession(null);
     setSessionError(null);
-    setCommentId(null);
-    setRev(WORKING_REV);
-    setTab("story");
-  }, []);
+  }, [toInbox]);
 
-  /**
-   * Open a checkout, optionally reviewing a branch other than the one it has
-   * checked out. The ref is always set, never left alone: typing a new path
-   * with a stale branch still applied would review something that isn't
-   * there.
-   */
-  const selectRepo = useCallback((path: string, branch?: string | null) => {
-    const trimmed = path.trim();
-    window.localStorage.setItem(STORAGE_KEY, trimmed);
-    if (trimmed !== repoRef.current || (branch ?? null) !== refRef.current)
-      reopened.current = true;
-    setRef(branch ?? null);
-    setRepoPath(trimmed);
-    setSetup(false);
-    setTab("story");
-  }, []);
+  /** Open a checkout, optionally on a branch other than the one it has checked out. */
+  const selectRepo = useCallback(
+    (path: string, branch?: string | null) => {
+      const trimmed = path.trim();
+      if (trimmed !== repoRef.current || (branch ?? null) !== refRef.current)
+        reopened.current = true;
+      open(trimmed, branch ?? null);
+    },
+    [open],
+  );
 
   /** A change picked above the tabs: it opens on Story, as every view does. */
   const pickRev = useCallback(
@@ -812,7 +765,7 @@ export default function Page() {
       setRev(next);
       setTab("story");
     },
-    [session],
+    [session, setRev, setTab],
   );
 
   // The change on screen as a note records it: a commit by its full sha,
@@ -841,7 +794,7 @@ export default function Page() {
         });
       setTab("files");
     },
-    [noteRev, pickRev, shown],
+    [noteRev, pickRev, shown, setTab],
   );
 
   // j/k move through a list the way they would in a TUI, the open tab's:
@@ -902,7 +855,7 @@ export default function Page() {
 
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [session, rev, threads, commentId, selectComment, tab]);
+  }, [session, rev, threads, commentId, selectComment, tab, setRev]);
 
   return (
     <ClaudeCodeGate>
