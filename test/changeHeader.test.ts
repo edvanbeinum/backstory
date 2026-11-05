@@ -117,6 +117,22 @@ test("Whole stack fetches the branch the stack starts from when the clone hasn't
   assert.deepEqual(header.picked, ["stack"]);
 });
 
+test("a fetch that doesn't bring in the stack's start leaves a later session's view alone", async () => {
+  standInFetch({
+    "/api/fetch": { json: { outcome: "unchanged", sha: "c".repeat(40) } },
+  });
+  const header = await mount(sessionFor({ stackStart: "epic" }));
+
+  await act(async () => header.chip("Whole stack")?.click());
+  await settle();
+  await header.rerenderWith(sessionFor({ stackStart: "epic" }));
+  await header.rerenderWith(
+    sessionFor({ stackStart: "epic", stackDiff: diffVs("vs epic") }),
+  );
+
+  assert.deepEqual(header.picked, []);
+});
+
 test("a fetch that fails shows git's message beside the chip and leaves the view as it was", async () => {
   standInFetch({
     "/api/fetch": {

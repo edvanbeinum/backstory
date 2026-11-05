@@ -109,14 +109,22 @@ export function ChangeHeader({
 }) {
   const options = useMemo(() => changesFor(thread, session), [thread, session]);
   const [fetching, setFetching] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  /** Set once the stack's start is fetched, so the view opens on it when the session has it */
-  const openStack = useRef(false);
+  const [fetchError, setFetchError] = useState<{
+    branch: string;
+    message: string;
+  } | null>(null);
+  /**
+   * The session a fetch of the stack's start finished on, so the view opens
+   * on the stack only once the session after it arrives for the same branch.
+   */
+  const openStack = useRef<SessionResponse | null>(null);
 
   useEffect(() => {
-    if (!openStack.current || !session.stackDiff) return;
-    openStack.current = false;
-    onRevChange(STACK_REV);
+    const from = openStack.current;
+    if (!from || session === from) return;
+    openStack.current = null;
+    if (session.stackDiff && session.repo.branch === from.repo.branch)
+      onRevChange(STACK_REV);
   }, [session, onRevChange]);
 
   const fetchStackStart = async () => {
@@ -129,10 +137,13 @@ export function ChangeHeader({
       // Fetches the branch with its stack's start as the base, which brings
       // in `origin/<start>` alongside whatever happens to the branch itself.
       await requestFetch(root, branch, stackStart);
-      openStack.current = true;
+      openStack.current = session;
       onFetched();
     } catch (err) {
-      setFetchError(err instanceof Error ? err.message : String(err));
+      setFetchError({
+        branch,
+        message: err instanceof Error ? err.message : String(err),
+      });
     } finally {
       setFetching(false);
     }
@@ -179,9 +190,9 @@ export function ChangeHeader({
             {option.label}
           </button>
         ))}
-        {fetchError && (
+        {fetchError?.branch === session.repo.branch && (
           <span className="text-[11px] text-[var(--fg-subtle)]">
-            {fetchError}
+            {fetchError.message}
           </span>
         )}
         {/* A commit picked from the dropdown isn't one of the offered
