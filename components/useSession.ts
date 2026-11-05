@@ -243,7 +243,6 @@ export function useSession({
           setSession(null);
           setError(err instanceof Error ? err.message : String(err));
           opened.current = null;
-          // A recent that no longer resolves is a deleted worktree.
           if (
             err instanceof ApiFetchError &&
             (err.kind === "missing-path" || err.kind === "not-a-repo")
