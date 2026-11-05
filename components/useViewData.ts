@@ -67,9 +67,12 @@ export function useViewData({
   // end advances with every commit); pinning the key otherwise keeps background
   // session refreshes from refetching a diff that cannot have changed. A
   // branch opened by ref keys on its base and tip instead: saves in the
-  // checkout fire watcher ticks, but can't move another branch.
+  // checkout fire watcher ticks, but can't move another branch. The stack
+  // view keys on its own fork point, which a fetch of its start can move.
+  const viewBase =
+    rev === STACK_REV ? session?.stackDiff?.baseSha : session?.base.sha;
   const branchEnds = shown.ref
-    ? `${session?.base.sha}..${session?.commits[0]?.sha}`
+    ? `${viewBase}..${session?.commits[0]?.sha}`
     : ticks.working;
   const workingDiffKey =
     rev === WORKING_REV || rev === BRANCH_REV || rev === STACK_REV
