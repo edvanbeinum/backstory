@@ -40,8 +40,8 @@ You need:
   `gh auth login`, the setup checklist shows GitHub as ready and Backstory
   reads through `gh`. On GitHub Enterprise, sign in with `gh`.
 
-1. Download `Backstory-<version>.dmg` from the
-   [latest release](https://github.com/edvanbeinum/backstory/releases/latest).
+1. Download
+   [Backstory.dmg](https://github.com/edvanbeinum/backstory/releases/latest/download/Backstory.dmg).
 2. Open the disk image and drag Backstory to Applications.
 3. Open Backstory. The inbox opens with **Set up Backstory**: a row each for
    git, Claude Code, GitHub and notes to your agent, with a button for anything

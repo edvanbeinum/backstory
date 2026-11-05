@@ -42,28 +42,33 @@ and signs the DMG but says it isn't notarized.
 A release is a version tag. `.github/workflows/release.yml` runs on any `v*`
 tag on a macOS runner: `npm run verify`, `mac:build`, `mac:dmg` with the
 `backstory` notary profile, `mac:appcast`, `mac:smoke`, then a GitHub release
-marked latest with `Backstory-<version>.dmg` and `appcast.xml`. The app's
+marked latest with `Backstory-<version>.dmg`, a copy of it named
+`Backstory.dmg`, and `appcast.xml`.
+`https://github.com/edvanbeinum/backstory/releases/latest/download/Backstory.dmg`
+serves that copy, so the landing page and the README download the newest DMG
+from one address. The app's
 **Check for Updates…** reads
 `https://github.com/edvanbeinum/backstory/releases/latest/download/appcast.xml`,
 so each release offers itself to every installed copy. That address answers
 only once the repository is public.
 
 `npm run mac:appcast` writes `mac/build/appcast.xml` for the DMG `mac:dmg`
-made, with one item signed by the Sparkle key. It fetches Sparkle's
-`generate_appcast` and `sign_update`, pinned in `mac/appcast.sh` to the
+made, with one item signed by the Sparkle key. It runs the `generate_appcast`
+Xcode resolved with the Sparkle package for `mac:build`, so it's always the
 version the app links, and takes the key from `SPARKLE_PRIVATE_KEY_FILE`, else
 the login keychain.
 
 Once:
 
 1. Make the Sparkle key pair with `generate_keys` from Sparkle's tools
-   (`mac/build/sparkle-2.10.0/bin/` after a `mac:appcast`). It keeps the
+   (`mac/build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/`
+   after a `mac:build`). It keeps the
    private key in the login keychain and prints the public key, which goes in
    `SUPublicEDKey` in `mac/backstory/Backstory/Info.plist`. A lost private key
    means installed copies can't take another update, so keep a copy:
 
    ```bash
-   mac/build/sparkle-2.10.0/bin/generate_keys -x sparkle-private-key
+   mac/build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/generate_keys -x sparkle-private-key
    ```
 
 2. Add these repository secrets on GitHub:
@@ -116,12 +121,6 @@ as soon as an advisory is published. Each pull request runs `check`, and
 `check` passes. A major update, or one that fails `check`, waits in the pull
 request list for a person. A merge changes nothing installed: updates reach the
 app at the next release.
-
-A Sparkle pull request needs one change by hand before it merges. On its
-branch, set `sparkle_version` and `sparkle_sha256` in `mac/appcast.sh` to the
-new version and the `checksum` in Sparkle's `Package.swift` at that tag, so the
-tools that sign the appcast match the framework the app links. The pull
-request is a major or minor update, so it waits for that change.
 
 The Node the app bundles is pinned in `mac/build.sh` with its checksum. To
 bump it, set `node_version` and take `node_sha256` from

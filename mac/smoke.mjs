@@ -5,8 +5,8 @@
  * server keeps a note in its database, and the server goes when the app quits
  * or is killed. Update: Sparkle, given a local
  * appcast signed with the release key, offers a newer version and not its
- * own; run `npm run mac:appcast` first for `sign_update`, which takes the key
- * from SPARKLE_PRIVATE_KEY_FILE as `mac:appcast` does. Command: the
+ * own, signed by the `sign_update` Xcode resolved for `mac:build`, which takes
+ * the key from SPARKLE_PRIVATE_KEY_FILE as `mac:appcast` does. Command: the
  * `backstory` command in a copy of the bundle runs, and still runs once the
  * copy is replaced at the same path, as a Sparkle update does, both by its path
  * and through a link like the one in /usr/local/bin. Needs a login
@@ -202,15 +202,19 @@ async function owned() {
   }
 }
 
-const signUpdate = path.join(
-  here,
-  "build",
-  "sparkle-2.10.0",
-  "bin",
-  "sign_update",
-);
+// Use the Sparkle tools Xcode resolved for mac:build, as mac:appcast does.
+function findSignUpdate() {
+  const signUpdate = path.join(
+    here,
+    "build/DerivedData/SourcePackages/artifacts/sparkle/Sparkle/bin/sign_update",
+  );
+  if (!existsSync(signUpdate)) {
+    throw new Error(`no ${signUpdate} — run npm run mac:build first`);
+  }
+  return signUpdate;
+}
 
-async function checkForUpdates(feed, advertised) {
+async function checkForUpdates(signUpdate, feed, advertised) {
   const dir = mkdtempSync(path.join(tmpdir(), "backstory-smoke-update-"));
   const archive = path.join(dir, `Backstory-${advertised}.dmg`);
   writeFileSync(archive, "not a real update");
@@ -269,9 +273,7 @@ async function checkForUpdates(feed, advertised) {
 }
 
 async function update() {
-  if (!existsSync(signUpdate)) {
-    throw new Error(`no ${signUpdate} — run npm run mac:appcast first`);
-  }
+  const signUpdate = findSignUpdate();
   const feed = { appcast: "" };
   const server = http.createServer((req, res) => {
     if (req.url === "/appcast.xml") {
@@ -285,11 +287,11 @@ async function update() {
   await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
   feed.base = `http://127.0.0.1:${server.address().port}`;
   try {
-    const newer = await checkForUpdates(feed, "99.0.0");
+    const newer = await checkForUpdates(signUpdate, feed, "99.0.0");
     if (!newer.includes("Backstory: update 99.0.0 available")) {
       throw new Error(`no update offered from 99.0.0; it logged:\n${newer}`);
     }
-    const same = await checkForUpdates(feed, version);
+    const same = await checkForUpdates(signUpdate, feed, version);
     if (!same.includes("Backstory: no update")) {
       throw new Error(`an update offered from ${version}; it logged:\n${same}`);
     }

@@ -63,14 +63,18 @@ jobs:
         env:
           BACKSTORY_NOTARY_PROFILE: backstory
       - run: npm run mac:appcast
-      # Smoke after the appcast, whose step fetches the `sign_update` the
-      # update mode signs its test feed with.
       - run: npm run mac:smoke
 
+      # Attach a copy of the DMG named Backstory.dmg, so that
+      # releases/latest/download/Backstory.dmg is one link that always
+      # downloads the newest release. The appcast keeps pointing Sparkle at the
+      # versioned DMG.
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           version="${GITHUB_REF_NAME#v}"
+          cp "mac/build/Backstory-$version.dmg" mac/build/Backstory.dmg
           gh release create "$GITHUB_REF_NAME" --notes-from-tag --latest \
-            "mac/build/Backstory-$version.dmg" mac/build/appcast.xml
+            "mac/build/Backstory-$version.dmg" mac/build/Backstory.dmg \
+            mac/build/appcast.xml

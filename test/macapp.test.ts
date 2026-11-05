@@ -135,3 +135,30 @@ test("the Mac app asks this repo's latest release for updates, signed by a real 
     "SUPublicEDKey isn't an Ed25519 public key",
   );
 });
+
+test("the release publishes Backstory.dmg, and the page and README download it from the permanent address", () => {
+  const latest =
+    "https://github.com/edvanbeinum/backstory/releases/latest/download/Backstory.dmg";
+  const workflow = readText(".github/workflows/release.yml");
+  const step = workflow.indexOf("name: Publish the release");
+  const create = workflow.indexOf("gh release create", step);
+  assert.ok(step >= 0 && create > step, "no gh release create in Publish");
+  assert.match(
+    workflow.slice(step, create),
+    /cp "mac\/build\/Backstory-\$version\.dmg" mac\/build\/Backstory\.dmg/,
+  );
+  const publish = workflow.slice(create);
+  assert.match(publish, /"mac\/build\/Backstory-\$version\.dmg"/);
+  assert.match(publish, /mac\/build\/Backstory\.dmg/);
+  assert.match(publish, /mac\/build\/appcast\.xml/);
+
+  const page = readText("site/index.html");
+  const button = page.match(
+    /<a[^>]*href="([^"]*)"[^>]*>\s*Download Backstory BETA for Mac/,
+  )?.[1];
+  assert.equal(button, latest);
+
+  const readme = readText("README.md");
+  assert.ok(readme.includes(latest), "README.md doesn't link Backstory.dmg");
+  assert.doesNotMatch(readme, /Backstory-<version>\.dmg/);
+});
