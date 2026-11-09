@@ -46,7 +46,7 @@ export function useFlows(
         // would put the old head's flows back beside the new diff.
         if (stale()) return null;
         // A failed request is an HTTP error; a failed run is a 200 whose
-        // status says so, and must reach the panel as one.
+        // status says so, and must reach `Flows` as one.
         if (!response.ok) {
           setError((data as { error: string }).error);
           return null;
