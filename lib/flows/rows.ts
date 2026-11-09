@@ -194,15 +194,15 @@ const words = (name: string) =>
   name.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z0-9]+|[^A-Za-z0-9]+/g) ?? [name];
 
 /**
- * Short lane names, as the approved mockup draws them: a CamelCase prefix
- * two participants share is dropped ("MovementProgressViewModel" beside
- * "MovementProgressView" reads "ViewModel" and "View"), unless that leaves two lanes
- * with one name. The full name stays in the chip's title.
+ * Shortens each participant's label by dropping a CamelCase prefix two
+ * participants share ("MovementProgressViewModel" beside
+ * "MovementProgressView" reads "ViewModel" and "View"), unless that leaves two
+ * participants with one name. The full name stays in the chip's title.
  */
 export function shortLabels(
-  lanes: { name: string; label: string }[],
+  participants: { name: string; label: string }[],
 ): Map<string, string> {
-  const split = lanes.map((l) => words(l.label));
+  const split = participants.map((p) => words(p.label));
   const short = split.map((w, i) => {
     let best = 0;
     for (let j = 0; j < split.length; j++) {
@@ -223,9 +223,9 @@ export function shortLabels(
   const seen = new Map<string, number>();
   for (const label of short) seen.set(label, (seen.get(label) ?? 0) + 1);
   return new Map(
-    lanes.map((l, i) => [
-      l.name,
-      (seen.get(short[i]) ?? 0) > 1 ? l.label : short[i],
+    participants.map((p, i) => [
+      p.name,
+      (seen.get(short[i]) ?? 0) > 1 ? p.label : short[i],
     ]),
   );
 }
