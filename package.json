@@ -30,7 +30,7 @@
     "demo:build": "node demo/build.mjs"
   },
   "dependencies": {
-    "next": "16.4.4",
+    "next": "16.4.6",
     "picomatch": "^4.0.7",
     "react": "19.3.1",
     "react-dom": "19.3.1",
@@ -46,7 +46,7 @@
     "@types/react-dom": "^19",
     "esbuild": "^0.28.2",
     "eslint": "^10.14.0",
-    "eslint-config-next": "16.4.4",
+    "eslint-config-next": "16.4.6",
     "eslint-config-prettier": "^10.1.8",
     "globals": "17.14.0",
     "happy-dom": "^21.0.4",
