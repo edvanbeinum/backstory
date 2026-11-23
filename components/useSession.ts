@@ -8,7 +8,7 @@ import { WORKING_REV } from "@/lib/constants";
 import type { ApiError, SessionResponse } from "@/lib/types";
 import { resolveComment, resolveRev } from "@/lib/url";
 
-export interface Ticks {
+interface Ticks {
   /** Bumped by watcher events; reads uncommitted work's diff again. */
   working: number;
   /**
