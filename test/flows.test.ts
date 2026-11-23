@@ -7,12 +7,7 @@ import { after, test } from "node:test";
 
 import type { Runner } from "../lib/ai/provider";
 import { generateFlows, traceHunk } from "../lib/flows/generate";
-import {
-  isAddedLine,
-  mapNewToOld,
-  mapOldToNew,
-  parseZeroContext,
-} from "../lib/flows/hunks";
+import { isAddedLine, mapNewToOld, parseZeroContext } from "../lib/flows/hunks";
 import {
   basePrompt,
   headPrompt,
@@ -33,7 +28,7 @@ const PATCH = `diff --git a/a.ts b/a.ts
 +ins2
 `;
 
-test("zero-context hunks map lines in both directions", () => {
+test("zero-context hunks map head lines to the base", () => {
   const hunks = parseZeroContext(PATCH);
   assert.equal(hunks.length, 2);
   assert.deepEqual(
@@ -43,20 +38,10 @@ test("zero-context hunks map lines in both directions", () => {
       [10, 0, 10, 2],
     ],
   );
-  // Before the first hunk: untouched.
-  assert.equal(mapOldToNew(hunks, "a.ts", 2), 2);
-  // Replaced lines have no counterpart.
-  assert.equal(mapOldToNew(hunks, "a.ts", 3), null);
-  assert.equal(mapOldToNew(hunks, "a.ts", 4), null);
-  // Between the hunks: one line shorter.
-  assert.equal(mapOldToNew(hunks, "a.ts", 5), 4);
-  // Line 10 is before the insertion point "after 10"; 11 is after it.
-  assert.equal(mapOldToNew(hunks, "a.ts", 10), 9);
-  assert.equal(mapOldToNew(hunks, "a.ts", 11), 12);
   assert.equal(mapNewToOld(hunks, "a.ts", 12), 11);
   assert.equal(mapNewToOld(hunks, "a.ts", 10), null);
   assert.equal(mapNewToOld(hunks, "a.ts", 4), 5);
-  assert.equal(mapOldToNew(hunks, "other.ts", 3), 3);
+  assert.equal(mapNewToOld(hunks, "other.ts", 3), 3);
   assert.ok(isAddedLine(hunks, "a.ts", 11));
   assert.ok(!isAddedLine(hunks, "a.ts", 12));
 });
