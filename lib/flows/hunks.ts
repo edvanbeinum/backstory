@@ -60,28 +60,9 @@ function stripPrefix(raw: string): string | null {
 }
 
 /**
- * A base line's number at the head, or null if the diff changed or deleted
- * it. With -U0, an old range of 0 lines is a pure insertion after `oldStart`.
+ * A head line's number at the base, or null if the diff added it. With -U0,
+ * a new range of 0 lines is a pure deletion after `newStart`.
  */
-export function mapOldToNew(
-  hunks: Pick<Hunk, "oldFile" | "oldStart" | "oldLines" | "newLines">[],
-  file: string,
-  line: number,
-): number | null {
-  let shift = 0;
-  for (const h of hunks) {
-    if (h.oldFile !== file) continue;
-    if (h.oldLines > 0) {
-      if (line >= h.oldStart && line < h.oldStart + h.oldLines) return null;
-      if (line >= h.oldStart + h.oldLines) shift += h.newLines - h.oldLines;
-    } else if (line > h.oldStart) {
-      shift += h.newLines;
-    }
-  }
-  return line + shift;
-}
-
-/** The reverse: a head line's number at the base, or null if it's new. */
 export function mapNewToOld(
   hunks: Pick<Hunk, "file" | "newStart" | "newLines" | "oldLines">[],
   file: string,
